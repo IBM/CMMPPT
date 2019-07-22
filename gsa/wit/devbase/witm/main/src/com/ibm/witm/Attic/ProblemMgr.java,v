@@ -1,0 +1,513 @@
+head	1.12;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.12
+date	2011.07.20.20.18.27;	author rjw;	state dead;
+branches;
+next	1.11;
+
+1.11
+date	2011.07.20.19.16.44;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.07.20.18.38.45;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.07.20.16.35.24;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.07.19.21.13.14;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.07.19.19.22.00;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.07.15.23.19.01;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.07.15.21.46.55;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.07.14.23.40.35;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.07.12.21.08.08;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.07.08.23.31.56;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.07.08.20.46.01;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.12
+log
+@ProblemMgr ==> ProblemManager
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File ProblemMgr.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import com.ibm.witj.Operation;
+import com.ibm.witj.Part;
+import com.ibm.witj.Problem;
+
+/*******************************************************************************
+ * "Problem Manager"<br>
+ * A ProblemMgr is associated with a WIT-J Problem and is responsible for
+ * maintaining WIT-M state information that's specific to the Problem.<br>
+ * 
+ * The factory method for creating instances of this class is
+ * ProblemMgr.newProblemMgr ().
+ *******************************************************************************
+ */
+public final class ProblemMgr
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The current ProblemMgr: The ProblemMgr for the current Problem that is to be
+ * used by various WIT-M methods, if any; otherwise null.
+ *******************************************************************************
+ */
+   private static ProblemMgr current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The Problem for this ProblemMgr.
+ *******************************************************************************
+ */
+   private final Problem myProblem;
+   
+/*******************************************************************************
+ * True, iff long names are to be used for Parts, Operations, and Demands.
+ *******************************************************************************
+ */
+   private boolean longNames = false;
+   
+/*******************************************************************************
+ * # of Parts created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nPartsCreated = 0;
+   
+/*******************************************************************************
+ * # of Operations created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nOpnsCreated = 0;
+   
+/*******************************************************************************
+ * # of Demands created by WIT-M in myProblem.
+ *******************************************************************************
+ */           @@SuppressWarnings("unused")
+   private int nDemandsCreated = 0;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   private ProblemMgr () 
+      {
+      myProblem = Problem.newInstance ();
+      
+      current   = this;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Computes and returns the name to be used used for a new Part, Operation, or
+ * Demand.
+ *******************************************************************************
+ */
+   private String makeName (
+         Item         theItem,
+         Property <?> theProp,
+         int          theCount)
+      {
+      String theName;
+      
+      theName = Integer.toString (theCount);
+      
+      if (longNames)
+         theName =
+            concatenation (
+               theProp.getName (),
+               ":",
+               theItem.getID (),
+               "#",
+               theName);
+      
+      return theName;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Creates and returns new Part
+ *******************************************************************************
+ */
+   Part newPart (
+         Item            theItem,
+         Property <Part> theProp,
+         Part.Category   thePartCat)
+      {
+      String thePartName;
+      Part   thePart;
+      
+      thePartName = makeName (theItem, theProp, nPartsCreated);
+      
+      thePart     = Part.newInstance (myProblem, thePartName, thePartCat);
+
+      nPartsCreated ++;
+      
+      theItem.setValue (theProp, thePart);
+      
+      return thePart;
+      }
+
+/*******************************************************************************
+ * Creates and returns new Operation
+ *******************************************************************************
+ */
+   Operation newOperation (Item theItem, Property <Operation> theProp)
+      {
+      String    theOpnName;
+      Operation theOpn;
+      
+      theOpnName = makeName (theItem, theProp, nOpnsCreated);
+      
+      theOpn     = Operation.newInstance (myProblem, theOpnName);
+
+      nOpnsCreated ++;
+      
+      theItem.setValue (theProp, theOpn);
+      
+      return theOpn;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Factory method: Constructs a new ProblemMgr.<br>
+ * Constructs a new WIT-J Problem that will be associated with this ProblemMgr.
+ * <br>
+ * The current ProblemMgr is set to the new ProbleMgr.
+ *
+ * @@return The new ProblemMgr
+ *******************************************************************************
+ */
+   public static ProblemMgr newProblemMgr ()
+      {
+      return new ProblemMgr ();
+      }
+  
+/*******************************************************************************
+ * Sets the current ProblemMgr.<br>
+ * Note: The current ProblemMgr should eventually be set to null, in order to
+ * allow the ProblemMgr and its Problem to be garbage collected.
+ * 
+ * @@param theProblemMgr The ProblemMgr which is to become current.
+ *        (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentProblemMgr (ProblemMgr theProblemMgr)
+      {
+      current = theProblemMgr;
+      }
+
+/*******************************************************************************
+ * @@return The current ProblemMgr, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static ProblemMgr getCurrentProblemMgr ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * @@return The current Problem, i.e., theProblem associated with the current
+ *         ProblemMgr, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static Problem getCurrentProblem ()
+      {
+      return
+         (current != null)?
+            current.myProblem:
+            null;
+      }
+
+/*******************************************************************************
+ * Sets the value of the longNames variable for the current ProblemMgr to a
+ * specified value; a ProblemMgr will use long names for Parts, Operations,
+ * and Demands, iff its longNames variable is true.
+ * 
+ * @@param theValue The value to which the longNames variable will be set.
+ * 
+ * @@throws IllegalStateException If the current ProblemMgr is null
+ *******************************************************************************
+ */
+   public static void setLongNames (boolean theValue)
+      {
+      reqCurProblemMgr ();
+      
+      current.longNames = theValue;
+      }
+
+/*******************************************************************************
+ * @@return True, iff the current ProblemMgr uses long names.
+ * 
+ * @@throws IllegalStateException If the current ProblemMgr is null
+ *******************************************************************************
+ */
+   public static boolean getLongNames ()
+      {
+      reqCurProblemMgr ();
+      
+      return current.longNames;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.11
+log
+@Revised String conventions
+@
+text
+@@
+
+
+1.10
+log
+@Some renaming.
+@
+text
+@d67 1
+a67 2
+ */
+              @@SuppressWarnings("unused")
+d105 1
+a105 1
+               ":",
+@
+
+
+1.9
+log
+@Minor revisions.
+@
+text
+@d225 1
+a225 1
+      requireCurProblemMgr ();
+d238 1
+a238 1
+      requireCurProblemMgr ();
+@
+
+
+1.8
+log
+@Embodiment ==> ModelInstance
+@
+text
+@d64 7
+@
+
+
+1.7
+log
+@Efficient String concatenation.
+@
+text
+@d175 2
+a176 1
+ * @@param theEmb The ProblemMgr which is to become current. (Null is allowed.)
+@
+
+
+1.6
+log
+@newOperation
+@
+text
+@d84 1
+a84 1
+   private String formName (
+d94 7
+a100 1
+         theName = theProp.getName () + ":" + theItem.getID () + ":" + theName;
+d121 1
+a121 1
+      thePartName = formName (theItem, theProp, nPartsCreated);
+d141 1
+a141 1
+      theOpnName = formName (theItem, theProp, nOpnsCreated);
+@
+
+
+1.5
+log
+@Long names.
+@
+text
+@d10 1
+d50 1
+a50 1
+   private boolean longNames;
+d56 7
+a62 1
+   private int nPartsCreated;
+d70 1
+a70 3
+      myProblem     = Problem.newInstance ();
+      longNames     = false;
+      nPartsCreated = 0;
+d72 1
+a72 1
+      current       = this;
+d76 1
+a76 1
+// Private Static Methods
+d78 20
+d115 1
+a115 1
+      thePartName = Integer.toString (nPartsCreated);
+d117 1
+a117 9
+      if (longNames)
+         thePartName =
+            theProp.getName ()
+          + ":"
+          + theItem.getID ()
+          + ":"
+          + thePartName;
+      
+      thePart = Part.newInstance (myProblem, thePartName, thePartCat);
+d126 20
+@
+
+
+1.4
+log
+@Signatures with argument names.
+@
+text
+@d8 3
+d46 6
+d64 1
+d71 4
+d79 1
+a79 1
+ * Records the occurrence of a Part being created by WIT-M in myProblem.
+d82 4
+a85 1
+   void recPartCreated ()
+d87 15
+d103 4
+a106 9
+      }
+
+/*******************************************************************************
+ * @@return # of Parts created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   int nPartsCreated ()
+      {
+      return nPartsCreated;
+d162 30
+@
+
+
+1.3
+log
+@ErrorTest for newPart.
+@
+text
+@d13 4
+a16 1
+ * maintaining WIT-M state information that's specific to the Problem.
+@
+
+
+1.2
+log
+@Item.newPart
+@
+text
+@d42 1
+a42 1
+ */           @@SuppressWarnings("unused")
+@
+
+
+1.1
+log
+@Class ProblemMgr.
+@
+text
+@d39 6
+d49 1
+a49 1
+   private ProblemMgr ()
+d51 2
+a52 1
+      myProblem = Problem.newInstance ();
+d54 1
+a54 1
+      current   = this;
+d58 22
+@
+

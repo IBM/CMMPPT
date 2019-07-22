@@ -1,0 +1,195 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2004.11.08.23.23.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.14.11.48;	author grzes;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Fixed up to recognize and test for records with duplicate keys.
+@
+text
+@#ifndef ECCcapacityFile_h
+#define ECCcapacityFile_h
+
+#include "scoFile.h"
+
+
+class ECCcapacityFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(capacity);
+  getIntFieldH(period);
+  getFloatFieldH(supply);
+  
+  // preferred constructor
+  ECCcapacityFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("mtm");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(3);
+    commentRecords(true);
+
+    // don't normally call initialize here, but doing this for eastman
+    // to make sure duplicate records are found.
+    initialize();  
+  };
+  
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & capacity,
+    int period) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = capacity+uniqueString()+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ECCcapacityFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ECCcapacityFile file("../data/example1/capacity.csv");
+
+    // Test reading first record
+    assert( file.capacity(0) == "EctonaTowCapacity" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.supplyAsFloat(0) == 14100.f );
+
+    assert( file.capacity(2) == "EctonaTowCapacity" );
+    assert( file.periodAsInt(2) == 3 );
+    assert( file.supplyAsFloat(2) == 14100.f );
+
+    // Test reading record by key    
+    assert( file.supplyAsFloat(file.key("PrimesterFlakesCapacity",3)) == 79242.f );
+
+    int nr = file.numRecords();
+    assert( nr == 25 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      capacity(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ECCcapacityFile();
+  
+  // copy constructor  -- don't use!
+  ECCcapacityFile( const ECCcapacityFile& source );
+  
+  // assignment operator -- don't use!
+  ECCcapacityFile&
+  operator=(const ECCcapacityFile& rhs);
+
+  
+};
+
+
+
+class ECCcapacityFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  
+  getFieldFileWithIteratorH(capacity);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(supply);
+  
+  // preferred constructor
+  ECCcapacityFileIterator(const ECCcapacityFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ECCcapacityFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ECCcapacityFile file("../data/example1/capacity.csv");
+    ECCcapacityFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.capacity() == "EctonaTowCapacity" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.supplyAsFloat() == 14100.f );
+      }   
+      else if ( recNo == 1 ) {
+        assert( fileIter.capacity() == "EctonaTowCapacity" );
+        assert( fileIter.periodAsInt() == 2 );
+        assert( fileIter.supplyAsFloat() == 14100.f );
+           
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ECCcapacityFileIterator();
+  
+  // copy constructor  -- don't use!
+  ECCcapacityFileIterator( const ECCcapacityFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ECCcapacityFileIterator&
+  operator=(const ECCcapacityFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.1
+log
+@Added capacityFile class
+@
+text
+@d28 4
+@
+

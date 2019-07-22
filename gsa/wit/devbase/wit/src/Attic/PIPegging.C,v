@@ -1,0 +1,533 @@
+head	1.10;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2003.09.30.15.40.54;	author rjw;	state dead;
+branches;
+next	1.9;
+
+1.9
+date	2003.09.29.23.29.41;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2003.09.29.19.25.49;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.09.26.20.55.13;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.09.26.16.06.04;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.09.25.22.58.26;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.09.25.19.29.02;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.09.25.18.51.09;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.09.25.16.26.25;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.09.24.23.08.17;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "PIPegging.C"
+//
+// Contains the implementation of the following classes:
+//
+//    PIPegInt
+//    PIPegMgr
+//    PIPegTarg
+//    PIPegger
+//------------------------------------------------------------------------------
+
+#include <PIPegger.h>
+#include <PIPegTarg.h>
+#include <PIPegMgr.h>
+#include <PIPegInt.h>
+#include <Global.h>
+#include <Demand.h>
+#include <MsgFac.h>
+#include <MapIdxI.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class PIPegInt.
+//------------------------------------------------------------------------------
+
+WitPIPegInt::WitPIPegInt (WitProblem * theProblem):
+
+      WitProbAssoc (theProblem),
+      myPIPegMgr_  (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPIPegInt::~WitPIPegInt ()
+   {
+   delete myPIPegMgr_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::preprocess ()
+   {
+   witAssert (myGlobalComp ()->perfPIPegging ());
+
+   myPIPegMgr_ = new WitPIPegMgr (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::unpreprocess ()
+   {
+   witAssert (myGlobalComp ()->perfPIPegging ());
+
+   delete myPIPegMgr_;
+   
+   myPIPegMgr_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::clearTargs ()
+   {
+   myPIPegMgr ()->clearTargs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::recIncShipVol (
+      WitDemand * theDemand,
+      WitPeriod   shipPer,
+      double      incVol)
+   {
+   myPIPegMgr ()->recIncShipVol (theDemand, shipPer, incVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::formPegging ()
+   {
+   myPIPegMgr ()->formPegging ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegInt::clearPegging ()
+   {
+   myPIPegMgr ()->clearPegging ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PIPegMgr.
+//------------------------------------------------------------------------------
+
+WitPIPegMgr::WitPIPegMgr (WitProblem * theProblem):
+
+      WitProbAssoc   (theProblem),
+      myPIPegTargs_  (theProblem),
+      eachPIPegTarg_ (theProblem),
+      myShipIncs_    (theProblem),
+      pegged_        (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPIPegMgr::~WitPIPegMgr ()
+   {
+   clearPegging ();
+
+   clearTargs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegMgr::recIncShipVol (
+      WitDemand * theDemand,
+      WitPeriod   shipPer,
+      double      incVol)
+   {
+   WitPIPegTarg * thePIPegTarg;
+
+   witAssert (incVol > NET_TOL);
+
+   thePIPegTarg = eachPIPegTarg_.myPtrAt (theDemand, shipPer);
+
+   if (thePIPegTarg == NULL)
+      {
+      thePIPegTarg = new WitPIPegTarg (theDemand, shipPer);
+
+      myPIPegTargs_.push (thePIPegTarg);
+
+      eachPIPegTarg_.myPtrAt (theDemand, shipPer) = thePIPegTarg;
+      }
+
+   myShipIncs_.push (thePIPegTarg, incVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegMgr::clearTargs ()
+   {
+   WitPIPegTarg * thePIPegTarg;
+   WitDemand *    theDemand;
+   WitPeriod      shipPer;
+
+   myShipIncs_.clear ();
+
+   while (myPIPegTargs_.pop (thePIPegTarg))
+      {
+      theDemand = thePIPegTarg->myDemand ();
+      shipPer   = thePIPegTarg->myShipPer ();
+
+      eachPIPegTarg_.myPtrAt (theDemand,shipPer) = NULL;
+
+      delete thePIPegTarg;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegMgr::formPegging ()
+   {
+   clearPegging ();
+
+   innerFormPegging ();
+
+   pegged_ = true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegMgr::clearPegging ()
+   {
+   if (not pegged_)
+      return;
+
+   pegged_ = false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegMgr::innerFormPegging ()
+   {
+   WitPIPegger thePIPegger (this);
+
+   thePIPegger.formPegging ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PIPegTarg.
+//------------------------------------------------------------------------------
+
+WitPIPegTarg::WitPIPegTarg (WitDemand * theDemand, WitPeriod shipPer):
+
+      myDemand_  (theDemand),
+      myShipPer_ (shipPer)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPIPegTarg::~WitPIPegTarg ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PIPegger.
+//------------------------------------------------------------------------------
+
+WitPIPegger::WitPIPegger (WitPIPegMgr * thePIPegMgr):
+
+      WitProbAssoc (thePIPegMgr->myProblem ()),
+      myPIPegMgr_  (thePIPegMgr)
+   {              
+   }
+
+//------------------------------------------------------------------------------
+
+WitPIPegger::~WitPIPegger ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPIPegger::formPegging ()
+   {
+   myMsgFac () ("piPeggingMsg");
+   }
+@
+
+
+1.9
+log
+@Contined implementation of post-implosion pegging.
+@
+text
+@@
+
+
+1.8
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@d25 2
+d28 1
+d39 15
+d59 1
+a59 1
+WitPIPegInt::~WitPIPegInt ()
+d61 2
+d64 9
+d82 1
+a82 1
+   myPIPegMgr_->recIncShipVol (theDemand, shipPer, incVol);
+d89 1
+a89 1
+   myPIPegMgr_->formPegging ();
+d96 1
+a96 1
+   myPIPegMgr_->clearPegging ();
+d105 5
+a109 2
+      WitProbAssoc (theProblem),
+      pegged_      (false)
+d118 2
+d129 37
+d202 4
+a205 1
+WitPIPegTarg::WitPIPegTarg (WitProblem * theProblem)
+@
+
+
+1.7
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@a24 2
+#include <Part.h>
+#include <Demand.h>
+a25 2
+#include <PerVolTriple.h>
+#include <MapIdxI.h>
+d76 2
+a77 4
+      WitProbAssoc  (theProblem),
+      shipIncs_     (myProblem ()),
+      pegged_       (false),
+      myPIPegTargs_ ()
+a84 2
+   deleteContents (shipIncs_);
+
+a94 1
+   shipIncs_.push (new WitDemPerVol (theDemand, shipPer, incVol));
+a100 3
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+
+a102 8
+   myPIPegTargs_.allocate (myProblem ());
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (shipPer, myProblem ())
+         if (theDemand->shipVol ()[shipPer] > FLOAT_EPSILON)
+            myPIPegTargs_.myPtrAt (theDemand, shipPer) =
+               new WitPIPegTarg (myProblem ());
+
+a104 2
+   deleteContents (shipIncs_);
+
+a114 9
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (shipPer, myProblem ())
+         delete myPIPegTargs_.myPtrAt (theDemand, shipPer);
+
+   myPIPegTargs_.clear ();
+
+d131 1
+a131 3
+WitPIPegTarg::WitPIPegTarg (WitProblem * theProblem):
+
+      supVolPegging_ (theProblem)
+a162 6
+
+   if (myCompMgr ()->nParts () > 0)
+      myMsgFac () ("nyiForPIPSmsg", "parts");
+
+   if (myCompMgr ()->nOperations () > 0)
+      myMsgFac () ("nyiForPIPSmsg", "operations");
+@
+
+
+1.6
+log
+@Corrected a file inclusion AIX porting bug.
+@
+text
+@d62 1
+a62 1
+void WitPIPegInt::peg ()
+d64 1
+a64 1
+   myPIPegMgr_->peg ();
+d69 1
+a69 1
+void WitPIPegInt::clear ()
+d71 1
+a71 1
+   myPIPegMgr_->clear ();
+d93 1
+a93 1
+   clear ();
+d108 1
+a108 1
+void WitPIPegMgr::peg ()
+d113 1
+a113 1
+   clear ();
+d121 1
+a121 1
+               new WitPIPegTarg;
+d123 1
+a123 5
+      {
+      WitPIPegger thePIPegger (this);
+
+      thePIPegger.peg ();
+      }
+d132 1
+a132 1
+void WitPIPegMgr::clear ()
+d150 9
+d162 3
+a164 1
+WitPIPegTarg::WitPIPegTarg ()
+d193 1
+a193 1
+void WitPIPegger::peg ()
+d196 6
+@
+
+
+1.5
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@d29 1
+@
+
+
+1.4
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@d25 2
+d79 4
+a82 2
+      WitProbAssoc (theProblem),
+      shipIncs_    (myProblem ())
+d91 2
+d109 18
+a126 1
+   WitPIPegger thePIPegger (this);
+d128 3
+a130 1
+   thePIPegger.peg ();
+d137 13
+a187 2
+
+   deleteContents (myPIPegMgr_->shipIncs ());
+@
+
+
+1.3
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@d17 1
+d22 1
+d111 14
+@
+
+
+1.2
+log
+@Continued implementation of Post-Implosion Pegging.
+@
+text
+@d17 1
+d20 1
+a20 1
+#include <PerVolTriple.h>
+d23 2
+d101 3
+a103 1
+   deleteContents (shipIncs_);
+d110 26
+@
+
+
+1.1
+log
+@Continued implementation of Post-Implosion Pegging.
+@
+text
+@d19 1
+a19 1
+#include <PerVolTrip.h>
+@
+

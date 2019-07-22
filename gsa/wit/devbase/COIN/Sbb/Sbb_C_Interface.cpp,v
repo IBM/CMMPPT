@@ -1,0 +1,2428 @@
+head	1.2;
+access;
+symbols
+	beforeInforms:1.1.1.1
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.2
+date	2005.04.12.18.44.43;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Removing Sbb
+@
+text
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a0 2374
+// Copyright (C) 2004, International Business Machines
+// Corporation and others.  All Rights Reserved.
+
+
+#include <math.h>
+#include <cfloat>
+
+#include "CoinPragma.hpp"
+#include "CoinHelperFunctions.hpp"
+#include "CoinPackedMatrix.hpp"
+#include "CoinTime.hpp"
+
+#include "SbbModel.hpp"
+#include "SbbBranchActual.hpp"
+
+#include "CoinMessageHandler.hpp"
+#include "OsiClpSolverInterface.hpp"
+
+//  bobe including extras.h to get strdup()
+#if defined(__MWERKS__) 
+#include <extras.h>
+#endif
+
+// Get C stuff but with extern C
+#define SBB_EXTERN_C
+#include "Coin_C_defines.h"
+
+const int  VERBOSE = 0;
+
+// To allow call backs
+class Sbb_MessageHandler 
+ : public CoinMessageHandler 
+  {
+  
+public:
+  /**@@name Overrides */
+  //@@{
+  virtual int print();
+  //@@}
+  /**@@name set and get */
+  //@@{
+  /// Model
+  const Sbb_Model * model() const;
+  void setModel(Sbb_Model * model);
+  /// Call back
+  void setCallBack(sbb_callback callback);
+  //@@}
+
+  /**@@name Constructors, destructor */
+  //@@{
+  /** Default constructor. */
+  Sbb_MessageHandler();
+  /// Constructor with pointer to model
+  Sbb_MessageHandler(Sbb_Model * model,
+         FILE * userPointer=NULL);
+  /** Destructor */
+  virtual ~Sbb_MessageHandler();
+  //@@}
+
+  /**@@name Copy method */
+  //@@{
+  /** The copy constructor. */
+  Sbb_MessageHandler(const Sbb_MessageHandler&);
+  /** The copy constructor from an CoinSimplexMessageHandler. */
+  Sbb_MessageHandler(const CoinMessageHandler&);
+  
+  Sbb_MessageHandler& operator=(const Sbb_MessageHandler&);
+  /// Clone
+  virtual CoinMessageHandler * clone() const ;
+  //@@}
+   
+    
+protected:
+  /**@@name Data members
+     The data members are protected to allow access for derived classes. */
+  //@@{
+  /// Pointer back to model
+  Sbb_Model * model_;
+  /// call back
+  sbb_callback callback_;
+  //@@}
+};
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+Sbb_MessageHandler::Sbb_MessageHandler () 
+  : CoinMessageHandler(),
+    model_(NULL),
+    callback_(NULL)
+{
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+Sbb_MessageHandler::Sbb_MessageHandler (const Sbb_MessageHandler & rhs) 
+ : CoinMessageHandler(rhs),
+    model_(rhs.model_),
+    callback_(rhs.callback_)
+{  
+}
+
+Sbb_MessageHandler::Sbb_MessageHandler (const CoinMessageHandler & rhs) 
+  : CoinMessageHandler(),
+    model_(NULL),
+    callback_(NULL)
+{  
+}
+
+// Constructor with pointer to model
+Sbb_MessageHandler::Sbb_MessageHandler(Sbb_Model * model,
+               FILE * userPointer)
+  : CoinMessageHandler(),
+    model_(model),
+    callback_(NULL)
+{
+}
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+Sbb_MessageHandler::~Sbb_MessageHandler ()
+{
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+Sbb_MessageHandler &
+Sbb_MessageHandler::operator=(const Sbb_MessageHandler& rhs)
+{
+  if (this != &rhs) {
+    CoinMessageHandler::operator=(rhs);
+    model_ = rhs.model_;
+    callback_ = rhs.callback_;
+  }
+  return *this;
+}
+//-------------------------------------------------------------------
+// Clone
+//-------------------------------------------------------------------
+CoinMessageHandler * Sbb_MessageHandler::clone() const
+{
+  return new Sbb_MessageHandler(*this);
+}
+int 
+Sbb_MessageHandler::print()
+{
+  if (callback_) {
+    int messageNumber = currentMessage().externalNumber();
+    if (currentSource()!="Sbb")
+      messageNumber += 1000000;
+    int i;
+    int nDouble=numberDoubleFields();
+    assert (nDouble<=10);
+    double vDouble[10];
+    for (i=0;i<nDouble;i++)
+      vDouble[i]=doubleValue(i);
+    int nInt=numberIntFields();
+    assert (nInt<=10);
+    int vInt[10];
+    for (i=0;i<nInt;i++)
+      vInt[i]=intValue(i);
+    int nString=numberStringFields();
+    assert (nString<=10);
+    char * vString[10];
+    for (i=0;i<nString;i++) {
+      std::string value = stringValue(i);
+      vString[i]=strdup(value.c_str());
+    }
+    callback_(model_,messageNumber,
+        nDouble,vDouble,
+        nInt,vInt,
+        nString,vString);
+    for (i=0;i<nString;i++) 
+      free(vString[i]);
+    
+  }
+  return CoinMessageHandler::print();
+  return 0;
+}
+const Sbb_Model *
+Sbb_MessageHandler::model() const
+{
+  return model_;
+}
+void 
+Sbb_MessageHandler::setModel(Sbb_Model * model)
+{
+  model_ = model;
+}
+// Call back
+void 
+Sbb_MessageHandler::setCallBack(sbb_callback callback)
+{
+  callback_ = callback;
+}
+/**
+  *
+  *  C Interface Routines
+  *
+  */
+#include "Sbb_C_Interface.h"
+#include <string>
+#include <stdio.h>
+#include <iostream>
+
+#if defined(__MWERKS__) 
+#pragma export on
+#endif
+
+/* Default Sbb_Model constructor */
+COINLIBAPI Sbb_Model *  COINLINKAGE 
+Sbb_newModel()
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_newModel(): ";
+  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  Sbb_Model * model = new Sbb_Model;
+  OsiClpSolverInterface solver1;
+  model->solver_    = &solver1;
+  model->solver_->OsiClpSolverInterface::setHintParam(OsiDoReducePrint,true,OsiHintTry);
+  model->model_     = new SbbModel(solver1);
+  model->handler_   = NULL;
+  model->information_ = NULL;
+  
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return model;
+}
+/* Sbb_Model Destructor */
+COINLIBAPI void COINLINKAGE 
+Sbb_deleteModel(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_deleteModel(): ";
+  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix); fflush(stdout);
+  
+  if (VERBOSE>1) printf("%s delete model->model_\n",prefix); fflush(stdout);
+  delete model->model_;
+  
+  if (VERBOSE>1) printf("%s delete model->handler_\n",prefix); fflush(stdout);
+  delete model->handler_;
+  
+  if (VERBOSE>1) printf("%s free model->information_\n",prefix); fflush(stdout);
+  if (model->information_) free(model->information_);
+  
+  if (VERBOSE>1) printf("%s delete model\n",prefix); fflush(stdout);
+  delete model;
+
+  if (VERBOSE>0) printf("%s return\n",prefix); fflush(stdout);
+}
+
+/* Loads a problem (the constraints on the
+    rows are given by lower and upper bounds). If a pointer is NULL then the
+    following values are the default:
+    <ul>
+    <li> <code>colub</code>: all columns have upper bound infinity
+    <li> <code>collb</code>: all columns have lower bound 0 
+    <li> <code>rowub</code>: all rows have upper bound infinity
+    <li> <code>rowlb</code>: all rows have lower bound -infinity
+    <li> <code>obj</code>: all variables have 0 objective coefficient
+    </ul>
+
+   Just like the other loadProblem() method except that the matrix is
+   given in a standard column major ordered format (without gaps). 
+*/
+COINLIBAPI void COINLINKAGE 
+Sbb_loadProblem (Sbb_Model * model,  const int numcols, const int numrows,
+     const CoinBigIndex * start, const int* index,
+     const double* value,
+     const double* collb, const double* colub,   
+     const double* obj,
+     const double* rowlb, const double* rowub)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_loadProblem(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  OsiSolverInterface * solver = model->model_->solver();
+
+  if (VERBOSE>1) {
+    printf("%s numcols = %i, numrows = %i\n", 
+      prefix, numcols, numrows);
+    printf("%s model = %p, start = %p, index = %p, value = %p\n",
+      prefix, model, start, index, value);
+    printf("%s collb = %p, colub = %p, obj = %p, rowlb = %p, rowub = %p\n",
+      prefix, collb, colub, obj, rowlb, rowub);
+  }
+
+  if (VERBOSE>1) printf("%s Calling solver->loadProblem()\n",prefix);
+  fflush(stdout);
+  
+  if (1) {
+    solver->loadProblem(numcols,numrows,start,index,value,
+             collb,colub,obj,rowlb,rowub);
+  } else {
+    solver->loadProblem(0,0,NULL,NULL,NULL,
+             NULL,NULL,NULL,NULL,NULL);
+  }
+  if (VERBOSE > 1) printf("%s Finished solver->loadProblem()\n",prefix);
+  fflush(stdout);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+} //  Sbb_loadProblem()
+
+/* Read an mps file from the given filename */
+COINLIBAPI int COINLINKAGE 
+Sbb_readMps(Sbb_Model * model,const char *filename)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_readMps(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  if (VERBOSE>1) printf("%s filename = '%s'\n",prefix,filename);
+
+  int result = 1;
+  result = model->model_->solver()->readMps(filename);
+  assert(result==0);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix, result);
+  return result;
+}
+/* Write an mps file from the given filename */
+COINLIBAPI void COINLINKAGE 
+Sbb_writeMps(Sbb_Model * model,const char *filename)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_readMps(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  if (VERBOSE>1) printf("%s filename = '%s'\n",prefix,filename);
+
+  model->model_->solver()->writeMps(filename,"mps",Sbb_optimizationDirection(model));
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Integer information */
+COINLIBAPI char * COINLINKAGE 
+Sbb_integerInformation(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_integerInformation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int col;
+  int numcols = Sbb_getNumCols(model);
+
+  // allocate model->information_ if null
+  // this is freed in Sbb_deleteModel() if not null
+  if (!model->information_) 
+    model->information_ = (char *) malloc(numcols*sizeof(char));
+
+  for (col=0; col<numcols; col++) 
+    if (model->model_->solver()->isContinuous(col)) 
+      model->information_[col] = 0;
+    else
+      model->information_[col] = 1;
+
+  char * result = model->information_;
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Copy in integer information */
+COINLIBAPI void COINLINKAGE 
+Sbb_copyInIntegerInformation(Sbb_Model * model, const char * information)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_copyInIntegerInformation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int col;
+  int numcols = Sbb_getNumCols(model);
+  for (col=0; col<numcols; col++) 
+    if (information[col]) 
+      model->model_->solver()->setInteger(col);
+    else
+      model->model_->solver()->setContinuous(col);
+  
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Drop integer informations */
+COINLIBAPI void COINLINKAGE 
+Sbb_deleteIntegerInformation(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_deleteIntegerInformation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+//  available through 
+//    OsiClpSolverInterface::setContinuous
+//tbd  model->model_->deleteIntegerInformation();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Resizes rim part of model  */
+COINLIBAPI void COINLINKAGE 
+Sbb_resize (Sbb_Model * model, int newNumberRows, int newNumberColumns)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_resize(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  model->model_->solver()->resize(newNumberRows,newNumberColumns);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Deletes rows */
+COINLIBAPI void COINLINKAGE 
+Sbb_deleteRows(Sbb_Model * model, int number, const int * which)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_deleteRows(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  OsiSolverInterface * solver = model->model_->solver();
+  solver->deleteRows(number,which);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Add rows */
+COINLIBAPI void COINLINKAGE 
+Sbb_addRows(Sbb_Model * model, const int number, const double * rowLower, 
+         const double * rowUpper,
+         const int * rowStarts, const int * columns,
+         const double * elements)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_addRows(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// available through OsiClp
+//tbd  model->model_->addRows(number,rowLower,rowUpper,rowStarts,columns,elements);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+
+/* Deletes columns */
+COINLIBAPI void COINLINKAGE 
+Sbb_deleteColumns(Sbb_Model * model, int number, const int * which)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_deleteColumns(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  OsiSolverInterface * solver = model->model_->solver();
+  solver->deleteCols(number,which);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Add columns */
+COINLIBAPI void COINLINKAGE 
+Sbb_addColumns(Sbb_Model * model, int number, const double * columnLower, 
+      const double * columnUpper,
+      const double * objective,
+      const int * columnStarts, const int * rows,
+      const double * elements)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_addColumns(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// available through OsiClp
+//tbd  model->model_->addColumns(number,columnLower,columnUpper,objective,
+//tbd			    columnStarts,rows,elements);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Drops names - makes lengthnames 0 and names empty */
+COINLIBAPI void COINLINKAGE 
+Sbb_dropNames(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dropNames(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->dropNames();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Copies in names */
+COINLIBAPI void COINLINKAGE 
+Sbb_copyNames(Sbb_Model * model, const char * const * rowNamesIn,
+        const char * const * columnNamesIn)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_copyNames(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find names in Sbb, Osi, or OsiClp
+/*clean
+  int iRow;
+  std::vector<std::string> rowNames;
+  int numberRows = model->model_->getNumRows();
+  rowNames.reserve(numberRows);
+  for (iRow=0;iRow<numberRows;iRow++) {
+    rowNames.push_back(rowNamesIn[iRow]);
+  }
+  
+  int iColumn;
+  std::vector<std::string> columnNames;
+  int numberColumns = model->model_->getNumCols();
+  columnNames.reserve(numberColumns);
+  for (iColumn=0;iColumn<numberColumns;iColumn++) {
+    columnNames.push_back(columnNamesIn[iColumn]);
+  }
+  model->model_->copyNames(rowNames,columnNames);
+*/
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+
+/* Number of rows */
+COINLIBAPI int COINLINKAGE 
+Sbb_numberRows(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_numberRows(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getNumRows();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Number of columns */
+COINLIBAPI int COINLINKAGE 
+Sbb_numberColumns(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_numberColumns(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getNumCols();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Primal tolerance to use */
+COINLIBAPI double COINLINKAGE 
+Sbb_primalTolerance(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_primalTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  model->model_->solver()->getDblParam(OsiPrimalTolerance,result) ;
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setPrimalTolerance(Sbb_Model * model,  double value) 
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setPrimalTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->solver()->setDblParam(OsiPrimalTolerance,value) ;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Dual tolerance to use */
+COINLIBAPI double COINLINKAGE 
+Sbb_dualTolerance(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  model->model_->solver()->getDblParam(OsiDualTolerance,result) ;
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setDualTolerance(Sbb_Model * model,  double value) 
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setDualTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->solver()->setDblParam(OsiDualTolerance,value) ;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Integer tolerance to use */
+COINLIBAPI double COINLINKAGE 
+Sbb_integerTolerance(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_primalTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  result = model->model_->getDblParam(SbbModel::SbbIntegerTolerance) ;
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setIntegerTolerance(Sbb_Model * model,  double value) 
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setPrimalTolerance(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->setDblParam(SbbModel::SbbIntegerTolerance,value) ;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Dual objective limit */
+COINLIBAPI double COINLINKAGE 
+Sbb_dualObjectiveLimit(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualObjectiveLimit(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  model->model_->solver()->getDblParam(OsiDualObjectiveLimit,result) ;
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setDualObjectiveLimit(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setDualObjectiveLimit(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->solver()->setDblParam(OsiDualObjectiveLimit,value) ;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Objective offset */
+COINLIBAPI double COINLINKAGE 
+Sbb_objectiveOffset(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_objectiveOffset(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  return model->model_->objectiveOffset();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setObjectiveOffset(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setObjectiveOffset(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->solver()->setObjectiveOffset(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Fills in array with problem name  */
+COINLIBAPI void COINLINKAGE 
+Sbb_problemName(Sbb_Model * model, int maxNumberCharacters, char * array)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_problemName(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  std::string name;
+  model->model_->solver()->getStrParam(OsiProbName,name);
+  maxNumberCharacters = CoinMin(maxNumberCharacters,(int)strlen(name.c_str()));
+  strncpy(array,name.c_str(),maxNumberCharacters-1);
+  array[maxNumberCharacters-1]='\0';
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Sets problem name.  Must have \0 at end.  */
+COINLIBAPI int COINLINKAGE 
+Sbb_setProblemName(Sbb_Model * model, int maxNumberCharacters, char * array)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setProblemName(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  bool result = false;
+  result = model->model_->solver()->setStrParam(OsiProbName, array);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return (result) ? 1 : 0;
+}
+/* Number of iterations */
+COINLIBAPI int COINLINKAGE 
+Sbb_numberIterations(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_numberIterations(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getIterationCount();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setNumberIterations(Sbb_Model * model, int numberIterations)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setNumberIterations(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  model->model_->setNumberIterations(numberIterations);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Maximum number of iterations */
+COINLIBAPI int 
+Sbb_maximumIterations(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_maximumIterations(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->solver()->maximumIterations();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setMaximumIterations(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setMaximumIterations(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  model->model_->setMaximumIterations(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Maximum number of nodes */
+COINLIBAPI int 
+Sbb_maxNumNode(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_maxNumNode(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getIntParam(SbbModel::SbbMaxNumNode);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setMaxNumNode(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setMaxNumNode(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->setIntParam(SbbModel::SbbMaxNumNode, value);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Maximum number of solutions */
+COINLIBAPI int 
+Sbb_maxNumSol(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::maxNumSol(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getIntParam(SbbModel::SbbMaxNumSol);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setMaxNumSol(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setMaxNumSol(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->setIntParam(SbbModel::SbbMaxNumSol, value);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Maximum time in seconds (from when set called) */
+COINLIBAPI double COINLINKAGE 
+Sbb_maximumSeconds(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_maximumSeconds(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  result = model->model_->getDblParam(SbbModel::SbbMaximumSeconds);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setMaximumSeconds(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setMaximumSeconds(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->setDblParam(SbbModel::SbbMaximumSeconds, value);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Returns true if hit maximum iteratio`ns (or time) */
+COINLIBAPI int COINLINKAGE 
+Sbb_hitMaximumIterations(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_hitMaximumIterations(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->solver()->hitMaximumIterations() ? 1 : 0;
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Status of problem:
+   0 - optimal
+   1 - primal infeasible
+   2 - dual infeasible
+   3 - stopped on iterations etc
+   4 - stopped due to errors
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_status(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_status(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->status();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Set problem status */
+COINLIBAPI void COINLINKAGE 
+Sbb_setProblemStatus(Sbb_Model * model, int problemStatus)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setProblemStatus(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  model->model_->setProblemStatus(problemStatus);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Secondary status of problem - may get extended
+   0 - none
+   1 - primal infeasible because dual limit reached
+   2 - scaled problem optimal - unscaled has primal infeasibilities
+   3 - scaled problem optimal - unscaled has dual infeasibilities
+   4 - scaled problem optimal - unscaled has both dual and primal infeasibilities
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_secondaryStatus(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_secondaryStatus(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->secondaryStatus();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setSecondaryStatus(Sbb_Model * model, int status)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setSecondaryStatus(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// cannot find this in Sbb, Osi, or OsiClp
+//tbd  model->model_->setSecondaryStatus(status);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Direction of optimization (1 - minimize, -1 - maximize, 0 - ignore */
+COINLIBAPI double COINLINKAGE 
+Sbb_optimizationDirection(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_optimizationDirection(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  result = model->model_->getObjSense();
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix, result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setOptimizationDirection(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setOptimizationDirection(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->setObjSense(value);
+//  model->model_->solver()->setObjSense(value);
+  
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Primal row solution */
+COINLIBAPI double * COINLINKAGE 
+Sbb_primalRowSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_primalRowSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+  
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->primalRowSolution();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Primal column solution */
+COINLIBAPI double * COINLINKAGE 
+Sbb_primalColumnSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_primalColumnSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//  result = model->model_->getColSolution();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Dual row solution */
+COINLIBAPI double * COINLINKAGE 
+Sbb_dualRowSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualRowSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->dualRowSolution();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Reduced costs */
+COINLIBAPI double * COINLINKAGE 
+Sbb_dualColumnSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualColumnSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->dualColumnSolution();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Row lower */
+COINLIBAPI double* COINLINKAGE 
+Sbb_rowLower(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_rowLower(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->rowLower();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Row upper  */
+COINLIBAPI double* COINLINKAGE 
+Sbb_rowUpper(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_rowUpper(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->rowUpper();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Objective Coefficients */
+COINLIBAPI double * COINLINKAGE 
+Sbb_objective(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_objective(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//  result = model->model_->objective();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Column Lower */
+COINLIBAPI double * COINLINKAGE 
+Sbb_columnLower(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_columnLower(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->columnLower();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Column Upper */
+COINLIBAPI double * COINLINKAGE 
+Sbb_columnUpper(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_columnUpper(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+// cannot find this in Sbb, Osi, or OsiClp
+// may have to make it somehow
+//tbd  return model->model_->columnUpper();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return NULL;
+}
+/* Number of elements in matrix */
+COINLIBAPI int COINLINKAGE 
+Sbb_getNumElements(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getNumElements(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+  result = model->model_->getNumElements();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+
+// Column starts in matrix 
+COINLIBAPI const CoinBigIndex * COINLINKAGE Sbb_getVectorStarts(Sbb_Model * model)
+{
+  const CoinPackedMatrix * matrix = NULL;
+  matrix = model->model_->solver()->getMatrixByCol();
+  return (matrix == NULL) ? NULL : matrix->getVectorStarts();
+}
+// Row indices in matrix 
+COINLIBAPI const int * COINLINKAGE 
+Sbb_getIndices(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getIndices(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  const int * result = NULL;
+  const CoinPackedMatrix * matrix = NULL;
+  matrix = model->model_->solver()->getMatrixByCol();
+  result = (matrix == NULL) ? NULL : matrix->getIndices();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+} 
+
+// Column vector lengths in matrix 
+COINLIBAPI const int * COINLINKAGE 
+Sbb_getVectorLengths(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getVectorLengths(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  const int * result = NULL;
+  const CoinPackedMatrix * matrix = NULL;
+  matrix = model->model_->solver()->getMatrixByCol();
+  result = (matrix == NULL) ? NULL : matrix->getVectorLengths();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+} 
+  
+// Element values in matrix 
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getElements(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getElements(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  const double * result = NULL;
+  const CoinPackedMatrix * matrix = NULL;
+  matrix = model->model_->solver()->getMatrixByCol();
+  result = (matrix == NULL) ? NULL : matrix->getElements();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+// ======================================================================
+
+/* Objective value */
+COINLIBAPI double COINLINKAGE 
+Sbb_objectiveValue(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_objectiveValue(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double result = 0.0;
+  result = model->model_->getObjValue();
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix, result);
+  return result;
+}
+/* Infeasibility/unbounded ray (NULL returned if none/wrong)
+   Up to user to use delete [] on these arrays.  */
+COINLIBAPI double * COINLINKAGE 
+Sbb_infeasibilityRay(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_infeasibilityRay(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+  // lots of rays (probably too many) are available in
+  // OsiClpSolverInterface::getDualRays()
+  //
+//tbd  result = model->model_->infeasibilityRay();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+COINLIBAPI double * COINLINKAGE 
+Sbb_unboundedRay(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_unboundedRay(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  double * result = NULL;
+  // lots of rays (probably too many) are available in
+  // OsiClpSolverInterface::getPrimalRays()
+  //
+//tbd  result = model->model_->unboundedRay();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* See if status array exists (partly for OsiClp) */
+COINLIBAPI int COINLINKAGE 
+Sbb_statusExists(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_statusExists(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  int result = 0;
+//tbd  result = model->model_->statusExists() ? 1 : 0;
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Return address of status array (char[numberRows+numberColumns]) */
+COINLIBAPI void  COINLINKAGE 
+Sbb_getBasisStatus(Sbb_Model * model, int * cstat, int * rstat)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getBasisStatus(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+// have to figure this out
+//tbd  model->model_->solver()->getBasisStatus(cstat, rstat);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Copy in status vector */
+COINLIBAPI void COINLINKAGE 
+setBasisStatus(Sbb_Model * model,  int * cstat, int * rstat)
+{
+  const char prefix[] = "Sbb_C_Interface::setBasisStatus(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+//  model->model_->solver()->setBasisStatus(cstat, rstat);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+
+/* User pointer for whatever reason */
+COINLIBAPI void COINLINKAGE 
+Sbb_setUserPointer (Sbb_Model * model, void * pointer)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setUserPointer(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  // not sure what this is for
+  //
+//tbd  model->model_->setUserPointer(pointer);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+COINLIBAPI void * COINLINKAGE 
+Sbb_getUserPointer (Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getUserPointer(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  void * result = NULL;
+  // not sure what this is for
+  //
+//tbd result = model->model_->getUserPointer();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Pass in Callback function */
+COINLIBAPI void COINLINKAGE 
+Sbb_registerCallBack(Sbb_Model * model, 
+         sbb_callback userCallBack)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_registerCallBack(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  // Will be copy of users one
+  delete model->handler_;
+  model->handler_ = new Sbb_MessageHandler(*(model->model_->messageHandler()));
+  model->handler_->setCallBack(userCallBack);
+  model->handler_->setModel(model);
+  model->model_->passInMessageHandler(model->handler_);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Unset Callback function */
+COINLIBAPI void COINLINKAGE 
+Sbb_clearCallBack(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_clearCallBack(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  delete model->handler_;
+  model->handler_=NULL;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Amount of print out:
+   0 - none
+   1 - just final
+   2 - just factorizations
+   3 - as 2 plus a bit more
+   4 - verbose
+   above that 8,16,32 etc just for selective debug
+*/
+COINLIBAPI void COINLINKAGE 
+Sbb_setLogLevel(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setLogLevel(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  if (VERBOSE>1) printf("%s value = %i\n",prefix, value);
+  
+  model->model_->messageHandler()->setLogLevel(value);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+COINLIBAPI int COINLINKAGE 
+Sbb_logLevel(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_logLevel(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->messageHandler()->logLevel();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* length of names (0 means no names0 */
+COINLIBAPI int COINLINKAGE 
+Sbb_lengthNames(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_lengthNames(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->lengthNames();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Fill in array (at least lengthNames+1 long) with a row name */
+COINLIBAPI void COINLINKAGE 
+Sbb_rowName(Sbb_Model * model, int iRow, char * name)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_rowName(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  sprintf(name,"ROW%5i",iRow);
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  std::string rowName=model->model_->rowName(iRow);
+//tbd  strcpy(name,rowName.c_str());
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Fill in array (at least lengthNames+1 long) with a column name */
+// cannot find names in Sbb, Osi, or OsiClp
+COINLIBAPI void COINLINKAGE 
+Sbb_columnName(Sbb_Model * model, int iColumn, char * name)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_columnName(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  sprintf(name,"COL%5i",iColumn);
+//tbd  std::string columnName= model->model_->columnName(iColumn);
+//tbd  strcpy(name,columnName.c_str());
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+
+/* General branch and bound solve algorithm which can do presolve.
+   See  SbbSolve.hpp for options
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_initialSolve(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_initialSolve(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  model->model_->initialSolve();
+  result = model->model_->status();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* General solve algorithm which can do presolve.
+   See  SbbModel.hpp for options
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_branchAndBound(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_branchAndBound(): ";
+//  const int  VERBOSE = 3;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  if (VERBOSE>2) Sbb_printModel(model,prefix);
+  try {
+    model->model_->branchAndBound();
+  } catch (CoinError e) {
+    printf("%s ERROR: %s::%s, %s\n", prefix,
+      e.className().c_str(), e.methodName().c_str(), e.message().c_str());
+  }
+  result = model->model_->status();
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Sets or unsets scaling, 0 -off, 1 equilibrium, 2 geometric, 3, auto, 4 dynamic(later) */
+COINLIBAPI void COINLINKAGE 
+Sbb_scaling(Sbb_Model * model, int mode)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_scaling(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  OsiSolverInterface * solver = model->model_->solver();
+  solver->setHintParam(OsiDoScale,mode);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Gets scalingFlag */
+COINLIBAPI int COINLINKAGE 
+Sbb_scalingFlag(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_scalingFlag(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// try to use OsiSolverInterface::getHintParam(OsiDoScale, ???)
+//tbd  result = model->model_->scalingFlag();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Crash - at present just aimed at dual, returns
+   -2 if dual preferred and crash basis created
+   -1 if dual preferred and all slack basis preferred
+   0 if basis going in was not all slack
+   1 if primal preferred and all slack basis preferred
+   2 if primal preferred and crash basis created.
+   
+   if gap between bounds <="gap" variables can be flipped
+   
+   If "pivot" is
+   0 No pivoting (so will just be choice of algorithm)
+   1 Simple pivoting e.g. gub
+   2 Mini iterations
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_crash(Sbb_Model * model, double gap,int pivot)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_crash(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->crash(gap,pivot);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* If problem is primal feasible */
+COINLIBAPI int COINLINKAGE 
+Sbb_primalFeasible(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_primalFeasible(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isProvenPrimalInfeasible() ? 0 : 1;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* If problem is dual feasible */
+COINLIBAPI int COINLINKAGE 
+Sbb_dualFeasible(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualFeasible(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isProvenDualInfeasible() ? 0 : 1;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Dual bound */
+COINLIBAPI double COINLINKAGE 
+Sbb_dualBound(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_dualBound(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+// cannot find in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->dualBound();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setDualBound(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setDualBound(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->setDualBound(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Infeasibility cost */
+COINLIBAPI double COINLINKAGE 
+Sbb_infeasibilityCost(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_infeasibilityCost(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->solver()->infeasibilityCost();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setInfeasibilityCost(Sbb_Model * model, double value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setInfeasibilityCost(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->setInfeasibilityCost(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Perturbation:
+   50  - switch on perturbation
+   100 - auto perturb if takes too long (1.0e-6 largest nonzero)
+   101 - we are perturbed
+   102 - don't try perturbing again
+   default is 100
+   others are for playing
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_perturbation(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_perturbation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->perturbation();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setPerturbation(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setPerturbation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->setPerturbation(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Current (or last) algorithm */
+COINLIBAPI int COINLINKAGE 
+Sbb_algorithm(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setPerturbation(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->algorithm();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Set algorithm */
+COINLIBAPI void COINLINKAGE 
+Sbb_setAlgorithm(Sbb_Model * model, int value)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setAlgorithm(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  model->model_->setAlgorithm(value);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}
+/* Sum of dual infeasibilities */
+COINLIBAPI double COINLINKAGE 
+Sbb_sumDualInfeasibilities(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_sumDualInfeasibilities(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->sumDualInfeasibilities();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+/* Number of dual infeasibilities */
+COINLIBAPI int COINLINKAGE 
+Sbb_numberDualInfeasibilities(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_numberDualInfeasibilities(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd  result = model->model_->numberDualInfeasibilities();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Sum of primal infeasibilities */
+COINLIBAPI double COINLINKAGE 
+Sbb_sumPrimalInfeasibilities(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_sumPrimalInfeasibilities(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+// cannot find names in Sbb, Osi, or OsiClp
+//tbd result = model->model_->sumPrimalInfeasibilities();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+/* Number of primal infeasibilities */
+COINLIBAPI int COINLINKAGE 
+Sbb_numberPrimalInfeasibilities(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_numberPrimalInfeasibilities(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+//tbd  result = model->model_->getContinuousInfeasibilities();
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Save model to file, returns 0 if success.  This is designed for
+   use outside algorithms so does not save iterating arrays etc.
+   It does not save any messaging information. 
+   Does not save scaling values.
+   It does not know about all types of virtual functions.
+*/
+COINLIBAPI int COINLINKAGE 
+Sbb_saveModel(Sbb_Model * model, const char * fileName)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_saveModel(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// there is a writeMPS method in Osi 
+//tbd  result = model->model_->saveModel(fileName);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Restore model from file, returns 0 if success,
+   deletes current model */
+COINLIBAPI int COINLINKAGE 
+Sbb_restoreModel(Sbb_Model * model, const char * fileName)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_restoreModel(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+// there is a readMPS method in Osi
+//tbd  result = model->model_->restoreModel(fileName);
+  printf("%s ERROR: NOT IMPLEMENTED\n",prefix);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+  
+/** Call this to really test if a valid solution can be feasible
+    Solution is number columns in size.
+    If fixVariables true then bounds of continuous solver updated.
+    Returns objective value (worse than cutoff if not feasible)
+*/
+COINLIBAPI void COINLINKAGE 
+Sbb_checkSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_checkSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  // see SbbModel::checkSolution(double cutoff, const double * solution,
+  //	       bool fixVariables);
+//  model->model_->checkSolution();
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Number of rows */
+COINLIBAPI int COINLINKAGE 
+Sbb_getNumRows(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getNumRows(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->getNumRows();
+
+  if (VERBOSE>0) printf("%s return %d\n",prefix, result);
+  return result;
+}
+/* Number of columns */
+COINLIBAPI int COINLINKAGE 
+Sbb_getNumCols(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getNumCols(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->getNumCols();
+
+  if (VERBOSE>0) printf("%s return %d\n",prefix, result);
+  return result;
+}
+/* Number of iterations */
+COINLIBAPI int COINLINKAGE 
+Sbb_getIterationCount(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getIterationCount(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->getIterationCount();
+
+  if (VERBOSE>0) printf("%s return %d\n",prefix, result);
+  return result;
+}
+/* Are there a numerical difficulties? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isAbandoned(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isAbandoned(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->isAbandoned() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Is optimality proven? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isProvenOptimal(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isProvenOptimal(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->isProvenOptimal() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Is primal infeasiblity proven? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isProvenPrimalInfeasible(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isProvenPrimalInfeasible(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isProvenPrimalInfeasible() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Is dual infeasiblity proven? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isProvenDualInfeasible(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isProvenDualInfeasible(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isProvenDualInfeasible() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Is the given primal objective limit reached? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isPrimalObjectiveLimitReached(Sbb_Model * model) 
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isPrimalObjectiveLimitReached(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isPrimalObjectiveLimitReached() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Is the given dual objective limit reached? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isDualObjectiveLimitReached(Sbb_Model * model) 
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isDualObjectiveLimitReached(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isDualObjectiveLimitReached() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Iteration limit reached? */
+COINLIBAPI int COINLINKAGE 
+Sbb_isIterationLimitReached(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isIterationLimitReached(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  OsiSolverInterface * solver = model->model_->solver();
+  result = solver->isIterationLimitReached() ? 1 : 0;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/* Direction of optimization (1 - minimize, -1 - maximize, 0 - ignore */
+COINLIBAPI double COINLINKAGE 
+Sbb_getObjSense(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getObjSense(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+  result = model->model_->getObjSense();
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+/* Primal row solution */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getRowActivity(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getRowActivity(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getRowActivity();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Primal column solution */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getColSolution(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getColSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getColSolution();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+COINLIBAPI void COINLINKAGE 
+Sbb_setColSolution(Sbb_Model * model, const double * input)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setColSolution(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  OsiSolverInterface * solver = model->model_->solver();
+  solver->setColSolution(input);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Dual row solution */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getRowPrice(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getRowPrice(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getRowPrice();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Reduced costs */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getReducedCost(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getReducedCost(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getReducedCost();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Row lower */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getRowLower(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getRowLower(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getRowLower();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Row upper  */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getRowUpper(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getRowUpper(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getRowUpper();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Objective Coefficients */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getObjCoefficients(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getObjCoefficients(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getObjCoefficients();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Column Lower */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getColLower(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getColLower(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getColLower();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Column Upper */
+COINLIBAPI const double * COINLINKAGE 
+Sbb_getColUpper(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getColUpper(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  const double * result = NULL;
+  result = model->model_->getColUpper();
+
+  if (VERBOSE>0) printf("%s return %p\n",prefix,result);
+  return result;
+}
+/* Objective value */
+COINLIBAPI double COINLINKAGE 
+Sbb_getObjValue(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getObjValue(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+  result = model->model_->getObjValue();
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+/* Print model */
+COINLIBAPI void COINLINKAGE 
+Sbb_printModel(Sbb_Model * model, const char * argPrefix)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_printModel(): ";
+  const int  VERBOSE = 4;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  SbbModel *sbb_model = model->model_;
+  int numrows    = sbb_model->getNumRows();
+  int numcols    = sbb_model->getNumCols();
+  int numelem    = sbb_model->getNumElements();
+  const CoinPackedMatrix * matrix = sbb_model->solver()->getMatrixByCol();
+  const CoinBigIndex     * start  = matrix->getVectorStarts();
+  const int              * index  = matrix->getIndices();
+  const double           * value  = matrix->getElements();
+  const double           * collb  = sbb_model->getColLower();
+  const double           * colub  = sbb_model->getColUpper();
+  const double           * obj    = sbb_model->getObjCoefficients();
+  const double           * rowlb  = sbb_model->getRowLower();
+  const double           * rowub  = sbb_model->getRowUpper();
+
+  printf("%s numcols = %i, numrows = %i, numelem = %i\n", 
+    argPrefix, numcols, numrows, numelem);
+  printf("%s model = %p, start = %p, index = %p, value = %p\n",
+    argPrefix, model, start, index, value);
+  matrix->dumpMatrix(NULL);
+  {
+    int i;
+    for (i=0; i<=numcols; i++) 
+      printf("%s start[%i] = %i\n", argPrefix, i, start[i]);
+    for (i=0; i< numelem; i++)
+      printf("%s index[%i] = %i, value[%i] = %g\n",
+        argPrefix, i, index[i], i, value[i]);
+  }
+  
+  printf("%s collb = %p, colub = %p, obj = %p, rowlb = %p, rowub = %p\n",
+    argPrefix, collb, colub, obj, rowlb, rowub);
+  printf("%s optimization direction = %g\n",argPrefix, Sbb_optimizationDirection(model));
+  printf("  (1 - minimize, -1 - maximize, 0 - ignore)\n");
+  {
+    int i;
+    for (i=0; i<numcols; i++) 
+      printf("%s collb[%i] = %g, colub[%i] = %g, obj[%i] = %g\n",
+        argPrefix, i, collb[i], i, colub[i], i, obj[i]);
+    for (i=0; i< numrows; i++)
+      printf("%s rowlb[%i] = %g, rowub[%i] = %g\n",
+        argPrefix, i, rowlb[i], i, rowub[i]);
+  }
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+}  // Sbb_printModel()
+
+COINLIBAPI int COINLINKAGE 
+Sbb_isInteger(Sbb_Model * model, int i)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_isInteger(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  bool result = false;
+  result = model->model_->isInteger(i);
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix, result);
+  return (result) ? 1 : 0;
+}
+
+COINLIBAPI double COINLINKAGE 
+Sbb_cpuTime(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_cpuTime(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  double result = 0;
+  result = CoinCpuTime() ;
+
+  if (VERBOSE>0) printf("%s return %g\n",prefix,result);
+  return result;
+}
+/** Number of nodes explored in B&B tree */
+COINLIBAPI int COINLINKAGE Sbb_getNodeCount(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_getNodeCount(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  int result = 0;
+  result = model->model_->getNodeCount() ;
+
+  if (VERBOSE>0) printf("%s return %i\n",prefix,result);
+  return result;
+}
+/** Return a copy of this model */
+COINLIBAPI Sbb_Model * COINLINKAGE Sbb_clone(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_clone(): ";
+  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  Sbb_Model * result = new Sbb_Model;
+  result->model_     = new SbbModel(*(model->model_));
+  result->solver_    = (OsiClpSolverInterface *) result->model_->solver();
+  result->handler_   = NULL;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return model;
+}
+/** Set this the variable to be continuous */
+COINLIBAPI Sbb_Model * COINLINKAGE Sbb_setContinuous(Sbb_Model * model, int iColumn)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_setContinuous(): ";
+//  const int  VERBOSE = 1;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  
+  model->model_->solver()->setContinuous(iColumn);
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return model;
+}
+/* Delete all object information */
+COINLIBAPI void  COINLINKAGE 
+Sbb_deleteObjects(Sbb_Model * model)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_deleteObjects(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+
+  model->model_->deleteObjects();
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Add an SOS constraint to the model */
+COINLIBAPI void  COINLINKAGE 
+Sbb_addSOS(Sbb_Model * model, int numberMembers,
+           const int * which, const double * weights, int identifier, int type)
+{
+  const char prefix[] = "Sbb_C_Interface::Sbb_addSOS(): ";
+//  const int  VERBOSE = 2;
+  if (VERBOSE>0) printf("%s begin\n",prefix);
+  if (VERBOSE>1) {
+    int i;
+    printf("%s numberMembers = %i, identifier = %i, type = %i\n",
+      prefix,numberMembers, identifier, type); fflush(stdout);
+    for (i=0;i<numberMembers;i++) 
+      printf("%s which[%i] = %d, weights[%i] = %g\n",
+        prefix, i, which[i], i, weights[i]); fflush(stdout);
+  }
+  
+  SbbObject ** objects = new SbbObject * [1];
+  if (VERBOSE>1) printf("%s new SbbSOS()\n",prefix);
+  objects[0] = new SbbSOS(model->model_,numberMembers,which,weights,identifier,type);
+  if (objects[0] == NULL) {
+    printf("%s ERROR: objects[0] == NULL\n",prefix); fflush(stdout);
+    assert(objects[0] != NULL);
+  }
+  if (VERBOSE>1) printf("%s calling addObjects()\n",prefix);
+  fflush(stdout);
+  model->model_->addObjects(1, objects);
+  if (VERBOSE>1) printf("%s finished addObjects()\n",prefix);
+  delete objects[0]; 
+  delete [] objects;
+
+  if (VERBOSE>0) printf("%s return\n",prefix);
+  return;
+}
+/* Print the solution */
+COINLIBAPI void  COINLINKAGE 
+Sbb_printSolution(Sbb_Model * model)
+{
+  {
+    //
+    //  Now to print out row solution.  The methods used return const 
+    //  pointers - which is of course much more virtuous.
+    //  
+    //  This version just does non-zero columns
+    //
+    
+    // * Rows 
+    
+    int numberRows = Sbb_getNumRows(model);
+    int iRow;
+    
+    
+    const double * rowPrimal = Sbb_getRowActivity(model);
+    // * Alternatively getReducedCost(model) 
+    const double * rowDual = Sbb_getRowPrice(model);
+    // * Alternatively getColLower(model) 
+    const double * rowLower = Sbb_getRowLower(model);
+    // * Alternatively getColUpper(model) 
+    const double * rowUpper = Sbb_getRowUpper(model);
+    printf("--------------------------------------\n");
+
+    // * If we have not kept names (parameter to readMps) this will be 0 
+  //    assert(Sbb_lengthNames(model));
+    
+    printf("                       Primal          Dual         Lower         Upper\n");
+    for (iRow=0;iRow<numberRows;iRow++) {
+      double value;
+      value = rowPrimal[iRow];
+      if (value>1.0e-8||value<-1.0e-8) {
+      	char name[20];
+  //      	Sbb_columnName(model,iColumn,name);
+        sprintf(name,"ROW%5i",iRow);
+      	printf("%6d %8s",iRow,name);
+      	printf(" %13g",rowPrimal[iRow]);
+      	printf(" %13g",rowDual[iRow]);
+      	printf(" %13g",rowLower[iRow]);
+      	printf(" %13g",rowUpper[iRow]);
+      	printf("\n");
+      }
+    }
+    printf("--------------------------------------\n");
+  }
+  {
+    //
+    //  Now to print out column solution.  The methods used return const 
+    //  pointers - which is of course much more virtuous.
+    //  
+    //  This version just does non-zero columns
+    //
+    //
+    
+    // * Columns 
+    
+    int numberColumns = Sbb_numberColumns(model);
+    int iColumn;
+    
+    
+    // * Alternatively getColSolution(model) 
+    const double * columnPrimal = Sbb_getColSolution(model);
+    // * Alternatively getReducedCost(model) 
+    const double * columnDual = Sbb_getReducedCost(model);
+    // * Alternatively getColLower(model) 
+    const double * columnLower = Sbb_getColLower(model);
+    // * Alternatively getColUpper(model) 
+    const double * columnUpper = Sbb_getColUpper(model);
+    // * Alternatively getObjCoefficients(model) 
+    const double * columnObjective = Sbb_getObjCoefficients(model);
+
+    const char * isInteger = Sbb_integerInformation(model);
+
+    printf("--------------------------------------\n");
+
+    // * If we have not kept names (parameter to readMps) this will be 0 
+//    assert(Sbb_lengthNames(model));
+    
+    printf("                       Primal          Dual         Lower         Upper          Cost     isInteger\n");
+    for (iColumn=0;iColumn<numberColumns;iColumn++) {
+      double value;
+      value = columnPrimal[iColumn];
+      if (value>1.0e-8||value<-1.0e-8) {
+      	char name[20];
+//      	Sbb_columnName(model,iColumn,name);
+        sprintf(name,"COL%5i",iColumn);
+      	printf("%6d %8s",iColumn,name);
+      	printf(" %13g",columnPrimal[iColumn]);
+      	printf(" %13g",columnDual[iColumn]);
+      	printf(" %13g",columnLower[iColumn]);
+      	printf(" %13g",columnUpper[iColumn]);
+      	printf(" %13g",columnObjective[iColumn]);
+      	printf(" %13i",isInteger[iColumn]);
+      	printf("\n");
+      }
+    }
+    printf("--------------------------------------\n");
+  }
+  if (0) Sbb_printModel(model, "sbb::main(): ");
+  return;
+}
+#if defined(__MWERKS__) 
+#pragma export off
+#endif
+@
+
+
+1.1.1.1
+log
+@COIN code from IBM hosted repository (before move to informs)
+@
+text
+@@

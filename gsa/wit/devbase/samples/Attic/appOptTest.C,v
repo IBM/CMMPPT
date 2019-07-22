@@ -1,0 +1,218 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2006.10.10.14.27.30;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2006.10.06.23.00.29;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Custom opt implosion.
+@
+text
+@//------------------------------------------------------------------------------
+// Source File: "appConTest.C".
+//
+// A WIT application program whose purpose is to test WIT's "application
+// controlled optimizing implosion" capability.
+//------------------------------------------------------------------------------
+
+#include <wit.h>
+
+#include <OsiClpSolverInterface.hpp>
+
+#include <stdlib.h>
+#include <stdio.h>
+
+//------------------------------------------------------------------------------
+// Class AppOptTester
+//------------------------------------------------------------------------------
+
+class AppOptTester
+   {
+   public:
+
+   //---------------------------------------------------------------------------
+   // Public Member Functions
+   //---------------------------------------------------------------------------
+
+    AppOptTester ();
+   ~AppOptTester ();
+
+   void testAppOpt ();
+
+   private:
+
+   //---------------------------------------------------------------------------
+   // Private Member Functions
+   //---------------------------------------------------------------------------
+
+   void callCoin ();
+
+   //---------------------------------------------------------------------------
+   // Private Member Data
+   //---------------------------------------------------------------------------
+
+   int      numcols_;
+   int      numrows_;
+   int *    start_;
+   int *    index_;
+   double * value_;
+   double * collb_;
+   double * colub_;
+   double * obj_;
+   double * rowlb_;
+   double * rowub_;
+   };
+
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+int main ()
+   {
+   AppOptTester theTester;
+
+   theTester.testAppOpt ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AppOptTester
+//------------------------------------------------------------------------------
+
+AppOptTester::AppOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+AppOptTester::~AppOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void AppOptTester::testAppOpt ()
+   {
+   WitRun * theWitRun;
+   float    supplyVolA[]  = {20.0};
+   float    demandVolB[]  = {30.0};
+   float    shipRewardB[] = { 4.0};
+
+   witNewRun            (& theWitRun);
+   witInitialize          (theWitRun);
+
+   witSetNPeriods         (theWitRun, 1);
+
+   witAddPart             (theWitRun, "A",      WitCAPACITY);
+   witAddDemand           (theWitRun, "A", "B");
+
+   witSetPartSupplyVol    (theWitRun, "A",      supplyVolA);
+   witSetDemandDemandVol  (theWitRun, "A", "B", demandVolB);
+   witSetDemandShipReward (theWitRun, "A", "B", shipRewardB);
+
+   witStartOptImp         (theWitRun);
+
+   witGetOptProblemDbl (
+        theWitRun,
+      & numcols_,
+      & numrows_,
+      & start_,
+      & index_,
+      & value_,
+      & collb_,
+      & colub_,
+      & obj_,
+      & rowlb_,
+      & rowub_);
+
+   callCoin ();
+
+   free (start_);
+   free (index_);
+   free (value_);
+   free (collb_);
+   free (colub_);
+   free (obj_);
+   free (rowlb_);
+   free (rowub_);
+
+   witFinishOptImp (theWitRun);
+
+   witDeleteRun    (theWitRun);
+   }
+
+//------------------------------------------------------------------------------
+
+void AppOptTester::callCoin ()
+   {
+   CoinMessageHandler *    theCMH;
+   OsiClpSolverInterface * theSI;
+
+   theCMH  = new CoinMessageHandler (stdout);
+
+   theCMH->setLogLevel (4);
+
+   theSI   = new OsiClpSolverInterface;
+
+   theSI->passInMessageHandler (theCMH);
+
+   theSI->getModelPtr ()->passInMessageHandler (theCMH);
+
+   theSI->
+      loadProblem (
+         numcols_,
+         numrows_,
+         start_,
+         index_,
+         value_,
+         collb_,
+         colub_,
+         obj_,
+         rowlb_,
+         rowub_);
+
+   theSI->setObjSense (-1.0);
+
+   theSI->writeMps ("app-opt");
+
+   printf (
+      "\n"
+      "File \"app-opt.mps\":\n"
+      "\n");
+
+   fflush (stdout);
+
+   system ("cat app-opt.mps");
+
+   remove ("app-opt.mps");
+
+   theSI->getModelPtr ()->dual ();
+
+   delete theSI;
+   }
+@
+
+
+1.1
+log
+@App controlled opt implosion.
+@
+text
+@@
+

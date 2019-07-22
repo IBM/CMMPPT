@@ -1,0 +1,345 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2006.02.17.20.53.14;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2006.02.17.19.30.50;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.02.16.16.24.46;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef PVecSorterH
+#define PVecSorterH
+
+//------------------------------------------------------------------------------
+// Header file: "PVecSorter.h"
+//
+// Contains the declaration of class template AbsPVecSorter <Elem>.
+// Contains the declaration of class template PVecSorter <Elem, Context>.
+// Contains the declaration of class template PVecCompFtor <Elem>.
+//------------------------------------------------------------------------------
+
+#include <PtrVec.h>
+
+#include <algorithm>
+
+//------------------------------------------------------------------------------
+// Class template AbsPVecSorter <Elem>
+//
+// Abstract base class responsible for sorting instances of class template
+// PtrVec <Elem>, using a sorting criterion defined in the derived class.
+//
+// Class Hierarchy:
+//
+// AbsPVecSorter <Elem>
+//    PVecSorter <Elem, Context>
+//
+// All implementation is inline.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      class WitAbsPVecSorter
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Public member functions.
+      //------------------------------------------------------------------------
+
+      inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort);
+         //
+         // Sorts the first nElemsToSort of thePtrVec.
+         // Implemented at the bottom of this file.
+
+      inline void sort (WitPtrVec <Elem> & thePtrVec)
+         {
+         sort (thePtrVec, thePtrVec.length ());
+         }
+
+      virtual bool compare (Elem * theElem1, Elem * theElem2) = 0;
+         //
+         // Returns true, iff theElem1 must appear before theElem2 in the sorted
+         // vector.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      inline WitAbsPVecSorter ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitAbsPVecSorter ()
+         {
+         }
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitAbsPVecSorter);
+   };
+
+//------------------------------------------------------------------------------
+// Class template PVecSorter <Elem, Context>
+//
+// Responsible for sorting instances of class template PtrVec <Elem>, using a
+// sorting criterion specified as a member function of class Context.
+//
+// Class Hierarchy:
+//
+// AbsPVecSorter <Elem>
+//    PVecSorter <Elem, Context>
+//
+// All implementation is inline.
+//------------------------------------------------------------------------------
+
+template <typename Elem, typename Context>
+      class WitPVecSorter: public WitAbsPVecSorter <Elem>
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      inline WitPVecSorter (
+               bool (Context::* theCompFunc) (Elem *, Elem *),
+               Context *        theContext):
+
+            WitAbsPVecSorter <Elem> (),
+
+            myCompFunc_             (theCompFunc),
+            myContext_              (theContext)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitPVecSorter ()
+         {
+         }
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      virtual bool compare (Elem * theElem1, Elem * theElem2)
+         {
+         return (myContext_->*myCompFunc_) (theElem1, theElem2);
+         }
+
+      noCopyCtorAssign (WitPVecSorter);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      bool (Context::* const myCompFunc_) (Elem *, Elem *);
+         //
+         // The sorting criterion function for this PVecSorter.
+
+      Context * const myContext_;
+         //
+         // The Context in which the sorting criterion is to be applied.
+   };
+
+//------------------------------------------------------------------------------
+// Class template PVecCompFtor <Elem>
+//
+// Comparison functor class used by AbsPVecSorter <Elem> when invoking 
+// std::sort (...).
+//
+// All implementation is inline.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      class WitPVecCompFtor
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      inline WitPVecCompFtor (WitAbsPVecSorter <Elem> * theAbsPVecSorter):
+
+            myAbsPVecSorter_ (theAbsPVecSorter)
+         {
+         }
+
+      inline WitPVecCompFtor (const WitPVecCompFtor & thePVecCompFtor):
+
+            myAbsPVecSorter_ (thePVecCompFtor.myAbsPVecSorter_)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      inline ~WitPVecCompFtor ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      inline bool operator () (void * theVoid1, void * theVoid2)
+         {
+         return
+            myAbsPVecSorter_->
+               compare (
+                  reinterpret_cast <Elem *> (theVoid1),
+                  reinterpret_cast <Elem *> (theVoid2));
+         }
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitAbsPVecSorter <Elem> * const myAbsPVecSorter_;
+         //
+         // The AbsPVecSorter for this PVecCompFtor.
+   };
+
+//------------------------------------------------------------------------------
+// Inline implementation of Class Template AbsPVecSorter <Elem>.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline void WitAbsPVecSorter <Elem>::sort (
+         WitPtrVec <Elem> & thePtrVec,
+         int                nElemsToSort)
+   {
+   WitPVecCompFtor <Elem> thePVecCompFtor (this);
+
+   std::sort (
+      thePtrVec.myVector_.myCVecForUpdate (),
+      thePtrVec.myVector_.myCVecForUpdate () + nElemsToSort,
+      thePVecCompFtor);
+   }
+
+//------------------------------------------------------------------------------
+// sort function for a PtrVec.
+// Sorts the first nElemsToSort of thePtrVec, using theCompFunc as the
+// comparision function, which is invoked with respect to theContext.
+//------------------------------------------------------------------------------
+
+namespace WitNonClass
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      WitPVecSorter <Elem, Context> theSorter (theCompFunc, theContext);
+
+      theSorter.sort (thePtrVec, nElemsToSort);
+      }
+   };
+
+//------------------------------------------------------------------------------
+// sort function for a PtrVec.
+// Same as above, but sorts the entire PtrVec.
+//------------------------------------------------------------------------------
+
+namespace WitNonClass
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      sort (thePtrVec, thePtrVec.length (), theCompFunc, theContext);
+      }
+   };
+
+#endif
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@a89 4
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+d116 1
+a116 1
+               bool (Context::* theCritFunc) (Elem *, Elem *),
+d121 1
+a121 1
+            myCritFunc_             (theCritFunc),
+d142 1
+a142 1
+         return (myContext_->*myCritFunc_) (theElem1, theElem2);
+d151 1
+a151 1
+      bool (Context::* const myCritFunc_) (Elem *, Elem *);
+d239 38
+@
+

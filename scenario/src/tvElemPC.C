@@ -1,0 +1,211 @@
+#include <iostream.h>
+
+#include <scenario/src/tvElemPC.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/partSchd.h>
+#include <scenario/src/machdep.h>
+
+// Do comparison
+int
+LgFrTimeVecElementPairCompareFloat::itemTimeVecPairCompareFloat(
+   const LgFrItemTimeVecPairFloat & itvpf1,
+   const LgFrItemTimeVecPairFloat & itvpf2)
+const
+{
+   assert( period_ < itvpf1.timeVecFloat().length() );
+   if 
+      ( (itvpf1.timeVecFloat())[period_] < (itvpf2.timeVecFloat())[period_] )
+         return -1;
+   else if 
+      ( (itvpf1.timeVecFloat())[period_] > (itvpf2.timeVecFloat())[period_] )
+         return  1;
+   else return 0;
+}
+
+// Set the element number (period) to sort on.
+void
+LgFrTimeVecElementPairCompareFloat::period(
+   const size_t p )
+{
+   assert( p >= 0 );
+   period_ = p;
+}
+
+// Get the element number (period) which is set to sort on.
+size_t
+LgFrTimeVecElementPairCompareFloat::period()
+const
+{
+   return period_;
+}
+
+// Make clone copy of object
+LgFrPairCompareFloat *
+LgFrTimeVecElementPairCompareFloat::clone()
+const
+{
+  LgFrTimeVecElementPairCompareFloat* newInst = 
+      new LgFrTimeVecElementPairCompareFloat(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with new Scenario
+LgFrPairCompareFloat *
+LgFrTimeVecElementPairCompareFloat::clone(LgFrScenario & newScenario)
+const
+{
+  LgFrTimeVecElementPairCompareFloat* newInst = 
+      new LgFrTimeVecElementPairCompareFloat(*this, newScenario);
+  return (newInst);
+}
+
+// Return comparison strategy identifier
+isAReturnType
+LgFrTimeVecElementPairCompareFloat::isA()
+const
+{
+   return id_;
+}
+
+// Assignment operator
+LgFrTimeVecElementPairCompareFloat &
+LgFrTimeVecElementPairCompareFloat::operator=(
+			  const LgFrTimeVecElementPairCompareFloat& rhs)
+{
+  assert( id_ == rhs.id_ );
+  if (this != &rhs) {		// Check for assignment to self
+     period_ = rhs.period_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrTimeVecElementPairCompareFloat::
+   LgFrTimeVecElementPairCompareFloat (
+      const LgFrTimeVecElementPairCompareFloat & source)
+:  LgFrPairCompareFloat(source),
+   id_(__LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT),
+   period_(source.period_)
+{
+  assert( id_ == source.id_ );
+}
+
+// Copy constructor with new Scenario
+LgFrTimeVecElementPairCompareFloat::
+   LgFrTimeVecElementPairCompareFloat (
+      const LgFrTimeVecElementPairCompareFloat & source,
+      LgFrScenario & newScenario)
+:  LgFrPairCompareFloat(source, newScenario),
+   id_(__LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT),
+   period_(source.period_)
+{
+  assert( id_ == source.id_ );
+}
+
+
+// Default Constructor
+LgFrTimeVecElementPairCompareFloat::
+   LgFrTimeVecElementPairCompareFloat ()
+:  LgFrPairCompareFloat(),
+   id_(__LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT),
+   period_(0)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrTimeVecElementPairCompareFloat::
+   ~LgFrTimeVecElementPairCompareFloat ()
+{
+   // Nothing to do here
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrTimeVecElementPairCompareFloat methods.
+void
+LgFrTimeVecElementPairCompareFloat::test()
+{
+  int i,t;
+
+  // Test default constructor
+  LgFrTimeVecElementPairCompareFloat cs1;
+  assert( cs1.id_ == __LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT );
+
+  // Test copy constructor
+  LgFrTimeVecElementPairCompareFloat cs2(cs1);
+  assert( cs2.isA() == __LGFRTIMEVECELEMENTPAIRCOMPAREFLOAT );
+
+  // Test assignment operator
+  LgFrTimeVecElementPairCompareFloat cs3;
+  cs3 = cs2;
+  assert( cs3.isA() == cs2.isA() );
+
+  // Test clone method
+  LgFrPairCompareFloat *cs4Ptr = cs1.clone();
+  assert( cs4Ptr->isA() == cs1.isA() );
+
+  // Test destructor
+  delete cs4Ptr;
+
+  // Test setting and getting the period to sort on.
+  assert( cs1.period() == 0 );
+  cs1.period(5);
+  assert( cs1.period() == 5 );
+  cs1.period(2);
+  assert( cs1.period() == 2 );
+
+  // Test itemTimeVecPairCompareFloat
+  // method by doing sort and testing result
+
+  // Create a part schedule to sort
+  const size_t psSize(100);
+  LgFrSortingPartScheduleFloat ps(psSize);
+  const LgFrSortingPartScheduleFloat & constps = ps;
+  RWCString partName;
+  LgFrPart part;
+  LgFrTimeVecFloat tvf(10);
+  srand( 1 );
+  char chars[]="abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUV";
+  int nChars = sizeof(chars)-1;
+  for ( i=0; ps.entries()<psSize; i++ ) {
+     // Generate 2 character partname
+     partName = RWCString(chars[rand()%nChars]) + 
+                RWCString(chars[rand()%nChars]);
+     // Create part
+     part = LgFrPart(partName);
+     // Make sure part was not already created
+     if ( ! (ps.contains(part)) ) {
+       // Generate random timeVecFloat
+       for ( t=0; t<tvf.length(); t++ ) tvf[t] = rand()/10.f; 
+       // Insert part and timeVecFloat in schedule
+       ps.insertKeyAndValue( part, tvf );
+     }
+  }
+
+  // Display unsorted schedule
+  // cout <<"$$$$$$$$$$ Unsorted $$$$$$$$$$$$$$$" <<endl;
+  // ps.print();
+
+  // Set period to sort on, then Sort the part schedule
+  cs1.period(4);
+  ps.sort( &cs1 );
+
+  // Display sorted schedule
+  // cout <<"$$$$$$$$$$  Sorted  $$$$$$$$$$$$$$$" <<endl;
+  // ps.print();
+
+  // Test to insure schedule is sorted
+  for ( i=1; i<ps.entries(); i++ ) {
+     assert( (constps[i-1].timeVecFloat())[4] <= (constps[i].timeVecFloat())[4] );
+  }
+
+  
+}

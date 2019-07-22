@@ -1,0 +1,588 @@
+head	1.2;
+access;
+symbols
+	beforeInforms:1.1.1.1
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.2
+date	2005.04.12.18.44.43;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Removing Sbb
+@
+text
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a0 534
+// Copyright (C) 2002, International Business Machines
+// Corporation and others.  All Rights Reserved.
+#ifndef SbbBranchActual_H
+#define SbbBranchActual_H
+
+#include "SbbBranchBase.hpp"
+
+
+/// Define a clique class
+
+
+class SbbClique : public SbbObject {
+
+public:
+
+  // Default Constructor 
+  SbbClique ();
+
+  /** Useful constructor (which are integer indices)
+      slack can denote a slack in set.
+      If type == NULL then as if 1
+  */
+  SbbClique (SbbModel * model, int cliqueType, int numberMembers,
+	     const int * which, const char * type,
+	     int identifier,int slack=-1);
+  
+  // Copy constructor 
+  SbbClique ( const SbbClique &);
+   
+  /// Clone
+  virtual SbbObject * clone() const;
+
+  // Assignment operator 
+  SbbClique & operator=( const SbbClique& rhs);
+
+  // Destructor 
+  ~SbbClique ();
+  
+  /// Infeasibility - large is 0.5
+  virtual double infeasibility(int & preferredWay, double & otherWay) const;
+
+  /// This looks at solution and sets bounds to contain solution
+  virtual void feasibleRegion();
+  /// Creates a branching object
+  virtual SbbBranchingObject * createBranch(int way) const;
+  /// Number of members
+  inline int numberMembers() const
+  {return numberMembers_;};
+
+  /// Number of Non SOS members i.e. fixing to zero is strong
+  inline int numberNonSOSMembers() const
+  {return numberNonSOSMembers_;};
+
+  /// Members (indices in range 0 ... numberIntegers_-1)
+  inline const int * members() const
+  {return members_;};
+
+  /** Type of each member i.e. which way is strong 0=non SOS, 1 =SOS,
+      index is 0 ... numberMembers_-1 */
+  inline const char type(int index) const
+  {if (type_) return type_[index]; else return 1;};
+
+  /// Clique type - 0 <=, 1 == 
+  inline int cliqueType() const
+  {return cliqueType_;};
+
+protected:
+  /// data
+  /// Number of members
+  int numberMembers_;
+
+  /// Number of Non SOS members i.e. fixing to zero is strong
+  int numberNonSOSMembers_;
+
+  /// Members (indices in range 0 ... numberIntegers_-1)
+  int * members_;
+
+  /// Type of each member 0=SOS, 1 =clique
+  char * type_;
+
+  /// Clique type - 0 <=, 1 ==
+   int cliqueType_;
+
+  /// Which one is slack (if any) sequence within this set
+  int slack_;
+};
+
+/** Define Special Ordered Sets of type 1 and 2.  These do not have to be
+    integer - so do not appear in lists of integers.
+    
+    which_ points directly to columns of matrix
+*/
+
+
+class SbbSOS : public SbbObject {
+
+public:
+
+  // Default Constructor 
+  SbbSOS ();
+
+  /** Useful constructor - which are integer indices
+      and  weights are also given.  If null then 0,1,2..
+      type is SOS type
+  */
+  SbbSOS (SbbModel * model, int numberMembers,
+	   const int * which, const double * weights, int identifier,
+	  int type=1);
+  
+  // Copy constructor 
+  SbbSOS ( const SbbSOS &);
+   
+  /// Clone
+  virtual SbbObject * clone() const;
+
+  // Assignment operator 
+  SbbSOS & operator=( const SbbSOS& rhs);
+
+  // Destructor 
+  ~SbbSOS ();
+  
+  /// Infeasibility - large is 0.5
+  virtual double infeasibility(int & preferredWay, double & otherWay) const;
+
+  /// This looks at solution and sets bounds to contain solution
+  virtual void feasibleRegion();
+  /// Creates a branching object
+  virtual SbbBranchingObject * createBranch(int way) const;
+
+  /// Number of members
+  inline int numberMembers() const
+  {return numberMembers_;};
+
+  /// Members (indices in range 0 ... numberColumns-1)
+  inline const int * members() const
+  {return members_;};
+
+  /// SOS type
+  inline int sosType() const
+  {return sosType_;};
+
+  /** Array of weights */
+  inline const double * weights() const
+  { return weights_;};
+
+private:
+  /// data
+
+  /// Members (indices in range 0 ... numberColumns-1)
+  int * members_;
+  /// Weights
+  double * weights_;
+
+  /// Number of members
+  int numberMembers_;
+  /// SOS type
+   int sosType_;
+};
+
+/// Define a single integer class
+
+
+class SbbSimpleInteger : public SbbObject {
+
+public:
+
+  // Default Constructor 
+  SbbSimpleInteger ();
+
+  // Useful constructor - passed integer index and model index
+  SbbSimpleInteger (SbbModel * model, int sequence, int iColumn);
+  
+  // Copy constructor 
+  SbbSimpleInteger ( const SbbSimpleInteger &);
+   
+  /// Clone
+  virtual SbbObject * clone() const;
+
+  // Assignment operator 
+  SbbSimpleInteger & operator=( const SbbSimpleInteger& rhs);
+
+  // Destructor 
+  ~SbbSimpleInteger ();
+  
+  /// Infeasibility - large is 0.5
+  virtual double infeasibility(int & preferredWay, double & otherWay) const;
+
+  /** Set bounds to contain the current solution.
+
+    More precisely, for the variable associated with this object, take the
+    value given in the current solution, force it within the current bounds
+    if required, then set the bounds to fix the variable at the integer
+    nearest the solution value.
+  */
+  virtual void feasibleRegion();
+
+  /// Creates a branching object
+  virtual SbbBranchingObject * createBranch(int way) const;
+
+  /** \brief Given a valid solution (with reduced costs, etc.),
+      return a branching object which would give a new feasible
+      point in the good direction.
+
+    The preferred branching object will force the variable to be +/-1 from
+    its current value, depending on the reduced cost and objective sense.  If
+    movement in the direction which improves the objective is impossible due
+    to bounds on the variable, the branching object will move in the other
+    direction.  If no movement is possible, the method returns NULL.
+
+    Only the bounds on this variable are considered when determining if the new
+    point is feasible.
+  */
+  virtual SbbBranchingObject * preferredNewFeasible() const;
+  
+  /** \brief Given a valid solution (with reduced costs, etc.),
+      return a branching object which would give a new feasible
+      point in a bad direction.
+
+    As for preferredNewFeasible(), but the preferred branching object will
+    force movement in a direction that degrades the objective.
+  */
+  virtual SbbBranchingObject * notPreferredNewFeasible() const ;
+  
+  /** Reset original upper and lower bound values from the solver.
+  
+    Handy for updating bounds held in this object after bounds held in the
+    solver have been tightened.
+   */
+  virtual void resetBounds();
+  
+  /// Sequence number
+  inline int sequence() const
+  {return sequence_;};
+
+  /// Model column number
+  inline int modelSequence() const
+  {return columnNumber_;};
+
+  /// Original bounds
+  inline double originalLowerBound() const
+  { return originalLower_;};
+  inline double originalUpperBound() const
+  { return originalUpper_;};
+
+
+private:
+  /// data
+
+  /// Sequence
+  int sequence_;
+  /// Column number in model
+  int columnNumber_;
+  /// Original lower bound
+  double originalLower_;
+  /// Original upper bound
+  double originalUpper_;
+};
+
+
+/** Simple branching object for an integer variable
+
+  This object can specify a two-way branch on an integer variable. For each
+  arm of the branch, the upper and lower bounds on the variable can be
+  independently specified.
+  
+  Variable_ holds the index of the integer variable in the integerVariable_
+  array of the model.
+*/
+
+class SbbIntegerBranchingObject : public SbbBranchingObject {
+
+public:
+
+  /// Default constructor 
+  SbbIntegerBranchingObject ();
+
+  /** Create a standard floor/ceiling branch object
+
+    Specifies a simple two-way branch. Let \p value = x*. One arm of the
+    branch will be is lb <= x <= floor(x*), the other ceil(x*) <= x <= ub.
+    Specify way = -1 to set the object state to perform the down arm first,
+    way = 1 for the up arm.
+  */
+  SbbIntegerBranchingObject (SbbModel *model, int variable,
+			     int way , double value) ;
+  
+  /** Create a degenerate branch object
+
+    Specifies a `one-way branch'. Calling branch() for this object will
+    always result in lowerValue <= x <= upperValue. Used to fix a variable
+    when lowerValue = upperValue.
+  */
+
+  SbbIntegerBranchingObject (SbbModel *model, int variable, int way,
+			     double lowerValue, double upperValue) ;
+  
+  /// Copy constructor 
+  SbbIntegerBranchingObject ( const SbbIntegerBranchingObject &);
+   
+  /// Assignment operator 
+  SbbIntegerBranchingObject & operator= (const SbbIntegerBranchingObject& rhs);
+
+  /// Clone
+  virtual SbbBranchingObject * clone() const;
+
+  /// Destructor 
+  virtual ~SbbIntegerBranchingObject ();
+  
+  /** \brief Sets the bounds for the variable according to the current arm
+	     of the branch and advances the object state to the next arm.
+  */
+  virtual void branch(bool normalBranch=false);
+
+  /** \brief Print something about branch - only if log level high
+  */
+  virtual void print(bool normalBranch);
+
+private:
+  /// Lower [0] and upper [1] bounds for the down arm (way_ = -1)
+  double down_[2];
+  /// Lower [0] and upper [1] bounds for the up arm (way_ = 1)
+  double up_[2];
+};
+
+
+/** Branching object for unordered cliques
+
+    Intended for cliques which are long enough to make it worthwhile
+    but <= 64 members.  There will also be ones for long cliques. 
+
+    Variable_ is the clique id number (redundant, as the object also holds a
+    pointer to the clique.
+ */
+class SbbCliqueBranchingObject : public SbbBranchingObject {
+
+public:
+
+  // Default Constructor 
+  SbbCliqueBranchingObject ();
+
+  // Useful constructor
+  SbbCliqueBranchingObject (SbbModel * model,  const SbbClique * clique,
+			    int way,
+			    int numberOnDownSide, const int * down,
+			    int numberOnUpSide, const int * up);
+  
+  // Copy constructor 
+  SbbCliqueBranchingObject ( const SbbCliqueBranchingObject &);
+   
+  // Assignment operator 
+  SbbCliqueBranchingObject & operator=( const SbbCliqueBranchingObject& rhs);
+
+  /// Clone
+  virtual SbbBranchingObject * clone() const;
+
+  // Destructor 
+  virtual ~SbbCliqueBranchingObject ();
+  
+  /// Does next branch and updates state
+  virtual void branch(bool normalBranch=false);
+
+  /** \brief Print something about branch - only if log level high
+  */
+  virtual void print(bool normalBranch);
+private:
+  /// data
+  const SbbClique * clique_;
+  /// downMask - bit set to fix to weak bounds, not set to leave unfixed
+  unsigned int downMask_[2];
+  /// upMask - bit set to fix to weak bounds, not set to leave unfixed
+  unsigned int upMask_[2];
+};
+
+
+/** Unordered Clique Branching Object class.
+    These are for cliques which are > 64 members
+    Variable is number of clique.
+ */
+class SbbLongCliqueBranchingObject : public SbbBranchingObject {
+
+public:
+
+  // Default Constructor 
+  SbbLongCliqueBranchingObject ();
+
+  // Useful constructor
+  SbbLongCliqueBranchingObject (SbbModel * model,  const SbbClique * clique,
+				 int way,
+			    int numberOnDownSide, const int * down,
+			    int numberOnUpSide, const int * up);
+  
+  // Copy constructor 
+  SbbLongCliqueBranchingObject ( const SbbLongCliqueBranchingObject &);
+   
+  // Assignment operator 
+  SbbLongCliqueBranchingObject & operator=( const SbbLongCliqueBranchingObject& rhs);
+
+  /// Clone
+  virtual SbbBranchingObject * clone() const;
+
+  // Destructor 
+  virtual ~SbbLongCliqueBranchingObject ();
+  
+  /// Does next branch and updates state
+  virtual void branch(bool normalBranch=false);
+
+  /** \brief Print something about branch - only if log level high
+  */
+  virtual void print(bool normalBranch);
+private:
+  /// data
+  const SbbClique * clique_;
+  /// downMask - bit set to fix to weak bounds, not set to leave unfixed
+  unsigned int * downMask_;
+  /// upMask - bit set to fix to weak bounds, not set to leave unfixed
+  unsigned int * upMask_;
+};
+
+/** Branching object for Special ordered sets
+
+    Variable_ is the set id number (redundant, as the object also holds a
+    pointer to the set.
+ */
+class SbbSOSBranchingObject : public SbbBranchingObject {
+
+public:
+
+  // Default Constructor 
+  SbbSOSBranchingObject ();
+
+  // Useful constructor
+  SbbSOSBranchingObject (SbbModel * model,  const SbbSOS * clique,
+			    int way,
+			 double separator);
+  
+  // Copy constructor 
+  SbbSOSBranchingObject ( const SbbSOSBranchingObject &);
+   
+  // Assignment operator 
+  SbbSOSBranchingObject & operator=( const SbbSOSBranchingObject& rhs);
+
+  /// Clone
+  virtual SbbBranchingObject * clone() const;
+
+  // Destructor 
+  virtual ~SbbSOSBranchingObject ();
+  
+  /// Does next branch and updates state
+  virtual void branch(bool normalBranch=false);
+
+  /** \brief Print something about branch - only if log level high
+  */
+  virtual void print(bool normalBranch);
+private:
+  /// data
+  const SbbSOS * set_;
+  /// separator
+  double separator_;
+};
+
+/** Branching decision default class
+
+  This class implements a simple default algorithm
+  (betterBranch()) for choosing a branching variable. 
+*/
+
+class SbbBranchDefaultDecision : public SbbBranchDecision {
+public:
+  // Default Constructor 
+  SbbBranchDefaultDecision ();
+
+  // Copy constructor 
+  SbbBranchDefaultDecision ( const SbbBranchDefaultDecision &);
+
+  virtual ~SbbBranchDefaultDecision();
+
+  /// Clone
+  virtual SbbBranchDecision * clone() const;
+
+  /// Initialize, <i>e.g.</i> before the start of branch selection at a node
+  virtual void initialize(SbbModel * model);
+
+  /** \brief Compare two branching objects. Return nonzero if \p thisOne is
+	     better than \p bestSoFar.
+
+    The routine compares branches using the values supplied in \p numInfUp and
+    \p numInfDn until a solution is found by search, after which it uses the
+    values supplied in \p changeUp and \p changeDn. The best branching object
+    seen so far and the associated parameter values are remembered in the
+    \c SbbBranchDefaultDecision object. The nonzero return value is +1 if the
+    up branch is preferred, -1 if the down branch is preferred.
+
+    As the names imply, the assumption is that the values supplied for
+    \p numInfUp and \p numInfDn will be the number of infeasibilities reported
+    by the branching object, and \p changeUp and \p changeDn will be the
+    estimated change in objective. Other measures can be used if desired.
+
+    Because an \c SbbBranchDefaultDecision object remembers the current best
+    branching candidate (#bestObject_) as well as the values used in the
+    comparison, the parameter \p bestSoFar is redundant, hence unused.
+ */
+  virtual int betterBranch(SbbBranchingObject * thisOne,
+			    SbbBranchingObject * bestSoFar,
+			    double changeUp, int numInfUp,
+			    double changeDn, int numInfDn);
+
+private:
+  
+  /// Illegal Assignment operator 
+  SbbBranchDefaultDecision & operator=(const SbbBranchDefaultDecision& rhs);
+
+  /// data
+
+  /// "best" so far
+  double bestCriterion_;
+
+  /// Change up for best
+  double bestChangeUp_;
+
+  /// Number of infeasibilities for up
+  int bestNumberUp_;
+
+  /// Change down for best
+  double bestChangeDown_;
+
+  /// Number of infeasibilities for down
+  int bestNumberDown_;
+
+  /// Pointer to best branching object
+  SbbBranchingObject * bestObject_;
+
+};
+
+#endif
+@
+
+
+1.1.1.1
+log
+@COIN code from IBM hosted repository (before move to informs)
+@
+text
+@@

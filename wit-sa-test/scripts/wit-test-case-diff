@@ -1,0 +1,91 @@
+#!/bin/ksh
+
+#-------------------------------------------------------------------------------
+# Script wit-test-case-diff
+#
+# Displays the significant differences from saved output for a single run of the
+# WIT stand alone executable for test purposes.
+#
+# Parameters:
+#    $1: The subdirectory of $WIT_HOME/wit-sa-test/data in which the input
+#        data file for the run, wit.data, is to be found.
+#    $2: The stem of the name of the parameters file for the run.
+#
+# The files to be compared are:
+#    $WIT_HOME/wit-sa-test/data/$1/$2/output-sav/*
+#    $WIT_HOME/wit-sa-test/data/$1/$2/output-new/*
+#
+# If there are no  significant differences:
+#    Nothing is displayed.
+#
+# If there are any significant differences:
+#    A heading is displayed.
+#    The significant differences are displayed.
+#-------------------------------------------------------------------------------
+
+DATA_DIR=$WIT_HOME/wit-sa-test/data/$1
+
+if [ ! -d $DATA_DIR/$2/output-sav ]
+then
+
+   echo
+   echo "ERROR from wit-test-case-diff:"
+   echo "   The directory"
+   echo "   $DATA_DIR/$2/output-sav"
+   echo "   does not exist."
+   echo "   wit-test-case-diff aborted."
+   echo
+
+   exit
+
+fi
+
+cd $DATA_DIR/$2/output-sav
+
+for FILE_NAME in *
+do
+
+   cd $DATA_DIR
+
+   diff                                   \
+     -I "^Build Date:"                    \
+     -I "^Run Started At:"                \
+     -I "^CPU Time:"                      \
+     -I "^   Input Reading time:"         \
+     -I "^   Default Output time:"        \
+     -I "^   Preprocessing time:"         \
+     -I "^   Heuristic time:"             \
+     -I "^   Opt. Prob. Management time:" \
+     -I "^   CPLEX time:"                 \
+     -I "^   Postprocessing time:"        \
+     -I "^   P.I. Pegging time:"          \
+     -I "^   MRP time:"                   \
+     -I "^   FSS time:"                   \
+     -I "^   Memory Deallocation time:"   \
+     -I "^   Other CPU time:"             \
+     -I "^   Standard CPU time:"          \
+     -I "^   Non-default Output time:"    \
+     -I "^   Total CPU time:"             \
+      $2/output-sav/$FILE_NAME            \
+      $2/output-new/$FILE_NAME            \
+    > diff.txt                            \
+
+   if [ -s diff.txt ]
+   then
+
+      echo
+      echo
+      echo "======================================================="
+      echo "diff"
+      echo "   $1/$2/output-sav/$FILE_NAME"
+      echo "   $1/$2/output-new/$FILE_NAME"
+      echo "======================================================="
+      echo
+
+      cat diff.txt
+
+   fi
+
+   rm diff.txt
+
+done

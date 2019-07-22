@@ -1,0 +1,540 @@
+                WIT INPUT-DATA PARSER AND INTERPRETER
+                =====================================
+
+
+INTRODUCTION
+------------
+
+This document describes a parser and an interpreter designed to simplify
+the process of specifying and checking the validity of input data for 
+the Workstation Implosion Tool (WIT).  It is primarily intended for
+programmers who wish to maintain and extend the input-data language and
+its semantics.
+
+The software facility being described here actually has four parts: (1) the
+lexical analyzer (also called the lexer or scanner), (2) the parser or syntax
+analyzer, which builds the syntax tree, (3) the semantics analyzer, which
+consists of semantics actions invoked during the parse to construct objects,
+and (4) the interpreter, which, once all the information about a language
+statement has been collected, invokes the appropriate Wit API function.
+Often, the four parts are not clearly distinguishable.  When a precise
+distinction is not necessary, the lexer-parser-syntax analyzer combination
+is referred to as "the parser" in this document. 		
+
+The parser and the lexer have been written using yacc and lex compiler-
+writing tools.  Originally written for AIX, the code has been ported to
+other platforms, with minor implementation changes but with exactly the
+same syntax and semantics.  In addition to the syntactic extensibility
+inherent in the yacc and lex grammar description, the parser and the 
+interpreter have been designed with extensibility in mind.  
+
+For example, a symbol table has been implemented in one file and is used
+for checking valid attribute names, argument types, and number of arguments.
+It is easy to add new attributes and arguments to this symbol table.  By 
+using wrapper functions, it is also easy to perform additional validation,
+obtain runtime information, and invoke the actual Wit API function.
+
+With a little more work, one can also extend the syntax and semantics
+of the language since the parser description is simply a list of syntax
+rules and semantic actions to be invoked at various stages while the
+parse tree is being built.  Syntax errors can be given precise inter-
+pretation using parse states and the available Wit message facility.
+By setting "states" during the parse, the programmer easily keeps track
+of what input is expected next, as well as the last token read, current
+line number and file name.
+
+
+THE LANGUAGE
+------------
+
+Essentially, the language consists of a sequence of statements, and each
+statement may have one entity and zero or more attributes associated with
+it.  In release 4.1, the valid statements are:
+
+               release specification
+               add command
+               set command
+               read command
+
+Each statement ends with a semicolon.
+
+An "add" command consists of the "add" keyword followed by the 
+specification of an "addable entity," followed by zero or more attribute 
+specifications.  The addable entities are:
+
+               part
+               operation
+               bomEntry
+               subEntry
+               bopEntry
+               demand
+               partWithOperation
+
+A "set" command consists of the "set" keyword followed by the 
+specification of a "settable entity," followed by zero or more attribute
+specifications.  The settable entities are:
+
+               problem
+               part
+               operation
+               bomEntry
+               subEntry
+               bopEntry
+               demand
+
+An entity specification consists of the name of one of the above entities 
+followed by "arguments". 
+
+An attribute specification consists of the name of an attribute followed
+by the attribute value which, for generality, we may also call it an 
+argument.  Usually this value is one of the basic types integer, float, 
+string or boolean.  There are, however, some composite types which are a 
+bit more complex.  They are vectors and bound-sets.  These are explained 
+in detail in the Wit User and Reference Guide.
+
+The complete formal syntax of the language is given at the end of this
+document.  
+
+
+INVOKING THE LEXER AND PARSER
+-----------------------------
+
+In the AIX implementation, the makefile appl.mk in the .../src directory
+contains the following lines to build the lexer and the parser:
+
+         lex  ../src/witLexer.l
+         yacc -d ../src/witParse.y                 
+
+where witLexer.l and witParse.y are, respectively, the source files for
+the lexer and the parser.  Three output files are generated in the 
+.../power (or whatever platform) subdirectory.  They are: ytab.h,
+witParse.C and witLexer.C.  These files are compiled by the C++ compiler 
+to produce the function yyparse().  Two libraries are included when 
+invoking the linker: liby.a and libl.a.  In AIX and Sun OS, these reside 
+in /usr/lib.
+
+The OS/2 and DOS implementations use MKS LEX & YACC products by Mortice
+Kern Systems, Inc.
+
+The parser gets started by invoking the function parseIt (a member of
+class WitParser).  This function creates the symbol table object and a 
+hash dictionary, and invokes the generated function yyparse().  yyparse
+is the higher-level routine.  It calls the lexer yylex() whenever it
+needs a token from the input stream.  The lexer then scans the input,
+recognizing tokens as defined by "regular expressions" in witLexer.l.
+
+
+LOGICAL STRUCTURE
+-----------------
+
+The lexer, parser and interpreter are logically built by the following
+C++ classes:
+
+WitParlex           Contains static global data for the entire parser and
+                    lexer and defines the data types Integer, Float, String,
+                    Boolean, Category, IntVector, FloatVector and BoundSet.
+                    It also contains information necessary to produce
+                    meaningful error messages.
+
+WitLexer            Derived from WitParlex, this class encapsulates the
+                    lexer.
+
+WitParser           Derived from WitParlex, this class encapsulates the
+                    parser.  It contains all information about the current
+                    state of the parsing process: pointers to the current
+                    entity object and attribute object, pointer to the 
+                    symbol table object, pointer to the WitRun object, 
+                    pointer to the Lexer object, and the current "parse
+                    state" (enum PS).  Therefore, most of the error 
+                    diagnostics are produced by the semantic actions 
+                    within the generated friend function yyparse().
+
+WitEntity           Encapsulates a Wit entity (e.g., part, demand).
+                    During the parsing process there is almost always a 	
+                    "current entity" object which keeps track of the 
+                    number, type and values of the entity arguments.  
+                    Member functions are called to check the validity of
+                    the arguments of each entity once they are parsed.
+
+WitAttribute        Inherits from WitEntity.  This class encapsulates a
+                    Wit attribute.  An object of type Attribute keeps 
+                    track of the type and value of the current attribute 
+                    (if there is one).  A member function checks its 
+                    validity. 
+
+WitVectorType       Implements "vector formats".  When a Wit function
+                    requires a vector format, an array of the required
+                    data type is constructed and passed to the function.
+                    The length of the vector is equal to the value
+                    returned by myProblem()->nPeriods.
+
+WitBoundSetBuffer   Implements BoundSet attribute values.  Each BoundSet-
+                    Buffer object may be of type execBounds, stockBounds
+                    or cumShipBounds and contains 3 pointers to VectorType
+                    objects of the required data type.    
+
+WitSymTabEntry      Implements a "symbol table entry" (explained in more 
+                    detail in the following section).
+
+WitSymTable         The collection of all symbol table entries is the	
+                    "symbol table" which is used by the parser to verify
+                    the number and types of arguments associated with	
+                    entities and attributes and to invoke the appropriate
+                    Wit API function.
+ 	                  
+
+THE SYMBOL TABLE
+----------------
+
+The class SymTable encapsulates a symbol table which associates Wit
+data-format rules (subsequently referred to simply as "rules") with API
+function declarations.  The symbol table is actually an array of 	
+symbol-table-entry structures.  Each structure is declared as follows:
+
+  typedef struct witSymbolDef
+  { 
+    char        *rule;          // rule recognized by the parser
+    int         nparms;         // number of parameters
+    functionP   func;           // pointer to local function wrapper
+    pType       parmTypes[10];  // types of parameters
+  } witSymbolDef;
+   
+A maximum of 10 "parameters" may be specified for an entity or attribute,
+although the syntax in Version 4.1 currently restricts the number of 
+attribute parameters or values to 1.  nparms is the number of 
+parameters which must be equal to the number of arguments or values 
+specified for an entity or an attribute.
+
+A data-format rule has one of the following forms:
+
+            add_entityName
+            set_entityName
+            set_entityName_attributeName
+            read
+where 
+            entityName = an entity name (e.g., part, demand)
+            attributeName = an attribute name (e.g., unitCost)
+
+Examples of valid rules are:
+
+            add_part
+            set_problem_autoPriority
+            set_part
+            set_part_unitCost
+            read       
+
+Thus each valid combination of a command, an entity and an attribute in 
+the language is represented by a data-format rule, and for each such rule
+there must be a corresponding entry in the symbol table.   
+
+A "pType" (implemented as an enumerated constant) is one of the following
+data types:
+
+            Integer
+            Float
+            String
+            Boolean
+            IntVector
+            FloatVector
+            BoundSet 
+ 
+func is a pointer to a "function wrapper."  Each such function is declared
+as a global function with prototype 
+
+            witReturnCode APIFunctionName_(void);
+
+where APIFunctionName is (by convention) the actual name of the Wit API
+function.
+
+
+HOW TO ADD A SYMBOL TABLE ENTRY
+-------------------------------
+
+To add a symbol table entry for a new rule, add an element to the
+WitSymTable::symbolTable[] array in the file SymTable.C, of the form:
+
+    {"rule", numberOfParms, APIFunctionName_, {datatype, datatype, ... }}
+
+Then, declare the function wrapper in the file SymTabEn.h, in the form:
+      
+      witReturnCode  APIFunctionName_(void);
+
+Finally, define the wrapper function in the file SymTable.C, which basically
+looks as follows:
+
+      witReturnCode APIFunctionName_(void)
+      {
+        declarations;
+        
+        WitSymTable::myWitRun()->APIFunctionName(arguments to API function);
+        return 0;
+      }       
+
+Some member functions are provided in class WitEntity to retrieve arguments 
+of the current entity and the current attribute, which in turn can be 
+passed to the API function.  For example, to retrieve the second argument 
+of the current entity (assuming it is a string) and the value of the 
+current attribute (assuming it is an integer), one can use the functions:
+
+      theParser->currentEntity()->getStringArg(1)
+and
+      theParser->currentAttr()->getIntArg(0)  
+
+As an example, suppose it is desired to add the following elements to the
+language:
+
+      add widget "name" index
+        price float-value;
+
+To implement this new entity and attribute, add the following entries to
+the symbol table:
+
+      {"add_widget", 2, witAddWidget_, {String, Integer}},
+      {"set_widget_price", 1, witSetWidgetPrice_, {Float}},
+
+then, declare the following function wrappers in SymTabEn.h:
+
+      witReturnCode  witAddWidget_(void);
+      witReturnCode  witSetWidgetPrice_(void);
+
+The function wrapper definitions may look something like these:
+
+      witReturnCode witAddWidget_(void)
+      {
+        WitSymTable::myWitRun()->witAddWidget
+          (theParser->currentEntity()->getStringArg(0),
+           theParser->currentEntity()->getIntArg(1));
+        return 0;
+      }
+
+      witReturnCode witSetWidgetPrice_(void)
+      {
+        WitSymTable::myWitRun()->witSetWidgetPrice
+          (theParser->currentEntity()->getStringArg(0),
+           theParser->currentAttr()->getIntArg(0));
+        return 0;
+      }
+
+The actual API functions would be coded as member functions of class 
+WitRun.
+
+For convenience, several member functions have been added to class
+WitEntity to retrieve arguments and other internal Wit data.  An example 
+is the function getPartName:
+
+      const char * const  WitEntity::getPartName()
+      {
+        ...
+        case part:
+          return getStringArg(0);
+        case bopEntry:
+          return getStringArg(1);
+        ...
+      }  
+
+To delete an attribute for a particular entity, simply delete the
+corresponding data-format rule from the symbol table and, if desired,
+the wrapper declaration and the wrapper definition.
+
+
+HOW TO ADD A NEW ENTITY TO THE GRAMMAR
+--------------------------------------
+
+To add a new entity to the grammar, simply do the following: 
+
+  1. Add a token to the lexer and parser in witParse.y:
+
+       %token WIDGET
+ 
+  2. Add a new entity type in WitEntit.h:
+
+       typedef enum eType { ... , widget} eType;
+
+  3. Add a new production and a semantic action to the parser in
+     witParse.y. For example:
+
+       entity_name: WIDGET
+       {
+         theParser->currentRule += "_widget";
+         entityType = WitEntity::widget;
+       }
+
+  4. Add a "regular expression" and a lexical action to the lexer in
+     witLexer.l:
+
+       widget     { yylval.strval = strdup((const char *) &yytext[0]);
+                    return WIDGET; 
+                  }
+
+     This returns a token to the parser and places the associated value
+     in the variable yylval, where the parser can find it.
+
+
+ERROR DETECTION AND REPORTING
+-----------------------------
+
+Error reporting should give as much information about the error as is
+possible.  The default yacc error reporting simply gives the generic
+message "syntax error" and stops parsing.  In the Wit parser, a better
+error reporting mechanism has been implemented, which provides more 
+information about errors and, whenever possible, tells the user precisely
+what to fix.
+
+The general technique for reporting an error is to use the Wit error 
+message facility to provide (1) an error description, (2) information 
+about the location of the error and the last token read, and (3) an
+optional termination message and exit.  For example, if an attribute is 
+not valid for an entity, as in:
+
+            set part "A"
+              nPeriods 6;           
+
+the error is handled as follows:
+
+       theParser->myWitRun()->message(noAttributeDefMsg,
+         theParser->currentAttr()->attrID(),
+         theParser->currentEntity()->entityID());
+       prterror();
+       theParser->myWitRun()->message(parsingStopsMsg);
+                  
+This causes the parser to stop with messages similar to the following:
+
+       WIT0612S Attribute "nPeriods" is not defined for entity "part".
+       WIT0611S Last token read (nPeriods) at line number 51 in file
+                /u/implode/c1jlaf/wit/examples/ex4.data
+       WIT0631S Parsing of data input stops.
+      
+Messages like these are created by adding message symbols to the file
+message.h, and adding the message text to the file message.C.  The
+function prterror() produces information about the location of the error 
+and is equivalent to coding:
+
+       theParser->myWitRun()->message(lineNumberMsg, yytext, 
+         WitParlex::lineno(), WitParlex::fileName());
+      
+The text of the last token read is always stored by the lexer in the null-
+terminated string yytext. 
+
+The message routine may be called with the message identifier 
+"parsingStopsMsg".  This is a fatal type of message which causes the 
+parsing process to terminate immediately, instead of continuing to attempt
+to find more errors.  
+
+It is still possible for yacc to encounter certain unusual error situations
+(e.g., "yacc stack overflow") in which it wants to call the error routine
+yyerror("some message").  The Wit parser overrides yyerror() with its
+own definition which provides more information about the location of the
+error (such as the line number).  This technique that reports a syntax 
+error with a line number and the last token read is a good one.  If we 
+cannot identify the error, we use this as a fallback.
+
+This section thus far has concentrated on general techniques for error
+reporting.  In order to discuss error detection and more specific error
+reporting, it is helpful to distinguish four categories of errors:
+
+  1.  Lexical errors (such as an unterminated quoted string or an invalid
+      character or sequence of characters).
+
+  2.  Syntax errors, produced when the parser cannot match a production of
+      the language grammar.
+
+  3.  Semantics errors, caused when something wrong is detected by a 
+      semantic action or by one of the member functions invoked to build
+      objects or to collect information.
+
+  4.  Wit API errors, which are produced by the Wit system when an API
+      function is invoked or during the actual run, that is, during one
+      of the Wit processing steps after the input data has been read.
+      These errors are described in detail in the Wit User and Reference 
+      Guide and are of no concern here.
+
+        
+Extending the Lexer for Error Checking
+--------------------------------------
+
+The method used to describe to the lexer what each token looks like and
+what to do when a token is recognized, is to code a table of regular
+expressions and corresponding actions in the file witLexer.l.  For
+example, the following code is used to describe an integer:
+
+      -?[0-9]+      { yylval.intval = atoi((const char *) &yytext[0]);
+                      return INTEGER; 
+                    }
+
+This says that an integer consists of an optional sign followed by one or
+more digits, and when an integer is recognized in the input stream, the
+lexer should convert the text of the token to an integer, store away the
+value, and return to the parser with an indication that the type of the
+token is INTEGER.
+
+A similar technique can be used to extend the lexer to detect and report
+common lexical errors.  For example, suppose that we discover that many
+users often make the common mistake of using the character combination /*
+to start comments, instead of the language-supported //.  It may be 
+desirable to produce a specific error message in this case.  This can be
+done by adding the following code to the lexer in the "rules" section:
+
+      /*        { theParser->myWitRun()->message(invalidCommentChar);
+                  theParser->myWitRun()->message(lineNumberMsg,
+                    yytext, WitParlex::lineno(), WitParlex::fileName());
+                } 
+
+and then adding a new message to read:
+
+      "Warning: if you are trying to code a comment, use // instead of /*"  
+
+This technique of accepting illegal input and then reporting it with an 
+error or warning message is a powerful one that can be used to anticipate 
+user errors and improve the error detection and reporting capabilities of
+the lexer. 
+
+
+Using Parse States
+------------------
+
+A technique that we designed in the Wit parser to handle syntax errors 
+(the type-2 errors as defined above) is the use of "parse states" and the
+implementation of a syntax checker which generates a meaningful error 
+message based on the current state, the current token, and the expected
+input.
+
+In essence, parse states encode the state of the yacc parser so that better
+error messages can be produced, and for use in situations where context-
+sensitive behavior is required.  Parse states are defined as enumerated
+constants (enum PS) in the header file witParse.h.  As the parser
+recognizes syntax rules, states are set.  When a syntax error occurs, the 
+function yyparse() returns control to WitParser::parseIt() which in turn
+invokes the syntax checker as follows:
+
+      theParser->prtSyntaxError(entryPtr, theParser->parseState(),
+        (const char *) yytext);
+ 
+The function prtSyntaxError() is defined in the file states.C.
+
+Consider, for example, the following syntax rules:
+
+      release_specification: RELEASE release_num
+      release_num: STRING 
+
+When the token RELEASE is recognized, the parser enters the state
+PS_release:
+
+      theParser->setParseState(WitParser::PS_release); 
+
+Now, if the input data contains RELEASE 4.0 (instead of RELEASE "4.0"),
+a syntax error occurs when the parser encounters a FLOAT token instead 
+of a STRING token.  The prtSyntaxError() routine contains the case:
+
+   case WitParser::PS_release:
+     theParser->myWitRun()->message(syntaxErrorMsg,
+       "a quoted string (the release number) after \"release\"", yytext);
+     break;
+
+which produces the message:
+
+      WIT0644S Expecting a quoted string (the release number) after 
+               "release" but found "4.0".
+
+If more context sensitive information needs to be remembered by the parser
+(for example, the previous 2 or 3 tokens), then more parse states can be 
+added.

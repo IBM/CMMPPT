@@ -1,0 +1,395 @@
+head	1.3;
+access;
+symbols
+	abandoningEtnParts:1.2
+	beforeEtnParts:1.2;
+locks; strict;
+comment	@// @;
+
+
+1.3
+date	2005.01.29.18.27.38;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.11.09.14.08.30;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.10.24.17.22.59;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@changed code to use std::string rather than BCP_string
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+
+//#include "wit.h"
+
+#include <map>
+#include <vector>
+
+#include <assert.h>
+#include <iostream>
+#include <float.h>
+#include <math.h>
+
+
+
+#include "CoinFloatEqual.h"
+#include "fileConvOct03.h"
+#include "globalAttrData.h"
+#include "alternatePartData.h"
+#include "featureData.h"
+#include "featureConversionData.h"
+#include "featureConversionOverrideData.h"
+#include "featureXrefData.h"
+#include "loosePartData.h"
+#include "mtmDemanBomData.h"
+#include "alternatePartData.h"
+#include "partInterplantData.h"
+#include "partInterplantOverrideData.h"
+#include "mtmInterplantData.h"
+#include "mtmInterplantOverrideData.h"
+#include "partDemandData.h"
+//#include "eso2Problem.h"
+
+
+typedef std::vector<std::string> StdStringVec;
+
+
+
+int
+main (int argc, char * argv[])
+{
+  
+  std::cout <<"fileConvOct03 Build date: " <<__DATE__ <<std::endl;
+  {
+    
+    // Put Parms into a vector
+    std::vector<std::string> args;
+    for (int i=0; i<argc; i++) 
+      args.push_back(argv[i]);
+    
+    {
+      // Check parm passed to program
+      bool parmError = false;
+      
+      if ( args.size()> 1 ) {
+        if (args[1]=="?" ) {
+          parmError = true; // set flag to provide usage info
+        }
+      }
+      
+      if ( ! parmError ) {
+        if ( args.size()!=2 ) {
+          // Wrong number of parms. Write message
+          std::cerr 
+            <<"-------------------------------------------------------"  <<std::endl
+            <<"Wrong number of parmeters specified"                      <<std::endl
+            <<"  Number parameters specified: " <<args.size()-1          <<std::endl
+            <<"  Expected number of parameters: 1"                       <<std::endl
+            <<"-------------------------------------------------------"  <<std::endl;
+          parmError = true;
+        }
+      }
+      
+      
+      
+      if ( parmError ) {
+        // Write correct usage
+        std::cerr 
+          <<"-------------------------------------------------------"  <<std::endl
+          <<argv[0] <<" dataDirectory "                                <<std::endl
+          <<"  where:"                                                 <<std::endl
+          <<"    dataDirectory:"                                       <<std::endl
+          <<"      Directory where input files are located and"        <<std::endl
+          <<"      output files are written."                          <<std::endl
+          <<"  example usage:"                                         <<std::endl
+          <<"    " <<argv[0] <<" ../example1"                          <<std::endl
+          <<"-------------------------------------------------------"  <<std::endl;
+        return 1;
+      }
+    }
+    
+    std::string outputDirectory=args[1];
+    std::string inputDirectory=args[1];
+    int nPeriods;
+    
+    {
+      // Get number of solves to be done (ie number of scale factors)
+      std::string globalAttrFileName = inputDirectory + "/globalAttrData.csv";
+      ESO2globalAttrData globalAttrFile(globalAttrFileName);
+      
+      nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+    }
+    
+    std::string heading;
+    
+    std::string altDataFileName = outputDirectory + "/altData.csv";
+    FILE * altDataFilePtr = fopen(altDataFileName.c_str(),"w");
+    heading="\"partOrFeature\",\"altPart\",\"altConvCost\",\"altConvTime\""; 
+    fprintf(altDataFilePtr,"%s\n",heading.c_str());
+
+    std::string altOverrideDataFileName = outputDirectory + "/altOverrideData.csv";
+    FILE * altOverrideDataFilePtr = fopen(altOverrideDataFileName.c_str(),"w");
+    heading="\"partOrFeature\",\"altPart\",\"loc\",\"altConvCost\",\"altConvTime\""; 
+    fprintf(altOverrideDataFilePtr,"%s\n",heading.c_str());
+    
+    std::string altExcludeLocDataFileName = outputDirectory + "/altExcludeLocData.csv";
+    FILE * altExcludeLocDataFilePtr = fopen(altExcludeLocDataFileName.c_str(),"w");
+    heading="\"partOrFeature\",\"altPart\",\"excludeLoc\""; 
+    fprintf(altExcludeLocDataFilePtr,"%s\n",heading.c_str());
+
+    std::string featureXrefFileName = outputDirectory + "/featureXrefData.csv";
+    FILE * featureXrefFilePtr = fopen(featureXrefFileName.c_str(),"w");
+    heading="\"part\",\"feature\",\"plantLoc\",\"period\",\"prodRate\""; 
+    fprintf(featureXrefFilePtr,"%s\n",heading.c_str());
+    
+    std::string featureConversionFileName = outputDirectory + "/featureConversionData.csv";
+    FILE * featureConversionFilePtr = fopen(featureConversionFileName.c_str(),"w");
+    heading="\"plantLoc\",\"cost\",\"usageTime\""; 
+    fprintf(featureConversionFilePtr,"%s\n",heading.c_str());
+    
+    std::string featureConversionOverrideFileName = outputDirectory + "/featureConversionOverrideData.csv";
+    FILE * featureConversionOverrideFilePtr = fopen(featureConversionOverrideFileName.c_str(),"w");
+    heading="\"part\",\"feature\",\"plantLoc\",\"period\",\"cost\",\"usageTime\""; 
+    fprintf(featureConversionOverrideFilePtr,"%s\n",heading.c_str());
+    
+    // Read altenate part data and convert to xref files
+    {
+      std::cout <<"Reading input files: alternatePartData and converting to featureXref" <<std::endl;
+      
+      std::string alternatePartFileName = inputDirectory + "/alternatePartData.csv";
+      ESO2alternatePartData alternatePartFile(alternatePartFileName);   
+      ESO2alternatePartDataIterator alternatePartFileIter(alternatePartFile);
+      
+      //ESO2featureConversionData featureConversionFile(featureConversionFileName);
+      //ESO2featureConversionOverrideData featureConversionOverrideFile(featureConversionOverrideFileName);
+      
+      std::string featureFileName = inputDirectory + "/featureData.csv";
+      ESO2featureData featureFile(featureFileName);
+
+      std::map<std::string,float> convTimeMap;
+      std::map<std::string,float> convCostMap;
+      
+      // loop once for each record in alternatePart file
+      for ( ; alternatePartFileIter()!=NULL; ) {
+        std::string part = alternatePartFileIter.upLevelPart();
+        std::string feature = alternatePartFileIter.downLevelPart();
+        std::string plantLoc = alternatePartFileIter.plantLoc();
+        int period = alternatePartFileIter.periodAsInt();
+        float prodRate = alternatePartFileIter.prodRateAsFloat();
+        float cost = alternatePartFileIter.costAsFloat();
+        float usageTime = alternatePartFileIter.usageTimeAsFloat();
+        
+        // make sure period is in range
+        if (period > nPeriods ) continue;
+        
+        // make sure feature exists
+        bool featExists = false;
+        int t;
+        for (t=0; t<nPeriods; t++ ) {
+          std::string key = featureFile.key(feature,plantLoc,t);
+          featExists = featureFile.keyExists(key);
+          if ( featExists ) break;
+        }
+        if ( !featExists ) continue;
+
+        // Write feature xrefRecord       
+        fprintf(featureXrefFilePtr,"\"%s\",\"%s\",\"%s\",%d,%f\n",part.c_str(),feature.c_str(),plantLoc.c_str(),period,prodRate);
+
+        // Check to see if part-feature pair have already been written to featureConversion file.
+        std::string featureConvKey = plantLoc;
+        std::map<std::string,float>::const_iterator it;
+        it = convCostMap.find(featureConvKey);
+        if ( it == convCostMap.end() ) {
+          // loc does not exist in featureConvFile, so add it
+          fprintf(featureConversionFilePtr,"\"%s\",%f,%f\n",plantLoc.c_str(),cost,usageTime);
+          convCostMap.insert(std::map<std::string,float>::value_type(featureConvKey,cost));
+          convTimeMap.insert(std::map<std::string,float>::value_type(featureConvKey,usageTime));
+        }
+        else {
+          // loc was already written to featureConvFile
+          // get costs and see if Override needs to be written
+          float featureConvCost = it->second;
+          float featureConvUsageTime = convTimeMap.find(featureConvKey)->second;
+
+          if ( featureConvCost != cost  ||  featureConvUsageTime != usageTime ) {
+            // an override must be written        
+            fprintf(featureConversionOverrideFilePtr,"\"%s\",\"%s\",\"%s\",%d,%f,%f\n",part.c_str(),feature.c_str(),plantLoc.c_str(),period,cost,usageTime);
+          }          
+        }
+       }
+    }
+    
+    //--------------------------------------
+    fclose(altDataFilePtr);
+    fclose(altOverrideDataFilePtr);
+    fclose(altExcludeLocDataFilePtr);
+    fclose(featureXrefFilePtr);
+    fclose(featureConversionFilePtr);
+    fclose(featureConversionOverrideFilePtr);
+    //--------------------------------------
+    
+    
+  }
+  
+  std::cout <<"fileConvOct03 application is finished." <<std::endl;
+  return 0;
+}
+@
+
+
+1.2
+log
+@Modified to use BCP_string
+@
+text
+@a34 1
+#include "BCP_string.cpp"
+d38 1
+a38 1
+typedef std::vector<BCP_string> StdStringVec;
+d50 1
+a50 1
+    std::vector<BCP_string> args;
+d95 2
+a96 2
+    BCP_string outputDirectory=args[1];
+    BCP_string inputDirectory=args[1];
+d101 1
+a101 1
+      BCP_string globalAttrFileName = inputDirectory + "/globalAttrData.csv";
+d107 1
+a107 1
+    BCP_string heading;
+d109 1
+a109 1
+    BCP_string altDataFileName = outputDirectory + "/altData.csv";
+d114 1
+a114 1
+    BCP_string altOverrideDataFileName = outputDirectory + "/altOverrideData.csv";
+d119 1
+a119 1
+    BCP_string altExcludeLocDataFileName = outputDirectory + "/altExcludeLocData.csv";
+d124 1
+a124 1
+    BCP_string featureXrefFileName = outputDirectory + "/featureXrefData.csv";
+d129 1
+a129 1
+    BCP_string featureConversionFileName = outputDirectory + "/featureConversionData.csv";
+d134 1
+a134 1
+    BCP_string featureConversionOverrideFileName = outputDirectory + "/featureConversionOverrideData.csv";
+d143 1
+a143 1
+      BCP_string alternatePartFileName = inputDirectory + "/alternatePartData.csv";
+d150 1
+a150 1
+      BCP_string featureFileName = inputDirectory + "/featureData.csv";
+d153 2
+a154 2
+      std::map<BCP_string,float> convTimeMap;
+      std::map<BCP_string,float> convCostMap;
+d158 3
+a160 3
+        BCP_string part = alternatePartFileIter.upLevelPart();
+        BCP_string feature = alternatePartFileIter.downLevelPart();
+        BCP_string plantLoc = alternatePartFileIter.plantLoc();
+d173 1
+a173 1
+          BCP_string key = featureFile.key(feature,plantLoc,t);
+d183 2
+a184 2
+        BCP_string featureConvKey = plantLoc;
+        std::map<BCP_string,float>::const_iterator it;
+d189 2
+a190 2
+          convCostMap.insert(std::map<BCP_string,float>::value_type(featureConvKey,cost));
+          convTimeMap.insert(std::map<BCP_string,float>::value_type(featureConvKey,usageTime));
+@
+
+
+1.1
+log
+@Added code to covert from old file format to new
+@
+text
+@d35 1
+d39 1
+a39 1
+typedef std::vector<std::string> StdStringVec;
+d51 1
+a51 1
+    std::vector<std::string> args;
+d96 2
+a97 2
+    std::string outputDirectory=args[1];
+    std::string inputDirectory=args[1];
+d102 1
+a102 1
+      std::string globalAttrFileName = inputDirectory + "/globalAttrData.csv";
+d108 1
+a108 1
+    std::string heading;
+d110 1
+a110 1
+    std::string altDataFileName = outputDirectory + "/altData.csv";
+d115 1
+a115 1
+    std::string altOverrideDataFileName = outputDirectory + "/altOverrideData.csv";
+d120 1
+a120 1
+    std::string altExcludeLocDataFileName = outputDirectory + "/altExcludeLocData.csv";
+d125 1
+a125 1
+    std::string featureXrefFileName = outputDirectory + "/featureXrefData.csv";
+d130 1
+a130 1
+    std::string featureConversionFileName = outputDirectory + "/featureConversionData.csv";
+d135 1
+a135 1
+    std::string featureConversionOverrideFileName = outputDirectory + "/featureConversionOverrideData.csv";
+d144 1
+a144 1
+      std::string alternatePartFileName = inputDirectory + "/alternatePartData.csv";
+d151 1
+a151 1
+      std::string featureFileName = inputDirectory + "/featureData.csv";
+d154 2
+a155 2
+      std::map<std::string,float> convTimeMap;
+      std::map<std::string,float> convCostMap;
+d159 3
+a161 3
+        std::string part = alternatePartFileIter.upLevelPart();
+        std::string feature = alternatePartFileIter.downLevelPart();
+        std::string plantLoc = alternatePartFileIter.plantLoc();
+d174 1
+a174 1
+          std::string key = featureFile.key(feature,plantLoc,t);
+d184 2
+a185 2
+        std::string featureConvKey = plantLoc;
+        std::map<std::string,float>::const_iterator it;
+d190 2
+a191 2
+          convCostMap.insert(std::map<std::string,float>::value_type(featureConvKey,cost));
+          convTimeMap.insert(std::map<std::string,float>::value_type(featureConvKey,usageTime));
+@
+

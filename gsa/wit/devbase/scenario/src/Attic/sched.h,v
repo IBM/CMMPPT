@@ -1,0 +1,1501 @@
+head	1.4;
+access;
+symbols
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	UsedBySCE:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.08.05.13.05.16;	author dpc;	state dead;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.45;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.17;	author austel;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.42.35;	author rwToStl;	state Exp;
+branches;
+next	1.2.6.2;
+
+1.2.6.2
+date	2003.01.09.13.54.40;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Removed sched.h and sched.C to avoid naming conflicts on GCC Linux. These were renamed to schedLF.h and schedLF.C.
+@
+text
+@#ifndef LGFR_SCHED_H
+#define LGFR_SCHED_H
+// RW2STL -- inserted:
+#include <map>
+#include <string>
+// End of RW2STL -- inserted includes.
+
+// This is a base class for representing schedules of items.
+// Items are parts or demands.
+
+// The structure used for
+// representing a schedule is an ordered vector of Pairs 
+// of Item - TimeVecFloat.
+
+
+
+#include <scenario/src/timeVecs.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/filtStrt.h>
+
+// Typedef for 
+typedef  LGFR_DECLSPEC
+         LgFrTimeVecFloat (LgFrTimeVecFloat::*LgFrTimeVecFloatOpFunction)
+         ( const LgFrTimeVecFloat &) const;
+typedef  LGFR_DECLSPEC
+         LgFrTimeVecFloat (*LgFrTimeVecFloatRhsScalarOpFunction)
+         ( const LgFrTimeVecFloat &, const float &);
+typedef  LGFR_DECLSPEC
+         LgFrTimeVecFloat (*LgFrTimeVecFloatLhsScalarOpFunction)
+         ( const float &, const LgFrTimeVecFloat & );
+
+class LGFR_DECLSPEC LgFrScheduleFloat {
+
+private:
+
+  static const LgFrScheduleFloat  emptySched; 
+  static const LgFrFilterStrategy defaultFilterStrategy; 
+                                // Used for default arg because SUN
+                                // compiler fails when passed
+                                // LgFrScheduleFloat(), LgFrFilterStrategy
+
+public:
+
+
+  // Is item in the schedule?
+  virtual
+    bool
+      contains (const LgFrItem& item)
+	const;
+
+  // If item is in the table, set tv to be its timeVec and return true,
+  // else return false.
+  virtual
+    bool
+      findValue (const LgFrItem& item, LgFrTimeVecFloat& retVal)
+	const;
+
+  // Add pair of item - TimeVecFloat's to the end of the collection.
+  virtual
+     void
+       insert (const LgFrItemTimeVecPairFloat pair);
+
+  // Add single ItemTimeVecPairFloat to the collection at position index.  
+  // Everything afterwards is shifted to a higher index.
+  // If item is already in the table, it's timeVec is changed.
+  virtual
+     void
+       insertAt (const size_t index,
+                 const LgFrItemTimeVecPairFloat pptvf);
+
+  // Insert Item if it isn't already in the schedule.  In any case,
+  // associate timeVec with item.
+  void
+    insertKeyAndValue(const LgFrItem& item, const LgFrTimeVecFloat& value);
+
+  // Obtain upper bound on number of entries which the schedule can
+  // contain before resizing is required.  The client does not have
+  // to manage the resizing, but may for better performance.
+  virtual
+    size_t 
+      capacity()
+          const;
+
+  // Increase the amount of storage allocated to the set
+  virtual
+     void
+       reserve (const size_t newCapacity);
+
+  // Return the i'th ItemTimeVecPairFloat
+  virtual
+     LgFrItemTimeVecPairFloat 
+       operator[](
+          const size_t& i)
+             const;
+  virtual
+     LgFrItemTimeVecPairFloat &
+       operator[](
+          const size_t& i );
+
+  // Return the LgFrItemTimeVecPairFloat whose item matches item.
+  // If there is no such LgFrItemTimeVecPairFloat, a new one is created
+  // (using the default LgFrTimeVecFloat constructor) and inserted at
+  // the end.
+  // There is no const version of this method because it might have to
+  // insert a new ItemTimeVecPairFloat.
+  virtual
+     LgFrItemTimeVecPairFloat &
+       operator[](
+          const LgFrItem& item);
+
+  // Return the LgFrItemTimeVecPairFloat whose item matches item.
+  // If there is no such LgFrItemTimeVecPairFloat, an assert exeception 
+  // occurs.
+  virtual
+     const LgFrItemTimeVecPairFloat &
+       operator[](
+          const LgFrItem& item)
+  const;
+
+
+  // Return number of pairs in schedule
+  virtual
+     size_t
+        size()
+           const;
+  
+   // Perform diadic schedule operation.
+   //   schedule operation schedule
+   // vectorOp is the operation applied to the timeVecFloat portions
+   // of the same items in the lhs and rhs schedule.
+   // If an item is not in the lhs or rhs schedule then a vector of
+   // zero is used.
+   //
+   // For example:
+   //
+   //   LgFrScheduleFloat lhs, rhs;
+   //   LgFrScheduleFloat diff( lhs.op(rhs,LgFrTimeVecFloat::subtract);
+   //
+   //   diff contains lhs - rhs 
+   //
+   // If an item is not in both the lhs and rhs schedules, then a timeVec
+   // timeVec with value defaultValue is used. 
+   LgFrScheduleFloat
+      op(
+         LgFrTimeVecFloatOpFunction vectorOp,
+         const LgFrScheduleFloat& rhs,
+         float defaultValue = 0.0f )
+      const;
+
+   // Perform operation on column (timePeriod) of schedule.
+   //
+   // period is the column (period) where scalarOp is applied.
+   //
+   // scalarOp is the operation applied to the timeVecFloat portions
+   // of each item in the schedule.
+   //
+   // For example 1:
+   //
+   //   LgFrScheduleFloat schedA;
+   //   LgFrScheduleFloat schedB = schedA.columnOp( 1, ::LgFrAssign, 3.1415 );
+   //
+   //   schedB is equivalent to schedA, except for the 2nd time period where
+   //   which has been assigned the value 3.1415. 
+   //
+   // For example 2:
+   //
+   //   LgFrScheduleFloat schedC = schedB.columnOp( 1, ::LgFrMultiply, 2.0 );
+   //
+   //   schedC is equivalent to schedB, except for the 2nd time period where
+   //   which has been assigned the value 2*3.1415. 
+   //
+   LgFrScheduleFloat
+      columnOp(
+         const size_t period,
+         float (*scalarOperation) (const float, const float),
+         const float rhs )
+      const;
+  
+#if 0
+   // Perform diadic schedule operation.
+   //   schedule operation float
+   // scalarOp is the operation applied to the timeVecFloat portions
+   // of each item in the schedule.
+   //
+   // For example:
+   //
+   //   LgFrScheduleFloat lhs;
+   //   LgFrScheduleFloat DoubleLhs( lhs.op(rhs,::operation*);
+   //
+   //   DoubleLhs contains lhs * 2
+   //
+   LgFrScheduleFloat
+      op(
+         const LgFrScheduleFloat& rhs,
+         LgFrTimeVecFloatScalarOpFunction scalarOp )
+      const;
+#endif
+
+   // reduceItems method.
+   // Named after APL reduce operator /.
+   //
+   // Original purpose is to implement method
+   // for summing timeVec entries in a schedule.
+   //
+   // A filter strategy can be specified to selectively exclude 
+   // itemTimeVecs from the reduction.
+   //
+   //
+   // Returned timveVec is:
+   //      result[0] = this[0].timeVec[0] "scalarOp" this[1].timeVec[0] 
+   //                                     "scalarOp" this[2].timeVec[0] 
+   //                                     "scalarOp" this[3].timeVec[0] ...
+   //
+   //      result[1] = this[0].timeVec[1] "scalarOp" this[1].timeVec[1] 
+   //                                     "scalarOp" this[2].timeVec[1] 
+   //                                     "scalarOp" this[3].timeVec[1] ...
+   //
+   //      result[2] = this[0].timeVec[2] "scalarOp" this[1].timeVec[2] 
+   //                                     "scalarOp" this[2].timeVec[2] ...
+   //                                     "scalarOp" this[3].timeVec[2] ...
+   //      ...
+   //
+   // For example:
+   //   LgFrScheduleFloat sched;
+   //   LgFrTimeVecFloat  sum(sched.reduceItems(LgFrAdd));
+   LgFrTimeVecFloat
+      reduceItems(
+         float (*scalarOp) ( const float, const float),
+         const LgFrFilterStrategy & filter = defaultFilterStrategy )
+            const;
+
+   // Return schedule whose timeVec elements are the maximum of the elements
+   // in *this and rhs.
+   //
+   // example:  
+   //  on entry *this:  "item 1"  -1  0  5
+   //                   "item 2"   1  1 -5
+   //           rhs:    "item 1"  -2  1  6 
+   //                   "item 3"   3 -1  6 
+   // Returned schedule: "item 1"  -1  1  6
+   //                    "item 2"   1  1 -5
+   //                    "item 3"   3 -1  6 
+   virtual
+     LgFrScheduleFloat
+       maximum(
+         const LgFrScheduleFloat & rhs )
+           const;
+
+
+  // Determine if two schedules are equal.
+  // Return true if both schedules contain the same itemTimeVec pairs.
+  virtual
+     bool
+        isEqual(
+           const LgFrScheduleFloat& rhs)
+              const;
+  virtual
+     bool
+        operator ==(
+           const LgFrScheduleFloat& rhs)
+              const;
+
+  virtual
+     bool
+        operator !=(
+           const LgFrScheduleFloat& rhs)
+              const;
+
+  // Assignment operator
+  LgFrScheduleFloat &
+    operator=(
+	      const LgFrScheduleFloat& rhs);
+
+  // Copy constructor
+  LgFrScheduleFloat (const LgFrScheduleFloat &);
+
+  // Constructor for a set expected to have up to n parts 
+  // (and default constructor)
+  LgFrScheduleFloat (const size_t n = DEFAULT_VECTOR_CAPACITY);
+
+  // Destructor
+  virtual
+    ~LgFrScheduleFloat ();
+
+  // print
+  virtual void print() const;
+
+   // Format a schedule for display.
+   // Returns a string representing the schedule.
+   //
+   // highLight:
+   //   If an item being formatted is contined in highLight and if
+   //   highLight[item].timeVecFloat[i] != 0.0 then
+   //   the i'th element of the timeVec
+   //   is emphasized by following the number with an "*",
+   //   or a client specified character.
+   //
+   // truncate: true indicates that item names all have the same length
+   //           and are truncated if they can not fit in the alloted
+   //           width.
+   //
+   // highLightFlag: character to follow a highlighted timeVec entry.
+   //
+   // width: ios width used to format each timeVec entry.
+   //
+   // precision: ios precision used to format each timeVec entry.
+   //
+   // iosFlags: ios formating flags used to format each timeVec entry.
+   //
+   std::string format(
+      const LgFrScheduleFloat & highLight = LgFrScheduleFloat::emptySched,
+      const bool truncate = true,
+      const char highLightFlag = '*',
+      const int width = 10,
+      const int precision = 1 )//,
+      //const long iosFlags = std::ios_base::fixed | std::ios_base::showpoint | std::ios_base::right )
+   const;
+
+  // test this class
+  static void test();
+
+protected:
+
+   // Used to implement op methods.
+   void
+   kernalOfOp(
+      LgFrTimeVecFloatOpFunction,
+      const LgFrScheduleFloat& rhs,
+      LgFrScheduleFloat &,
+      float defaultValue )
+         const;
+
+   void
+   kernalOfOp(
+      LgFrTimeVecFloatRhsScalarOpFunction,
+      const float rhs,
+      LgFrScheduleFloat & )
+         const;
+
+   void
+   kernalOfOp(
+      const float lhs,
+      LgFrTimeVecFloatLhsScalarOpFunction,
+      LgFrScheduleFloat & )
+         const;
+   void
+   kernalOfColumnOp(
+      const size_t period,
+      float (*scalarOperation) (const float, const float),
+      const float rhs,              
+      LgFrScheduleFloat & )
+         const;
+  
+  // Remove all pairs from schedule.
+  // Used to implement localClear in derived classes.
+  virtual
+     void
+        clear();
+
+private:
+
+  virtual
+  void
+  fillDictionary();
+
+  LgFrItemTimeVecPairFloatVector schedule_;
+  size_t capacity_;              // Upper bound on number of schedule
+                                 // entries, without resizing.
+
+  struct Less
+  {
+      bool operator() (const LgFrItem* left, const LgFrItem* right) const
+      {
+          return ( left->compareTo( right ) < 0 );
+      }
+  };
+ 
+  typedef std::pair<LgFrItem*,LgFrItemTimeVecPairFloat*> ItemItemTimeVecPair;
+  typedef std::map<LgFrItem*,LgFrItemTimeVecPairFloat*,Less> ItemItemTimeVecDictionary;
+  ItemItemTimeVecDictionary itemToEntry_; // Used to implement the mapping from 
+	 			 // item to entry-in-schedule
+  
+};
+
+// Addition Operator
+LgFrScheduleFloat
+   operator+ (const LgFrScheduleFloat& lhs, const LgFrScheduleFloat& rhs);
+
+// Subtraction Operator
+LgFrScheduleFloat
+   operator- (const LgFrScheduleFloat& lhs, const LgFrScheduleFloat& rhs);
+
+// Maximum 
+//LgFrScheduleFloat
+//   maximum (const LgFrScheduleFloat& lhs, const LgFrScheduleFloat& rhs);
+
+#endif
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d3 4
+a15 3
+#include <rw/collect.h>
+#include <rw/gordvec.h>
+#include <rw/hashdict.h>
+a20 1
+
+d47 1
+a47 1
+    RWBoolean
+d51 2
+a52 2
+  // If item is in the table, set tv to be its timeVec and return TRUE,
+  // else return FALSE.
+d54 1
+a54 1
+    RWBoolean
+d87 1
+a87 1
+       resize (const size_t newCapacity);
+d124 1
+a124 1
+        entries()
+d253 1
+a253 1
+     RWBoolean
+d258 1
+a258 1
+     RWBoolean
+d264 1
+a264 1
+     RWBoolean
+d279 1
+a279 1
+  LgFrScheduleFloat (const size_t n = 0);
+d298 1
+a298 1
+   // truncate: TRUE indicates that item names all have the same length
+d310 1
+a310 1
+   RWCString format(
+d312 1
+a312 1
+      const RWBoolean truncate = TRUE,
+d315 2
+a316 2
+      const int precision = 1,
+      const long iosFlags = ios::fixed | ios::showpoint | ios::right )
+d364 1
+a364 1
+  fillHashTable();
+d366 1
+a366 1
+  LgFrOrderedVectorItemTimeVecPairFloat schedule_;
+d370 11
+a380 1
+  RWHashDictionary itemToEntry_; // Used to implement the mapping from 
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@a2 4
+// RW2STL -- inserted:
+#include <map>
+#include <string>
+// End of RW2STL -- inserted includes.
+d12 3
+d20 1
+d47 1
+a47 1
+    bool
+d51 2
+a52 2
+  // If item is in the table, set tv to be its timeVec and return true,
+  // else return false.
+d54 1
+a54 1
+    bool
+d87 1
+a87 1
+       reserve (const size_t newCapacity);
+d124 1
+a124 1
+        size()
+d253 1
+a253 1
+     bool
+d258 1
+a258 1
+     bool
+d264 1
+a264 1
+     bool
+d279 1
+a279 1
+  LgFrScheduleFloat (const size_t n = DEFAULT_VECTOR_CAPACITY);
+d298 1
+a298 1
+   // truncate: true indicates that item names all have the same length
+d310 1
+a310 1
+   std::string format(
+d312 1
+a312 1
+      const bool truncate = true,
+d316 1
+a316 1
+      const long iosFlags = std::ios_base::fixed | std::ios_base::showpoint | std::ios_base::right )
+d364 1
+a364 1
+  fillDictionary();
+d366 1
+a366 1
+  LgFrItemTimeVecPairFloatVector schedule_;
+d370 1
+a370 11
+  struct Less
+  {
+      bool operator() (const LgFrItem* left, const LgFrItem* right) const
+      {
+          return ( left->compareTo( right ) < 0 );
+      }
+  };
+ 
+  typedef std::pair<LgFrItem*,LgFrItemTimeVecPairFloat*> ItemItemTimeVecPair;
+  typedef std::map<LgFrItem*,LgFrItemTimeVecPairFloat*,Less> ItemItemTimeVecDictionary;
+  ItemItemTimeVecDictionary itemToEntry_; // Used to implement the mapping from 
+@
+
+
+1.2.6.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d315 2
+a316 2
+      const int precision = 1 )//,
+      //const long iosFlags = std::ios_base::fixed | std::ios_base::showpoint | std::ios_base::right )
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d81 1
+a81 1
+      LgFrScheduleFloat::capacity()
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

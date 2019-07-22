@@ -1,0 +1,286 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2011.09.14.15.31.35;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@ProblemManager ==> WitJHandler
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File WitJHandler.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import com.ibm.witj.Demand;
+import com.ibm.witj.Operation;
+import com.ibm.witj.Part;
+import com.ibm.witj.Problem;
+
+/*******************************************************************************
+ * A WitJHandler is associated with a WIT-J Problem and is responsible for
+ * maintaining WIT-M state information that's specific to the Problem.<br>
+ * 
+ * The factory method for creating instances of this class is
+ * WitJHandler.newWitJHandler ().
+ *******************************************************************************
+ */
+public final class WitJHandler
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The current WitJHandler: The WitJHandler for the current Problem that
+ * is to be used by various WIT-M methods, if any; otherwise null.
+ *******************************************************************************
+ */
+   private static WitJHandler current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The Problem for this WitJHandler.
+ *******************************************************************************
+ */
+   private final Problem myProblem;
+   
+/*******************************************************************************
+ * True, iff short names are to be used for Parts, Operations, and Demands.
+ *******************************************************************************
+ */
+   private boolean useShortNames = false;
+   
+/*******************************************************************************
+ * # of Parts created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nPartsCreated = 0;
+   
+/*******************************************************************************
+ * # of Operations created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nOpnsCreated = 0;
+   
+/*******************************************************************************
+ * # of Demands created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nDemandsCreated = 0;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   private WitJHandler () 
+      {
+      myProblem = Problem.newInstance ();
+      
+      current   = this;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Computes and returns the name to be used used for a new Part, Operation, or
+ * Demand.
+ *******************************************************************************
+ */
+   private String makeName (
+         Item         theItem,
+         Property <?> theProp,
+         int          theCount)
+      {
+      String theName;
+      
+      theName = Integer.toString (theCount);
+      
+      if (! useShortNames)
+         theName =
+            concatenation (
+               theProp.getName (),
+               ":",
+               theItem.getID (),
+               "#",
+               theName);
+      
+      return theName;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Creates and returns new Part
+ *******************************************************************************
+ */
+   Part newPart (
+         Item            theItem,
+         Property <Part> theProp,
+         Part.Category   thePartCat)
+      {
+      String thePartName;
+      Part   thePart;
+      
+      thePartName = makeName (theItem, theProp, nPartsCreated);
+      
+      thePart     = Part.newInstance (myProblem, thePartName, thePartCat);
+
+      nPartsCreated ++;
+      
+      theItem.setValue (theProp, thePart);
+      
+      return thePart;
+      }
+
+/*******************************************************************************
+ * Creates and returns new Operation
+ *******************************************************************************
+ */
+   Operation newOperation (Item theItem, Property <Operation> theProp)
+      {
+      String    theOpnName;
+      Operation theOpn;
+      
+      theOpnName = makeName (theItem, theProp, nOpnsCreated);
+      
+      theOpn     = Operation.newInstance (myProblem, theOpnName);
+
+      nOpnsCreated ++;
+      
+      theItem.setValue (theProp, theOpn);
+      
+      return theOpn;
+      }
+
+/*******************************************************************************
+ * Creates and returns new Demand
+ *******************************************************************************
+ */
+   Demand newDemand (Item theItem, Property <Demand> theProp, Part thePart)
+      {
+      String theDemandName;
+      Demand theDemand;
+      
+      theDemandName = makeName (theItem, theProp, nDemandsCreated);
+      
+      theDemand     = Demand.newInstance (thePart, theDemandName);
+
+      nDemandsCreated ++;
+      
+      theItem.setValue (theProp, theDemand);
+      
+      return theDemand;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Factory method: Constructs a new WitJHandler.<br>
+ * Constructs a new WIT-J Problem that will be associated with this
+ * WitJHandler.<br>
+ * The current WitJHandler is set to the new ProbleMgr.
+ *
+ * @@return The new WitJHandler
+ *******************************************************************************
+ */
+   public static WitJHandler newWitJHandler ()
+      {
+      return new WitJHandler ();
+      }
+  
+/*******************************************************************************
+ * Sets the current WitJHandler.<br>
+ * Note: The current WitJHandler should eventually be set to null, in order
+ * to allow the WitJHandler and its Problem to be garbage collected.
+ * 
+ * @@param theProbMgr The WitJHandler which is to become current.
+ *        (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentWitJHandler (WitJHandler theProbMgr)
+      {
+      current = theProbMgr;
+      }
+
+/*******************************************************************************
+ * @@return The current WitJHandler, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static WitJHandler getCurrentWitJHandler ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * @@return The current Problem, i.e., theProblem associated with the current
+ *         WitJHandler, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static Problem getCurrentProblem ()
+      {
+      return
+         (current != null)?
+            current.myProblem:
+            null;
+      }
+
+/*******************************************************************************
+ * Sets the value of the useShortNames variable for the current WitJHandler
+ * to a specified value; a WitJHandler will use short names for Parts,
+ * Operations, and Demands, iff its useShortNames variable is true.
+ * 
+ * @@param theValue The value to which the useShortNames variable will be set.
+ * 
+ * @@throws IllegalStateException If the current WitJHandler is null
+ *******************************************************************************
+ */
+   public static void setUseShortNames (boolean theValue)
+      {
+      reqCurProbMgr ();
+      
+      current.useShortNames = theValue;
+      }
+
+/*******************************************************************************
+ * @@return True, iff the current WitJHandler uses short names.
+ * 
+ * @@throws IllegalStateException If the current WitJHandler is null
+ *******************************************************************************
+ */
+   public static boolean getUseShortNames ()
+      {
+      reqCurProbMgr ();
+      
+      return current.useShortNames;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@

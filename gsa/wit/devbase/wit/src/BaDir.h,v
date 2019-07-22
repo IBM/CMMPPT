@@ -1,0 +1,934 @@
+head	1.12;
+access;
+symbols
+	sce_5_01_20080919:1.8
+	latest_sce_4_20_20060523:1.8.0.2
+	sce_4_20_20060523:1.8
+	latest_sce4_20_OSL:1.7.0.2
+	sce_4_20_OSL:1.7
+	sce_410_withVa:1.7
+	sce_4_05_20040511:1.6
+	sce_4_00_20040201:1.6
+	nextGenBranch:1.6.0.8
+	nextGenRoot:1.6
+	sce_3_30_20030627:1.6
+	EndRw-branch:1.6.0.6
+	Root-of-EndRw:1.6
+	rwToStl:1.6.0.4
+	latest_sce_3_10_20010924:1.6.0.2
+	sce_3_10_20010924:1.6
+	latest_sce_3_00_20010601:1.5.0.2
+	sce_3_00_20010601:1.5;
+locks; strict;
+comment	@ * @;
+
+
+1.12
+date	2011.09.28.23.49.03;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.09.24.00.27.20;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.08.30.20.17.16;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.06.24.23.37.32;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.05.02.17.33.54;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.12.10.21.58.31;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.07.03.17.00.56;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.04.03.19.23.03;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.03.30.21.23.07;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.03.30.18.54.47;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.03.29.00.10.15;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.03.27.20.07.25;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.12
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+#ifndef BaDirH
+#define BaDirH
+
+//------------------------------------------------------------------------------
+// Header file: "BaDir.h"
+//
+// Contains the declaration of the following classes:
+//
+//    BaDir.
+//    NstnDir.
+//    AsapDir.
+//------------------------------------------------------------------------------
+
+#include <Assoc.h>
+
+//------------------------------------------------------------------------------
+// Class BaDir
+//
+// "Build-Ahead Direction"
+// Responsible for the behavior that distinguishes between NSTN Build-Ahead and
+// ASAP Build-Ahead.
+//
+// BaDir
+//    NstnBaDir
+//    AsapBaDir
+//
+// Implemented in BuildAhd.C.
+//------------------------------------------------------------------------------
+
+class WitBaDir: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitBaDir ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      virtual void findInitExpPers (
+            WitMaterial *         theMat,
+            WitTVec <WitPeriod> & expPerVec) = 0;
+         //
+         // Base class function.
+         // On return, expPerVec[fillPer] is the initial explosion period to be
+         // used when filling requirements for theMat in fillPer.
+
+      virtual WitPeriod findInitExpPer (
+            WitMaterial * theMat,
+            WitPeriod     fillPer) = 0;
+         //
+         // Base class function.
+         // Returns the initial explosion period to be used when filling
+         // requirements for theMat in fillPer.
+
+      virtual void advanceExpPer (
+            WitMaterial * theMat,
+            WitPeriod     fillPer, 
+            WitPeriod &   expPer) = 0;
+         //
+         // Base class function.
+         // Moves expPer one period in the appropriate direction, as appropriate
+         // for theMat. If the resulting expPer is not a valid explosion period
+         // for fillPer, it is set to -1.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Protected member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitBaDir (WitBaMgr *);
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (WitBaMgr *, myBaMgr)
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitBaDir);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitBaMgr * const myBaMgr_;
+         //
+         // The BaMgr that owns this BaDir.
+
+   };
+
+//------------------------------------------------------------------------------
+// Class NstnBaDir
+//
+// "No-Sooner-Than-Necessary Build-Ahead Direction"
+// Responsible for the behavior of NSTN Build-Ahead that distinguishes it from
+// ASAP Build-Ahead.
+//
+// BaDir
+//    NstnBaDir
+//
+// Implemented in BuildAhd.C.
+//------------------------------------------------------------------------------
+
+class WitNstnBaDir: public WitBaDir
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitNstnBaDir (WitBaMgr *);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitNstnBaDir ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+      virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+         //
+         // Overrides from class BaDir.
+
+      noCopyCtorAssign (WitNstnBaDir);
+   };
+
+//------------------------------------------------------------------------------
+// Class AsapBaDir
+//
+// "As-Soon-As-Possible Build-Ahead Direction"
+// Responsible for the behavior of ASAP Build-Ahead that distinguishes it from
+// NSTN Build-Ahead.
+//
+// BaDir
+//    AsapBaDir
+//
+// Implemented in BuildAhd.C.
+//------------------------------------------------------------------------------
+
+class WitAsapBaDir: public WitBaDir
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitAsapBaDir (WitBaMgr *);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitAsapBaDir ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+      virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+         //
+         // Overrides from class BaDir.
+
+      noCopyCtorAssign (WitAsapBaDir);
+   };
+
+#endif
+@
+
+
+1.11
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.10
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d40 2
+a41 44
+{
+public:
+
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+
+virtual ~WitBaDir ();
+
+//------------------------------------------------------------------------
+// Other public member functions.
+//------------------------------------------------------------------------
+
+virtual void findInitExpPers (
+WitMaterial *         theMat,
+WitTVec <WitPeriod> & expPerVec) = 0;
+//
+// Base class function.
+// On return, expPerVec[fillPer] is the initial explosion period to be
+// used when filling requirements for theMat in fillPer.
+
+virtual WitPeriod findInitExpPer (
+WitMaterial * theMat,
+WitPeriod     fillPer) = 0;
+//
+// Base class function.
+// Returns the initial explosion period to be used when filling
+// requirements for theMat in fillPer.
+
+virtual void advanceExpPer (
+WitMaterial * theMat,
+WitPeriod     fillPer,
+WitPeriod &   expPer) = 0;
+//
+// Base class function.
+// Moves expPer one period in the appropriate direction, as appropriate
+// for theMat. If the resulting expPer is not a valid explosion period
+// for fillPer, it is set to -1.
+
+protected:
+
+//------------------------------------------------------------------------
+// Protected member functions.
+//------------------------------------------------------------------------
+d43 69
+a111 3
+//------------------------------------------------------------------------
+// Constructor functions.
+//------------------------------------------------------------------------
+d113 1
+a113 25
+WitBaDir (WitBaMgr *);
+
+//------------------------------------------------------------------------
+// Data access functions.
+//------------------------------------------------------------------------
+
+accessFunc (WitBaMgr *, myBaMgr)
+
+private:
+
+//------------------------------------------------------------------------
+// Private member functions.
+//------------------------------------------------------------------------
+
+noCopyCtorAssign (WitBaDir);
+
+//------------------------------------------------------------------------
+// Private member data.
+//------------------------------------------------------------------------
+
+WitBaMgr * const myBaMgr_;
+//
+// The BaMgr that owns this BaDir.
+
+};
+d129 2
+a130 2
+{
+public:
+d132 3
+a134 3
+//------------------------------------------------------------------------
+// Constructor functions.
+//------------------------------------------------------------------------
+d136 1
+a136 1
+WitNstnBaDir (WitBaMgr *);
+d138 1
+a138 1
+private:
+d140 3
+a142 3
+//------------------------------------------------------------------------
+// Private member functions.
+//------------------------------------------------------------------------
+d144 3
+a146 3
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+d148 1
+a148 1
+virtual ~WitNstnBaDir ();
+d150 3
+a152 3
+//------------------------------------------------------------------------
+// Other private member functions.
+//------------------------------------------------------------------------
+d154 5
+a158 5
+virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+//
+// Overrides from class BaDir.
+d160 2
+a161 2
+noCopyCtorAssign (WitNstnBaDir);
+};
+d177 2
+a178 2
+{
+public:
+d180 3
+a182 3
+//------------------------------------------------------------------------
+// Constructor functions.
+//------------------------------------------------------------------------
+d184 1
+a184 1
+WitAsapBaDir (WitBaMgr *);
+d186 1
+a186 1
+private:
+d188 3
+a190 3
+//------------------------------------------------------------------------
+// Private member functions.
+//------------------------------------------------------------------------
+d192 3
+a194 3
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+d196 1
+a196 1
+virtual ~WitAsapBaDir ();
+d198 3
+a200 3
+//------------------------------------------------------------------------
+// Other private member functions.
+//------------------------------------------------------------------------
+d202 5
+a206 5
+virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+//
+// Overrides from class BaDir.
+d208 2
+a209 2
+noCopyCtorAssign (WitAsapBaDir);
+};
+@
+
+
+1.9
+log
+@Selection reuse.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d40 44
+a83 2
+   {
+   public:
+d85 3
+a87 69
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitBaDir ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      virtual void findInitExpPers (
+            WitMaterial *         theMat,
+            WitTVec <WitPeriod> & expPerVec) = 0;
+         //
+         // Base class function.
+         // On return, expPerVec[fillPer] is the initial explosion period to be
+         // used when filling requirements for theMat in fillPer.
+
+      virtual WitPeriod findInitExpPer (
+            WitMaterial * theMat,
+            WitPeriod     fillPer) = 0;
+         //
+         // Base class function.
+         // Returns the initial explosion period to be used when filling
+         // requirements for theMat in fillPer.
+
+      virtual void advanceExpPer (
+            WitMaterial * theMat,
+            WitPeriod     fillPer, 
+            WitPeriod &   expPer) = 0;
+         //
+         // Base class function.
+         // Moves expPer one period in the appropriate direction, as appropriate
+         // for theMat. If the resulting expPer is not a valid explosion period
+         // for fillPer, it is set to -1.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Protected member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitBaDir (WitBaMgr *);
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (WitBaMgr *, myBaMgr)
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitBaDir);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitBaMgr * const myBaMgr_;
+         //
+         // The BaMgr that owns this BaDir.
+d89 25
+a113 1
+   };
+d129 2
+a130 2
+   {
+   public:
+d132 3
+a134 3
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+d136 1
+a136 1
+      WitNstnBaDir (WitBaMgr *);
+d138 1
+a138 1
+   private:
+d140 3
+a142 3
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+d144 3
+a146 3
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+d148 1
+a148 1
+      virtual ~WitNstnBaDir ();
+d150 3
+a152 3
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+d154 5
+a158 5
+      virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+      virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+         //
+         // Overrides from class BaDir.
+d160 2
+a161 2
+      noCopyCtorAssign (WitNstnBaDir);
+   };
+d177 2
+a178 2
+   {
+   public:
+d180 3
+a182 3
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+d184 1
+a184 1
+      WitAsapBaDir (WitBaMgr *);
+d186 1
+a186 1
+   private:
+d188 3
+a190 3
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+d192 3
+a194 3
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+d196 1
+a196 1
+      virtual ~WitAsapBaDir ();
+d198 3
+a200 3
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+d202 5
+a206 5
+      virtual void      findInitExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual WitPeriod findInitExpPer  (WitMaterial *, WitPeriod);
+      virtual void      advanceExpPer   (WitMaterial *, WitPeriod, WitPeriod &);
+         //
+         // Overrides from class BaDir.
+d208 2
+a209 2
+      noCopyCtorAssign (WitAsapBaDir);
+   };
+@
+
+
+1.8
+log
+@Updated the copyright date on all source files.
+@
+text
+@d53 1
+a53 1
+      virtual void findInitSelExpPers (
+d59 9
+a67 1
+         // used when filling requirements for theMat.
+d154 3
+a156 2
+      virtual void findInitSelExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual void advanceExpPer      (WitMaterial *, WitPeriod, WitPeriod &);
+d202 3
+a204 2
+      virtual void findInitSelExpPers (WitMaterial *, WitTVec <WitPeriod> &);
+      virtual void advanceExpPer      (WitMaterial *, WitPeriod, WitPeriod &);
+@
+
+
+1.7
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+@
+
+
+1.6
+log
+@Refactoring build-ahead.
+@
+text
+@d53 3
+a55 3
+      virtual void findInitSelBaCands (
+            WitMaterial *            theMat,
+            WitPtrTVec <WitBaCand> & selBaCandVec) = 0;
+d58 2
+a59 3
+         // On return, selBaCandVec[fillPer] is the BaCand that represents the
+         // initial explosion period to be used when filling requirements for 
+         // theMat.
+d130 6
+d143 1
+a143 1
+      // Other public member functions.
+d146 2
+a147 5
+      virtual void findInitSelBaCands (WitMaterial *, WitPtrTVec <WitBaCand> &);
+         //
+         // Override from class BaDir.
+
+      virtual void advanceExpPer (WitMaterial *, WitPeriod, WitPeriod &);
+d149 1
+a149 7
+         // Override from class BaDir.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+d157 1
+a157 1
+// "As-Sooner-As-Possible Build-Ahead Direction"
+d177 6
+d190 1
+a190 1
+      // Other public member functions.
+d193 2
+a194 5
+      virtual void findInitSelBaCands (WitMaterial *, WitPtrTVec <WitBaCand> &);
+         //
+         // Override from class BaDir.
+
+      virtual void advanceExpPer (WitMaterial *, WitPeriod, WitPeriod &);
+d196 1
+a196 7
+         // Override from class BaDir.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+@
+
+
+1.5
+log
+@Continued implementation of selection splitting.
+@
+text
+@d53 3
+a55 3
+      virtual void findInitExpPers (
+            WitMaterial *         theMat,
+            WitTVec (WitPeriod) & selExpPerVec) = 0;
+d58 3
+a60 2
+         // On return, selExpPerVec[fillPer] is the initial explosion period to
+         // be used when filling requirements for theMat.
+d82 7
+a88 1
+      WitBaDir (WitProblem *);
+d97 9
+d129 1
+a129 1
+      WitNstnBaDir (WitProblem *);
+d141 1
+a141 1
+      virtual void findInitExpPers (WitMaterial *, WitTVec (WitPeriod) &);
+d179 1
+a179 1
+      WitAsapBaDir (WitProblem *);
+d191 1
+a191 1
+      virtual void findInitExpPers (WitMaterial *, WitTVec (WitPeriod) &);
+@
+
+
+1.4
+log
+@Refactoring build-ahead for selection splitting.
+@
+text
+@a70 6
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (WitBaMgr *, myBaMgr)
+
+d81 1
+a81 1
+      WitBaDir (WitBaMgr *);
+a89 8
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitBaMgr * const myBaMgr_;
+         //
+         // The BaMgr that owns this BaDir.
+d113 1
+a113 1
+      WitNstnBaDir (WitBaMgr *);
+d163 1
+a163 1
+      WitAsapBaDir (WitBaMgr *);
+@
+
+
+1.3
+log
+@Continued implementation of selection splitting.
+@
+text
+@d53 3
+a55 3
+      virtual void buildBaAltPts (
+            WitBaMat *                theBaMat, 
+            WitPtrTVec (WitBaAltPt) & theBaAltPtVec) = 0;
+d58 2
+a59 3
+         // Constructs the BaAltPts for theBaMat.
+         // On return, theBaAltPtVec[fillPer] is the BaAltPt for theBaMat in
+         // fillPer.
+d139 1
+a139 1
+      virtual void buildBaAltPts (WitBaMat *, WitPtrTVec (WitBaAltPt) &);
+d189 1
+a189 1
+      virtual void buildBaAltPts (WitBaMat *, WitPtrTVec (WitBaAltPt) &);
+@
+
+
+1.2
+log
+@Re-factoring for selection splitting.
+@
+text
+@d62 1
+a62 1
+      virtual WitBoolean updatedExpPerIsValid (
+d69 2
+a70 3
+         // for theMat. 
+         // Returns TRUE, iff the new value is an appropriate explosion period
+         // for fillPer.
+d144 1
+a144 4
+      virtual WitBoolean updatedExpPerIsValid (
+            WitMaterial *, 
+            WitPeriod, 
+            WitPeriod &);
+d194 1
+a194 4
+      virtual WitBoolean updatedExpPerIsValid (
+            WitMaterial *, 
+            WitPeriod, 
+            WitPeriod &);
+@
+
+
+1.1
+log
+@Re-factoring build-ahead for selection splitting.
+@
+text
+@d53 3
+a55 3
+      virtual void initExpPeriod (
+            WitMaterial *         theMat,
+            WitTVec (WitPeriod) & expPeriodRef) = 0;
+d58 3
+a60 2
+         // On return, for each fillPer, expPeriodRef[fillPer] == the initial
+         // explosion period for theMat in fillPer.
+d141 1
+a141 1
+      virtual void initExpPeriod (WitMaterial *, WitTVec (WitPeriod) &);
+d194 1
+a194 1
+      virtual void initExpPeriod (WitMaterial *, WitTVec (WitPeriod) &);
+@
+

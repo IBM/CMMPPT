@@ -1,0 +1,419 @@
+head	1.11;
+access;
+symbols
+	EndRw-branch:1.10.0.6
+	Root-of-EndRw:1.10
+	rwToStl:1.10.0.4
+	latest_sce_3_10_20010924:1.10.0.2
+	sce_3_10_20010924:1.10
+	latest_sce_3_00_20010601:1.7.0.4
+	sce_3_00_20010601:1.7
+	latest_sce_2_31_20010308:1.7.0.2
+	sce_2_31_20010308:1.7;
+locks; strict;
+comment	@ * @;
+
+
+1.11
+date	2003.03.03.23.26.41;	author rjw;	state dead;
+branches;
+next	1.10;
+
+1.10
+date	2001.08.24.22.03.19;	author bobw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2001.07.03.20.07.29;	author bobw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2001.06.20.20.07.03;	author bobw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2001.01.15.19.01.49;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.01.11.16.35.07;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.01.04.22.27.49;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.01.03.15.56.48;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.12.28.22.13.35;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.12.22.16.18.25;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.12.15.23.45.57;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.10
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@@
+
+
+1.9
+log
+@Moved Stack template implementations to header files.
+@
+text
+@a0 157
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "DblSpSch.C"
+//
+// Contains the implementation of the following classes:
+//
+//    AbsDblSpSched
+//    DblSpSched (TheType)
+//------------------------------------------------------------------------------
+
+#include <DblSpSch.h>
+#include <ObjStack.h>
+#include <PairStack.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class AbsDblSpSched.
+//------------------------------------------------------------------------------
+
+void WitAbsDblSpSched::clear ()
+   {
+   double * theCellPtr;
+
+   while (nonZeroCells_.pop (theCellPtr))
+      * theCellPtr = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAbsDblSpSched::saveAndClear ()
+   {
+   double * theCellPtr;
+
+   savedCells_.clear ();
+
+   while (nonZeroCells_.pop (theCellPtr))
+      {
+      savedCells_.push (theCellPtr, * theCellPtr);
+
+      * theCellPtr = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAbsDblSpSched::restore ()
+   {
+   WitPairStItr <double, double> theItr;
+   double *                      theCellPtr;
+   double                        theValue;
+
+   clear ();
+
+   theItr.attachTo (savedCells_);
+
+   while (theItr.advance (theCellPtr, theValue))
+      setCellAbs (* theCellPtr, theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+WitAbsDblSpSched::WitAbsDblSpSched (WitProblem * theProblem):
+      WitProbAssoc                                       (theProblem),
+      nonZeroCells_ (* new WitObjStack          <double> (theProblem)),
+      savedCells_   (* new WitPairStack <double, double> (theProblem))
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitAbsDblSpSched::~WitAbsDblSpSched ()
+   {
+   delete & savedCells_;
+   delete & nonZeroCells_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAbsDblSpSched::setCellAbs (double & theCell, double theValue)
+   {
+   theCell = theValue;
+
+   nonZeroCells_.push (& theCell);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class DblSpSched (TheType).
+//------------------------------------------------------------------------------
+
+#define WitDblSpSchedimplement(TheType)                                        \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitDblSpSched (TheType)::WitDblSpSched (TheType) (WitProblem * theProblem):    \
+                                                                               \
+      WitAbsDblSpSched (theProblem),                                           \
+                                                                               \
+      mySched_         ()                                                      \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitDblSpSched (TheType)::~WitDblSpSched (TheType) ()                           \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitDblSpSched (TheType)::allocate1D ()                                    \
+   {                                                                           \
+   mySched_.allocate1D (myProblem ());                                         \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitDblSpSched (TheType)::allocateRow (TheType * theObject)                \
+   {                                                                           \
+   mySched_ (theObject).allocate (myProblem (), 0.0);                          \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitDblSpSched (TheType)::setCell (                                        \
+      TheType * theObject,                                                     \
+      WitPeriod thePer,                                                        \
+      double    theValue)                                                      \
+   {                                                                           \
+   setCellAbs (mySched_ (theObject, thePer), theValue);                        \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitDblSpSched (TheType)::incCell (                                        \
+      TheType * theObject,                                                     \
+      WitPeriod thePer,                                                        \
+      double    theValue)                                                      \
+   {                                                                           \
+   double & theCell = mySched_ (theObject, thePer);                            \
+                                                                               \
+   setCellAbs (theCell, theCell + theValue);                                   \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementations of all specific cases of the generic classes implemented in
+// this file.
+//------------------------------------------------------------------------------
+
+implement (WitDblSpSched, WitConsEntry)
+implement (WitDblSpSched, WitBopEntry)
+@
+
+
+1.8
+log
+@Converted several generic classes into class templates.
+@
+text
+@d21 1
+a21 1
+#include <PairSt.h>
+@
+
+
+1.7
+log
+@Fixed some bugs in coarse selection splitting.
+@
+text
+@d55 1
+a55 1
+   WitPairStItr (double, double) theItr;
+d71 2
+a72 2
+      nonZeroCells_ (* new WitObjStack          (double) (theProblem)),
+      savedCells_   (* new WitPairStack (double, double) (theProblem))
+@
+
+
+1.6
+log
+@Initial implementation of coarse selection splitting for build-ahead.
+@
+text
+@d31 1
+a31 1
+   while (nonZeroCells_.get (theCellPtr))
+d43 1
+a43 1
+   while (nonZeroCells_.get (theCellPtr))
+d45 1
+a45 1
+      savedCells_.put (theCellPtr, * theCellPtr);
+d90 1
+a90 1
+   nonZeroCells_.put (& theCell);
+@
+
+
+1.5
+log
+@Coarse selection splitting.
+@
+text
+@d21 1
+a21 1
+#include <StackItr.h>
+d55 3
+a57 3
+   WitPairStackItr (double, double) theItr;
+   double *                         theCellPtr;
+   double                           theValue;
+d70 1
+a93 7
+
+WitProblem * WitAbsDblSpSched::myProblem ()
+   {
+   return nonZeroCells_.myProblem ();
+   }
+
+//------------------------------------------------------------------------------
+d102 1
+d105 1
+a105 1
+      mySched_          ()                                                     \
+a106 1
+   mySched_.partiallyAllocate (theProblem);                                    \
+d117 8
+a124 1
+void WitDblSpSched (TheType)::allocate (TheType * theObject)                   \
+@
+
+
+1.4
+log
+@Fixed some bugs in coarse selection splitting.
+@
+text
+@d155 2
+a156 1
+implement (WitDblSpSched, WitBillEntry)
+@
+
+
+1.3
+log
+@Completed a limited implementation of coarse selection splitting for BOP
+entries.
+@
+text
+@d21 1
+a21 1
+#include <PairSt.h>
+d37 1
+a37 1
+void WitAbsDblSpSched::save ()
+d55 3
+a57 2
+   double * theCellPtr;
+   double   theValue;
+d61 3
+a63 1
+   while (savedCells_.get (theCellPtr, theValue))
+a64 7
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAbsDblSpSched::unsave ()
+   {
+   savedCells_.clear ();
+@
+
+
+1.2
+log
+@Further development of coarse selection splitting.
+@
+text
+@d31 1
+a31 1
+   while (nonZeroCells_.pop (theCellPtr))
+d43 1
+a43 1
+   while (nonZeroCells_.pop (theCellPtr))
+d45 1
+a45 1
+      savedCells_.push (theCellPtr, * theCellPtr);
+d60 1
+a60 1
+   while (savedCells_.pop (theCellPtr, theValue))
+d93 1
+a93 1
+   nonZeroCells_.push (& theCell);
+d155 2
+a156 2
+// Implementations of all specific cases of the generic classes functions 
+// implemented in this file.
+d159 1
+a159 1
+implement (WitDblSpSched, WitBomEntry)
+@
+
+
+1.1
+log
+@Futher development of selection splitting.
+@
+text
+@d20 2
+a21 1
+#include <Stack.h>
+@
+

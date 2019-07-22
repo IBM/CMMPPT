@@ -1,0 +1,385 @@
+head	1.3;
+access;
+symbols
+	EndRw-branch:1.2.0.2
+	Root-of-EndRw:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2002.12.17.21.32.50;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.21.22.53.58;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.15.20.27.11;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Removed implementation of single-source by the old algorithm.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef OldSglSiteH
+#define OldSglSiteH
+
+//------------------------------------------------------------------------------
+// Header file: "OldSglSite.h"
+//
+// Contains the declaration of the following classes:
+//
+//    OldSglSite.
+//    PmrOsSite.
+//    CmrOsSite.
+//------------------------------------------------------------------------------
+
+#include <ObjStack.h>
+#include <Assoc.h>
+
+//------------------------------------------------------------------------------
+// Class OldSglSite
+//
+// "Old Single-Source Site"
+//
+// Represents a Part or BomEntry for which the single-source technique has been
+// requested. In comments, the Part or BomEntry associated with this OldSglSite
+// is called "myComp".
+//
+// This class is part of the implementation of the old single-source algorithm.
+//
+// Class Hierarchy:
+//
+// OldSglSite
+//    PmrOsSite
+//    CmrOsSite
+//
+// Implemented in OldSgl.C.
+//------------------------------------------------------------------------------
+
+class WitOldSglSite: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitOldSglSite ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void init (WitBoolean forReinit);
+         //
+         // Puts this OldSglSite into its initial state.
+         // forReinit is TRUE, iff this is for re-initialization.
+
+      void alterSel ();
+         //
+         // Advances the selection to the next candidate or switches this
+         // OldSglSite into multi-source mode, as appropriate.
+
+      void switchToMS ();
+         //
+         // Switches this OldSglSite to multi-source mode.
+
+      void applySsSel ();
+         //
+         // Applies the single-source selection for this OldSglSite to
+         // Multi-Route.
+
+      WitBoolean hasMisMatch (WitPeriod thePer);
+         //
+         // Returns TRUE, iff the current multi-route selection at myComp in
+         // thePer differs from selOsCand_.
+
+      WitBoolean altered ();
+         //
+         // Returns TRUE, iff the selection of this OldSglSite has been altered.
+                                                   
+      virtual void prtID () = 0;
+         //
+         // Prints info identifying this OldSglSite.
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (const WitTVec <WitBoolean> &, nonMS)
+
+      inline WitBoolean sglSrcMode ()
+         {
+         return (selOsCand_ != NULL);
+         }
+         //
+         // TRUE  --> this OldSglSite is single-source mode.
+         // FALSE --> this OldSglSite is  multi-source mode.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitOldSglSite (WitProblem *);
+
+      void setup (WitSelector * theSelector);
+         //
+         // Sets up this OldSglSite, using theSelector.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      void printInit (WitBoolean forReinit);
+         //
+         // Does printing for initializing the single-source selection.
+         // forReinit is TRUE, iff this is for re-initialization.
+
+      void prtAlter ();
+         //
+         // Does printing for altering the single-source selection.
+
+      virtual void buildOsCands (
+            WitObjStack <WitOldSglCand> & theOsCands,
+            WitSelector *                 theSelector) = 0;
+         //
+         // Creates the OldSglCands for this OldSglSite, storing them in order
+         // in theOsCands, and using theSelector.
+
+      noCopyCtorAssign (WitOldSglSite);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitObjStack <WitOldSglCand> myOsCands_;
+         //
+         // The ordered list of OldSglCands for this OldSglSite.
+
+      WitObjStItr <WitOldSglCand> selOsCandItr_;
+         //
+         // The Itr corresponding to selOsCand_.
+
+      WitOldSglCand * selOsCand_;
+         //
+         // The OldSglCand currently selected for single-source routing from
+         // this OldSglSite, if any; otherwise NULL.
+
+      WitTVec <WitBoolean> nonMS_;
+         //
+         // nonMS_[thePer] is TRUE, iff the selection used by CMQ at
+         // myComp in thePer is different from the multi-source selection at
+         // myComp in thePer.
+   };
+
+//------------------------------------------------------------------------------
+// Class PmrOsSite
+//
+// "Old Production Multi-Route Single-Source Site"
+//
+// Represents a Part for which the single-source technique has been requested.
+//
+// This class is part of the implementation of the old single-source algorithm.
+//
+// Class Hierarchy:
+//
+// OldSglSite
+//    PmrOsSite
+//
+// Implemented in OldSgl.C.
+//------------------------------------------------------------------------------
+
+class WitPmrOsSite: public WitOldSglSite
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitPmrOsSite (WitPart *, WitSelector *);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitPmrOsSite ();
+
+      //------------------------------------------------------------------------
+      // Overrides from class OldSglSite.
+      //------------------------------------------------------------------------
+
+      virtual void prtID ();
+
+      virtual void buildOsCands (WitObjStack <WitOldSglCand> &, WitSelector *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitPmrOsSite);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitPart * const myPart_;
+         //
+         // The Part associated with this PmrOsSite.
+   };
+
+//------------------------------------------------------------------------------
+// Class CmrOsSite
+//
+// "Old Production Multi-Route Single-Source Site"
+//
+// Represents a BomEntry for which the single-source technique has been
+// requested.
+//
+// This class is part of the implementation of the old single-source algorithm.
+//
+// Class Hierarchy:
+//
+// OldSglSite
+//    CmrOsSite
+//
+// Implemented in OldSgl.C.
+//------------------------------------------------------------------------------
+
+class WitCmrOsSite: public WitOldSglSite
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCmrOsSite (WitBomEntry *);
+
+      WitCmrOsSite (WitBomEntry *, WitSelector * theSelector);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitCmrOsSite ();
+
+      //------------------------------------------------------------------------
+      // Overrides from class OldSglSite.
+      //------------------------------------------------------------------------
+
+      virtual void prtID ();
+
+      virtual void buildOsCands (WitObjStack <WitOldSglCand> &, WitSelector *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitCmrOsSite);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitBomEntry * const myBomEnt_;
+         //
+         // The BomEntry associated with this CmrOsSite.
+   };
+
+#endif
+@
+
+
+1.2
+log
+@Continued implementation of single-source with the new algorithm.
+@
+text
+@@
+
+
+1.1
+log
+@Began implementation of the new single-source algorithm.
+@
+text
+@d43 1
+a43 1
+// Implemented in SglSrc.C.
+d82 1
+a82 1
+         // thePer differs from selSoCand_.
+d100 1
+a100 1
+         return (selSoCand_ != NULL);
+d133 2
+a134 2
+      virtual void buildSoCands (
+            WitObjStack <WitOldSglCand> & theSoCands,
+d138 1
+a138 1
+         // in theSoCands, and using theSelector.
+d146 1
+a146 1
+      WitObjStack <WitOldSglCand> mySoCands_;
+d150 1
+a150 1
+      WitObjStItr <WitOldSglCand> selSoCandItr_;
+d152 1
+a152 1
+         // The Itr corresponding to selSoCand_.
+d154 1
+a154 1
+      WitOldSglCand * selSoCand_;
+d180 1
+a180 1
+// Implemented in SglSrc.C.
+d211 1
+a211 1
+      virtual void buildSoCands (WitObjStack <WitOldSglCand> &, WitSelector *);
+d243 1
+a243 1
+// Implemented in SglSrc.C.
+d276 1
+a276 1
+      virtual void buildSoCands (WitObjStack <WitOldSglCand> &, WitSelector *);
+@
+

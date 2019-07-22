@@ -1,0 +1,1465 @@
+head	1.24;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.24
+date	2011.09.28.23.49.43;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2011.09.24.00.28.03;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2011.08.30.20.17.45;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2010.01.29.23.53.01;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2010.01.06.20.42.40;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2010.01.06.20.10.32;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2009.12.30.20.11.19;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2009.12.30.20.02.27;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2009.12.29.23.24.32;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2009.12.29.20.42.57;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2009.12.29.20.17.18;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2009.12.29.19.39.05;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2009.12.29.16.33.45;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2009.12.25.00.34.51;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2009.12.24.22.58.55;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2009.12.24.21.00.04;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2009.12.24.20.26.59;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2009.12.23.22.39.55;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.12.23.00.21.49;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.12.22.23.44.51;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.12.21.20.17.09;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.12.18.23.47.57;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.12.18.00.46.39;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.12.17.23.37.38;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.24
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "ObjVec.C"
+//
+// Contains the implementation of the following classes:
+//
+//    ObjVec
+//    ObjVecIR
+//    SglObjVecIR
+//    MultiObjVecIR
+//------------------------------------------------------------------------------
+
+#include <ObjVec.h>
+#include <SglObjVecIR.h>
+#include <MultiObjVecIR.h>
+#include <MultiObjMgr.h>
+#include <Objective.h>
+#include <Problem.h>
+#include <OptComp.h>
+#include <DelComp.h>
+#include <DataWrit.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class ObjVec.
+//------------------------------------------------------------------------------
+
+WitObjVec::WitObjVec (WitProblem * theProblem, double initValue):
+
+      myObjVecIR_ (newObjVecIR (theProblem, initValue))
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjVec::~WitObjVec ()
+   {
+   delete myObjVecIR_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVec::operator = (const WitObjVec & theObjVec)
+   {
+   theObjVec.myObjVecIR_->copyInto (myObjVecIR_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVec::writeDataMulti (
+      const char *   attrName,
+      WitDelComp *   theDelComp,
+      WitObjective * theObj)
+      const
+   {
+   myObjVecIR_->writeDataMulti (attrName, theDelComp, theObj);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVec::display (WitMsgID theMsgID, WitProblem * theProblem) const
+   {
+   myObjVecIR_->display (theMsgID, theProblem);
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjVecIR * WitObjVec::newObjVecIR (WitProblem * theProblem, double initValue)
+   {
+   if (theProblem->myOptComp ()->multiObjMode ())
+      {
+      return
+         new WitMultiObjVecIR  (
+            theProblem->myOptComp ()->myMultiObjMgr (),
+            initValue);
+      }
+   else
+      {
+      return new WitSglObjVecIR (theProblem, initValue);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ObjVecIR.
+//------------------------------------------------------------------------------
+
+WitObjVecIR::~WitObjVecIR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVecIR::copyFrom (WitSglObjVecIR *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVecIR::copyFrom (WitMultiObjVecIR *)
+   {
+   stronglyAssert (false);
+   }
+
+WitObjVecIR::WitObjVecIR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SglObjVecIR.
+//------------------------------------------------------------------------------
+
+WitSglObjVecIR::WitSglObjVecIR (WitProblem * theProblem, double initValue):
+
+      WitObjVecIR   (),
+      myDblFlexVec_ (theProblem, initValue)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSglObjVecIR::~WitSglObjVecIR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglObjVecIR::copyInto (WitObjVecIR * theObjVecIR)
+   {
+   theObjVecIR->copyFrom (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglObjVecIR::copyFrom (WitSglObjVecIR * theSglObjVecIR)
+   {
+   myDblFlexVec_ = theSglObjVecIR->myDblFlexVec_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglObjVecIR::writeDataMulti (const char *, WitDelComp *, WitObjective *)
+   {
+   stronglyAssert (false);
+   }
+   
+//------------------------------------------------------------------------------
+
+void WitSglObjVecIR::display (WitMsgID theMsgID, WitProblem * theProblem)
+   {
+   theProblem->display (theMsgID, myDblFlexVec_);
+   }
+
+//------------------------------------------------------------------------------
+
+WitDblFlexVec & WitSglObjVecIR::curDblFlexVec ()
+   {
+   return myDblFlexVec_;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class MultiObjVecIR.
+//------------------------------------------------------------------------------
+
+WitMultiObjVecIR::WitMultiObjVecIR (
+         WitMultiObjMgr * theMultiObjMgr,
+         double           initValue):
+
+      WitObjVecIR      (),
+      myMultiObjMgr_   (theMultiObjMgr),
+      myDblFlexVecMap_ (theMultiObjMgr->myProblem ())
+   {
+   WitObjective * theObj;
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myDblFlexVecMap_ (theObj) =
+         new WitDblFlexVec (myMultiObjMgr_->myProblem (), initValue);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitMultiObjVecIR::~WitMultiObjVecIR ()
+   {
+   WitObjective * theObj;
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      delete myDblFlexVecMap_ (theObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjVecIR::copyInto (WitObjVecIR * theObjVecIR)
+   {
+   theObjVecIR->copyFrom (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjVecIR::copyFrom (WitMultiObjVecIR * theMultiObjVecIR)
+   {
+   WitObjective * theObj;
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myDblFlexVecMap_.myElemAt (theObj) =
+         theMultiObjVecIR->
+            myDblFlexVecMap_.myElemAt (theObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjVecIR::writeDataMulti (
+      const char *   attrName,
+      WitDelComp *   theDelComp,
+      WitObjective * theObj)
+   {
+   if (myDblFlexVecMap_.myElemAt (theObj) == 0.0)
+      return;
+
+   theDelComp->writeSetClause ();
+
+   myMultiObjMgr_->
+      myProblem ()->
+         myDataWriter ()->
+            writeVector (attrName, myDblFlexVecMap_.myElemAt (theObj), 0.0);
+
+   myMultiObjMgr_->
+      myProblem ()->
+         myDataWriter ()->writeEndCommand   ();
+   }
+   
+//------------------------------------------------------------------------------
+
+void WitMultiObjVecIR::display (WitMsgID theMsgID, WitProblem * theProblem)
+   {
+   WitObjective * theObj;
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myMultiObjMgr_->myMsgFac () ("objNameDdMsg", theObj->myObjName ());
+
+      theProblem->display (theMsgID, myDblFlexVecMap_.myElemAt (theObj));
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitDblFlexVec & WitMultiObjVecIR::curDblFlexVec ()
+   {
+   return myDblFlexVecMap_.myElemAt (myMultiObjMgr_->currentObjective ());
+   }
+@
+
+
+1.23
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.22
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d38 3
+a40 3
+myObjVecIR_ (newObjVecIR (theProblem, initValue))
+{
+}
+d45 3
+a47 3
+{
+delete myObjVecIR_;
+}
+d52 3
+a54 3
+{
+theObjVec.myObjVecIR_->copyInto (myObjVecIR_);
+}
+d59 7
+a65 7
+const char *   attrName,
+WitDelComp *   theDelComp,
+WitObjective * theObj)
+const
+{
+myObjVecIR_->writeDataMulti (attrName, theDelComp, theObj);
+}
+d70 3
+a72 3
+{
+myObjVecIR_->display (theMsgID, theProblem);
+}
+d77 13
+a89 13
+{
+if (theProblem->myOptComp ()->multiObjMode ())
+{
+return
+new WitMultiObjVecIR  (
+theProblem->myOptComp ()->myMultiObjMgr (),
+initValue);
+}
+else
+{
+return new WitSglObjVecIR (theProblem, initValue);
+}
+}
+d96 2
+a97 2
+{
+}
+d102 3
+a104 3
+{
+stronglyAssert (false);
+}
+d109 3
+a111 3
+{
+stronglyAssert (false);
+}
+d114 2
+a115 2
+{
+}
+d123 4
+a126 4
+WitObjVecIR   (),
+myDblFlexVec_ (theProblem, initValue)
+{
+}
+d131 2
+a132 2
+{
+}
+d137 3
+a139 3
+{
+theObjVecIR->copyFrom (this);
+}
+d144 3
+a146 3
+{
+myDblFlexVec_ = theSglObjVecIR->myDblFlexVec_;
+}
+d151 4
+a154 4
+{
+stronglyAssert (false);
+}
+
+d158 3
+a160 3
+{
+theProblem->display (theMsgID, myDblFlexVec_);
+}
+d165 3
+a167 3
+{
+return myDblFlexVec_;
+}
+d174 2
+a175 2
+WitMultiObjMgr * theMultiObjMgr,
+double           initValue):
+d177 12
+a188 12
+WitObjVecIR      (),
+myMultiObjMgr_   (theMultiObjMgr),
+myDblFlexVecMap_ (theMultiObjMgr->myProblem ())
+{
+WitObjective * theObj;
+
+forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+{
+myDblFlexVecMap_ (theObj) =
+new WitDblFlexVec (myMultiObjMgr_->myProblem (), initValue);
+}
+}
+d193 2
+a194 2
+{
+WitObjective * theObj;
+d196 5
+a200 5
+forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+{
+delete myDblFlexVecMap_ (theObj);
+}
+}
+d205 3
+a207 3
+{
+theObjVecIR->copyFrom (this);
+}
+d212 2
+a213 2
+{
+WitObjective * theObj;
+d215 7
+a221 7
+forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+{
+myDblFlexVecMap_.myElemAt (theObj) =
+theMultiObjVecIR->
+myDblFlexVecMap_.myElemAt (theObj);
+}
+}
+d226 19
+a244 19
+const char *   attrName,
+WitDelComp *   theDelComp,
+WitObjective * theObj)
+{
+if (myDblFlexVecMap_.myElemAt (theObj) == 0.0)
+return;
+
+theDelComp->writeSetClause ();
+
+myMultiObjMgr_->
+myProblem ()->
+myDataWriter ()->
+writeVector (attrName, myDblFlexVecMap_.myElemAt (theObj), 0.0);
+
+myMultiObjMgr_->
+myProblem ()->
+myDataWriter ()->writeEndCommand   ();
+}
+
+d248 2
+a249 2
+{
+WitObjective * theObj;
+d251 7
+a257 7
+forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+{
+myMultiObjMgr_->myMsgFac () ("objNameDdMsg", theObj->myObjName ());
+
+theProblem->display (theMsgID, myDblFlexVecMap_.myElemAt (theObj));
+}
+}
+d262 3
+a264 3
+{
+return myDblFlexVecMap_.myElemAt (myMultiObjMgr_->currentObjective ());
+}
+@
+
+
+1.21
+log
+@Multi-objective mode
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d38 3
+a40 3
+      myObjVecIR_ (newObjVecIR (theProblem, initValue))
+   {
+   }
+d45 3
+a47 3
+   {
+   delete myObjVecIR_;
+   }
+d52 3
+a54 3
+   {
+   theObjVec.myObjVecIR_->copyInto (myObjVecIR_);
+   }
+d59 7
+a65 7
+      const char *   attrName,
+      WitDelComp *   theDelComp,
+      WitObjective * theObj)
+      const
+   {
+   myObjVecIR_->writeDataMulti (attrName, theDelComp, theObj);
+   }
+d70 3
+a72 3
+   {
+   myObjVecIR_->display (theMsgID, theProblem);
+   }
+d77 13
+a89 13
+   {
+   if (theProblem->myOptComp ()->multiObjMode ())
+      {
+      return
+         new WitMultiObjVecIR  (
+            theProblem->myOptComp ()->myMultiObjMgr (),
+            initValue);
+      }
+   else
+      {
+      return new WitSglObjVecIR (theProblem, initValue);
+      }
+   }
+d96 2
+a97 2
+   {
+   }
+d102 3
+a104 3
+   {
+   stronglyAssert (false);
+   }
+d109 3
+a111 3
+   {
+   stronglyAssert (false);
+   }
+d114 2
+a115 2
+   {
+   }
+d123 4
+a126 4
+      WitObjVecIR   (),
+      myDblFlexVec_ (theProblem, initValue)
+   {
+   }
+d131 2
+a132 2
+   {
+   }
+d137 3
+a139 3
+   {
+   theObjVecIR->copyFrom (this);
+   }
+d144 3
+a146 3
+   {
+   myDblFlexVec_ = theSglObjVecIR->myDblFlexVec_;
+   }
+d151 4
+a154 4
+   {
+   stronglyAssert (false);
+   }
+   
+d158 3
+a160 3
+   {
+   theProblem->display (theMsgID, myDblFlexVec_);
+   }
+d165 3
+a167 3
+   {
+   return myDblFlexVec_;
+   }
+d174 2
+a175 2
+         WitMultiObjMgr * theMultiObjMgr,
+         double           initValue):
+d177 12
+a188 12
+      WitObjVecIR      (),
+      myMultiObjMgr_   (theMultiObjMgr),
+      myDblFlexVecMap_ (theMultiObjMgr->myProblem ())
+   {
+   WitObjective * theObj;
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myDblFlexVecMap_ (theObj) =
+         new WitDblFlexVec (myMultiObjMgr_->myProblem (), initValue);
+      }
+   }
+d193 2
+a194 2
+   {
+   WitObjective * theObj;
+d196 5
+a200 5
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      delete myDblFlexVecMap_ (theObj);
+      }
+   }
+d205 3
+a207 3
+   {
+   theObjVecIR->copyFrom (this);
+   }
+d212 2
+a213 2
+   {
+   WitObjective * theObj;
+d215 7
+a221 7
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myDblFlexVecMap_.myElemAt (theObj) =
+         theMultiObjVecIR->
+            myDblFlexVecMap_.myElemAt (theObj);
+      }
+   }
+d226 19
+a244 19
+      const char *   attrName,
+      WitDelComp *   theDelComp,
+      WitObjective * theObj)
+   {
+   if (myDblFlexVecMap_.myElemAt (theObj) == 0.0)
+      return;
+
+   theDelComp->writeSetClause ();
+
+   myMultiObjMgr_->
+      myProblem ()->
+         myDataWriter ()->
+            writeVector (attrName, myDblFlexVecMap_.myElemAt (theObj), 0.0);
+
+   myMultiObjMgr_->
+      myProblem ()->
+         myDataWriter ()->writeEndCommand   ();
+   }
+   
+d248 2
+a249 2
+   {
+   WitObjective * theObj;
+d251 7
+a257 7
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      myMultiObjMgr_->myMsgFac () ("objNameDdMsg", theObj->myObjName ());
+
+      theProblem->display (theMsgID, myDblFlexVecMap_.myElemAt (theObj));
+      }
+   }
+d262 3
+a264 3
+   {
+   return myDblFlexVecMap_.myElemAt (myMultiObjMgr_->currentObjective ());
+   }
+@
+
+
+1.20
+log
+@Multi-objective mode
+@
+text
+@d253 1
+a253 1
+      myMultiObjMgr_->myMsgFac () ("objNameDdMsg", theObj->objectiveName ());
+@
+
+
+1.19
+log
+@Multi-objective mode
+@
+text
+@a57 14
+void WitObjVec::operator = (const WitDblFlexVec & theDblFlexVec)
+   {
+   myObjVecIR_->curDblFlexVec () = theDblFlexVec;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVec::operator = (const WitIVRealArg & theIVRealArg)
+   {
+   myObjVecIR_->curDblFlexVec () = theIVRealArg;
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.18
+log
+@Multi-Objective Mode
+@
+text
+@a183 9
+
+WitDblFlexVec & WitSglObjVecIR::myDblFlexVecFor (WitObjective *)
+   {
+   stronglyAssert (false);
+
+   return myDblFlexVec_;
+   }
+
+//------------------------------------------------------------------------------
+a278 7
+
+//------------------------------------------------------------------------------
+
+WitDblFlexVec & WitMultiObjVecIR::myDblFlexVecFor (WitObjective * theObj)
+   {
+   return myDblFlexVecMap_.myElemAt (theObj);
+   }
+@
+
+
+1.17
+log
+@Multi-Objective Mode
+@
+text
+@d115 1
+a115 1
+void WitObjVecIR::copyFrom (const WitSglObjVecIR *)
+d122 1
+a122 1
+void WitObjVecIR::copyFrom (const WitMultiObjVecIR *)
+d150 1
+a150 1
+void WitSglObjVecIR::copyInto (WitObjVecIR * theObjVecIR) const
+d157 1
+a157 1
+void WitSglObjVecIR::copyFrom (const WitSglObjVecIR * theSglObjVecIR)
+d164 1
+a164 5
+void WitSglObjVecIR::writeDataMulti (
+      const char *, 
+      WitDelComp *, 
+      WitObjective *)
+      const
+d171 1
+a171 1
+void WitSglObjVecIR::display (WitMsgID theMsgID, WitProblem * theProblem) const
+d227 1
+a227 1
+void WitMultiObjVecIR::copyInto (WitObjVecIR * theObjVecIR) const
+d234 1
+a234 1
+void WitMultiObjVecIR::copyFrom (const WitMultiObjVecIR * theMultiObjVecIR)
+a251 1
+      const
+d270 1
+a270 4
+void WitMultiObjVecIR::display (
+      WitMsgID     theMsgID,
+      WitProblem * theProblem)
+      const
+@
+
+
+1.16
+log
+@Multi-Objective Mode
+@
+text
+@d188 9
+d296 7
+@
+
+
+1.15
+log
+@Multi-Objective Mode
+@
+text
+@d36 1
+a36 1
+WitObjVec::WitObjVec (WitProblem * theProblem):
+d38 1
+a38 1
+      myObjVecIR_ (newObjVecIR (theProblem))
+d90 1
+a90 1
+WitObjVecIR * WitObjVec::newObjVecIR (WitProblem * theProblem)
+d94 4
+a97 1
+      return new WitMultiObjVecIR  (theProblem->myOptComp ()->myMultiObjMgr ());
+d101 1
+a101 1
+      return new WitSglObjVecIR (theProblem);
+d135 1
+a135 1
+WitSglObjVecIR::WitSglObjVecIR (WitProblem * theProblem):
+d138 1
+a138 1
+      myDblFlexVec_ (theProblem, 0.0)
+d191 3
+a193 1
+WitMultiObjVecIR::WitMultiObjVecIR (WitMultiObjMgr * theMultiObjMgr):
+d204 1
+a204 1
+         new WitDblFlexVec (myMultiObjMgr_->myProblem (), 0.0);
+@
+
+
+1.14
+log
+@Multi-Objective Mode
+@
+text
+@a71 7
+void WitObjVec::writeDataSingle (const char * attrName) const
+   {
+   myObjVecIR_->writeDataSingle (attrName);
+   }
+
+//------------------------------------------------------------------------------
+
+a160 10
+void WitSglObjVecIR::writeDataSingle (const char * attrName) const
+   {
+   myDblFlexVec_.
+      myProblem ()->
+         myDataWriter ()->
+            writeVector (attrName, myDblFlexVec_, 0.0);
+   }
+
+//------------------------------------------------------------------------------
+
+a237 6
+void WitMultiObjVecIR::writeDataSingle (const char *) const
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.13
+log
+@Multi-Objective Mode
+@
+text
+@d90 1
+a90 1
+void WitObjVec::display (WitMsgID theMsgID) const
+d92 1
+a92 1
+   myObjVecIR_->display (theMsgID);
+d189 1
+a189 1
+void WitSglObjVecIR::display (WitMsgID theMsgID) const
+d191 1
+a191 1
+   myDblFlexVec_.myProblem ()->display (theMsgID, myDblFlexVec_);
+d284 4
+a287 1
+void WitMultiObjVecIR::display (WitMsgID theMsgID) const
+d295 1
+a295 3
+      myMultiObjMgr_->
+         myProblem ()->
+            display (theMsgID, myDblFlexVecMap_.myElemAt (theObj));
+@
+
+
+1.12
+log
+@Multi-Objective Mode
+@
+text
+@d51 46
+d119 1
+a119 1
+const WitSglObjVecIR * WitObjVecIR::thisSglObjVecIR () const
+a121 2
+
+   return NULL;
+d126 1
+a126 1
+const WitMultiObjVecIR * WitObjVecIR::thisMultiObjVecIR () const
+a128 2
+
+   return NULL;
+a130 2
+//------------------------------------------------------------------------------
+
+d154 1
+a154 1
+void WitSglObjVecIR::copyFrom (const WitObjVecIR * theObjVecIR)
+d156 8
+a163 1
+   myDblFlexVec_ = theObjVecIR->thisSglObjVecIR ()->myDblFlexVec_;
+a195 7
+const WitSglObjVecIR * WitSglObjVecIR::thisSglObjVecIR () const
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+
+d234 1
+a234 1
+void WitMultiObjVecIR::copyFrom (const WitObjVecIR * theObjVecIR)
+d236 4
+a239 2
+   const WitMultiObjVecIR * theMultiObjVecIR;
+   WitObjective *           theObj;
+d241 3
+a243 1
+   theMultiObjVecIR = theObjVecIR->thisMultiObjVecIR ();
+a299 7
+const WitMultiObjVecIR * WitMultiObjVecIR::thisMultiObjVecIR () const
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.11
+log
+@Multi-Objective Mode
+@
+text
+@d16 3
+a18 2
+//    SingleObjVec
+//    MultiObjVec
+d21 3
+a23 2
+#include <SingleObjVec.h>
+#include <MultiObjVec.h>
+d36 8
+d46 1
+d51 1
+a51 1
+const WitSingleObjVec * WitObjVec::thisSingleObjVec () const
+d53 13
+a65 1
+   stronglyAssert (false);
+d67 2
+a68 1
+   return NULL;
+d73 1
+a73 1
+const WitMultiObjVec * WitObjVec::thisMultiObjVec () const
+d82 1
+a82 1
+WitObjVec::WitObjVec ()
+d84 3
+d91 1
+a91 1
+WitObjVec * WitNonClass::newObjVec (WitProblem * theProblem)
+a92 8
+   if (theProblem->myOptComp ()->multiObjMode ())
+      {
+      return new WitMultiObjVec  (theProblem->myOptComp ()->myMultiObjMgr ());
+      }
+   else
+      {
+      return new WitSingleObjVec (theProblem);
+      }
+d96 1
+a96 1
+// Implementation of class SingleObjVec.
+d99 1
+a99 1
+WitSingleObjVec::WitSingleObjVec (WitProblem * theProblem):
+d101 1
+a101 1
+      WitObjVec     (),
+d108 1
+a108 1
+WitSingleObjVec::~WitSingleObjVec ()
+d114 1
+a114 1
+void WitSingleObjVec::copyFrom (const WitObjVec * theObjVec)
+d116 1
+a116 1
+   myDblFlexVec_ = theObjVec->thisSingleObjVec ()->myDblFlexVec_;
+d121 1
+a121 1
+void WitSingleObjVec::writeDataSingle (const char * attrName) const
+d131 1
+a131 1
+void WitSingleObjVec::writeDataMulti (
+d142 1
+a142 1
+void WitSingleObjVec::display (WitMsgID theMsgID) const
+d149 1
+a149 1
+const WitSingleObjVec * WitSingleObjVec::thisSingleObjVec () const
+d156 1
+a156 1
+WitDblFlexVec & WitSingleObjVec::curDblFlexVec ()
+d162 1
+a162 1
+// Implementation of class MultiObjVec.
+d165 1
+a165 1
+WitMultiObjVec::WitMultiObjVec (WitMultiObjMgr * theMultiObjMgr):
+d167 1
+a167 1
+      WitObjVec        (),
+d182 1
+a182 1
+WitMultiObjVec::~WitMultiObjVec ()
+d194 1
+a194 1
+void WitMultiObjVec::copyFrom (const WitObjVec * theObjVec)
+d196 2
+a197 2
+   const WitMultiObjVec * theMultiObjVec;
+   WitObjective *         theObj;
+d199 1
+a199 1
+   theMultiObjVec = theObjVec->thisMultiObjVec ();
+d204 1
+a204 1
+         theMultiObjVec->
+d211 1
+a211 1
+void WitMultiObjVec::writeDataSingle (const char *) const
+d217 1
+a217 1
+void WitMultiObjVec::writeDataMulti (
+d240 1
+a240 1
+void WitMultiObjVec::display (WitMsgID theMsgID) const
+d256 1
+a256 1
+const WitMultiObjVec * WitMultiObjVec::thisMultiObjVec () const
+d263 1
+a263 1
+WitDblFlexVec & WitMultiObjVec::curDblFlexVec ()
+@
+
+
+1.10
+log
+@Multi-Objective Mode
+@
+text
+@d26 1
+d112 5
+a116 1
+void WitSingleObjVec::writeDataMulti (const char *, WitObjective *) const
+d120 1
+a120 1
+
+d200 1
+d204 5
+d213 4
+d218 1
+a218 1
+
+@
+
+
+1.9
+log
+@Multi-Objective Mode
+@
+text
+@d101 1
+a101 1
+void WitSingleObjVec::writeData (const char * attrName) const
+d111 7
+d187 10
+a196 1
+void WitMultiObjVec::writeData (const char *) const
+d198 4
+@
+
+
+1.8
+log
+@Multi-Objective Mode
+@
+text
+@d26 1
+d101 10
+d180 6
+@
+
+
+1.7
+log
+@Multi-Objective Mode
+@
+text
+@d38 1
+a38 1
+WitSingleObjVec * WitObjVec::thisSingleObjVec ()
+d47 1
+a47 1
+WitMultiObjVec * WitObjVec::thisMultiObjVec ()
+d93 1
+a93 1
+void WitSingleObjVec::copyFrom (WitObjVec * theObjVec)
+d100 1
+a100 1
+void WitSingleObjVec::display (WitMsgID theMsgID)
+d107 1
+a107 1
+WitSingleObjVec * WitSingleObjVec::thisSingleObjVec ()
+d152 1
+a152 1
+void WitMultiObjVec::copyFrom (WitObjVec * theObjVec)
+d154 2
+a155 2
+   WitMultiObjVec * theMultiObjVec;
+   WitObjective *   theObj;
+d169 1
+a169 1
+void WitMultiObjVec::display (WitMsgID theMsgID)
+d185 1
+a185 1
+WitMultiObjVec * WitMultiObjVec::thisMultiObjVec ()
+@
+
+
+1.6
+log
+@Multi-Objective Mode
+@
+text
+@d26 1
+d93 1
+a93 1
+WitDblFlexVec & WitSingleObjVec::curDblFlexVec ()
+d95 1
+a95 1
+   return myDblFlexVec_;
+d100 1
+a100 1
+void WitSingleObjVec::copyFrom (WitObjVec * theObjVec)
+d102 1
+a102 1
+   myDblFlexVec_ = theObjVec->thisSingleObjVec ()->myDblFlexVec_;
+d113 7
+a151 7
+WitDblFlexVec & WitMultiObjVec::curDblFlexVec ()
+   {
+   return myDblFlexVecMap_.myElemAt (myMultiObjMgr_->currentObjective ());
+   }
+
+//------------------------------------------------------------------------------
+
+d169 16
+d189 7
+@
+
+
+1.5
+log
+@Multi-Objective Mode
+@
+text
+@d37 18
+d98 14
+d148 24
+@
+
+
+1.4
+log
+@Multi-Objective Mode
+@
+text
+@d43 1
+a43 1
+WitObjVec & WitNonClass::newObjVecRef (WitProblem * theProblem)
+d47 1
+a47 1
+      return * new WitMultiObjVec  (theProblem->myOptComp ()->myMultiObjMgr ());
+d51 1
+a51 1
+      return * new WitSingleObjVec (theProblem);
+@
+
+
+1.3
+log
+@Multi-Objective Mode
+@
+text
+@d37 7
+a43 1
+WitObjVec & WitObjVec::newInstanceRef (WitProblem * theProblem)
+a55 20
+
+void WitObjVec::copyInto (WitSingleObjVec & theSingleObjVec) const
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjVec::copyInto (WitMultiObjVec  & theMultiObjVec) const
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjVec::WitObjVec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+d74 1
+a74 1
+WitDblFlexVec & WitSingleObjVec::myDblFlexVec ()
+a79 14
+
+void WitSingleObjVec::operator = (const WitObjVec & theObjVec)
+   {
+   theObjVec.copyInto (* this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSingleObjVec::copyInto (WitSingleObjVec & theSingleObjVec) const
+   {
+   theSingleObjVec.myDblFlexVec_ = myDblFlexVec_;
+   }
+
+//------------------------------------------------------------------------------
+d112 1
+a112 1
+WitDblFlexVec & WitMultiObjVec::myDblFlexVec ()
+a115 24
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjVec::operator = (const WitObjVec & theObjVec)
+   {
+   theObjVec.copyInto (* this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjVec::copyInto (WitMultiObjVec & theMultiObjVec) const
+   {
+   WitObjective * theObj;
+
+   stronglyAssert (     
+                        myMultiObjMgr_->nObjectives ()
+      == theMultiObjVec.myMultiObjMgr_->nObjectives ());
+
+   forEachEl (theObj, myMultiObjMgr_->myObjectives ())
+      {
+      theMultiObjVec.myDblFlexVecMap_.myElemAt (theObj) =
+                     myDblFlexVecMap_.myElemAt (theObj);
+      }
+   }
+@
+
+
+1.2
+log
+@Multi-Objective Mode
+@
+text
+@d17 1
+d21 5
+d37 28
+d73 1
+a73 3
+WitSingleObjVec::WitSingleObjVec (
+         WitProblem * theProblem,
+         double       initValue):
+d76 1
+a76 1
+      myDblFlexVec_ (theProblem, initValue)
+d92 76
+@
+
+
+1.1
+log
+@Multi-Objective Mode
+@
+text
+@d16 1
+d19 1
+a19 1
+#include <ObjVec.h>
+d34 26
+@
+

@@ -1,0 +1,1103 @@
+head	1.2;
+access;
+symbols
+	sce_5_01_20080919:1.2
+	latest_sce_4_20_20060523:1.2.0.6
+	sce_4_20_20060523:1.2
+	latest_sce4_20_OSL:1.2.0.4
+	sce_4_20_OSL:1.2
+	sce_4_05_20040511:1.2
+	sce_4_00_20040201:1.2
+	nextGenBranch:1.2.0.2
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2003.01.15.19.36.46;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.49;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.49;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.36;	author rwToStl;	state Exp;
+branches;
+next	1.1.1.1.14.2;
+
+1.1.1.1.14.2
+date	2003.01.09.13.54.39;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+#include <assert.h>
+#include <scenario/src/scenP.h>
+#include <scenario/src/scTestP.h>
+#include <scenario/src/testScen.h>
+#include <scenario/src/inPrFile.h>
+#include <scenario/src/schFctry.h>
+
+// Default Constructor
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst() : pointer_(0)
+{
+};
+
+// Preferred Constructor
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst(LgFrTestScenario* newedPointer) 
+: pointer_(newedPointer), count_(1)
+{
+}
+
+// Constructor for cast operator
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst(
+    LgFrTestScenario* existingPointer,
+    LgFrReferenceCount& count) : pointer_(existingPointer)
+{
+    count_ = count;
+}
+
+// Constructor 
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst(
+    LgFrScenarioSmartPointerToConst rhs)
+{
+    if (rhs->GetScenarioType() != __LGFRTESTSCENARIO)  {
+	std::cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << std::endl;
+	assert(0);
+    }
+    else  {
+	pointer_ = (LgFrTestScenario*)(rhs.pointer_);
+	count_ = rhs.count_;
+    }
+}
+
+// Destructor
+LgFrTestScenarioSmartPointerToConst::~LgFrTestScenarioSmartPointerToConst()
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	 && (count_.reference() == 3) ) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = 0;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+    else if ( (count_.reference() == 2) && 
+	      ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = 0;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+    else if (count_.reference() == 1) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = 0;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+}
+
+// Copy Constructor
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst(const LgFrTestScenarioSmartPointerToConst& rhs) 
+: pointer_(rhs.pointer_)
+{
+    count_ = ((LgFrTestScenarioSmartPointerToConst&)rhs).count_;
+}
+
+// Deep Copy
+LgFrTestScenarioSmartPointerToConst
+LgFrTestScenarioSmartPointerToConst::deepCopy() const
+{
+    // do scenario deep copy and create a new smart pointer
+    LgFrTestScenarioSmartPointer temp(new LgFrTestScenario(*pointer_));
+
+    // fix the ipp - since Scenario::initialProblemAndParameters() is non-const
+    //  we need to cast away *pointer_
+    temp->initialProblemAndParameters(((LgFrInitialProblemFromFile&)(((LgFrTestScenario&)(*pointer_)).initialProblemAndParameters())).clone(temp));
+
+    // fix the schedule factory - since Scenario::scheduleFactory() 
+    // is non-const we need to cast away *pointer_
+    temp->scheduleFactory(((LgFrScheduleFactory*)(((LgFrTestScenario&)(*pointer_)).scheduleFactory()))->clone(temp));
+
+    return temp;
+}
+
+// Assignment Operator
+LgFrTestScenarioSmartPointerToConst& 
+LgFrTestScenarioSmartPointerToConst::operator=(const LgFrTestScenarioSmartPointerToConst& rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != 0)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrTestScenarioSmartPointerToConst&)rhs).count_;
+    pointer_ = rhs.pointer_;
+    return *this;
+}
+
+
+bool
+LgFrTestScenarioSmartPointerToConst::operator==(const LgFrTestScenarioSmartPointerToConst& rhs) const
+{
+    if ( (pointer_ == rhs.pointer_) && (pointer_ == 0 || count_ == rhs.count_) )
+	return true;
+    else
+	return false;
+}
+
+bool
+LgFrTestScenarioSmartPointerToConst::operator!=(const LgFrTestScenarioSmartPointerToConst& rhs) const
+{
+    return !( *this == rhs );
+}
+
+const LgFrTestScenario* const
+LgFrTestScenarioSmartPointerToConst::operator->() const
+{
+    // implicit cast to const
+    return pointer_;
+}
+
+const LgFrTestScenario&
+LgFrTestScenarioSmartPointerToConst::operator*() const
+{
+    // implicit cast to const
+    return *pointer_;
+}
+
+
+LgFrTestScenarioSmartPointerToConst::operator LgFrScenarioSmartPointerToConst () const
+{
+    // need to cast away const for count_
+    return LgFrScenarioSmartPointerToConst(pointer_, (LgFrReferenceCount&)count_);
+}
+
+bool
+LgFrTestScenarioSmartPointerToConst::unique() const
+{
+    return (count_.reference() == 1);
+}
+
+bool 
+LgFrTestScenarioSmartPointerToConst::null() const
+{
+    return (pointer_ == 0);
+}
+
+void
+LgFrTestScenarioSmartPointerToConst::test()
+{
+    std::cout << "Testing default constructor" << std::endl;
+    LgFrTestScenarioSmartPointerToConst dummy;
+    assert(dummy.pointer_ == 0);
+    std::cout << "dummy count is " << dummy.count_.reference() << std::endl;
+
+    std::cout << "Testing preferred constructor (dummy)" << std::endl;
+    LgFrTestScenarioSmartPointerToConst b(new LgFrTestScenario);
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing assignement operator dummy = b" << std::endl;
+    dummy = b;
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing copy constructor (c = b)" << std::endl;
+    LgFrTestScenarioSmartPointerToConst c(b);
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing backdoor constructor" << std::endl;
+    LgFrTestScenarioSmartPointerToConst e(b.pointer_, b.count_);
+    std::cout << "e count is " << e.count_.reference() << std::endl;    
+
+    std::cout << "Testing equality operator (c == b)" << std::endl;
+    assert(c == b);
+
+    std::cout << "Testing inequality operator (c != d)" << std::endl;
+    LgFrTestScenarioSmartPointerToConst d(new LgFrTestScenario);
+    assert(c != d);
+
+    std::cout << "Test destructor" << std::endl;
+    c = d;
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+    c = b;
+    d = b;
+
+    // this should be a compiler error
+//    LgFrTestScenarioSmartPointerToConst e(&(*d));
+}
+
+
+
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer() 
+{
+    // calls base class default constructor
+}
+
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer(LgFrTestScenario* newedPointer) 
+: LgFrTestScenarioSmartPointerToConst(newedPointer)
+{
+}
+
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer(
+    LgFrTestScenario* existingPointer,
+    LgFrReferenceCount& count) 
+: LgFrTestScenarioSmartPointerToConst(existingPointer, count)
+{
+}
+
+
+LgFrTestScenarioSmartPointer::~LgFrTestScenarioSmartPointer()
+{
+    // call base class destructor
+}
+
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer(const LgFrTestScenarioSmartPointer& rhs) 
+: LgFrTestScenarioSmartPointerToConst(rhs.pointer_)
+{
+    count_ = ((LgFrTestScenarioSmartPointer&)rhs).count_;
+}
+
+// need to do some casting to a derived class so that we can access protected
+//  members
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer(LgFrTestScenarioSmartPointerToConst rhs) 
+    : LgFrTestScenarioSmartPointerToConst(((LgFrTestScenarioSmartPointer&)rhs).pointer_)
+{
+    count_ = ((LgFrTestScenarioSmartPointer&)rhs).count_;
+}
+
+// Constructor 
+LgFrTestScenarioSmartPointer::LgFrTestScenarioSmartPointer(
+    LgFrScenarioSmartPointerToConst rhs)
+{
+    if (rhs->GetScenarioType() != __LGFRTESTSCENARIO)  {
+	std::cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << std::endl;
+	assert(0);
+    }
+    else  {
+	// silly casting to derived class (SmartPointerToConst -> SmartPointer)
+	//   so that we can access protected members pointer_, count_
+	pointer_ = (LgFrTestScenario*)(((LgFrScenarioSmartPointer&)rhs).pointer_);
+	count_ = ((LgFrScenarioSmartPointer&)rhs).count_;
+    }
+}
+
+// Deep Copy
+LgFrTestScenarioSmartPointer
+LgFrTestScenarioSmartPointer::deepCopy()
+{
+    // do scenario deep copy and create a new smart pointer
+    LgFrTestScenarioSmartPointer temp(new LgFrTestScenario(*pointer_));
+
+    // fix the ipp 
+    temp->initialProblemAndParameters(((LgFrInitialProblemFromFile&)(pointer_->initialProblemAndParameters())).clone(temp));
+
+    // fix the schedule factory 
+    temp->scheduleFactory(((LgFrScheduleFactory*)(pointer_->scheduleFactory()))->clone(temp));
+
+    return temp;
+}
+
+LgFrTestScenarioSmartPointer& 
+LgFrTestScenarioSmartPointer::operator=(const LgFrTestScenarioSmartPointer& rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != 0)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrTestScenarioSmartPointer&)rhs).count_;
+    pointer_ = rhs.pointer_;
+    return *this;
+}
+
+// need to do some casting to a derived class so that we can access protected
+//  members
+LgFrTestScenarioSmartPointer& 
+LgFrTestScenarioSmartPointer::operator=(LgFrTestScenarioSmartPointerToConst rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != 0)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+	    delete pointer_;
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+	    pointer_ = 0;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrTestScenarioSmartPointer&)rhs).count_;
+    pointer_ = ((LgFrTestScenarioSmartPointer&)rhs).pointer_;
+    return *this;
+}
+
+bool
+LgFrTestScenarioSmartPointer::operator==(const LgFrTestScenarioSmartPointer& rhs) const
+{
+    if ( (pointer_ == rhs.pointer_) && (pointer_ == 0 || count_ == rhs.count_) )
+	return true;
+    else
+	return false;
+}
+
+bool
+LgFrTestScenarioSmartPointer::operator!=(const LgFrTestScenarioSmartPointer& rhs) const
+{
+    return !( *this == rhs );
+}
+
+LgFrTestScenario* const
+LgFrTestScenarioSmartPointer::operator->()
+{
+    return pointer_;
+}
+
+const LgFrTestScenario* const
+LgFrTestScenarioSmartPointer::operator->() const
+{
+    return pointer_;
+}
+
+LgFrTestScenario &
+LgFrTestScenarioSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+const LgFrTestScenario &
+LgFrTestScenarioSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+
+LgFrTestScenarioSmartPointer::operator LgFrScenarioSmartPointerToConst () const
+{
+    // need to cast away const for count_
+    return LgFrScenarioSmartPointerToConst(pointer_, (LgFrReferenceCount&)count_);
+}
+
+LgFrTestScenarioSmartPointer::operator LgFrScenarioSmartPointer () 
+{
+    return LgFrScenarioSmartPointer(pointer_, count_);
+}
+
+
+
+bool
+LgFrTestScenarioSmartPointer::unique() const
+{
+    return (count_.reference() == 1);
+}
+
+bool 
+LgFrTestScenarioSmartPointer::null() const
+{
+    return (pointer_ == 0);
+}
+
+void
+LgFrTestScenarioSmartPointer::test()
+{
+    std::cout << "Testing default constructor" << std::endl;
+    LgFrTestScenarioSmartPointer dummy;
+    assert(dummy.pointer_ == 0);
+    std::cout << "dummy count is " << dummy.count_.reference() << std::endl;
+
+    std::cout << "Testing preferred constructor (dummy)" << std::endl;
+    LgFrTestScenarioSmartPointer b(new LgFrTestScenario);
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing assignement operator dummy = b" << std::endl;
+    dummy = b;
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing copy constructor (c = b)" << std::endl;
+    LgFrTestScenarioSmartPointer c(b);
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+
+    std::cout << "Testing backdoor constructor" << std::endl;
+    LgFrTestScenarioSmartPointer e(b.pointer_, b.count_);
+    std::cout << "e count is " << e.count_.reference() << std::endl;    
+
+    std::cout << "Testing equality operator (c == b)" << std::endl;
+    assert(c == b);
+
+    std::cout << "Testing inequality operator (c != d)" << std::endl;
+    LgFrTestScenarioSmartPointer d(new LgFrTestScenario);
+    assert(c != d);
+
+    std::cout << "Test destructor" << std::endl;
+    c = d;
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+    c = b;
+    d = b;
+}
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+d13 1
+a13 1
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst() : pointer_(NULL)
+d35 2
+a36 2
+    if (rhs->isA() != __LGFRTESTSCENARIO)  {
+	cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << endl;
+d60 1
+a60 1
+	pointer_ = NULL;
+d67 1
+a67 1
+	pointer_ = NULL;
+d73 1
+a73 1
+	pointer_ = NULL;
+d115 1
+a115 1
+    if (pointer_ != NULL)  {
+d119 1
+a119 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+d121 2
+a122 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d128 1
+a128 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+d130 2
+a131 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d136 1
+a136 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+d138 2
+a139 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d149 1
+a149 1
+RWBoolean
+d152 2
+a153 2
+    if ( (pointer_ == rhs.pointer_) && (count_ == rhs.count_) )
+	return TRUE;
+d155 1
+a155 1
+	return FALSE;
+d158 1
+a158 1
+RWBoolean
+d161 1
+a161 4
+    if ( (pointer_ != rhs.pointer_) || (count_ != rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+d185 1
+a185 1
+RWBoolean
+d191 1
+a191 1
+RWBoolean 
+d194 1
+a194 1
+    return (pointer_ == NULL);
+d200 1
+a200 1
+    cout << "Testing default constructor" << endl;
+d202 2
+a203 2
+    assert(dummy.pointer_ == NULL);
+    cout << "dummy count is " << dummy.count_.reference() << endl;
+d205 1
+a205 1
+    cout << "Testing preferred constructor (dummy)" << endl;
+d207 1
+a207 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d209 1
+a209 1
+    cout << "Testing assignement operator dummy = b" << endl;
+d211 1
+a211 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d213 1
+a213 1
+    cout << "Testing copy constructor (c = b)" << endl;
+d215 1
+a215 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d217 1
+a217 1
+    cout << "Testing backdoor constructor" << endl;
+d219 1
+a219 1
+    cout << "e count is " << e.count_.reference() << endl;    
+d221 1
+a221 1
+    cout << "Testing equality operator (c == b)" << endl;
+d224 1
+a224 1
+    cout << "Testing inequality operator (c != d)" << endl;
+d228 1
+a228 1
+    cout << "Test destructor" << endl;
+d230 1
+a230 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d281 2
+a282 2
+    if (rhs->isA() != __LGFRTESTSCENARIO)  {
+	cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << endl;
+d320 1
+a320 1
+    if (pointer_ != NULL)  {
+d324 1
+a324 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+d326 2
+a327 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d333 1
+a333 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+d335 2
+a336 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d341 1
+a341 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+d343 2
+a344 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d366 1
+a366 1
+    if (pointer_ != NULL)  {
+d370 1
+a370 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+d372 2
+a373 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d379 1
+a379 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+d381 2
+a382 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d387 1
+a387 1
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+d389 2
+a390 2
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+d399 1
+a399 1
+RWBoolean
+d402 2
+a403 2
+    if ( (pointer_ == rhs.pointer_) && (count_ == rhs.count_) )
+	return TRUE;
+d405 1
+a405 1
+	return FALSE;
+d408 1
+a408 1
+RWBoolean
+d411 1
+a411 4
+    if ( (pointer_ != rhs.pointer_) || (count_ != rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+d452 1
+a452 1
+RWBoolean
+d458 1
+a458 1
+RWBoolean 
+d461 1
+a461 1
+    return (pointer_ == NULL);
+d467 1
+a467 1
+    cout << "Testing default constructor" << endl;
+d469 2
+a470 2
+    assert(dummy.pointer_ == NULL);
+    cout << "dummy count is " << dummy.count_.reference() << endl;
+d472 1
+a472 1
+    cout << "Testing preferred constructor (dummy)" << endl;
+d474 1
+a474 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d476 1
+a476 1
+    cout << "Testing assignement operator dummy = b" << endl;
+d478 1
+a478 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d480 1
+a480 1
+    cout << "Testing copy constructor (c = b)" << endl;
+d482 1
+a482 1
+    cout << "b count is " << b.count_.reference() << endl;    
+d484 1
+a484 1
+    cout << "Testing backdoor constructor" << endl;
+d486 1
+a486 1
+    cout << "e count is " << e.count_.reference() << endl;    
+d488 1
+a488 1
+    cout << "Testing equality operator (c == b)" << endl;
+d491 1
+a491 1
+    cout << "Testing inequality operator (c != d)" << endl;
+d495 1
+a495 1
+    cout << "Test destructor" << endl;
+d497 1
+a497 1
+    cout << "b count is " << b.count_.reference() << endl;    
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d10 1
+a10 1
+LgFrTestScenarioSmartPointerToConst::LgFrTestScenarioSmartPointerToConst() : pointer_(0)
+d32 1
+a32 1
+    if (rhs->GetScenarioType() != __LGFRTESTSCENARIO)  {
+d57 1
+a57 1
+	pointer_ = 0;
+d64 1
+a64 1
+	pointer_ = 0;
+d70 1
+a70 1
+	pointer_ = 0;
+d112 1
+a112 1
+    if (pointer_ != 0)  {
+d119 1
+a119 1
+	    pointer_ = 0;
+d128 1
+a128 1
+	    pointer_ = 0;
+d136 1
+a136 1
+	    pointer_ = 0;
+d146 1
+a146 1
+bool
+d149 2
+a150 2
+    if ( (pointer_ == rhs.pointer_) && (pointer_ == 0 || count_ == rhs.count_) )
+	return true;
+d152 1
+a152 1
+	return false;
+d155 1
+a155 1
+bool
+d158 4
+a161 1
+    return !( *this == rhs );
+d185 1
+a185 1
+bool
+d191 1
+a191 1
+bool 
+d194 1
+a194 1
+    return (pointer_ == 0);
+d202 1
+a202 1
+    assert(dummy.pointer_ == 0);
+d281 1
+a281 1
+    if (rhs->GetScenarioType() != __LGFRTESTSCENARIO)  {
+d320 1
+a320 1
+    if (pointer_ != 0)  {
+d327 1
+a327 1
+	    pointer_ = 0;
+d336 1
+a336 1
+	    pointer_ = 0;
+d344 1
+a344 1
+	    pointer_ = 0;
+d366 1
+a366 1
+    if (pointer_ != 0)  {
+d373 1
+a373 1
+	    pointer_ = 0;
+d382 1
+a382 1
+	    pointer_ = 0;
+d390 1
+a390 1
+	    pointer_ = 0;
+d399 1
+a399 1
+bool
+d402 2
+a403 2
+    if ( (pointer_ == rhs.pointer_) && (pointer_ == 0 || count_ == rhs.count_) )
+	return true;
+d405 1
+a405 1
+	return false;
+d408 1
+a408 1
+bool
+d411 4
+a414 1
+    return !( *this == rhs );
+d455 1
+a455 1
+bool
+d461 1
+a461 1
+bool 
+d464 1
+a464 1
+    return (pointer_ == 0);
+d472 1
+a472 1
+    assert(dummy.pointer_ == 0);
+@
+
+
+1.1.1.1.14.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d36 1
+a36 1
+	std::cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << std::endl;
+d119 1
+a119 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+d121 1
+a121 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d128 1
+a128 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+d130 1
+a130 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d136 1
+a136 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+d138 1
+a138 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d200 1
+a200 1
+    std::cout << "Testing default constructor" << std::endl;
+d203 1
+a203 1
+    std::cout << "dummy count is " << dummy.count_.reference() << std::endl;
+d205 1
+a205 1
+    std::cout << "Testing preferred constructor (dummy)" << std::endl;
+d207 1
+a207 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d209 1
+a209 1
+    std::cout << "Testing assignement operator dummy = b" << std::endl;
+d211 1
+a211 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d213 1
+a213 1
+    std::cout << "Testing copy constructor (c = b)" << std::endl;
+d215 1
+a215 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d217 1
+a217 1
+    std::cout << "Testing backdoor constructor" << std::endl;
+d219 1
+a219 1
+    std::cout << "e count is " << e.count_.reference() << std::endl;    
+d221 1
+a221 1
+    std::cout << "Testing equality operator (c == b)" << std::endl;
+d224 1
+a224 1
+    std::cout << "Testing inequality operator (c != d)" << std::endl;
+d228 1
+a228 1
+    std::cout << "Test destructor" << std::endl;
+d230 1
+a230 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d282 1
+a282 1
+	std::cerr << "Cannot construct a LgFrTestScenarioSmartPointerToConst from a non LgFrTestScenario object" << std::endl;
+d324 1
+a324 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+d326 1
+a326 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d333 1
+a333 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+d335 1
+a335 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d341 1
+a341 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+d343 1
+a343 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d370 1
+a370 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 3)" << std::endl;
+d372 1
+a372 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d379 1
+a379 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 2)" << std::endl;
+d381 1
+a381 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d387 1
+a387 1
+	    std::cout << "deleting LgFrTestScenario (count_.reference() == 1)" << std::endl;
+d389 1
+a389 1
+	    std::cout << "deleted LgFrTestScenario" << std::endl;
+d467 1
+a467 1
+    std::cout << "Testing default constructor" << std::endl;
+d470 1
+a470 1
+    std::cout << "dummy count is " << dummy.count_.reference() << std::endl;
+d472 1
+a472 1
+    std::cout << "Testing preferred constructor (dummy)" << std::endl;
+d474 1
+a474 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d476 1
+a476 1
+    std::cout << "Testing assignement operator dummy = b" << std::endl;
+d478 1
+a478 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d480 1
+a480 1
+    std::cout << "Testing copy constructor (c = b)" << std::endl;
+d482 1
+a482 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+d484 1
+a484 1
+    std::cout << "Testing backdoor constructor" << std::endl;
+d486 1
+a486 1
+    std::cout << "e count is " << e.count_.reference() << std::endl;    
+d488 1
+a488 1
+    std::cout << "Testing equality operator (c == b)" << std::endl;
+d491 1
+a491 1
+    std::cout << "Testing inequality operator (c != d)" << std::endl;
+d495 1
+a495 1
+    std::cout << "Test destructor" << std::endl;
+d497 1
+a497 1
+    std::cout << "b count is " << b.count_.reference() << std::endl;    
+@
+
+

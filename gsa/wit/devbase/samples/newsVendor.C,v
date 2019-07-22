@@ -1,0 +1,356 @@
+head	1.6;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2009.01.13.16.23.49;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.01.12.23.19.33;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.10.26.19.38.12;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.10.26.19.36.41;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.10.25.14.33.22;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.10.24.19.45.23;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Minor revision.
+@
+text
+@//------------------------------------------------------------------------------
+// Program: "newsVendor.C".
+//
+// A C++ WIT application program to illustrate stochastic implosion.
+// This program uses stochastic implosion to solve a very simple instance of
+// the news vendor problem.
+// Stage-By-Period version.
+//------------------------------------------------------------------------------
+
+#include <wit.h>
+#include <iostream>
+
+//------------------------------------------------------------------------------
+// Function declarations.
+//------------------------------------------------------------------------------
+
+void buildCoreProblem (WitRun * & theWitRun);
+   //
+   // Builds the core problem in theWitRun.
+
+void enterStochData (WitRun * theWitRun);
+   //
+   // Enters the stochastic data into theWitRun.
+
+void enterScenarioData (
+      WitRun * theWitRun,
+      int      theScen,
+      float    probability,
+      float    demandVolPer1);
+   //
+   // Enters the data for one scenario into theWitRun.
+   // theScen       is the index       of the scenario.
+   // probability   is the probability of the scenario.
+   // demandVolPer1 is the period 1 demandVol for demand "Sell" in the scenario.
+
+void displaySoln (WitRun * theWitRun);
+   //
+   // Displays the solution to the news vendor problem from theWitRun.
+
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+int main ()
+   {
+   WitRun * theWitRun;
+
+   buildCoreProblem (theWitRun);
+   enterStochData   (theWitRun);
+   witStochImplode  (theWitRun);
+   displaySoln      (theWitRun);
+   witDeleteRun     (theWitRun);
+
+   exit (0);
+   }
+
+//------------------------------------------------------------------------------
+
+void buildCoreProblem (WitRun * & theWitRun)
+   {
+   float supplyVol [] = {500.0, 0.0};
+   float execCost  [] = {  0.6, 0.6};
+   float shipReward[] = {  1.0, 1.0};
+
+   witNewRun              (& theWitRun);
+
+   witSetMesgFileAccessMode (theWitRun, WitTRUE, "w");
+   witSetMesgFileName       (theWitRun, WitTRUE, "newsVendor.log");
+
+   witInitialize            (theWitRun);
+   witSetNPeriods           (theWitRun, 2);
+
+   witAddPart               (theWitRun, "Source",           WitCAPACITY);
+   witAddOperation          (theWitRun, "Buy");
+   witAddBomEntry           (theWitRun, "Buy",    "Source");
+   witAddPart               (theWitRun, "Hold",             WitMATERIAL);
+   witAddBopEntry           (theWitRun, "Buy",    "Hold");
+   witAddDemand             (theWitRun, "Hold",   "Sell");
+
+   witSetPartSupplyVol      (theWitRun, "Source",           supplyVol);
+   witSetOperationExecCost  (theWitRun, "Buy",              execCost);
+   witSetDemandShipReward   (theWitRun, "Hold",   "Sell",   shipReward);
+   }
+
+//------------------------------------------------------------------------------
+
+void enterStochData (WitRun * theWitRun)
+   {
+   int periodStage[] = {0, 1};
+
+   witSetNScenarios    (theWitRun, 3);
+   witSetStageByObject (theWitRun, WitFALSE);
+
+   witSetStochMode     (theWitRun, WitTRUE);
+   
+   witSetPeriodStage   (theWitRun, periodStage);
+
+   enterScenarioData   (theWitRun, 0, 0.25, 200.0);
+   enterScenarioData   (theWitRun, 1, 0.50, 300.0);
+   enterScenarioData   (theWitRun, 2, 0.25, 400.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void enterScenarioData (
+      WitRun * theWitRun,
+      int      theScen,
+      float    probability,
+      float    demandVolPer1)
+   {
+   float demandVol[2];
+
+   demandVol[0] = 0.0;
+   demandVol[1] = demandVolPer1;
+
+   witSetCurrentScenario (theWitRun,                 theScen);
+   witSetProbability     (theWitRun,                 probability);
+   witSetDemandDemandVol (theWitRun, "Hold", "Sell", demandVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void displaySoln (WitRun * theWitRun)
+   {
+   int     theScen;
+   float * execVol;
+   float * demandVol;
+   float * shipVol;
+   float   objValue;
+   float   boundsValue;
+
+   witGetOperationExecVol (theWitRun, "Buy",  & execVol);
+
+   std::cout
+      << "Buy "
+      << execVol[0]
+      << " papers."
+      << std::endl
+      << std::endl;
+   
+   witFree (execVol);
+
+   for (theScen = 0; theScen < 3; theScen ++)
+      {
+      witSetCurrentScenario (theWitRun,                   theScen);
+      
+      witGetDemandDemandVol (theWitRun, "Hold", "Sell", & demandVol);
+      witGetDemandShipVol   (theWitRun, "Hold", "Sell", & shipVol);
+
+      std::cout
+         << "If the demand is for "
+         << demandVol[1]
+         << " papers, sell "
+         << shipVol[1]
+         << " papers."
+         << std::endl;
+
+      witFree (demandVol);
+      witFree (shipVol);
+      }
+
+   witGetObjValues (theWitRun, & objValue, & boundsValue);
+
+   std::cout
+      << std::endl
+      << "The expected profit is $"
+      << objValue
+      << "."
+      << std::endl;
+   }
+@
+
+
+1.5
+log
+@Revised newsVendor.C to use stage-by-periods.
+Saved the stage-by-object version as newsVendorSBO.C.
+@
+text
+@d29 1
+a29 1
+      float    demandVol);
+d32 3
+a34 3
+   // theScen     is the index       of the scenario.
+   // probability is the probability of the scenario.
+   // demandVol   is the demandVol for demand "Sell" in the scenario.
+d111 1
+a111 1
+   float demandVol[] = {0.0, 0.0};
+d113 1
+@
+
+
+1.4
+log
+@Minor update
+@
+text
+@d7 1
+d27 1
+a27 1
+      int      theScenIdx,
+d32 1
+a32 1
+   // theScenIdx  is the index       of the scenario.
+d61 3
+a63 2
+   float execCost  [] = {0.6};
+   float shipReward[] = {1.0};
+d71 3
+a73 2
+   witSetNPeriods           (theWitRun, 1);
+   witAddPart               (theWitRun, "Hold",         WitMATERIAL);
+d75 8
+a82 4
+   witAddBopEntry           (theWitRun, "Buy",  "Hold");
+   witAddDemand             (theWitRun, "Hold", "Sell");
+   witSetOperationExecCost  (theWitRun, "Buy",          execCost);
+   witSetDemandShipReward   (theWitRun, "Hold", "Sell", shipReward);
+d89 4
+a92 2
+   witSetNScenarios          (theWitRun, 3);
+   witSetStageByObject       (theWitRun, WitTRUE);
+d94 1
+a94 1
+   witSetStochMode           (theWitRun, WitTRUE);
+d96 1
+a96 2
+   witSetOperationStageIndex (theWitRun, "Buy",  0);
+   witSetPartStageIndex      (theWitRun, "Hold", 1);
+d98 3
+a100 3
+   enterScenarioData         (theWitRun, 0, 0.25, 200.0);
+   enterScenarioData         (theWitRun, 1, 0.50, 300.0);
+   enterScenarioData         (theWitRun, 2, 0.25, 400.0);
+d107 1
+a107 1
+      int      theScenIdx,
+d109 1
+a109 1
+      float    demandVol)
+d111 1
+a111 1
+   float demandVolVec[1];
+d113 1
+a113 1
+   demandVolVec[0] = demandVol;
+d115 3
+a117 3
+   witSetCurScenarioIndex (theWitRun,                 theScenIdx);
+   witSetProbability      (theWitRun,                 probability);
+   witSetDemandDemandVol  (theWitRun, "Hold", "Sell", demandVolVec);
+d124 1
+a124 1
+   int     theScenIdx;
+d142 1
+a142 1
+   for (theScenIdx = 0; theScenIdx < 3; theScenIdx ++)
+d144 1
+a144 1
+      witSetCurScenarioIndex (theWitRun,                   theScenIdx);
+d146 2
+a147 2
+      witGetDemandDemandVol  (theWitRun, "Hold", "Sell", & demandVol);
+      witGetDemandShipVol    (theWitRun, "Hold", "Sell", & shipVol);
+d151 1
+a151 1
+         << demandVol[0]
+d153 1
+a153 1
+         << shipVol[0]
+@
+
+
+1.3
+log
+@Minor update.
+@
+text
+@a42 2
+// int main (int, char *)
+
+@
+
+
+1.2
+log
+@Altered data.
+@
+text
+@d43 3
+a45 1
+int main (int, char *)
+@
+
+
+1.1
+log
+@Changed file name.
+@
+text
+@d90 3
+a92 3
+   enterScenarioData         (theWitRun, 0, 0.3, 200.0);
+   enterScenarioData         (theWitRun, 1, 0.4, 300.0);
+   enterScenarioData         (theWitRun, 2, 0.3, 400.0);
+@
+

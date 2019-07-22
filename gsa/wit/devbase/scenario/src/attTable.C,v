@@ -1,0 +1,635 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.46;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.27;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.25;	author rwToStl;	state Exp;
+branches;
+next	1.1.1.1.14.2;
+
+1.1.1.1.14.2
+date	2003.01.09.13.54.43;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+#include <scenario/src/attTable.h>
+#include <ostream>
+#include <scenario/src/RWToSTLHelpers.h>
+
+LgFrAttributeValueType
+LgFrAttributeTable::attributeValueType(const std::string& attrName,
+                                       const LgFrItemSubType& itemSubType,
+                                       const LgFrItemType& itemType)
+     const
+{
+    AttributeInfoDictionary::const_iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+            if( (*it2)->itemSubType() == itemSubType &&
+                (*it2)->itemType() == itemType )
+            {
+              return ( (*it2)->attributeValueType() );
+            }
+    }
+    return unknown;
+}
+
+LgFrPtrToValueExtractionFunction
+LgFrAttributeTable::getAttributeFunction(
+    const std::string& attrName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+const
+{
+    AttributeInfoDictionary::const_iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+        {
+            LgFrAttributeInformation* pAI = *it2;
+            if( pAI->itemSubType() == itemSubType && pAI->itemType() == itemType )
+            {
+              return ( pAI->valueFunctionPtr() );
+            }
+        }
+    }
+    return 0;
+}
+
+void
+LgFrAttributeTable::registerFunction(
+                           const std::string& attributeName,
+                           const LgFrItemSubType& itemSubType,
+                           const LgFrItemType& itemType,
+                           const LgFrAttributeValueType& attrValueType,
+                           const LgFrPtrToValueExtractionFunction& valFuncPtr)
+{
+  LgFrAttributeInformation attrInfo
+      (itemType, itemSubType, attrValueType, valFuncPtr);
+
+  insert(attributeName, attrInfo);
+}
+
+void
+LgFrAttributeTable::unregisterFunction(
+                          const std::string& attributeName,
+                          const LgFrItemSubType& itemSubType,
+                          const LgFrItemType& itemType)
+{
+  LgFrAttributeInformation attrInfo(itemType, itemSubType);
+  unregisterFunction(attributeName,attrInfo);
+}
+
+
+// Constructor
+
+LgFrAttributeTable::LgFrAttributeTable ()
+{
+// nothing to do here
+}
+
+// Copy constructor(deep copy)
+LgFrAttributeTable::LgFrAttributeTable (const LgFrAttributeTable& copy)
+{
+  // For each key and value pair in copy's dictionary_, create a clone and 
+  // insert the clone key/clone value pair to this->dictionary_.  
+    for( AttributeInfoDictionary::const_iterator it1 = copy.dictionary_.begin();
+            it1 != copy.dictionary_.end();
+            it1++ )
+    {
+        const std::string& key = it1->first;
+        LgFrGSlistAttributeInformation* pVec = it1->second;
+
+        LgFrGSlistAttributeInformation* pNewVec = new LgFrGSlistAttributeInformation;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pVec->begin(); it2 != pVec->end(); it2++ )
+            pNewVec->push_back( new LgFrAttributeInformation( *(*it2) ) );
+
+        AttrInfoDictPair p( key, pNewVec );
+
+        dictionary_.insert( p );
+    }
+}
+
+// Destructor
+LgFrAttributeTable::~LgFrAttributeTable()
+{
+    for( AttributeInfoDictionary::iterator iter = dictionary_.begin();
+         iter != dictionary_.end();
+         iter++ )
+    {
+        delete iter->second;
+    }
+}
+
+// PRIVATE:
+
+void
+LgFrAttributeTable::unregisterFunction(
+                                       const std::string& attrName,
+                           const LgFrAttributeInformation& attrInfo)
+{
+    AttributeInfoDictionary::iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+            if( (*it2)->itemSubType() == attrInfo.itemSubType() &&
+                (*it2)->itemType() == attrInfo.itemType() )
+            {
+              pv->erase( it2 );
+              break;
+            }
+    }
+}
+
+// Insert new LgFrAttributeInformation into the dictionary_.
+void
+LgFrAttributeTable::insert(	const std::string& k, const LgFrAttributeInformation& attrInfoPtr)
+{
+    AttributeInfoDictionary::iterator it = dictionary_.find( k );
+    LgFrGSlistAttributeInformation* pVec = 0;
+
+    if( it != dictionary_.end() )
+    {
+        pVec = it->second;
+    }
+    else
+    {
+        pVec = new LgFrGSlistAttributeInformation;
+
+        AttrInfoDictPair p( k, pVec );
+        dictionary_.insert( p );
+    }
+
+    pVec->push_back( new LgFrAttributeInformation( attrInfoPtr ) );
+
+}
+
+
+
+
+
+
+
+
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 3
+a3 1
+#include <rw/defs.h>
+d5 2
+d8 20
+a27 16
+// Apply function applied to each key/value pair found in the dictionary
+// of one LgFrAttributeTable (k and value) to delete all
+// LgFrAttributeInformations stored in the link list pointed 
+// to by value and remove/delete the key/value pair in the dictionary.
+// Can be used by destructor.
+void deleteDataPointedByKeyAndValue(RWCollectable*, RWCollectable* value, 
+				    void*)
+{
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+      = (LgFrGSlistAttrInfoAndCollectable*) value;
+  for (int i = 0; i < attrListPtr->entries(); i++ ) 
+      {
+	  LgFrAttributeInformation* attrInfoPtr
+	      = attrListPtr->at(i);
+          delete attrInfoPtr;    // free stored LgFrAttributeInformation
+      }
+d30 12
+d43 10
+a52 39
+// Apply function applied to each key/value pair found in the dictionary
+// of one LgFrAttributeTable (k and value) to create clones of both 
+// (k and value) and insert them(clones) to another
+// LgFrAttributeTable's dictionary pointed to by "d".
+// Can be used by copy constructor and assignment operator.
+void createNewKeyAndValue(RWCollectable* k, RWCollectable* value, void* d)
+{
+  RWHashDictionary& dictionary = *((RWHashDictionary*)d);
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+      = (LgFrGSlistAttrInfoAndCollectable*) value;
+  LgFrKey* keyPtr = (LgFrKey*) k;
+  LgFrKey* newKeyPtr = new LgFrKey(*keyPtr);
+  LgFrGSlistAttrInfoAndCollectable* newAttrListPtr =
+      new LgFrGSlistAttrInfoAndCollectable;
+  for (int i = 0; i < attrListPtr->entries(); i++ ) 
+      {
+	  LgFrAttributeInformation* attrInfoPtr
+	      = attrListPtr->at(i);
+	  LgFrAttributeInformation* newAttrInfoPtr
+	      = new LgFrAttributeInformation(*attrInfoPtr);
+	  newAttrListPtr->insert(newAttrInfoPtr);
+      }
+  dictionary.insertKeyAndValue(newKeyPtr,newAttrListPtr);
+}
+
+// Test function used by LgFrGSlistAttrInfoAndCollectable to test
+// if any match for LgFrAttributeInformation in the list with the
+// one not in the list.
+RWBoolean
+matchAllTypes(const LgFrAttributeInformation* oldAttrInfoPtr,
+              const void* d)
+{
+  const LgFrAttributeInformation* newAttrInfoPtr 
+    = (const LgFrAttributeInformation*) d;
+  if ( oldAttrInfoPtr->itemSubType() == newAttrInfoPtr->itemSubType() &&
+       oldAttrInfoPtr->itemType()    == newAttrInfoPtr->itemType()
+       )
+    return TRUE;
+  else return FALSE;
+d57 1
+a57 1
+                           const RWCString& attributeName,
+d65 2
+a66 2
+  LgFrKey key(attributeName);
+  insert(key, attrInfo);
+d71 1
+a71 1
+                          const RWCString& attributeName,
+d76 1
+a76 2
+  LgFrKey key(attributeName);
+  unregisterFunction(key,attrInfo);
+a78 18
+void
+LgFrAttributeTable::unregisterFunction(
+                           const LgFrKey& key,
+                           const LgFrAttributeInformation& attrInfo)
+{
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+    = (LgFrGSlistAttrInfoAndCollectable*) dictionary_.findValue(&key);
+  if ( attrListPtr != NULL )
+    {
+      LgFrAttributeInformation* oldAttrInfoPtr
+               = attrListPtr->find(matchAllTypes,&attrInfo);
+      if ( oldAttrInfoPtr != NULL )
+        {
+          attrListPtr->removeReference(oldAttrInfoPtr);
+          delete oldAttrInfoPtr;
+        }
+    }
+}
+d80 1
+a80 19
+LgFrAttributeValueType
+LgFrAttributeTable::attributeValueType(const RWCString& attributeName,
+                                       const LgFrItemSubType& itemSubType,
+                                       const LgFrItemType& itemType)
+     const
+{
+  LgFrKey key(attributeName);
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+    = (LgFrGSlistAttrInfoAndCollectable*) dictionary_.findValue(&key);
+  if ( attrListPtr == NULL ) return unknown;
+  else {
+    LgFrAttributeInformation newAttrInfo(itemType, itemSubType);
+    LgFrAttributeInformation* oldAttrInfoPtr
+           = attrListPtr->find(matchAllTypes,(void*)&newAttrInfo);
+    if ( oldAttrInfoPtr != NULL )
+      return oldAttrInfoPtr->attributeValueType();
+  }
+  return unknown;
+}
+a81 51
+LgFrPtrToValueExtractionFunction
+LgFrAttributeTable::getAttributeFunction(
+    const RWCString& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+const
+{
+  LgFrKey key(attributeName);
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+    = (LgFrGSlistAttrInfoAndCollectable*) dictionary_.findValue(&key);
+  if ( attrListPtr == NULL ) return NULL;
+  else {
+    LgFrAttributeInformation newAttrInfo(itemType, itemSubType);
+    LgFrAttributeInformation* oldAttrInfoPtr
+             = attrListPtr->find(matchAllTypes, &newAttrInfo);
+    if ( oldAttrInfoPtr != NULL )
+      return oldAttrInfoPtr->valueFunctionPtr();
+  }
+  return NULL;
+}
+
+// Insert new LgFrAttributeInformation into the dictionary_.
+void
+LgFrAttributeTable::insert(	
+    LgFrKey& key,
+    LgFrAttributeInformation& attrInfoPtr)
+{
+  LgFrGSlistAttrInfoAndCollectable* attrListPtr
+    = (LgFrGSlistAttrInfoAndCollectable*) dictionary_.findValue(&key);
+  if ( attrListPtr == NULL ) {  // Create and store a new list 
+    LgFrGSlistAttrInfoAndCollectable* attrListPtr =
+      new LgFrGSlistAttrInfoAndCollectable;
+    LgFrAttributeInformation* attrInfoNewPtr =
+       new LgFrAttributeInformation(attrInfoPtr);
+    LgFrKey* keyNewPtr = new LgFrKey(key);
+    attrListPtr->insert(attrInfoNewPtr);
+    dictionary_.insertKeyAndValue(keyNewPtr,attrListPtr);
+
+  }
+  else { // Insert to the existing list
+    
+    if ( !attrListPtr->contains(matchAllTypes, &attrInfoPtr) )
+      {
+        LgFrAttributeInformation* attrInfoNewPtr =
+          new LgFrAttributeInformation(attrInfoPtr);        
+        attrListPtr->insert(attrInfoNewPtr);
+      }
+  }
+}
+
+// Constructor
+a82 2
+:
+  dictionary_()
+d92 16
+a107 2
+  ((RWHashDictionary&) copy.dictionary_)	// cast away const
+  .applyToKeyAndValue(createNewKeyAndValue, &dictionary_);
+d113 6
+a118 4
+  dictionary_.applyToKeyAndValue(
+      deleteDataPointedByKeyAndValue, 
+      NULL);
+  dictionary_.clearAndDestroy();
+a119 1
+  
+d121 1
+d123 10
+d134 9
+d144 22
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 3
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+a2 2
+#include <ostream.h>
+#include <scenario/src/RWToSTLHelpers.h>
+d4 16
+a19 20
+LgFrAttributeValueType
+LgFrAttributeTable::attributeValueType(const std::string& attrName,
+                                       const LgFrItemSubType& itemSubType,
+                                       const LgFrItemType& itemType)
+     const
+{
+    AttributeInfoDictionary::const_iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+            if( (*it2)->itemSubType() == itemSubType &&
+                (*it2)->itemType() == itemType )
+            {
+              return ( (*it2)->attributeValueType() );
+            }
+    }
+    return unknown;
+a21 12
+LgFrPtrToValueExtractionFunction
+LgFrAttributeTable::getAttributeFunction(
+    const std::string& attrName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+const
+{
+    AttributeInfoDictionary::const_iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+d23 39
+a61 10
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+        {
+            LgFrAttributeInformation* pAI = *it2;
+            if( pAI->itemSubType() == itemSubType && pAI->itemType() == itemType )
+            {
+              return ( pAI->valueFunctionPtr() );
+            }
+        }
+    }
+    return 0;
+d66 1
+a66 1
+                           const std::string& attributeName,
+d74 2
+a75 2
+
+  insert(attributeName, attrInfo);
+d80 1
+a80 1
+                          const std::string& attributeName,
+d85 21
+a105 1
+  unregisterFunction(attributeName,attrInfo);
+d108 69
+a178 1
+
+d180 2
+d191 2
+a192 16
+    for( AttributeInfoDictionary::const_iterator it1 = copy.dictionary_.begin();
+            it1 != copy.dictionary_.end();
+            it1++ )
+    {
+        const std::string& key = it1->first;
+        LgFrGSlistAttributeInformation* pVec = it1->second;
+
+        LgFrGSlistAttributeInformation* pNewVec = new LgFrGSlistAttributeInformation;
+
+        for( LgFrGSlistAttributeInformation::iterator it2 = pVec->begin(); it2 != pVec->end(); it2++ )
+            pNewVec->push_back( new LgFrAttributeInformation( *(*it2) ) );
+
+        AttrInfoDictPair p( key, pNewVec );
+
+        dictionary_.insert( p );
+    }
+d198 4
+a201 6
+    for( AttributeInfoDictionary::iterator iter = dictionary_.begin();
+         iter != dictionary_.end();
+         iter++ )
+    {
+        delete iter->second;
+    }
+d203 1
+a204 1
+// PRIVATE:
+a205 10
+void
+LgFrAttributeTable::unregisterFunction(
+                                       const std::string& attrName,
+                           const LgFrAttributeInformation& attrInfo)
+{
+    AttributeInfoDictionary::iterator it = dictionary_.find( attrName );
+    
+    if( it != dictionary_.end() )
+    {
+        LgFrGSlistAttributeInformation* pv = it->second;
+a206 9
+        for( LgFrGSlistAttributeInformation::iterator it2 = pv->begin(); it2 != pv->end(); it2++ )
+            if( (*it2)->itemSubType() == attrInfo.itemSubType() &&
+                (*it2)->itemType() == attrInfo.itemType() )
+            {
+              pv->erase( it2 );
+              break;
+            }
+    }
+}
+a207 22
+// Insert new LgFrAttributeInformation into the dictionary_.
+void
+LgFrAttributeTable::insert(	const std::string& k, const LgFrAttributeInformation& attrInfoPtr)
+{
+    AttributeInfoDictionary::iterator it = dictionary_.find( k );
+    LgFrGSlistAttributeInformation* pVec = 0;
+
+    if( it != dictionary_.end() )
+    {
+        pVec = it->second;
+    }
+    else
+    {
+        pVec = new LgFrGSlistAttributeInformation;
+
+        AttrInfoDictPair p( k, pVec );
+        dictionary_.insert( p );
+    }
+
+    pVec->push_back( new LgFrAttributeInformation( attrInfoPtr ) );
+
+}
+@
+
+
+1.1.1.1.14.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d5 1
+a5 1
+#include <ostream>
+@
+
+

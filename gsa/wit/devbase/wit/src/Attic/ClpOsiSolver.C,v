@@ -1,0 +1,987 @@
+head	1.10;
+access;
+symbols
+	nextGenBranch:1.6.0.2
+	nextGenRoot:1.6;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2003.07.31.16.23.29;	author rjw;	state dead;
+branches;
+next	1.9;
+
+1.9
+date	2003.07.31.15.52.37;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2003.07.30.22.47.24;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.07.29.21.07.35;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.07.28.20.34.12;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.07.25.23.05.21;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.07.25.19.02.10;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.07.24.23.28.27;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.07.18.23.38.06;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.07.18.21.13.38;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Continued implementation of opt with COIN.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "ClpOsiSolver.C"
+//
+// Contains the main and dummy implementations of class ClpOsiSolver.
+//------------------------------------------------------------------------------
+
+#include <ClpOsiSolver.h>
+#include <OptCon.h>
+#include <OptVar.h>
+#include <OptModel.h>
+#include <OptImp.h>
+#include <OptStarter.h>
+#include <OptComp.h>
+#include <MsgFac.h>
+#include <Timing.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// USE_COIN
+//
+// Determines which implementation of class ClpOsiSolver is to be compiled.
+//
+// If USE_COIN == 1, the main implementation of class ClpOsiSolver is to
+// be compiled. The main implementations make calls to COIN functions.
+//
+// If USE_COIN == 0, the dummy implementation of class ClpOsiSolver is to
+// be compiled. The dummy implementations do not make calls to COIN functions.
+//
+// For now, until we are ready to link WIT to the COIN code an all platforms
+// that WIT supports, the CVS repository version of WIT should always have
+// USE_COIN == 0.
+//
+// The default value of USE_COIN is 0; it can be set to 1 from the makefile, by
+// using the compile option -DUSE_COIN=1.
+//------------------------------------------------------------------------------
+
+#ifndef USE_COIN
+
+#define USE_COIN 0
+
+#endif
+
+//------------------------------------------------------------------------------
+// Main implementation of class ClpOsiSolver.
+//------------------------------------------------------------------------------
+
+#if USE_COIN
+
+#include <coin/OsiClpSolverInterface.hpp>
+#include <coin/Presolve.hpp>
+
+//------------------------------------------------------------------------------
+
+WitClpOsiSolver::WitClpOsiSolver (WitOptModel * theOptModel):
+
+      WitOptSolver (theOptModel),
+      myOsiClpSI_  (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitClpOsiSolver::~WitClpOsiSolver ()
+   {
+   WitTimer::enterSection ("coin");
+
+   shutDownClpOsi ();
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::solve ()
+   {
+   WitTimer::enterSection ("coin");
+
+   stronglyAssert (not myOptImploder ()->accelerated ());
+
+   stronglyAssert (not myOptModel ()->isaMIP ());
+
+   myMsgFac () ("solveLpMsg", "COIN");
+
+   setUpClpOsi ();
+
+   passFixedModel ();
+
+   passFlexibleModel ();
+
+   writeMps ();
+
+   if (myOptImploder ()->stopOpt () == 2)
+      {
+      WitTimer::leaveSection ("coin");
+
+      return;
+      }
+
+   solveLpUnAcc ();
+
+   myMsgFac () ("optSolnFoundMsg");
+
+   storePrimalSoln ();
+
+   if (myOptModel ()->needDual ())
+      storeDualSoln ();
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::setUpClpOsi ()
+   {
+   FILE *               theFile;
+   CoinMessageHandler * theCoinMessageHandler;
+
+   theFile = openFile (myOptComp ()->coinMesgFileName ().myCstring (), "w");
+
+   theCoinMessageHandler = new CoinMessageHandler (theFile);
+
+   theCoinMessageHandler->setLogLevel (2);
+
+   myOsiClpSI_ = new OsiClpSolverInterface;
+
+   myClpSimplex ()->passInMessageHandler (theCoinMessageHandler);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passFixedModel ()
+   {
+   WitVector <int>    indexRow;
+   WitVector <int>    startOfEachColumn;
+   WitVector <double> elements;
+
+   WitTimer::enterSection ("model");
+
+   myOptModel ()->defMatrixByCols (indexRow, startOfEachColumn, elements);
+
+   WitTimer::leaveSection ("model");
+
+   myOsiClpSI_->loadProblem (
+      myOptModel ()->nOptVars (),
+      myOptModel ()->nOptCons (),
+      startOfEachColumn.myCvector (),
+      indexRow.myCvector (),
+      elements.myCvector (),
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL);
+      
+   myOsiClpSI_->setObjSense (-1.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passFlexibleModel ()
+   {
+   passConBounds ();
+   passVarBounds ();
+   passObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passConBounds ()
+   {
+   int                nCons;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptCon *        theOptCon;
+   int                conIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nCons = myOptModel ()->nOptCons ();
+
+   indexVec.resize (nCons + 1);
+   boundVec.resize (nCons * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptCon, myOptModel ()->myOptCons ())
+      {
+      conIdx = theOptCon->index ();
+
+      witAssert (bndIdx == conIdx * 2);
+
+      indexVec[conIdx]     = conIdx;
+
+      boundVec[bndIdx]     = theOptCon->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptCon->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiClpSI_->setRowSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nCons,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passVarBounds ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptVar *        theOptVar;
+   int                varIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   boundVec.resize (nVars * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      varIdx = theOptVar->index ();
+
+      witAssert (bndIdx == varIdx * 2);
+
+      indexVec[varIdx]     = varIdx;
+
+      boundVec[bndIdx]     = theOptVar->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptVar->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiClpSI_->setColSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passObjCoeffs ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> objVec;
+   WitOptVar *        theOptVar;
+   int                theIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   objVec  .resize (nVars);
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      theIdx           = theOptVar->index ();
+
+      indexVec[theIdx] = theIdx;
+
+      objVec  [theIdx] = static_cast <double> (theOptVar->mainObjCoeffVal ());
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiClpSI_->setObjCoeffSet (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      objVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::writeMps ()
+   {
+   if (myOptImploder ()->printMps ())
+      {
+      myMsgFac () ("mpsFileMsg");
+
+      myOsiClpSI_->writeMps ("model", "mps");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::solveLpUnAcc ()
+   {
+   Presolve     thePresolve;
+   ClpSimplex * presolvedCS;
+
+   passInitSoln ();
+
+   presolvedCS = thePresolve.presolvedModel (* myClpSimplex (), 1.0e-8);
+
+   if (presolvedCS != NULL)
+      {
+      presolvedCS->primal (1);
+
+      thePresolve.postsolve (true);
+
+      delete presolvedCS;
+
+      presolvedCS = NULL;
+      }
+
+   myClpSimplex ()->primal (1);
+
+   checkSolnStatus ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::passInitSoln ()
+   {
+   WitVector <double> initSoln;
+   WitOptVar *        theVar;
+   
+   if (not myOptComp ()->optInitMethod ()->external ())
+      return;
+
+   initSoln.resize (myOptModel ()->nOptVars (), 0.0);
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      initSoln[theVar->index ()] = theVar->primalValue ();
+
+   WitTimer::leaveSection ("model");
+
+   myOsiClpSI_->setColSolution (initSoln.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::checkSolnStatus ()
+   {
+   if (myOsiClpSI_->isProvenOptimal ())
+      return;
+
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myOptModel ()->reportInfeasible ();
+
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myOptModel ()->reportUnbounded ();
+
+   myMsgFac () ("clpOptimalNotFoundSmsg");
+
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myMsgFac () ("primalInfeasFmsg");
+
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myMsgFac () ("dualInfeasFmsg");
+
+   if (myOsiClpSI_->isAbandoned ())
+      myMsgFac () ("abandonedFmsg");
+
+   myMsgFac () ("unknownNonOptReasonFmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::storePrimalSoln ()
+   {
+   const double * primalSoln;
+   WitOptVar *    theVar;
+
+   primalSoln = myOsiClpSI_->getColSolution ();
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      theVar->setPrimalValue (primalSoln[theVar->index ()]);
+
+   WitTimer::leaveSection ("model");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::storeDualSoln ()
+   {
+   const double * dualSoln;
+   WitOptCon *    theCon;
+
+   dualSoln = myOsiClpSI_->getRowPrice ();
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theCon, myOptModel ()->myOptCons ())
+      theCon->setDualValue (- dualSoln[theCon->index ()]);
+
+   WitTimer::leaveSection ("model");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::shutDownClpOsi ()
+   {
+   CoinMessageHandler * theCoinMessageHandler;
+   FILE *               theFile;
+   int                  fcloseRes;
+
+   theCoinMessageHandler = myClpSimplex ()->messageHandler ();
+
+   theFile               = theCoinMessageHandler->filePointer ();
+
+   delete myOsiClpSI_;
+
+   delete theCoinMessageHandler;
+
+   fcloseRes = fclose (theFile);
+
+   if (fcloseRes != 0)
+      myMsgFac () ("fcloseError", myOptComp ()->coinMesgFileName ());
+   }
+
+//------------------------------------------------------------------------------
+
+ClpSimplex * WitClpOsiSolver::myClpSimplex ()
+   {
+   witAssert (myOsiClpSI_ != NULL);
+
+   return myOsiClpSI_->getModelPtr ();
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // USE_COIN
+
+//------------------------------------------------------------------------------
+// Dummy implementation of class ClpOsiSolver.
+//------------------------------------------------------------------------------
+
+#if ! USE_COIN
+
+//------------------------------------------------------------------------------
+
+WitClpOsiSolver::WitClpOsiSolver (WitOptModel * theOptModel):
+
+      WitOptSolver (theOptModel),
+      myOsiClpSI_  (NULL)
+   {
+   myMsgFac () ("coinNYAvailSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitClpOsiSolver::~WitClpOsiSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpOsiSolver::solve ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // Not USE_COIN
+
+//------------------------------------------------------------------------------
+
+#endif // OPT_IMPLODE
+@
+
+
+1.9
+log
+@Continued implementation of opt with COIN.
+@
+text
+@@
+
+
+1.8
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d84 1
+a84 1
+void WitClpOsiSolver::passFixedModel ()
+d86 1
+a86 3
+   WitVector <int>    indexRow;
+   WitVector <int>    startOfEachColumn;
+   WitVector <double> elements;
+d88 1
+a88 1
+   WitTimer::enterSection ("model");
+d90 1
+a90 1
+   myOptModel ()->defMatrixByCols (indexRow, startOfEachColumn, elements);
+d92 1
+a92 1
+   WitTimer::leaveSection ("model");
+d94 1
+a94 14
+   myOsiClpSI_->loadProblem (
+      myOptModel ()->nOptVars (),
+      myOptModel ()->nOptCons (),
+      startOfEachColumn.myCvector (),
+      indexRow.myCvector (),
+      elements.myCvector (),
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL);
+      
+   myOsiClpSI_->setObjSense (-1.0);
+   }
+d96 1
+a96 1
+//------------------------------------------------------------------------------
+d98 1
+a98 6
+void WitClpOsiSolver::passFlexibleModel ()
+   {
+   passConBounds ();
+   passVarBounds ();
+   passObjCoeffs ();
+   }
+d100 1
+a100 1
+//------------------------------------------------------------------------------
+d102 1
+a102 3
+void WitClpOsiSolver::writeMps ()
+   {
+   if (myOptImploder ()->printMps ())
+d104 1
+a104 1
+      myMsgFac () ("mpsFileMsg");
+d106 1
+a106 1
+      myOsiClpSI_->writeMps ("model", "mps");
+d108 11
+d123 1
+a123 1
+void WitClpOsiSolver::passInitSoln ()
+d125 2
+a126 5
+   WitVector <double> initSoln;
+   WitOptVar *        theVar;
+   
+   if (not myOptComp ()->optInitMethod ()->external ())
+      return;
+d128 1
+a128 1
+   initSoln.resize (myOptModel ()->nOptVars (), 0.0);
+d130 1
+a130 1
+   WitTimer::enterSection ("model");
+d132 1
+a132 2
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      initSoln[theVar->index ()] = theVar->primalValue ();
+d134 1
+a134 1
+   WitTimer::leaveSection ("model");
+d136 1
+a136 1
+   myOsiClpSI_->setColSolution (initSoln.myCvector ());
+d141 1
+a141 1
+void WitClpOsiSolver::storePrimalSoln ()
+d143 3
+a145 4
+   const double * primalSoln;
+   WitOptVar *    theVar;
+
+   primalSoln = myOsiClpSI_->getColSolution ();
+d149 1
+a149 2
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      theVar->setPrimalValue (primalSoln[theVar->index ()]);
+d152 14
+d170 1
+a170 1
+void WitClpOsiSolver::storeDualSoln ()
+d172 3
+a174 11
+   const double * dualSoln;
+   WitOptCon *    theCon;
+
+   dualSoln = myOsiClpSI_->getRowPrice ();
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theCon, myOptModel ()->myOptCons ())
+      theCon->setDualValue (- dualSoln[theCon->index ()]);
+
+   WitTimer::leaveSection ("model");
+d297 1
+a297 1
+void WitClpOsiSolver::solve ()
+d299 3
+a301 1
+   WitTimer::enterSection ("coin");
+d303 3
+a305 1
+   stronglyAssert (not myOptImploder ()->accelerated ());
+d307 1
+a307 1
+   stronglyAssert (not myOptModel ()->isaMIP ());
+d309 4
+a312 1
+   myMsgFac () ("solveLpMsg", "COIN");
+d314 1
+a314 1
+   setUpClpOsi ();
+d316 1
+a316 1
+   passFixedModel ();
+d318 3
+a320 1
+   passFlexibleModel ();
+d322 1
+a322 1
+   writeMps ();
+d324 1
+a324 3
+   if (myOptImploder ()->stopOpt () == 2)
+      {
+      WitTimer::leaveSection ("coin");
+d326 1
+a326 1
+      return;
+d329 1
+a329 1
+   solveLpUnAcc ();
+d331 1
+a331 8
+   myMsgFac () ("optSolnFoundMsg");
+
+   storePrimalSoln ();
+
+   if (myOptModel ()->needDual ())
+      storeDualSoln ();
+
+   WitTimer::leaveSection ("coin");
+d336 1
+a336 1
+void WitClpOsiSolver::setUpClpOsi ()
+d338 5
+a342 2
+   FILE *               theFile;
+   CoinMessageHandler * theCoinMessageHandler;
+d344 1
+a344 1
+   theFile = openFile (myOptComp ()->coinMesgFileName ().myCstring (), "w");
+d346 1
+a346 1
+   theCoinMessageHandler = new CoinMessageHandler (theFile);
+d348 2
+a349 1
+   theCoinMessageHandler->setLogLevel (2);
+d351 1
+a351 1
+   myOsiClpSI_ = new OsiClpSolverInterface;
+d353 1
+a353 1
+   myClpSimplex ()->passInMessageHandler (theCoinMessageHandler);
+d358 1
+a358 1
+void WitClpOsiSolver::shutDownClpOsi ()
+d360 5
+a364 3
+   CoinMessageHandler * theCoinMessageHandler;
+   FILE *               theFile;
+   int                  fcloseRes;
+d366 2
+a367 1
+   theCoinMessageHandler = myClpSimplex ()->messageHandler ();
+d369 1
+a369 1
+   theFile               = theCoinMessageHandler->filePointer ();
+d371 2
+a372 1
+   delete myOsiClpSI_;
+d374 2
+a375 1
+   delete theCoinMessageHandler;
+d377 2
+a378 1
+   fcloseRes = fclose (theFile);
+d380 1
+a380 2
+   if (fcloseRes != 0)
+      myMsgFac () ("fcloseError", myOptComp ()->coinMesgFileName ());
+d385 1
+a385 1
+void WitClpOsiSolver::solveLpUnAcc ()
+d387 6
+a392 2
+   Presolve     thePresolve;
+   ClpSimplex * presolvedCS;
+d394 2
+a395 1
+   passInitSoln ();
+d397 2
+a398 1
+   presolvedCS = thePresolve.presolvedModel (* myClpSimplex (), 1.0e-8);
+d400 1
+a400 3
+   if (presolvedCS != NULL)
+      {
+      presolvedCS->primal (1);
+d402 4
+a405 1
+      thePresolve.postsolve (true);
+d407 1
+a407 1
+      delete presolvedCS;
+d409 1
+a409 2
+      presolvedCS = NULL;
+      }
+d411 2
+a412 1
+   myClpSimplex ()->primal (1);
+d414 1
+a414 1
+   checkSolnStatus ();
+d419 1
+a419 1
+void WitClpOsiSolver::checkSolnStatus ()
+d421 3
+a423 2
+   if (myOsiClpSI_->isProvenOptimal ())
+      return;
+d425 1
+a425 2
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myOptModel ()->reportInfeasible ();
+d427 1
+a427 2
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myOptModel ()->reportUnbounded ();
+d429 1
+a429 1
+   myMsgFac () ("clpOptimalNotFoundSmsg");
+d431 1
+a431 2
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myMsgFac () ("primalInfeasFmsg");
+d433 1
+a433 2
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myMsgFac () ("dualInfeasFmsg");
+d435 2
+a436 4
+   if (myOsiClpSI_->isAbandoned ())
+      myMsgFac () ("abandonedFmsg");
+
+   myMsgFac () ("unknownNonOptReasonFmsg");
+@
+
+
+1.7
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d17 2
+d21 1
+d29 25
+d66 1
+a66 1
+      WitOsiSolver (theOptModel),
+d84 224
+a449 7
+OsiSolverInterface * WitClpOsiSolver::myOsiSI ()
+   {
+   return myOsiClpSI_;
+   }
+
+//------------------------------------------------------------------------------
+
+d462 1
+a462 1
+      WitOsiSolver (theOptModel),
+a477 7
+   }
+
+//------------------------------------------------------------------------------
+
+OsiSolverInterface * WitClpOsiSolver::myOsiSI ()
+   {
+   return NULL;
+@
+
+
+1.6
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d64 1
+a64 1
+   myMsgFac () ("solveLpMsg", "CLP/OSI");
+d220 1
+a220 1
+   myMsgFac () ("clpOsiNYAvailSmsg");
+@
+
+
+1.5
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d100 1
+a100 1
+   theFile = openFile (myOptComp ()->oslMesgFileName ().myCstring (), "w");
+d130 1
+a130 1
+      myMsgFac () ("fcloseError", myOptComp ()->oslMesgFileName ());
+@
+
+
+1.4
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d19 1
+d49 1
+a49 1
+   delete myOsiClpSI_;
+d66 1
+a66 1
+   myOsiClpSI_ = new OsiClpSolverInterface;
+d91 40
+@
+
+
+1.3
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d97 1
+a97 1
+   ClpSimplex * psClpSimplex;
+d101 1
+a101 1
+   psClpSimplex = thePresolve.presolvedModel (* myClpSimplex (), 1.0e-8);
+d103 3
+a105 1
+   stronglyAssert (psClpSimplex != NULL);
+d107 1
+a107 1
+   psClpSimplex->primal (1);
+d109 1
+a109 1
+   thePresolve.postsolve (true);
+d111 4
+a114 1
+   delete psClpSimplex;
+d132 1
+a132 1
+   myMsgFac () ("oslOptimalNotFoundFmsg");
+@
+
+
+1.2
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d31 1
+d63 1
+a63 1
+   myMsgFac () ("solveLpMsg", "CLP");
+d96 3
+d101 9
+a109 1
+   myClpSimplex ()->primal (1);
+@
+
+
+1.1
+log
+@Continued implementation of opt with COIN.
+@
+text
+@a38 1
+   myMsgFac () ("clpOsiNYAvailSmsg");
+a99 2
+
+   stronglyAssert (false);
+@
+

@@ -1,0 +1,1027 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	beforeTiersAdded:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+#endif
+
+#include <iostream>
+#include <set>
+#include <string>
+#include <cassert>
+#include <cstdlib>
+//#include <math.h>
+//#include <rw/collint.h>
+//#include <rw/ctoken.h>
+#include "scoFile.h"
+
+
+#define SCOFILE_DEFAULT_CAPACITY 100000
+
+//size_t RWCollection::DEFAULT_CAPACITY = 64;
+
+
+void SCOfile::resize(
+  size_t newSize)
+{
+   //fileData_.resize(newSize);
+}
+
+unsigned int
+  SCOfile::numRecords()
+const
+{
+  // make a local version of this that's
+  // not a pointer-to-const, Scott Meyers item 21 p 77.
+  SCOfile * const localThis =
+                  ( SCOfile * const ) this;
+  if ( !fileDataInitialized_ ) ((SCOfile*const)this)->initializeFileData();
+  int retVal = fileData_.size();
+  return retVal;
+}
+
+std::string
+  SCOfile::filename()
+const
+{
+  return filename_;
+}
+
+std::string 
+  SCOfile::record ( unsigned int recNum ) 
+const
+{
+  if ( !fileDataInitialized_ ) ((SCOfile*const)this)->initializeFileData();
+  assert( recNum >= 0 );
+  assert( recNum < numRecords() );
+  std::string retVal;
+  retVal = fileData_[recNum];
+  return retVal;
+}
+
+
+bool
+  SCOfile::removeDuplicateRecords()
+const
+{
+  return removeDuplicateRecords_;
+}
+void
+  SCOfile::removeDuplicateRecords(bool rdr)
+{
+  if ( fileDataInitialized() ) {
+    std::cerr <<"ERROR: Cannot set removeDuplicateRecords flag" <<std::endl
+         <<"       because file has already been initialized" <<std::endl
+         <<"   Filename : " <<filename_.c_str() <<std::endl;
+         assert( !fileDataInitialized() );
+  }
+  removeDuplicateRecords_ = rdr;
+}
+
+
+bool
+  SCOfile::strip()
+const
+{
+  return strip_;
+}
+void
+  SCOfile::strip(bool s)
+{
+  strip_ = s;
+}
+// implement rogue wave strip
+std::string SCOfile::stripString( const std::string & orig ) const 
+{
+  int b,e;
+  for ( b=0; b<orig.size(); ++b ) {
+    if ( orig.substr(b,1)!=" " ) break;
+  }
+  for ( e=orig.size()-1; e>=0; --e ) {
+    if ( orig.substr(e,1)!=" " ) break;
+  }
+  std::string retVal = orig.substr(b,e-b+1);
+  return retVal;
+}
+
+
+bool SCOfile::fileDataInitialized() const
+{
+  return fileDataInitialized_;
+}
+
+bool SCOfile::fileDictInitialized() const
+{
+  return fileDictInitialized_;
+}
+
+
+std::string 
+  SCOfile::record ( std::string key ) 
+const
+{
+  return record( recordIndex(key) );
+}
+
+// Return index of record with specfied key
+int 
+  SCOfile::recordIndex ( std::string key ) 
+const
+{
+  if ( !fileDictInitialized_ ) ((SCOfile*const)this)->initializeFileDict();
+  
+  std::map<std::string, int>::const_iterator it = fileDict_.find(key);
+
+  if( it == fileDict_.end() ) {
+    std::cerr <<"ERROR: Key not in file. " <<std::endl
+         <<"   Filename : " <<filename_.c_str() <<std::endl
+         <<"   key value: \"" <<key.c_str() <<"\"" <<std::endl;
+         assert( it != fileDict_.end() );
+  }
+  int retVal = (*it).second;
+  return retVal;
+}
+
+// Return true if record with specified key exists
+bool
+  SCOfile::keyExists( const std::string & key )
+const
+{
+  if ( !fileDictInitialized_ ) ((SCOfile*const)this)->initializeFileDict();
+
+  std::map<std::string, int>::const_iterator it = fileDict_.find(key);
+
+  if( it == fileDict_.end() ) return false;
+  else return true;
+}
+
+
+
+std::string 
+  SCOfile::fieldAsString ( unsigned int recNum, std::string fieldName ) 
+const
+{
+  std::string rec = record(recNum);
+  return fieldOnRecord( rec, fieldName );
+}
+
+std::string 
+  SCOfile::fieldAsString ( std::string key, std::string fieldName ) 
+const
+{
+  return fieldAsString ( recordIndex(key), fieldName );
+}
+
+float
+SCOfile::fieldToFloat( 
+  std::string fieldValue,
+  unsigned int recNum,
+  std::string fieldName )
+const
+{
+#if 0
+  double dbl;
+  int rc = RWLocale::global().stringToNum( fieldValue.c_str(), &dbl);
+  if ( !rc ) {
+    std::cerr <<"ERROR: Invalid floating point number" <<std::endl
+         <<"  Field name: " <<fieldName.c_str() <<std::endl
+         <<"  Field value: \"" <<fieldValue.c_str() <<"\"" <<std::endl
+         <<"  Record number: " <<recNum <<std::endl
+         <<"  Filename: " <<filename().c_str() <<std::endl;
+    assert( rc );
+  }
+  float retVal = (float) dbl;
+  return retVal;
+#endif
+  float retVal = atof(fieldValue.c_str());
+  return retVal;
+}
+
+float
+SCOfile::fieldAsFloat( unsigned int recNum, std::string fieldName )
+const
+{
+  return fieldToFloat( fieldAsString( recNum, fieldName ), recNum, fieldName );
+}
+
+float 
+  SCOfile::fieldAsFloat ( std::string key, std::string fieldName ) 
+const
+{
+  return fieldAsFloat ( recordIndex(key), fieldName );
+}
+
+int
+SCOfile::fieldToInt( 
+  std::string fieldValue, 
+  unsigned int /*recNum*/, 
+  std::string /*fieldName*/ )
+const
+{
+  int retVal = atoi(fieldValue.c_str());
+  return retVal;
+}
+
+int
+SCOfile::fieldAsInt( unsigned int recNum, std::string fieldName )
+const
+{
+  return fieldToInt( fieldAsString( recNum, fieldName ), recNum, fieldName );
+}
+
+int
+  SCOfile::fieldAsInt ( std::string key, std::string fieldName ) 
+const
+{
+  return fieldAsInt ( recordIndex(key), fieldName );
+}
+
+float 
+  SCOfile::fieldOnRecordAsFloat( 
+  std::string record, unsigned int recNum, std::string fieldName ) 
+const
+{
+  std::string field = fieldOnRecord( record,fieldName );
+  return fieldToFloat( field, recNum, fieldName );
+}
+
+int 
+  SCOfile::fieldOnRecordAsInt( 
+  std::string record, unsigned int recNum, std::string fieldName ) 
+const
+{
+  std::string field = fieldOnRecord( record,fieldName );
+  return fieldToInt( field, recNum, fieldName );
+}
+
+void 
+SCOfile::initialize()
+{
+  initializeFileData();
+  initializeFileDict();
+}
+
+//---------------------------------------------------------------------------------
+void 
+SCOfile::initializeFileData()
+{
+
+  if ( fileDataInitialized_ ) return;
+  fileDataInitialized_ = true;
+
+  // Initialize field and position information.
+  initializeFieldInformation();
+
+  // open file
+  FILE * filePtr =  fopen( filename_.c_str(), "r" );
+  if ( filePtr == NULL ) {
+    std::cout <<"Error: File could not be opened." <<std::endl
+         <<"       Filename: "  <<filename_.c_str() <<std::endl;
+    abort();
+  }
+
+# define MAX_REC_LEN 5000
+  // read each record of file
+  std::set<std::string> dupTable;
+  //dupTable.reserve(SCOFILE_DEFAULT_CAPACITY);
+
+  for ( unsigned int recNum = 0; ;recNum++ ) {
+
+    // read next record
+    char cRec[MAX_REC_LEN];
+    char * rc = fgets( cRec, MAX_REC_LEN, filePtr );
+
+    // check for error
+    if ( rc==NULL ) {
+      if ( feof(filePtr) ) break;
+      std::cerr <<"Failure reading: " 
+           <<filename_.c_str() <<std::endl;
+      assert( rc!=NULL );
+    }
+
+    // Remove last charcter from record. This is the newline character
+    std::string rec(cRec);
+    // if the last character is a newline character then remove it
+    if ( rec.substr(rec.size()-1) == std::string("\n") ) 
+      rec = rec.substr(0,rec.size()-1);
+    //std::string rec = std::string(cRec)(0,strlen(cRec)-1);
+
+
+    // For fixed format records ensure that the record length is correct.
+    // For CSV format records ensure that the record has the correct number 
+    // of fields.
+    //testRecordFormat(rec,recNum);
+
+    // store record in memory
+    fileData_.push_back( rec );
+
+    // If duplicate are to be removed and this record is a dup, then
+    // skip it.
+    if ( removeDuplicateRecords() ) {
+      size_t lastRecNo = fileData_.size()-1;
+      std::set<std::string>::iterator it = dupTable.find(rec);
+      if ( it != dupTable.end() ) {
+        fileData_.pop_back();
+      } 
+      else {
+        dupTable.insert(rec);
+      }
+    }
+
+  }
+  //dupTable.clearAndDestroy();
+
+  // close file
+  fclose( filePtr );
+
+}
+//---------------------------------------------------------------------------------
+void 
+SCOfile::initializeFileDict()
+{
+  
+  
+  // If file has not been read, then read it
+  if ( !fileDataInitialized_ ) initializeFileData();
+  
+  if ( fileDictInitialized_ ) return; 
+  fileDictInitialized_ = true;
+  
+  //fileDict_.reserve((int)1.7*fileData_.entries());
+  for ( unsigned int recNum = 0; recNum<fileData_.size(); recNum++ ) {
+    // store pointer to record in hash dictionary
+    std::string keyAsString = key( recNum );
+    
+    std::pair<std::map<std::string, int>::iterator, bool> 
+      retVal =fileDict_.insert (
+      std::map<std::string, int>::value_type(keyAsString,recNum) );
+    
+    
+    // Was key already in the dictionary?
+    if( !retVal.second ) {
+      //if ( fileData_[recordIndex(*keyPtr)] != fileData_[recNum] ) {
+      if ( record(keyAsString) != fileData_[recNum] ) {
+        std::cerr <<"WARNING: Duplicate key in file. " <<std::endl
+          <<"   filename: " <<filename_.c_str() <<std::endl
+          <<"   Record key   : " <<keyAsString.c_str() <<std::endl
+          <<"   Duplicate Record number: " <<recNum <<std::endl
+          <<"   Duplicate Record       : " <<fileData_[recNum].c_str() <<std::endl
+          <<"   Original Record number : " <<recordIndex(keyAsString) <<std::endl
+          <<"   Original Record        : " <<fileData_[recordIndex(keyAsString)].c_str() <<std::endl;
+      }
+      else {
+        std::cerr <<"WARNING: Duplicate record in file. " <<std::endl
+          <<"   filename: " <<filename_.c_str() <<std::endl
+          <<"   Duplicate Record number: " <<recNum <<std::endl
+          <<"   Original Record number : " <<recordIndex(keyAsString) <<std::endl
+          <<"   Record contents        : " <<fileData_[recNum].c_str() <<std::endl;
+        
+	       // Since recNum record is a duplicate remove it from fileData.
+        //fileData_.removeAt( recNum );
+        
+      }
+      // Since recNum record is a duplicate remove it from fileData.
+      // fileData_.removeAt( recNum );
+    }
+    
+  }
+  
+}
+
+//---------------------------------------------------------------------------------
+// preferred constructor
+SCOfile::SCOfile
+(
+   std::string filename
+)
+:
+  removeDuplicateRecords_(false),
+  fileData_(/*SCOFILE_DEFAULT_CAPACITY*/),
+  fileDataInitialized_(false),
+  fileDict_(),
+  fileDictInitialized_(false),
+  filename_(filename),
+  strip_(false)
+{
+  // nothing to do here
+}
+
+
+// destructor
+SCOfile::~SCOfile()
+{
+#if 0  
+  {
+    RWHashDictionaryIterator iter(fileDict_);
+    while (iter()) {
+      RWCollectableString *keyPtr = (RWCollectableString*)iter.key();
+      RWCollectableInt  *valuePtr = (RWCollectableInt *) iter.value();
+      iter.remove();
+      delete keyPtr;
+      delete valuePtr;
+    }
+  }
+#endif
+}
+
+//---------------------------------------------------------------------------------
+// File Iterator
+//---------------------------------------------------------------------------------
+const std::string * 
+SCOfileIterator::operator()()
+{
+  delete recordPtr_;
+  recordPtr_ = NULL;
+  // read next record
+  recNum_++;
+  char cRec[MAX_REC_LEN];
+  if ( filePtr_ == NULL ) return recordPtr_;
+  char * rc = fgets( cRec, MAX_REC_LEN, filePtr_ );
+
+  // check for error
+  if ( rc==NULL ) {
+    if ( feof(filePtr_) ) {
+      return recordPtr_;
+    }
+    std::cerr <<"Failure reading: " 
+          <<scoFile().filename().c_str() <<std::endl;
+    assert( rc!=NULL );
+  }
+
+  // Remove last charcter from record. This is the newline character
+  recordPtr_ = new std::string(cRec);
+  // if the last character is a newline character then remove it
+  if ( (*recordPtr_).substr(recordPtr_->size()-1) == std::string("\n") ) 
+    (*recordPtr_) = (*recordPtr_).substr(0,recordPtr_->length()-1);
+
+  // For fixed format records ensure that the record length is correct.
+  // For CSV format records ensure that the record has the correct number 
+  // of fields.
+  scoFile().testRecordFormat(*recordPtr_,recNum_);
+
+  return recordPtr_;
+}
+
+// Return refernce to file being iterated on
+const SCOfile & SCOfileIterator::scoFile() const
+{
+  return *scoFilePtr_;
+}
+
+// Return current record iterator is pointing to.
+std::string SCOfileIterator::record() const
+{
+  return *recordPtr_;
+}
+
+unsigned int SCOfileIterator::recNum() const
+{
+  return recNum_;
+}
+
+   
+std::string
+SCOfileIterator::fieldOnRecord ( std::string fieldName )
+const
+{
+  return scoFile().fieldOnRecord( record(), fieldName );
+}
+
+
+float 
+SCOfileIterator::fieldOnRecordAsFloat ( std::string fieldName )
+const
+{
+  return scoFile().fieldOnRecordAsFloat( 
+    record(),
+    recNum(),
+    fieldName);
+}
+
+int 
+SCOfileIterator::fieldOnRecordAsInt ( std::string fieldName )
+const
+{
+  return scoFile().fieldOnRecordAsInt( 
+    record(),
+    recNum(),
+    fieldName);
+}
+
+//---------------------------------------------------------------------------------
+// preferred constructor
+SCOfileIterator::SCOfileIterator(
+  const SCOfile & file)
+:
+  filePtr_(false),
+  scoFilePtr_(&file),
+  recNum_(0),
+  recordPtr_(NULL)
+{
+  // open file
+  std::string filename = scoFilePtr_->filename();
+  filePtr_ =  fopen( filename.c_str(), "r" );
+  if ( filePtr_ == NULL ) {
+    std::cout <<"Error: File could not be opened." <<std::endl
+         <<"       Filename: "  <<filename.c_str() <<std::endl;
+    abort();
+  }
+}
+
+
+// destructor
+SCOfileIterator::~SCOfileIterator()
+{
+  if(filePtr_!=NULL) fclose(filePtr_);
+  delete recordPtr_;
+}
+
+//---------------------------------------------------------------------------------
+// Fixed Format File
+//---------------------------------------------------------------------------------
+
+std::string 
+  SCOfixedFormatFile::fieldOnRecord( std::string record, std::string fieldName ) 
+const
+{
+  std::string field = record.substr( fieldPos(fieldName), fieldLen(fieldName) );
+  if ( strip() ) field=stripString(field);
+  return field;
+}
+
+int
+SCOfixedFormatFile::recLength()
+const
+{
+  if ( !fileDataInitialized() ) ((SCOfixedFormatFile*const)this)->initializeFileData();
+  int retVal=0;
+  for ( unsigned int i=0; i<fields_.size(); i++ ) {
+    retVal += fieldLens_[i];
+  }
+  return retVal;
+}
+
+
+size_t
+  SCOfixedFormatFile::fieldLen( std::string fieldName )
+const
+{
+  if ( !fileDictInitialized() ) ((SCOfixedFormatFile*const)this)->initializeFileDict();
+  //RWCollectableString keyColStr(fieldName);
+  //RWCollectable * valueColPtr = fieldLenDict_.findValue(&keyColStr);
+  std::map<std::string,int>::const_iterator it = fieldLenDict_.find(fieldName);
+  if( it == fieldLenDict_.end() ) {
+    std::cerr <<"ERROR: Field not in file. " <<std::endl
+         <<"   Filename : " <<filename().c_str() <<std::endl
+         <<"   Field name: " <<fieldName.c_str() <<std::endl;
+         assert( it != fieldLenDict_.end() );
+  }
+  return (*it).second;
+}
+
+
+size_t
+  SCOfixedFormatFile::fieldPos( std::string fieldName )
+const
+{ 
+  if ( !fileDictInitialized() ) ((SCOfixedFormatFile*const)this)->initializeFileDict();
+  //RWCollectableString keyColStr(fieldName);
+  //RWCollectable * valueColPtr = fieldPosDict_.findValue(&keyColStr);
+  std::map<std::string,int>::const_iterator it = fieldPosDict_.find(fieldName);
+  if( it == fieldPosDict_.end() ) {
+    std::cerr <<"ERROR: Field not in file. " <<std::endl
+         <<"   Filename : " <<filename().c_str() <<std::endl
+         <<"   Field name: " <<fieldName.c_str() <<std::endl;
+         assert( it != fieldPosDict_.end() );
+  }
+  return (*it).second;
+}
+
+
+void
+SCOfixedFormatFile::insertField( std::string fieldName, int fieldLen ) 
+{
+  fields_.push_back(fieldName);
+  fieldLens_.push_back(fieldLen);
+}
+
+void
+SCOfixedFormatFile::initializeFieldInformation()
+{
+  // setupp dictionary with starting position and length of each field
+  assert( fields_.size() == fieldLens_.size() );
+  int position = 0;
+  for ( size_t i=0; i<fields_.size(); i++ ){
+    //RWCollectableString * keyPtr = new RWCollectableString( fields_( i ) );
+    //RWCollectableInt * lenPtr = new RWCollectableInt( fieldLens_(i) );
+    //RWCollectableInt * posPtr = new RWCollectableInt( position );
+    //RWCollectable * rc = fieldLenDict_.insertKeyAndValue( keyPtr, lenPtr );
+
+       
+    std::pair<std::map<std::string, int>::iterator, bool> 
+      retVal =fieldLenDict_.insert (
+      std::map<std::string, int>::value_type(fields_[i],fieldLens_[i]) );
+    
+    
+    // Was key already in the dictionary?
+    if( !retVal.second ) {
+      std::cerr <<"Error inserting field name and length in dictionary" <<std::endl
+           <<"  filename: " <<filename().c_str() <<std::endl
+           <<"  fieldname: " <<fields_[i].c_str() <<std::endl;
+      assert( retVal.second );
+    }
+
+    retVal = fieldPosDict_.insert (
+      std::map<std::string, int>::value_type(fields_[i],position) );
+    assert( retVal.second );
+    position += fieldLens_[i];
+  }
+}
+
+
+void
+SCOfixedFormatFile::testRecordFormat( std::string rec, unsigned int recNum )
+const
+{
+    int definedLengthOfRecord = recLength();
+    int lenOfRecordRead = rec.length();
+    if ( lenOfRecordRead != definedLengthOfRecord ) {
+#if 1
+      std::cerr <<"ERROR: Record in file does not have required length" <<std::endl
+           <<"  recLength:" << lenOfRecordRead <<std::endl
+           <<"  reqLength:" << recLength() <<std::endl
+           <<"  filename: " <<filename().c_str() <<std::endl
+           <<"  recNum:   " <<recNum <<std::endl
+           <<"  record:   \"" <<rec.c_str() <<"\"" <<std::endl;
+      //assert(lenOfRecordRead==definedLengthOfRecord);
+#endif
+    }
+}
+
+//---------------------------------------------------------------------------------
+// preferred constructor
+SCOfixedFormatFile::SCOfixedFormatFile
+(
+   std::string filename
+)
+:
+  SCOfile( filename ),
+  fields_(),
+  fieldLens_(),
+  fieldLenDict_(),
+  fieldPosDict_()
+{
+  // nothing to do here
+}
+
+
+// destructor
+SCOfixedFormatFile::~SCOfixedFormatFile()
+{
+#if 0
+  {
+    RWHashDictionaryIterator iter(fieldLenDict_);
+    while (iter()) {
+      RWCollectableString *keyPtr = (RWCollectableString*)iter.key();
+      RWCollectableInt  *valuePtr = (RWCollectableInt *) iter.value();
+      iter.remove();
+      //delete keyPtr;
+      delete valuePtr;
+    }
+  }
+  {
+    RWHashDictionaryIterator iter(fieldPosDict_);
+    while (iter()) {
+      RWCollectableString *keyPtr = (RWCollectableString*)iter.key();
+      RWCollectableInt  *valuePtr = (RWCollectableInt *) iter.value();
+      iter.remove();
+      delete keyPtr;
+      delete valuePtr;
+    }
+  }
+#endif
+
+}
+
+
+
+//---------------------------------------------------------------------------------
+// Comma Seperated Variable File
+//---------------------------------------------------------------------------------
+
+std::string 
+  SCOcsvFormatFile::fieldOnRecord( std::string record, std::string fieldName ) 
+const
+{
+  size_t fp = fieldPos(fieldName);
+  std::string retVal = fieldOnRecord( record, fp);
+#if 0
+  size_t fieldStartPos = 0;
+  size_t fieldLen = 0;
+  int fieldNumber = 0;
+  bool fieldFound=false;
+
+  
+
+  // loop once for each character on record
+  for ( size_t i=0; i<record.length(); i++ ) {
+
+    fieldStartPos = i;
+
+    // If field seperator is ' ' then skip over consecutive blanks
+    if ( fieldSeperator() == ' ' ) {
+      for ( ; fieldStartPos<record.length(); fieldStartPos++ ) {
+        if( record[fieldStartPos] != ' ' ) break;
+      }
+    }
+    fieldLen = 0;
+
+    // Is current field quoted
+    if ( record[fieldStartPos] == '"' ) {
+      // increment starting position
+      fieldStartPos ++;
+      // compute length of field
+      for ( i=fieldStartPos, fieldLen=0; i<record.length(); i++, fieldLen++ ) {
+        if ( record[i] == '"' ) break;
+      }
+      for ( ; i<record.length(); i++ ) {
+        if ( record[i] == fieldSeperator() ) break;
+      }
+    }
+    else {
+      for ( i=fieldStartPos, fieldLen=0; i<record.length(); i++, fieldLen++ ) {
+        if ( record[i] == fieldSeperator() ) break;
+      }
+    }
+
+    if( i<record.size() ) assert( record[i] == fieldSeperator() );
+
+    // Check to see if field retrieved is the desired field
+    if ( fields_[fieldNumber] == fieldName ) {
+      retVal = record.substr( fieldStartPos, fieldLen );
+      fieldFound = true;
+      break;
+    }
+
+    // setup to parse next field
+    fieldNumber++;
+  }
+ 
+  assert(fieldFound || fields_[fields_.size()-1]==fieldName );
+
+  if ( strip() ) retVal=stripString(retVal);
+#endif
+
+  return retVal;
+}
+
+std::string 
+  SCOcsvFormatFile::fieldOnRecord( std::string record, int desiredFieldNumber ) 
+const
+{
+
+  size_t fieldStartPos = 0;
+  size_t fieldLen = 0;
+  int fieldNumber = 0;
+  std::string retVal;
+  bool fieldFound=false;
+
+  
+
+  // loop once for each character on record
+  for ( size_t i=0; i<record.length(); i++ ) {
+
+    fieldStartPos = i;
+
+    // If field seperator is ' ' then skip over consecutive blanks
+    if ( fieldSeperator() == ' ' ) {
+      for ( ; fieldStartPos<record.length(); fieldStartPos++ ) {
+        if( record[fieldStartPos] != ' ' ) break;
+      }
+    }
+    fieldLen = 0;
+
+    // Is current field quoted
+    if ( record[fieldStartPos] == '"' ) {
+      // increment starting position
+      fieldStartPos ++;
+      // compute length of field
+      for ( i=fieldStartPos, fieldLen=0; i<record.length(); i++, fieldLen++ ) {
+        if ( record[i] == '"' ) break;
+      }
+      for ( ; i<record.length(); i++ ) {
+        if ( record[i] == fieldSeperator() ) break;
+      }
+    }
+    else {
+      for ( i=fieldStartPos, fieldLen=0; i<record.length(); i++, fieldLen++ ) {
+        if ( record[i] == fieldSeperator() ) break;
+      }
+    }
+
+    if( i<record.size() ) assert( record[i] == fieldSeperator() );
+
+    // Check to see if field retrieved is the desired field
+    if ( fieldNumber == desiredFieldNumber ) {
+      retVal = record.substr( fieldStartPos, fieldLen );
+      fieldFound = true;
+      break;
+    }
+
+    // setup to parse next field
+    fieldNumber++;
+  }
+ 
+  assert(fieldFound);
+
+  if ( strip() ) retVal=stripString(retVal);
+
+  return retVal;
+}
+
+int
+SCOcsvFormatFile::numberOfFields()
+const
+{
+  return fields_.size();
+}
+
+
+size_t
+  SCOcsvFormatFile::fieldPos( const std::string & fieldName ) 
+const
+{ 
+  if ( !fileDictInitialized() ) ((SCOcsvFormatFile*const)this)->initializeFileDict();
+  //RWCollectableString keyColStr(fieldName);
+  //RWCollectable * valueColPtr = fieldPosDict_.findValue(&keyColStr);
+  std::map<std::string,int>::const_iterator it = fieldPosDict_.find(fieldName);
+  if( it == fieldPosDict_.end() ) {
+    std::cerr <<"ERROR: Field not in file. " <<std::endl
+         <<"   Filename : " <<filename().c_str() <<std::endl
+         <<"   Field name: " <<fieldName.c_str() <<std::endl;
+         assert( it != fieldPosDict_.end() );
+  }
+  return (*it).second;
+}
+
+
+void
+SCOcsvFormatFile::insertField( std::string fieldName ) 
+{
+  fields_.push_back(fieldName);
+}
+
+void
+SCOcsvFormatFile::initializeFieldInformation()
+{
+  // setup dictionary containing number of fields position on record
+  int position = 0;
+  for ( size_t i=0; i<fields_.size(); i++ ){
+
+    //std::string * keyPtr = new std::string( fields_[ i ] );
+    //RWCollectableInt * posPtr = new RWCollectableInt( position );
+    //RWCollectable * rc = fieldPosDict_.insertKeyAndValue( keyPtr, posPtr );
+       
+    std::pair<std::map<std::string, int>::iterator, bool> 
+      retVal =fieldPosDict_.insert (
+      std::map<std::string, int>::value_type(fields_[ i ],position) );
+    
+    
+    // Was key already in the dictionary?
+    if( !retVal.second ) {
+      std::cerr <<"Error inserting field name and position in dictionary" <<std::endl
+           <<"  filename: " <<filename().c_str() <<std::endl
+           <<"  fieldname: " <<fields_[i].c_str() <<std::endl;
+      assert( retVal.second  );
+    }
+    position ++;
+  }
+}
+
+void SCOcsvFormatFile::fieldSeperator( char fs )
+{
+  fieldSeperator_ = fs;
+}
+
+char SCOcsvFormatFile::fieldSeperator() const
+{
+  return fieldSeperator_;
+}
+
+void SCOcsvFormatFile::hasHeaderRecord( int numFields )
+{
+  assert( numFields>0 );
+  hasHeaderRecord_ = true;
+  for ( int f=0; f<numFields; f++ ) {
+    // Grab first record from file using iterator class
+    SCOfileIterator fileIter(*this);
+    const std::string * headerRecPtr = fileIter();
+    assert( headerRecPtr!=NULL ); // test to ensure header rec exists
+    std::string fieldNameOnHeader = fieldOnRecord( *headerRecPtr, f );
+    insertField( fieldNameOnHeader );
+  }
+}
+
+bool SCOcsvFormatFile::hasHeaderRecord() const
+{
+  return hasHeaderRecord_;
+}
+
+
+void
+SCOcsvFormatFile::testRecordFormat( std::string rec, unsigned int recNum )
+const
+{
+   // Test to make sure last field on record is accessible
+  if ( !hasHeaderRecord() )
+    std::string lastField = fieldOnRecord( rec, fields_[fields_.size()-1] );
+}
+
+//---------------------------------------------------------------------------------
+// preferred constructor
+SCOcsvFormatFile::SCOcsvFormatFile
+(
+   std::string filename
+)
+:
+  SCOfile( filename ),
+  fields_(),
+  fieldPosDict_(),
+  fieldSeperator_(','),
+  hasHeaderRecord_(false)
+{
+  // nothing to do here
+}
+
+
+// destructor
+SCOcsvFormatFile::~SCOcsvFormatFile()
+{
+#if 0
+  {
+    RWHashDictionaryIterator iter(fieldPosDict_);
+    while (iter()) {
+      RWCollectableString *keyPtr = (RWCollectableString*)iter.key();
+      RWCollectableInt  *valuePtr = (RWCollectableInt *) iter.value();
+      iter.remove();
+      delete keyPtr;
+      delete valuePtr;
+    }
+  }
+#endif
+
+}
+#if 0
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+void
+SCOfile::test()
+{
+
+  float flt_eps = 0.000001;
+  assert(fabs(mrpConsVol[0] - 700.0) < flt_eps);
+
+} 
+#endif
+@
+
+
+1.1.1.1
+log
+@globalResource import
+@
+text
+@@

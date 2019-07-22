@@ -1,0 +1,117 @@
+#!/bin/ksh
+# Runs a WIT program in one or more data directories and
+# renames the output files so that regressionCompare can compare
+# the output from the base version of WIT and a new version of WIT.
+
+# Default wit program is /u/implode/releases/wit34/bin/wit (latest production
+#   version). If no data set is spcified, all data sets 
+#   in /u/implode/wit/devroot/pmrp/data will be run.
+# If /u/implode/releases/wit34/bin/wit is used, concatenate all output with
+# .base extension. These output will be used for the comparison. 
+
+# Invoke: regression.test [wit-program] [specific data set]
+
+
+# $Id: regressionRunProg.sh,v 1.1.1.1 2000/02/23 17:02:57 wit Exp $
+
+
+# set -o verbose
+
+implode_dir=/u/implode
+pmrp_dir=$implode_dir/devroot/pmrp
+pmrp_data_dir=$pmrp_dir/data
+production_version=$implode_dir/releases/wit34/bin/wit
+
+function run_curr_data
+{
+  cd $curr_data
+  print ..... Start running $curr_data .....
+  echo -------------------------------------------------------------------
+  $wit < wit.data
+  if [ $BASE = 1 ]
+  then
+    ifExistsMove echo.out echo.out.base
+    ifExistsMove prod.out prod.out.base
+    ifExistsMove ship.out ship.out.base
+    ifExistsMove mrpsup.out mrpsup.out.base
+    ifExistsMove wit.log  wit.log.base
+    chmod a-w *.base
+  else
+    ifExistsMove echo.out echo.out.new
+    ifExistsMove prod.out prod.out.new
+    ifExistsMove ship.out ship.out.new
+    ifExistsMove mrpsup.out mrpsup.out.new
+    ifExistsMove wit.log  wit.log.new
+  fi 
+  ls
+  print ..... Finished running $curr_data ..... 
+  cd ..
+}
+
+if [ $# = 0 ] 
+then 
+  wit=$production_version
+else
+  if [ $# -ge 1 ]
+  then
+    echo $1 | egrep '^\/'	
+    if [ $? = 0 ]		# filename path is absolute
+    then
+	wit=$1
+    else
+	wit=$PWD/$1
+    fi
+  fi
+fi
+if [ $wit = $production_version ] # The production wit is used.
+    then  BASE=1
+    else  BASE=0
+fi
+
+if [ $# -gt 1 ] # only one data is requested to run
+then
+  curr_data=$2
+  print $wit $curr_data
+  cd $pmrp_data_dir
+  run_curr_data
+  exit 
+fi
+
+# Test data is stored in /u/implode/wit/devroot/pmrp/data, currently, files in
+# data are as follows.
+# data 	- brenda 	- (brenson, cmos26, denise, rch818, vern929)
+#      	- csi   	- (case09, case10, case11) 
+#      	- holder 	- (lh, lht)
+#	- standard	- (ob1, ob2)
+# brenda, csi and holder are real data, standard is small make-up data.
+
+# Recursively, run all data sets in data
+
+cd $pmrp_data_dir
+
+for i in *            # for all directories inside data, curr_dir
+do
+  curr_dir=$i
+  cd $curr_dir
+  for j in *	      # for all data sets inside curr_dir
+  do		
+    curr_data=$j
+    echo -------------------------------------------------------------------
+    print - ..... Running wit program = $wit
+    print - ..... with data = $pmrp_data_dir/$curr_dir/$curr_data
+    run_curr_data
+  done
+  cd .. 
+done
+
+# Finished running all data sets
+cd $pmrp_dir
+exit 
+
+
+
+
+
+
+
+

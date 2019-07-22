@@ -1,0 +1,315 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	UsedBySCE:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.47;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.35;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.41;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.41;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.29;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+#include <scenario/src/lastPrbS.h>
+#include <scenario/src/explode.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/machdep.h>
+
+
+// updateFrom - This method is invoked when the algorthm solution has
+// been updated.
+void
+LgFrExplode::updateFrom (
+   LgFrModel * ,
+   void * a )
+{
+  if (a != 0)  {
+    LgFrAlgorithm * algorithm = (LgFrAlgorithm *)a;
+
+    if ( algorithm->GetAlgorithmType() == __LGFREXPLODE )
+      changed( 0 );
+  }
+}
+
+
+// Get Last Problem Solved
+LgFrLastProblemSolved &
+LgFrExplode::lastProblemSolved()
+const
+{
+   assert (lpsPtr_ != 0);
+   return *lpsPtr_;
+}
+
+
+// Return pointer to the explode algorithm in the specified scenario.
+LgFrAlgorithm *
+LgFrExplode::counterPart(
+LgFrScenario & scenario)
+const
+{
+   return &( scenario.explode() );
+}
+
+
+// Default constructor
+LgFrExplode::LgFrExplode()
+: 
+  LgFrAlgorithm(),
+  lpsPtr_(0),
+  id_(__LGFREXPLODE)
+{
+  // All the work is done in the initialization part
+}
+
+// A Constructor
+LgFrExplode::LgFrExplode(
+   LgFrLastProblemSolved & lps )
+: 
+  LgFrAlgorithm(),
+  lpsPtr_(&lps),
+  id_(__LGFREXPLODE)
+{
+  assert (this->numberDependents() == 0);
+  // Register with LPS to be informed when explosion solution changes
+  lpsPtr_->addDependent( this );
+
+}
+
+
+//Copy constructor
+LgFrExplode::LgFrExplode 
+   (const LgFrExplode& source)
+: 
+  LgFrAlgorithm(source),
+  lpsPtr_(source.lpsPtr_),
+  id_(__LGFREXPLODE)
+{
+  assert (this->numberDependents() == 0);
+  // Register with LPS to be informed when explosion solution changes
+  if (lpsPtr_!=0) lpsPtr_->addDependent( this );
+}
+
+// Destructor
+LgFrExplode::~LgFrExplode()
+{
+  // Unregister with LPS
+  if (lpsPtr_!=0) lpsPtr_->removeDependent( this );
+}
+
+// Assignment
+LgFrExplode&
+LgFrExplode::operator=
+(const LgFrExplode & )
+{
+  // Difficult to implement, so wait till it is necessary
+  abort();
+  return *this;
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrExplode
+void
+LgFrExplode::test()
+{
+  // Test default constructor
+  LgFrExplode defaultImplodeCtrl;
+  assert (defaultImplodeCtrl.lpsPtr_ == 0);
+}
+
+//
+void
+LgFrExplode::contextTest(LgFrLastProblemSolved       &lps,
+                         LgFrSetOfParts              &sop)
+{
+  // The data for this test should have come from
+  // "/u/implode/wit/data/examples/diner12/wit.data"
+
+  // Test non-default constructors
+  LgFrExplode anExplodeCtrl (lps);
+  assert(sop[0].name() == "Skillet");
+  LgFrExplode copiedExplodeCtrl (anExplodeCtrl);
+  assert ((copiedExplodeCtrl.lpsPtr_)->numberOfPeriods()
+          == (anExplodeCtrl.lpsPtr_)->numberOfPeriods());
+  assert ((anExplodeCtrl.lpsPtr_)->numberOfPeriods() == 2);
+
+  // Test method to get an explode's lps
+  assert( &(copiedExplodeCtrl.lastProblemSolved()) == &lps );
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 4
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 3
+a3 1
+#include <iostream.h>
+d18 1
+a18 1
+  if (a != NULL)  {
+d21 2
+a22 2
+    if ( algorithm->isA() == __LGFREXPLODE )
+      changed( NULL );
+d32 1
+a32 1
+   assert (lpsPtr_ != NULL);
+a36 8
+// Return object class identifier
+isAReturnType
+LgFrExplode::isA()
+const
+{
+   return id_;
+}
+
+d51 1
+a51 1
+  lpsPtr_(NULL),
+a79 1
+  assert( id_ == source.id_ );
+d82 1
+a82 1
+  if (lpsPtr_!=NULL) lpsPtr_->addDependent( this );
+d89 1
+a89 1
+  if (lpsPtr_!=NULL) lpsPtr_->removeDependent( this );
+d112 1
+a112 2
+  assert (defaultImplodeCtrl.lpsPtr_ == NULL);
+  assert (defaultImplodeCtrl.isA() == __LGFREXPLODE );
+a125 1
+  assert (anExplodeCtrl.isA() == __LGFREXPLODE );
+a129 1
+  assert (copiedExplodeCtrl.isA() == __LGFREXPLODE );
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 3
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d16 1
+a16 1
+  if (a != 0)  {
+d19 2
+a20 2
+    if ( algorithm->GetAlgorithmType() == __LGFREXPLODE )
+      changed( 0 );
+d30 1
+a30 1
+   assert (lpsPtr_ != 0);
+d35 8
+d57 1
+a57 1
+  lpsPtr_(0),
+d86 1
+d89 1
+a89 1
+  if (lpsPtr_!=0) lpsPtr_->addDependent( this );
+d96 1
+a96 1
+  if (lpsPtr_!=0) lpsPtr_->removeDependent( this );
+d119 2
+a120 1
+  assert (defaultImplodeCtrl.lpsPtr_ == 0);
+d134 1
+d139 1
+@
+

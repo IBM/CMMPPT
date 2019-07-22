@@ -1,0 +1,389 @@
+head	1.10;
+access;
+symbols
+	nextGenBranch:1.9.0.2
+	nextGenRoot:1.9
+	sce_3_30_20030627:1.9
+	EndRw-branch:1.2.0.4
+	Root-of-EndRw:1.2
+	rwToStl:1.2.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2003.09.25.20.44.44;	author rjw;	state dead;
+branches;
+next	1.9;
+
+1.9
+date	2003.03.03.21.07.32;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2003.02.19.21.47.33;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.02.13.23.06.32;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.02.07.20.20.51;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.02.03.21.57.27;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.01.23.19.13.23;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.11.25.15.15.22;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.09.04.21.53.36;	author rjw;	state Exp;
+branches
+	1.2.2.1;
+next	1.1;
+
+1.1
+date	2002.09.04.19.14.58;	author rjw;	state Exp;
+branches;
+next	;
+
+1.2.2.1
+date	2002.11.08.16.11.34;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef PtrSchedIH
+#define PtrSchedIH
+
+//------------------------------------------------------------------------------
+// Header file: "PtrSchedI.h"
+//
+// Contains the implementation of class template PtrSched <DomEl, RangeEl>.
+//------------------------------------------------------------------------------
+
+#include <PtrSched.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class template PtrSched <DomEl, RangeEl>.
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      WitPtrSched <PtrSchedArgs>::WitPtrSched ():
+         myPtrVec_ ()
+   {
+   ifDebug (DomEl * theDomEl);
+
+   ifDebug (DomEl::verifyMappingIndex (theDomEl));
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      WitPtrSched <PtrSchedArgs>::WitPtrSched (WitProblem * theProblem):
+
+         myPtrVec_ ()
+   {
+   allocate (theProblem);
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      WitPtrSched <PtrSchedArgs>::~WitPtrSched ()
+   {
+   clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      void WitPtrSched <PtrSchedArgs>::allocate (WitProblem * theProblem)
+   {
+   size_t theIdx;
+
+   allocate1D (theProblem);
+
+   for (theIdx = 0; theIdx < myPtrVec_.length (); theIdx ++)
+      myPtrVec_ (theIdx).allocate (theProblem);
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      void WitPtrSched <PtrSchedArgs>::allocate1D (WitProblem * theProblem)
+   {
+   allocate1D (DomEl::nInstances (theProblem));
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      void WitPtrSched <PtrSchedArgs>::allocate1D (int nInst)
+   {
+   int theIdx;
+
+   clear ();
+
+   myPtrVec_.resize (nInst);
+
+   for (theIdx = 0; theIdx < nInst; theIdx ++)
+      myPtrVec_[theIdx] = new WitPtrTVec <RangeEl>;
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs> 
+      void WitPtrSched <PtrSchedArgs>::clear ()
+   {
+   size_t theIdx;
+
+   for (theIdx = 0; theIdx < myPtrVec_.length (); theIdx ++)
+      delete myPtrVec_[theIdx];
+
+   myPtrVec_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline RangeEl & WitPtrSched <PtrSchedArgs>::myElemAt (
+         const DomEl * theDomEl, 
+         WitPeriod     thePer)
+   {
+   return * myPtrAt (theDomEl, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline RangeEl * & WitPtrSched <PtrSchedArgs>::myPtrAt (
+         const DomEl * theDomEl, 
+         WitPeriod     thePer)
+   {
+   return myPtrTVecAt (theDomEl)[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline RangeEl * WitPtrSched <PtrSchedArgs>::myPtrAt (
+         const DomEl * theDomEl, 
+         WitPeriod     thePer)
+         const
+   {
+   return myPtrTVecAt (theDomEl)[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline WitPtrTVec <RangeEl> & WitPtrSched <PtrSchedArgs>::myPtrTVecAt (
+         const DomEl * theDomEl)
+   {
+   witAssert (theDomEl != NULL);
+
+   return myPtrVec_ (theDomEl->mappingIndex ());
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline const WitPtrTVec <RangeEl> &
+         WitPtrSched <PtrSchedArgs>::myPtrTVecAt (const DomEl * theDomEl) const
+   {
+   witAssert (theDomEl != NULL);
+
+   return myPtrVec_ (theDomEl->mappingIndex ());
+   }
+
+#endif
+@
+
+
+1.9
+log
+@Continued implementation of proportionate routing.
+@
+text
+@@
+
+
+1.8
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d124 11
+d137 11
+@
+
+
+1.7
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d70 8
+a77 1
+   int nInst;
+a80 2
+
+   nInst = DomEl::nInstances (theProblem);
+@
+
+
+1.6
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d75 1
+a75 1
+   nInst = theProblem->myCompMgr ()->nInstances (static_cast <DomEl *> (NULL));
+@
+
+
+1.5
+log
+@Continued implementation of proportionate routing.
+@
+text
+@a101 1
+         const
+a118 11
+      inline RangeEl * WitPtrSched <PtrSchedArgs>::myPtrAt (
+         const DomEl * theDomEl, 
+         WitPeriod     thePer)
+         const
+   {
+   return myPtrTVecAt (theDomEl)[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+a120 13
+   {
+   witAssert (theDomEl != NULL);
+
+   return myPtrVec_ (theDomEl->mappingIndex ());
+   }
+
+//------------------------------------------------------------------------------
+
+template <PtrSchedArgDecs>
+      inline const WitPtrTVec <RangeEl> &
+            WitPtrSched <PtrSchedArgs>::myPtrTVecAt (
+         const DomEl * theDomEl)
+         const
+@
+
+
+1.4
+log
+@Replaced some C style casts with C++ style casts.
+@
+text
+@d102 1
+d120 11
+d133 13
+@
+
+
+1.3
+log
+@modications to change rogueWave tools.h++ to STL
+@
+text
+@d75 1
+a75 1
+   nInst = theProblem->myCompMgr ()->nInstances ((DomEl *) NULL);
+@
+
+
+1.2
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@d57 1
+a57 2
+   int nInst;
+   int theIdx;
+d88 1
+a88 1
+   int theIdx;
+@
+
+
+1.2.2.1
+log
+@Migration from Roguewave tools.h++ to STL
+@
+text
+@d57 2
+a58 1
+   size_t theIdx;
+d89 1
+a89 1
+   size_t theIdx;
+@
+
+
+1.1
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@d26 1
+a26 1
+      inline WitPtrSched <PtrSchedArgs>::WitPtrSched ():
+d37 1
+a37 1
+      inline WitPtrSched <PtrSchedArgs>::WitPtrSched (WitProblem * theProblem):
+d47 1
+a47 1
+      inline WitPtrSched <PtrSchedArgs>::~WitPtrSched ()
+d55 1
+a55 1
+      inline void WitPtrSched <PtrSchedArgs>::allocate (WitProblem * theProblem)
+d69 1
+a69 2
+      inline void WitPtrSched <PtrSchedArgs>::allocate1D (WitProblem *
+         theProblem)
+@
+

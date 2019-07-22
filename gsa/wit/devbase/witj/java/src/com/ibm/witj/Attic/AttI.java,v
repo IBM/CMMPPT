@@ -1,0 +1,381 @@
+head	1.4;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.4
+date	2008.06.19.13.36.44;	author rjw;	state dead;
+branches;
+next	1.3;
+
+1.3
+date	2008.06.18.14.34.38;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.06.18.14.13.39;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.06.18.14.06.23;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Changed class name       AttI to       AttAcc.
+Changed class name DblVecAttI to DblVecAttAcc.
+@
+text
+@
+//==============================================================================
+// WIT-J Java Source File AttI.java.
+//
+// Contains the declaration of class AttI.
+//==============================================================================
+
+package com.ibm.witj;
+
+//==============================================================================
+// Class AttI
+//
+// "Attribute Interface"
+// An instance of any subclass of this class functions as an interface to all
+// attributes of one type belonging to all the Components of a Problem.
+// At any point in time, an AttI will be associated either with one
+// attribute of one Component or with no attribute.
+// The associated attribute and Component can be changed at any time.
+// The sub classes of this class are attribute-type specific and provide the
+// ability to set and retrieve the value of the associated attribute
+// for the associated Component.
+//
+// Class Hierarchy:
+//
+//    PublicObject
+//       AttI
+//          DblVecAttI
+//==============================================================================
+
+public abstract class AttI extends PublicObject
+{
+//==============================================================================
+// Public Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// isAssociated ().
+//
+// Returns true, iff this AttI is currently associated with an attribute.
+//------------------------------------------------------------------------------
+
+   public boolean isAssociated ()
+      {
+      return (assocAttID != null);
+      }
+
+//------------------------------------------------------------------------------
+// toStringActive ().
+//
+// Override from class PublicObject.
+//------------------------------------------------------------------------------
+
+   public String toStringActive ()
+      {
+      if (isAssociated ())
+         return
+              concClassName ()
+            + " currently associated with the "
+            + assocAttID
+            + " attribute of "
+            + assocComp;
+      else
+         return
+              concClassName ()
+            + " not currently associated with an attribute";
+      }
+
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Constructor.
+//------------------------------------------------------------------------------
+
+   AttI (AttMgr theAttMgr)
+      {
+      super ();
+
+      myAttMgr = theAttMgr;
+      }
+
+//------------------------------------------------------------------------------
+// shutDown ().
+//
+// Override from class PublicObject.
+//------------------------------------------------------------------------------
+
+   void shutDown ()
+      {
+      assocComp  = null;
+      assocAttID = null;
+      myAttMgr   = null;
+
+      super.shutDown ();
+      }
+
+//------------------------------------------------------------------------------
+// associateWith (theAttID, theComp).
+//
+// Associates this AttI with the attribute indicated by theAttID and theComp.
+//------------------------------------------------------------------------------
+
+   void associateWith (
+         AttID     theAttID,
+         Component theComp)
+      {
+      assert (theComp.myProbCoord () == myAttMgr.myProbCoord ());
+
+      assocAttID = theAttID;
+      assocComp  = theComp;
+      }
+
+//------------------------------------------------------------------------------
+// disassociate ().
+//
+// Causes this AttI not to be associated with any attribute and Component.
+//------------------------------------------------------------------------------
+
+   void disassociate ()
+      {
+      assocAttID = null;
+      assocComp  = null;
+      }
+
+//------------------------------------------------------------------------------
+// checkVecSetValue (int theLength)
+//
+// Does error checking for setting the value of a vector attribute to an array
+// of length theLength.
+//------------------------------------------------------------------------------
+
+   void checkVecSetValue (int theLength)
+      {
+      mustBeActive (concClassName () + ".setValue");
+
+      if (! isAssociated ())
+         abortWmsg (
+              "   "
+            +     concClassName ()
+            +    ".setValue (...) was called on an AttI\n"
+            + "   that is not currently associated with an attribute.");
+
+      if (theLength != nPeriods ())
+         abortWmsg (
+              "   "
+            +     concClassName ()
+            +    ".setValue (...) was called with an array\n"
+            + "   whose length does not match nPeriods for the Problem.\n"
+            + "\n"
+            + "      Array Length: "
+            +        theLength
+            + "\n"
+            + "      nPeriods:     "
+            +        nPeriods ());
+      }
+
+//------------------------------------------------------------------------------
+// checkGetValue ()
+//
+// Does error checking for retrieving the value of an attribute.
+//------------------------------------------------------------------------------
+
+   void checkGetValue ()
+      {
+      mustBeActive (concClassName () + ".getValue");
+
+      if (! isAssociated ())
+         abortWmsg (
+              "   "
+            +     concClassName ()
+            +    ".getValue (...) was called on an AttI\n"
+            + "   that is not currently associated with an attribute.");
+      }
+
+//------------------------------------------------------------------------------
+// assocAttCI ()
+//
+// Returns the AttCI for the currently associated attribute.
+// Throws a null pointer exception, if this AttI is not currently associated
+// with an attribute.
+//------------------------------------------------------------------------------
+
+   AttCI assocAttCI ()
+      {
+      return myAttMgr.myAttCIFor (assocAttID);
+      }
+
+//------------------------------------------------------------------------------
+// assocCompCI ()
+//
+// Returns the ComponentCI for the currently associated Component.
+// Throws a null pointer exception, if this AttI is not currently associated
+// with an attribute.
+//------------------------------------------------------------------------------
+
+   ComponentCI assocCompCI ()
+      {
+      return assocComp.myCompCI ();
+      }
+
+//------------------------------------------------------------------------------
+// nPeriods ()
+//
+// Access Wrapper
+//------------------------------------------------------------------------------
+
+   int nPeriods ()
+      {
+      return myAttMgr.myProbCoord ().myCompMgr ().myGlobalComp ().nPeriods ();
+      }
+
+//------------------------------------------------------------------------------
+// concClassName ()
+//
+// Returns the name of the concrete class to which this AttI belongs.
+//------------------------------------------------------------------------------
+
+   abstract String concClassName ();
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// myAttMgr
+//
+// The AttMgr that owns this AddRep.
+//------------------------------------------------------------------------------
+
+   private AttMgr myAttMgr;
+
+//------------------------------------------------------------------------------
+// assocAttID
+//
+// The AttID of the currently associated attribute.
+// Null, if this AttI is not currently associated with an attribute.
+//------------------------------------------------------------------------------
+
+   private AttID assocAttID;
+
+//------------------------------------------------------------------------------
+// assocComp
+//
+// The currently associated Component.
+// Null, if this AttI is not currently associated with an attribute.
+//------------------------------------------------------------------------------
+
+   private Component assocComp;
+
+//==============================================================================
+}
+@
+
+
+1.3
+log
+@Attributes.
+@
+text
+@@
+
+
+1.2
+log
+@Attributes.
+@
+text
+@d139 1
+a139 1
+              "   setValue (...) was called on a "
+d141 2
+a142 1
+            +    "that is not currently associated with an attribute.");
+d170 1
+a170 1
+              "   getValue (...) was called on a "
+d172 2
+a173 1
+            +    "that is not currently associated with an attribute.");
+@
+
+
+1.1
+log
+@Changed name of class       AttRep to       AttI.
+Changed name of class DblVecAttRep to DblVecAttI.
+@
+text
+@d44 1
+a44 1
+      return (curAttID != null);
+d59 1
+a59 1
+            + curAttID
+d61 1
+a61 1
+            + curComp;
+d91 3
+a93 3
+      curComp  = null;
+      curAttID = null;
+      myAttMgr = null;
+d110 2
+a111 2
+      curAttID = theAttID;
+      curComp  = theComp;
+d122 2
+a123 2
+      curAttID = null;
+      curComp  = null;
+d175 1
+a175 1
+// curAttCI ()
+d182 1
+a182 1
+   AttCI curAttCI ()
+d184 1
+a184 1
+      return myAttMgr.myAttCIFor (curAttID);
+d188 1
+a188 1
+// curCompCI ()
+d195 1
+a195 1
+   ComponentCI curCompCI ()
+d197 1
+a197 1
+      return curComp.myCompCI ();
+d232 1
+a232 1
+// curAttID
+d238 1
+a238 1
+   private AttID curAttID;
+d241 1
+a241 1
+// curComp
+d247 1
+a247 1
+   private Component curComp;
+@
+

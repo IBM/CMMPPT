@@ -1,0 +1,3530 @@
+head	1.13;
+access;
+symbols
+	sce_5_01_20080919:1.8;
+locks; strict;
+comment	@ * @;
+
+
+1.13
+date	2011.09.28.23.49.55;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.09.24.00.28.17;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.08.30.20.17.56;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.09.10.22.10.40;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.03.16.22.42.27;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.07.11.19.29.59;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.07.10.15.57.23;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.07.09.23.01.15;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.07.05.21.51.36;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.06.29.21.57.51;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.08.08.17.38.43;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.08.03.18.59.32;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.08.03.17.38.33;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "PipReq.C"
+//
+// Contains the implementation of the following classes:
+//
+//    PipReqMgr
+//    PipReqSpec
+//    PipReqSrc
+//    PipSeqEl
+//------------------------------------------------------------------------------
+
+#include <PipReqMgr.h>
+#include <PipReqSpec.h>
+#include <PipReqSrc.h>
+#include <PipSeqEl.h>
+#include <PipMgr.h>
+#include <TripStack.h>
+#include <PtrVecSort.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <Operation.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class PipReqMgr.
+//------------------------------------------------------------------------------
+
+WitPipReqMgr::WitPipReqMgr (WitProblem * theProblem):
+
+      WitProbAssoc    (theProblem),
+
+      mySeqElVec_     (),
+      myReqSrcs_      (theProblem),
+      myVacReqSrc_    (NULL),
+      myPartReqs_     (),
+      myBopEntReqs_   (),
+      myReqSpecVec_   (),
+      nActReqSpecs_   (0),
+      maxActReqSpecs_ (0),
+      curReqList_     (myProblem ()),
+      myReqListItr_   (),
+      curReqSrc_      (NULL),
+      incReqVolCur_   (0.0)
+   {
+   WitPart *     thePart;
+   WitPeriod     fillPer;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+
+   buildSeqEls ();
+
+   myVacReqSrc_ = newReqSrcForSeqNo (mySeqElVec_.length () - 1);
+
+   myPartReqs_.allocate (myProblem ());
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (fillPer, myProblem ())
+         myPartReqs_.myPtrAt (thePart, fillPer) =
+            new WitPipReqList (myProblem ());
+
+   myBopEntReqs_.allocate (myProblem ());
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         myBopEntReqs_.myPtrAt (theBopEnt, execPer) =
+            new WitPipReqList (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipReqMgr::~WitPipReqMgr ()
+   {
+   int           theIdx;
+   WitPart *     thePart;
+   WitPeriod     fillPer;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+   int           theSeqNo;
+
+   for (theIdx = 0; theIdx < myReqSpecVec_.length (); theIdx ++)
+      delete myReqSpecVec_[theIdx];
+
+   myReqSpecVec_.clear ();
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         delete myBopEntReqs_.myPtrAt (theBopEnt, execPer);
+
+   myBopEntReqs_.clear ();
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (fillPer, myProblem ())
+         delete myPartReqs_.myPtrAt (thePart, fillPer);
+
+   myPartReqs_.clear ();
+
+   myVacReqSrc_ = NULL;
+
+   deleteContents (myReqSrcs_);
+
+   for (theSeqNo = 0; theSeqNo < mySeqElVec_.length (); theSeqNo ++)
+      delete mySeqElVec_[theSeqNo];
+
+   mySeqElVec_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqMgr::hasReqsFor (WitOperation * theOpn, WitPeriod execPer)
+   {
+   WitBopEntry * theBopEnt;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipReqSrc * WitPipReqMgr::newReqSrcForSeqNo (int theSeqNo)
+   {
+   WitPipReqSrc * theReqSrc;
+
+   theReqSrc = new WitPipReqSrc (mySeqElVec_[theSeqNo]);
+
+   myReqSrcs_.push (theReqSrc);
+
+   return theReqSrc;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::addReq (
+      WitPart *      thePart,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc,
+      double         incReqVol)
+   {
+   witAssert (incReqVol > NET_TOL);
+
+   myPartReqs_.myElemAt (thePart, fillPer).push (theReqSrc, incReqVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::addReq (
+      WitBopEntry *  theBopEnt,
+      WitPeriod      execPer,
+      WitPipReqSrc * theReqSrc,
+      double         incExecVol)
+   {
+   witAssert (incExecVol > NET_TOL);
+
+   myBopEntReqs_.myElemAt (theBopEnt, execPer).push (theReqSrc, incExecVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::getCurReqList (WitPipReqList & theReqList)
+   {
+   theReqList.takeContentsFrom (curReqList_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::loadCurReqList (WitPart * thePart, WitPeriod fillPer)
+   {
+   witAssert (curReqList_.isEmpty ());
+
+   curReqList_.takeContentsFrom (myPartReqs_.myElemAt (thePart, fillPer));
+
+   if (curReqList_.isNonEmpty ())
+      sortReqList ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::loadCurReqList (WitOperation * theOpn, WitPeriod execPer)
+   {
+   witAssert (hasReqsFor (theOpn, execPer));
+
+   witAssert (curReqList_.isEmpty ());
+
+   if (hasMultiExp (theOpn, execPer))
+      mergeReqs (theOpn, execPer);
+   else
+      loadReqsFromOne (theOpn, execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::clearCurReqList ()
+   {  
+   curReqList_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::initReqListItr ()
+   {
+   curReqList_.attachItr (myReqListItr_);
+
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::advanceReqListItr (
+      double &         netReqVol,
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol)
+   {
+   witAssert (not finishedReqListItr ());
+
+   witAssert (netReqVol > NET_TOL);
+
+   theReqSrc      = curReqSrc_;
+
+   incReqVol      = min (incReqVolCur_, netReqVol);
+
+   incReqVolCur_ -= incReqVol;
+   netReqVol     -= incReqVol;
+
+   if (incReqVolCur_ > NET_TOL)
+      return;
+
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::advanceReqListItr (
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol)
+   {
+   witAssert (not finishedReqListItr ());
+
+   theReqSrc = curReqSrc_;
+   incReqVol = incReqVolCur_;
+
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqMgr::finishedReqListItr ()
+   {
+   return (curReqSrc_ == NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtSizes ()
+   {
+   myMsgFac () ("pipSizesMsg",
+      maxActReqSpecs_,
+      myReqSpecVec_.length ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::buildSeqEls ()
+   {
+   WitDemTripStack theShipSeq (myProblem ());
+   int             theSeqNo;
+   WitDemand *     theDemand;
+   WitPeriod       shipPer;
+   double          incShipVol;
+
+   myProblem ()->myPipMgr ()->getShipSeq (theShipSeq);
+
+   mySeqElVec_.resize (theShipSeq.nElements () + 1);
+
+   theSeqNo = -1;
+
+   while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+      {
+      theSeqNo ++;
+
+      mySeqElVec_[theSeqNo] = new WitPipSeqEl (theDemand, shipPer, theSeqNo);
+      }
+
+   theSeqNo ++;
+
+   mySeqElVec_[theSeqNo] = new WitPipSeqEl (NULL, -1, theSeqNo);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::loadReqsFromOne (WitOperation * theOpn, WitPeriod execPer)
+   {
+   WitBopEntry * expBopEnt;
+   WitBopEntry * theBopEnt;
+
+   expBopEnt = NULL;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (expEligible (theBopEnt, execPer))
+         {
+         expBopEnt = theBopEnt;
+
+         break;
+         }
+
+   witAssert (expBopEnt != NULL);
+
+   curReqList_.takeContentsFrom (myBopEntReqs_.myElemAt (expBopEnt, execPer));
+
+   curReqList_.reverse ();
+
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqList (theOpn, execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::mergeReqs (WitOperation * theOpn, WitPeriod execPer)
+   {
+   WitBopEntry *     theBopEnt;
+   double            incExecVol;
+   WitPipReqSrc *    theReqSrc;
+   WitPipReqSrcStack theReqSrcs (myProblem ());
+
+   witAssert (theOpn->bop ().nElements () > 1);
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      myBopEntReqs_.myElemAt (theBopEnt, execPer).reverse ();
+
+   if (myGlobalComp ()->printDebug ())
+      prtBopEntReqs (theOpn, execPer);
+
+   while (true)
+      {
+      incExecVol = minIncReqVol (theOpn, execPer);
+
+      if (incExecVol < 0.0)
+         break;
+
+      extractReqSrcs (theOpn, execPer, incExecVol, theReqSrcs);
+
+      theReqSrc = new WitPipReqSrc (theReqSrcs);
+
+      myReqSrcs_.push (theReqSrc);
+      
+      curReqList_.push (theReqSrc, incExecVol);
+      }
+
+   sortReqList ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitPipReqMgr::minIncReqVol (WitOperation * theOpn, WitPeriod execPer)
+   {
+   double        minVol;
+   WitBopEntry * theBopEnt;
+   double        incReqVol;
+
+   witAssert (theOpn->bop ().nElements () > 1);
+
+   minVol = -1.0;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         {
+         incReqVol =
+            myBopEntReqs_.myElemAt (theBopEnt, execPer).firstValue ();
+
+         if (minVol < 0.0)
+            minVol = incReqVol;
+         else
+            setToMin (minVol, incReqVol);
+         }
+
+   return minVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::extractReqSrcs (
+      WitOperation *      theOpn,
+      WitPeriod           execPer,
+      double              deltaIncReqVol,
+      WitPipReqSrcStack & theReqSrcs)
+   {
+   WitBopEntry *  theBopEnt;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   witAssert (deltaIncReqVol > NET_TOL);
+
+   theReqSrcs.clear ();
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         {
+         myBopEntReqs_.myElemAt (theBopEnt, execPer).
+            pop (theReqSrc, incReqVol);
+
+         if (incReqVol - deltaIncReqVol > NET_TOL)
+            myBopEntReqs_.myElemAt (theBopEnt, execPer).
+               push (theReqSrc, incReqVol - deltaIncReqVol);
+
+         theReqSrcs.push (theReqSrc);
+         }
+      else
+         if (expEligible (theBopEnt, execPer))
+            theReqSrcs.push (myVacReqSrc_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::sortReqList ()
+   {
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqListBeforeSort ();
+
+   loadReqSpecVec ();
+
+   sort (
+        myReqSpecVec_,
+        nActReqSpecs_,
+      & WitPipReqMgr::compareReqSpecs,
+        this);
+
+   unloadReqSpecVec ();
+
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqListAfterSort ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::loadReqSpecVec ()
+   {
+   int            theIdx;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   witAssert (nActReqSpecs_ == 0);
+
+   nActReqSpecs_ = curReqList_.nElements ();
+
+   setToMax (maxActReqSpecs_, nActReqSpecs_);
+
+   if (nActReqSpecs_ > myReqSpecVec_.length ())
+      expandReqSpecVec ();
+
+   theIdx = nActReqSpecs_;
+
+   while (curReqList_.pop (theReqSrc, incReqVol))
+      {
+      theIdx --;
+
+      myReqSpecVec_[theIdx]->setData (theReqSrc, incReqVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::expandReqSpecVec ()
+   {
+   int                         oldVecLength;
+   WitObjStack <WitPipReqSpec> theReqSpecs (myProblem ());
+   int                         theIdx;
+
+   witAssert (nActReqSpecs_ > myReqSpecVec_.length ());
+
+   oldVecLength = myReqSpecVec_.length ();
+
+   for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+      theReqSpecs.push (myReqSpecVec_[theIdx]);
+
+   myReqSpecVec_.resize (2 * nActReqSpecs_);
+
+   for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+      theReqSpecs.pop  (myReqSpecVec_[theIdx]);
+
+   for (theIdx = oldVecLength; theIdx < myReqSpecVec_.length (); theIdx ++)
+      myReqSpecVec_[theIdx] = new WitPipReqSpec;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqMgr::compareReqSpecs (
+      WitPipReqSpec * theReqSpec1,
+      WitPipReqSpec * theReqSpec2)
+   {
+   return theReqSpec1->belongsBefore (theReqSpec2);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::unloadReqSpecVec ()
+   {
+   int            theIdx;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+   WitPipReqSrc * prevReqSrc;
+   double         prevIncReqVol;
+
+   witAssert (nActReqSpecs_ > 0);
+
+   for (theIdx = nActReqSpecs_ - 1; theIdx >= 0; theIdx --)
+      {
+      myReqSpecVec_[theIdx]->getData (theReqSrc, incReqVol);
+      myReqSpecVec_[theIdx]->setData (NULL,      0.0);
+
+      if (curReqList_.isNonEmpty ())
+         if (curReqList_.firstObject ()->isEquivalentTo (theReqSrc))
+            {
+            curReqList_.pop  (prevReqSrc, prevIncReqVol);
+
+            incReqVol += prevIncReqVol;
+            }
+
+      curReqList_.push (theReqSrc, incReqVol);
+      }
+
+   nActReqSpecs_ = 0;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqMgr::hasMultiExp (WitOperation * theOpn, WitPeriod execPer)
+   {
+   int           nEligible;
+   WitBopEntry * theBopEnt;
+
+   nEligible = 0;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (expEligible (theBopEnt, execPer))
+         nEligible ++;
+
+   return (nEligible > 1);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqMgr::expEligible (WitBopEntry * theBopEnt, WitPeriod execPer)
+   {
+   if (theBopEnt->expAllowed ())
+      if (theBopEnt->execPerOKForExp (execPer))
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtCurReqListBeforeSort ()
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements before sorting and consolidation:\n");
+
+   prtReqList (curReqList_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtCurReqListAfterSort ()
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements after sorting and consolidation:\n");
+
+   prtReqList (curReqList_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtCurReqList (WitOperation * theOpn, WitPeriod execPer)
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements for Operation %s in Period %d:\n",
+      theOpn->operationName ().myCstring (),
+      execPer);
+
+   prtReqList (curReqList_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtBopEntReqs (WitOperation * theOpn, WitPeriod execPer)
+   {
+   WitBopEntry *    theBopEnt;
+   WitPipReqListItr theItr;
+   WitPipReqSrc *   theReqSrc;
+   double           incReqVol;
+   
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "Merging requirements for Operation %s in Period %d:\n",
+      theOpn->operationName ().myCstring (),
+      execPer);
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "   BOP Entry #%d:\n",
+         theBopEnt->localIndex ());
+
+      myBopEntReqs_.myElemAt (theBopEnt, execPer).attachItr (theItr);
+
+      while (theItr.advance (theReqSrc, incReqVol))
+         {
+         fprintf (msgFile (),
+            "\n"
+            "      IncReqVol: %3.0f\n",
+            incReqVol);
+
+         theReqSrc->print (msgFile (), "      ");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prtReqList (const WitPipReqList & theReqList)
+   {
+   WitPipReqListItr theItr;
+   WitPipReqSrc *   theReqSrc;
+   double           incReqVol;
+
+   witAssert (myGlobalComp ()->printDebug ());
+
+   theReqList.attachItr (theItr);
+
+   while (theItr.advance (theReqSrc, incReqVol))
+      {
+      fprintf (msgFile (),
+         "\n"
+         "   IncReqVol: %3.0f\n",
+         incReqVol);
+
+      theReqSrc->print (msgFile (), "   ");
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PipReqSpec.
+//------------------------------------------------------------------------------
+
+WitPipReqSpec::WitPipReqSpec ():
+      myReqSrc_    (NULL),
+      myIncReqVol_ (0.0)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipReqSpec::~WitPipReqSpec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSpec::setData (WitPipReqSrc * theReqSrc, double incReqVol)
+   {
+   witAssert (incReqVol >= 0.0);
+
+   myReqSrc_    = theReqSrc;
+   myIncReqVol_ = incReqVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSpec::getData (WitPipReqSrc * & theReqSrc, double & incReqVol)
+   {
+   theReqSrc = myReqSrc_;
+   incReqVol = myIncReqVol_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqSpec::belongsBefore (WitPipReqSpec * theReqSpec)
+   {
+   return myReqSrc_->belongsBefore (theReqSpec->myReqSrc_);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PipReqSrc.
+//------------------------------------------------------------------------------
+
+WitPipReqSrc::WitPipReqSrc (WitPipSeqEl * theSeqEl):
+      mySeqElVec_ (1)
+   {
+   mySeqElVec_[0] = theSeqEl;
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipReqSrc::WitPipReqSrc (const WitPipReqSrcStack & theReqSrcs):
+      mySeqElVec_ ()
+   {
+   WitPtrVec <WitPipSeqEl> tempSeqElVec;
+
+   witAssert (theReqSrcs.isNonEmpty ());
+
+   buildTempSeqElVec (theReqSrcs, tempSeqElVec);
+
+   sort (
+        tempSeqElVec,
+      & WitPipReqSrc::compareSeqEls,
+        this);
+
+   consolidateSeqEls (tempSeqElVec);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipReqSrc::~WitPipReqSrc ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqSrc::belongsBefore (WitPipReqSrc * theReqSrc)
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl1;
+   WitPipSeqEl *  theSeqEl2;
+
+   attachSeqElItr (theItr);
+
+   while (theItr.advance (theSeqEl1))
+      {
+      if (theItr.myIdx () >= theReqSrc->mySeqElVec_.length ())
+         return false;
+
+      theSeqEl2 = theReqSrc->mySeqElVec_[theItr.myIdx ()];
+
+      if (theSeqEl1->isBefore (theSeqEl2))
+         return true;
+
+      if (theSeqEl2->isBefore (theSeqEl1))
+         return false;
+      }
+
+   if (mySeqElVec_.length () < theReqSrc->mySeqElVec_.length ())
+      return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqSrc::isEquivalentTo (WitPipReqSrc * theReqSrc)
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl;
+
+   if (mySeqElVec_.length () != theReqSrc->mySeqElVec_.length ())
+      return false;
+
+   attachSeqElItr (theItr);
+
+   while (theItr.advance (theSeqEl))
+      if (theSeqEl != theReqSrc->mySeqElVec_[theItr.myIdx ()])
+         return false;
+
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSrc::print (FILE * theFile, const char * leadingBlanks)
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl;
+   
+   fprintf (theFile,
+      "%sReq Src:\n",
+      leadingBlanks);
+
+   attachSeqElItr (theItr);
+
+   while (theItr.advance (theSeqEl))
+      theSeqEl->print (theFile, leadingBlanks);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSrc::attachSeqElItr (WitPipSeqElItr & theItr)
+   {
+   mySeqElVec_.attachItr (theItr);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipReqSrc::compareSeqEls (
+      WitPipSeqEl * theSeqEl1,
+      WitPipSeqEl * theSeqEl2)
+   {
+   return (theSeqEl1->isBefore (theSeqEl2));
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSrc::buildTempSeqElVec (
+      const WitPipReqSrcStack & theReqSrcs,
+      WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+   {
+   int                        totSeqEls;
+   WitObjStItr <WitPipReqSrc> theReqSrcItr;
+   WitPipReqSrc *             theReqSrc;
+   int                        tempIdx;
+   WitPipSeqElItr             theSeqElItr;
+   WitPipSeqEl *              theSeqEl;
+
+   totSeqEls = 0;
+
+   theReqSrcs.attachItr (theReqSrcItr);
+
+   while (theReqSrcItr.advance (theReqSrc))
+      totSeqEls += theReqSrc->mySeqElVec_.length ();
+
+   tempSeqElVec.resize (totSeqEls);
+
+   tempIdx = -1;
+
+   theReqSrcs.attachItr (theReqSrcItr);
+
+   while (theReqSrcItr.advance (theReqSrc))
+      {
+      theReqSrc->attachSeqElItr (theSeqElItr);
+
+      while (theSeqElItr.advance (theSeqEl))
+         {
+         tempIdx ++;
+
+         tempSeqElVec[tempIdx] = theSeqEl;
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqSrc::consolidateSeqEls (
+      const WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+   {
+   int nDistinct;
+   int tempIdx;
+   int theIdx;
+
+   nDistinct = 1;
+
+   for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+      if (tempSeqElVec[tempIdx] != tempSeqElVec[tempIdx - 1])
+         nDistinct ++;
+
+   mySeqElVec_.resize (nDistinct);
+
+   mySeqElVec_[0] = tempSeqElVec[0];
+
+   theIdx = 0;
+
+   for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+      if (tempSeqElVec[tempIdx] != mySeqElVec_[theIdx])
+         {
+         theIdx ++;
+
+         mySeqElVec_[theIdx] = tempSeqElVec[tempIdx];
+         }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PipSeqEl.
+//------------------------------------------------------------------------------
+
+WitPipSeqEl::WitPipSeqEl (
+         WitDemand * theDemand,
+         WitPeriod   shipPer,
+         int         theSeqNo):
+
+      myDemand_   (theDemand),
+      shipPerFor_ (shipPer),
+      mySeqNo_    (theSeqNo)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipSeqEl::~WitPipSeqEl ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipSeqEl::getData (WitDemand * & theDemand, WitPeriod & shipPer)
+   {
+   witAssert (hasaShipment ());
+
+   theDemand = myDemand_;
+   shipPer   = shipPerFor_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipSeqEl::isBefore (WitPipSeqEl * theSeqEl)
+   {
+   return (mySeqNo_ < theSeqEl->mySeqNo_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipSeqEl::print (FILE * theFile, const char * leadingBlanks)
+   {
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+   
+   if (hasaShipment ())
+      {
+      getData (theDemand, shipPer);
+
+      fprintf (theFile,
+         "   %sDem %s, Per %d, Seq #%d\n",
+         leadingBlanks,
+         theDemand->demandName ().myCstring (),
+         shipPer,
+         mySeqNo_);
+      }
+   else
+      fprintf (theFile,
+         "   %sDem None,     Seq #%d\n",
+         leadingBlanks,
+         mySeqNo_);
+   }
+@
+
+
+1.12
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.11
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d41 1
+a41 1
+WitProbAssoc    (theProblem),
+d43 36
+a78 36
+mySeqElVec_     (),
+myReqSrcs_      (theProblem),
+myVacReqSrc_    (NULL),
+myPartReqs_     (),
+myBopEntReqs_   (),
+myReqSpecVec_   (),
+nActReqSpecs_   (0),
+maxActReqSpecs_ (0),
+curReqList_     (myProblem ()),
+myReqListItr_   (),
+curReqSrc_      (NULL),
+incReqVolCur_   (0.0)
+{
+WitPart *     thePart;
+WitPeriod     fillPer;
+WitBopEntry * theBopEnt;
+WitPeriod     execPer;
+
+buildSeqEls ();
+
+myVacReqSrc_ = newReqSrcForSeqNo (mySeqElVec_.length () - 1);
+
+myPartReqs_.allocate (myProblem ());
+
+forEachPart (thePart, myProblem ())
+forEachPeriod (fillPer, myProblem ())
+myPartReqs_.myPtrAt (thePart, fillPer) =
+new WitPipReqList (myProblem ());
+
+myBopEntReqs_.allocate (myProblem ());
+
+forEachBopEntry (theBopEnt, myProblem ())
+forEachPeriod (execPer, myProblem ())
+myBopEntReqs_.myPtrAt (theBopEnt, execPer) =
+new WitPipReqList (myProblem ());
+}
+d83 7
+a89 7
+{
+int           theIdx;
+WitPart *     thePart;
+WitPeriod     fillPer;
+WitBopEntry * theBopEnt;
+WitPeriod     execPer;
+int           theSeqNo;
+d91 2
+a92 2
+for (theIdx = 0; theIdx < myReqSpecVec_.length (); theIdx ++)
+delete myReqSpecVec_[theIdx];
+d94 1
+a94 1
+myReqSpecVec_.clear ();
+d96 3
+a98 3
+forEachBopEntry (theBopEnt, myProblem ())
+forEachPeriod (execPer, myProblem ())
+delete myBopEntReqs_.myPtrAt (theBopEnt, execPer);
+d100 1
+a100 1
+myBopEntReqs_.clear ();
+d102 3
+a104 3
+forEachPart (thePart, myProblem ())
+forEachPeriod (fillPer, myProblem ())
+delete myPartReqs_.myPtrAt (thePart, fillPer);
+d106 1
+a106 1
+myPartReqs_.clear ();
+d108 1
+a108 1
+myVacReqSrc_ = NULL;
+d110 1
+a110 1
+deleteContents (myReqSrcs_);
+d112 2
+a113 2
+for (theSeqNo = 0; theSeqNo < mySeqElVec_.length (); theSeqNo ++)
+delete mySeqElVec_[theSeqNo];
+d115 2
+a116 2
+mySeqElVec_.clear ();
+}
+d121 2
+a122 2
+{
+WitBopEntry * theBopEnt;
+d124 3
+a126 3
+forEachEl (theBopEnt, theOpn->bop ())
+if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+return true;
+d128 2
+a129 2
+return false;
+}
+d134 2
+a135 2
+{
+WitPipReqSrc * theReqSrc;
+d137 1
+a137 1
+theReqSrc = new WitPipReqSrc (mySeqElVec_[theSeqNo]);
+d139 1
+a139 1
+myReqSrcs_.push (theReqSrc);
+d141 2
+a142 2
+return theReqSrc;
+}
+d147 6
+a152 6
+WitPart *      thePart,
+WitPeriod      fillPer,
+WitPipReqSrc * theReqSrc,
+double         incReqVol)
+{
+witAssert (incReqVol > NET_TOL);
+d154 2
+a155 2
+myPartReqs_.myElemAt (thePart, fillPer).push (theReqSrc, incReqVol);
+}
+d160 6
+a165 6
+WitBopEntry *  theBopEnt,
+WitPeriod      execPer,
+WitPipReqSrc * theReqSrc,
+double         incExecVol)
+{
+witAssert (incExecVol > NET_TOL);
+d167 2
+a168 2
+myBopEntReqs_.myElemAt (theBopEnt, execPer).push (theReqSrc, incExecVol);
+}
+d173 3
+a175 3
+{
+theReqList.takeContentsFrom (curReqList_);
+}
+d180 2
+a181 2
+{
+witAssert (curReqList_.isEmpty ());
+d183 1
+a183 1
+curReqList_.takeContentsFrom (myPartReqs_.myElemAt (thePart, fillPer));
+d185 3
+a187 3
+if (curReqList_.isNonEmpty ())
+sortReqList ();
+}
+d192 2
+a193 2
+{
+witAssert (hasReqsFor (theOpn, execPer));
+d195 1
+a195 1
+witAssert (curReqList_.isEmpty ());
+d197 5
+a201 5
+if (hasMultiExp (theOpn, execPer))
+mergeReqs (theOpn, execPer);
+else
+loadReqsFromOne (theOpn, execPer);
+}
+d206 3
+a208 3
+{
+curReqList_.clear ();
+}
+d213 2
+a214 2
+{
+curReqList_.attachItr (myReqListItr_);
+d216 3
+a218 3
+if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+curReqSrc_ = NULL;
+}
+d223 5
+a227 5
+double &         netReqVol,
+WitPipReqSrc * & theReqSrc,
+double &         incReqVol)
+{
+witAssert (not finishedReqListItr ());
+d229 1
+a229 1
+witAssert (netReqVol > NET_TOL);
+d231 1
+a231 1
+theReqSrc      = curReqSrc_;
+d233 1
+a233 1
+incReqVol      = min (incReqVolCur_, netReqVol);
+d235 2
+a236 2
+incReqVolCur_ -= incReqVol;
+netReqVol     -= incReqVol;
+d238 2
+a239 2
+if (incReqVolCur_ > NET_TOL)
+return;
+d241 3
+a243 3
+if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+curReqSrc_ = NULL;
+}
+d248 11
+a258 11
+WitPipReqSrc * & theReqSrc,
+double &         incReqVol)
+{
+witAssert (not finishedReqListItr ());
+
+theReqSrc = curReqSrc_;
+incReqVol = incReqVolCur_;
+
+if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+curReqSrc_ = NULL;
+}
+d263 3
+a265 3
+{
+return (curReqSrc_ == NULL);
+}
+d270 5
+a274 5
+{
+myMsgFac () ("pipSizesMsg",
+maxActReqSpecs_,
+myReqSpecVec_.length ());
+}
+d279 6
+a284 6
+{
+WitDemTripStack theShipSeq (myProblem ());
+int             theSeqNo;
+WitDemand *     theDemand;
+WitPeriod       shipPer;
+double          incShipVol;
+d286 1
+a286 1
+myProblem ()->myPipMgr ()->getShipSeq (theShipSeq);
+d288 1
+a288 1
+mySeqElVec_.resize (theShipSeq.nElements () + 1);
+d290 1
+a290 1
+theSeqNo = -1;
+d292 3
+a294 3
+while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+{
+theSeqNo ++;
+d296 2
+a297 2
+mySeqElVec_[theSeqNo] = new WitPipSeqEl (theDemand, shipPer, theSeqNo);
+}
+d299 1
+a299 1
+theSeqNo ++;
+d301 2
+a302 2
+mySeqElVec_[theSeqNo] = new WitPipSeqEl (NULL, -1, theSeqNo);
+}
+d307 3
+a309 3
+{
+WitBopEntry * expBopEnt;
+WitBopEntry * theBopEnt;
+d311 1
+a311 1
+expBopEnt = NULL;
+d313 4
+a316 4
+forEachEl (theBopEnt, theOpn->bop ())
+if (expEligible (theBopEnt, execPer))
+{
+expBopEnt = theBopEnt;
+d318 2
+a319 2
+break;
+}
+d321 1
+a321 1
+witAssert (expBopEnt != NULL);
+d323 1
+a323 1
+curReqList_.takeContentsFrom (myBopEntReqs_.myElemAt (expBopEnt, execPer));
+d325 1
+a325 1
+curReqList_.reverse ();
+d327 3
+a329 3
+if (myGlobalComp ()->printDebug ())
+prtCurReqList (theOpn, execPer);
+}
+d334 5
+a338 7
+{
+WitBopEntry *     theBopEnt;
+double            incExecVol;
+WitPipReqSrc *    theReqSrc;
+WitPipReqSrcStack theReqSrcs (myProblem ());
+
+witAssert (theOpn->bop ().nElements () > 1);
+d340 1
+a340 2
+forEachEl (theBopEnt, theOpn->bop ())
+myBopEntReqs_.myElemAt (theBopEnt, execPer).reverse ();
+d342 2
+a343 2
+if (myGlobalComp ()->printDebug ())
+prtBopEntReqs (theOpn, execPer);
+d345 2
+a346 3
+while (true)
+{
+incExecVol = minIncReqVol (theOpn, execPer);
+d348 3
+a350 2
+if (incExecVol < 0.0)
+break;
+d352 2
+a353 1
+extractReqSrcs (theOpn, execPer, incExecVol, theReqSrcs);
+d355 1
+a355 1
+theReqSrc = new WitPipReqSrc (theReqSrcs);
+d357 1
+a357 1
+myReqSrcs_.push (theReqSrc);
+d359 4
+a362 2
+curReqList_.push (theReqSrc, incExecVol);
+}
+d364 2
+a365 2
+sortReqList ();
+}
+d370 20
+a389 20
+{
+double        minVol;
+WitBopEntry * theBopEnt;
+double        incReqVol;
+
+witAssert (theOpn->bop ().nElements () > 1);
+
+minVol = -1.0;
+
+forEachEl (theBopEnt, theOpn->bop ())
+if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+{
+incReqVol =
+myBopEntReqs_.myElemAt (theBopEnt, execPer).firstValue ();
+
+if (minVol < 0.0)
+minVol = incReqVol;
+else
+setToMin (minVol, incReqVol);
+}
+d391 2
+a392 2
+return minVol;
+}
+d397 29
+a425 29
+WitOperation *      theOpn,
+WitPeriod           execPer,
+double              deltaIncReqVol,
+WitPipReqSrcStack & theReqSrcs)
+{
+WitBopEntry *  theBopEnt;
+WitPipReqSrc * theReqSrc;
+double         incReqVol;
+
+witAssert (deltaIncReqVol > NET_TOL);
+
+theReqSrcs.clear ();
+
+forEachEl (theBopEnt, theOpn->bop ())
+if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+{
+myBopEntReqs_.myElemAt (theBopEnt, execPer).
+pop (theReqSrc, incReqVol);
+
+if (incReqVol - deltaIncReqVol > NET_TOL)
+myBopEntReqs_.myElemAt (theBopEnt, execPer).
+push (theReqSrc, incReqVol - deltaIncReqVol);
+
+theReqSrcs.push (theReqSrc);
+}
+else
+if (expEligible (theBopEnt, execPer))
+theReqSrcs.push (myVacReqSrc_);
+}
+d430 17
+a446 17
+{
+if (myGlobalComp ()->printDebug ())
+prtCurReqListBeforeSort ();
+
+loadReqSpecVec ();
+
+sort (
+myReqSpecVec_,
+nActReqSpecs_,
+& WitPipReqMgr::compareReqSpecs,
+this);
+
+unloadReqSpecVec ();
+
+if (myGlobalComp ()->printDebug ())
+prtCurReqListAfterSort ();
+}
+d451 4
+a454 4
+{
+int            theIdx;
+WitPipReqSrc * theReqSrc;
+double         incReqVol;
+d456 1
+a456 1
+witAssert (nActReqSpecs_ == 0);
+d458 1
+a458 1
+nActReqSpecs_ = curReqList_.nElements ();
+d460 1
+a460 1
+setToMax (maxActReqSpecs_, nActReqSpecs_);
+d462 2
+a463 2
+if (nActReqSpecs_ > myReqSpecVec_.length ())
+expandReqSpecVec ();
+d465 1
+a465 1
+theIdx = nActReqSpecs_;
+d467 3
+a469 3
+while (curReqList_.pop (theReqSrc, incReqVol))
+{
+theIdx --;
+d471 3
+a473 3
+myReqSpecVec_[theIdx]->setData (theReqSrc, incReqVol);
+}
+}
+d478 4
+a481 4
+{
+int                         oldVecLength;
+WitObjStack <WitPipReqSpec> theReqSpecs (myProblem ());
+int                         theIdx;
+d483 1
+a483 1
+witAssert (nActReqSpecs_ > myReqSpecVec_.length ());
+d485 1
+a485 1
+oldVecLength = myReqSpecVec_.length ();
+d487 2
+a488 2
+for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+theReqSpecs.push (myReqSpecVec_[theIdx]);
+d490 1
+a490 1
+myReqSpecVec_.resize (2 * nActReqSpecs_);
+d492 2
+a493 2
+for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+theReqSpecs.pop  (myReqSpecVec_[theIdx]);
+d495 3
+a497 3
+for (theIdx = oldVecLength; theIdx < myReqSpecVec_.length (); theIdx ++)
+myReqSpecVec_[theIdx] = new WitPipReqSpec;
+}
+d502 5
+a506 5
+WitPipReqSpec * theReqSpec1,
+WitPipReqSpec * theReqSpec2)
+{
+return theReqSpec1->belongsBefore (theReqSpec2);
+}
+d511 18
+a528 18
+{
+int            theIdx;
+WitPipReqSrc * theReqSrc;
+double         incReqVol;
+WitPipReqSrc * prevReqSrc;
+double         prevIncReqVol;
+
+witAssert (nActReqSpecs_ > 0);
+
+for (theIdx = nActReqSpecs_ - 1; theIdx >= 0; theIdx --)
+{
+myReqSpecVec_[theIdx]->getData (theReqSrc, incReqVol);
+myReqSpecVec_[theIdx]->setData (NULL,      0.0);
+
+if (curReqList_.isNonEmpty ())
+if (curReqList_.firstObject ()->isEquivalentTo (theReqSrc))
+{
+curReqList_.pop  (prevReqSrc, prevIncReqVol);
+d530 2
+a531 2
+incReqVol += prevIncReqVol;
+}
+d533 2
+a534 2
+curReqList_.push (theReqSrc, incReqVol);
+}
+d536 2
+a537 2
+nActReqSpecs_ = 0;
+}
+d542 9
+a550 9
+{
+int           nEligible;
+WitBopEntry * theBopEnt;
+
+nEligible = 0;
+
+forEachEl (theBopEnt, theOpn->bop ())
+if (expEligible (theBopEnt, execPer))
+nEligible ++;
+d552 2
+a553 2
+return (nEligible > 1);
+}
+d558 4
+a561 4
+{
+if (theBopEnt->expAllowed ())
+if (theBopEnt->execPerOKForExp (execPer))
+return true;
+d563 2
+a564 2
+return false;
+}
+d569 4
+a572 4
+{
+fprintf (msgFile (),
+"\n"
+"Requirements before sorting and consolidation:\n");
+d574 2
+a575 2
+prtReqList (curReqList_);
+}
+d580 4
+a583 4
+{
+fprintf (msgFile (),
+"\n"
+"Requirements after sorting and consolidation:\n");
+d585 2
+a586 2
+prtReqList (curReqList_);
+}
+d591 6
+a596 6
+{
+fprintf (msgFile (),
+"\n"
+"Requirements for Operation %s in Period %d:\n",
+theOpn->operationName ().myCstring (),
+execPer);
+d598 2
+a599 2
+prtReqList (curReqList_);
+}
+d604 34
+a637 34
+{
+WitBopEntry *    theBopEnt;
+WitPipReqListItr theItr;
+WitPipReqSrc *   theReqSrc;
+double           incReqVol;
+
+witAssert (myGlobalComp ()->printDebug ());
+
+fprintf (msgFile (),
+"\n"
+"Merging requirements for Operation %s in Period %d:\n",
+theOpn->operationName ().myCstring (),
+execPer);
+
+forEachEl (theBopEnt, theOpn->bop ())
+{
+fprintf (msgFile (),
+"\n"
+"   BOP Entry #%d:\n",
+theBopEnt->localIndex ());
+
+myBopEntReqs_.myElemAt (theBopEnt, execPer).attachItr (theItr);
+
+while (theItr.advance (theReqSrc, incReqVol))
+{
+fprintf (msgFile (),
+"\n"
+"      IncReqVol: %3.0f\n",
+incReqVol);
+
+theReqSrc->print (msgFile (), "      ");
+}
+}
+}
+d642 19
+a660 19
+{
+WitPipReqListItr theItr;
+WitPipReqSrc *   theReqSrc;
+double           incReqVol;
+
+witAssert (myGlobalComp ()->printDebug ());
+
+theReqList.attachItr (theItr);
+
+while (theItr.advance (theReqSrc, incReqVol))
+{
+fprintf (msgFile (),
+"\n"
+"   IncReqVol: %3.0f\n",
+incReqVol);
+
+theReqSrc->print (msgFile (), "   ");
+}
+}
+d667 4
+a670 4
+myReqSrc_    (NULL),
+myIncReqVol_ (0.0)
+{
+}
+d675 2
+a676 2
+{
+}
+d681 2
+a682 2
+{
+witAssert (incReqVol >= 0.0);
+d684 3
+a686 3
+myReqSrc_    = theReqSrc;
+myIncReqVol_ = incReqVol;
+}
+d691 4
+a694 4
+{
+theReqSrc = myReqSrc_;
+incReqVol = myIncReqVol_;
+}
+d699 3
+a701 3
+{
+return myReqSrc_->belongsBefore (theReqSpec->myReqSrc_);
+}
+d708 4
+a711 4
+mySeqElVec_ (1)
+{
+mySeqElVec_[0] = theSeqEl;
+}
+d716 3
+a718 3
+mySeqElVec_ ()
+{
+WitPtrVec <WitPipSeqEl> tempSeqElVec;
+d720 1
+a720 1
+witAssert (theReqSrcs.isNonEmpty ());
+d722 1
+a722 1
+buildTempSeqElVec (theReqSrcs, tempSeqElVec);
+d724 4
+a727 4
+sort (
+tempSeqElVec,
+& WitPipReqSrc::compareSeqEls,
+this);
+d729 2
+a730 2
+consolidateSeqEls (tempSeqElVec);
+}
+d735 2
+a736 2
+{
+}
+d741 4
+a744 4
+{
+WitPipSeqElItr theItr;
+WitPipSeqEl *  theSeqEl1;
+WitPipSeqEl *  theSeqEl2;
+d746 1
+a746 1
+attachSeqElItr (theItr);
+d748 4
+a751 4
+while (theItr.advance (theSeqEl1))
+{
+if (theItr.myIdx () >= theReqSrc->mySeqElVec_.length ())
+return false;
+d753 1
+a753 1
+theSeqEl2 = theReqSrc->mySeqElVec_[theItr.myIdx ()];
+d755 2
+a756 2
+if (theSeqEl1->isBefore (theSeqEl2))
+return true;
+d758 3
+a760 3
+if (theSeqEl2->isBefore (theSeqEl1))
+return false;
+}
+d762 2
+a763 2
+if (mySeqElVec_.length () < theReqSrc->mySeqElVec_.length ())
+return true;
+d765 2
+a766 2
+return false;
+}
+d771 3
+a773 3
+{
+WitPipSeqElItr theItr;
+WitPipSeqEl *  theSeqEl;
+d775 2
+a776 2
+if (mySeqElVec_.length () != theReqSrc->mySeqElVec_.length ())
+return false;
+d778 1
+a778 1
+attachSeqElItr (theItr);
+d780 3
+a782 3
+while (theItr.advance (theSeqEl))
+if (theSeqEl != theReqSrc->mySeqElVec_[theItr.myIdx ()])
+return false;
+d784 2
+a785 2
+return true;
+}
+d790 13
+a802 13
+{
+WitPipSeqElItr theItr;
+WitPipSeqEl *  theSeqEl;
+
+fprintf (theFile,
+"%sReq Src:\n",
+leadingBlanks);
+
+attachSeqElItr (theItr);
+
+while (theItr.advance (theSeqEl))
+theSeqEl->print (theFile, leadingBlanks);
+}
+d807 3
+a809 3
+{
+mySeqElVec_.attachItr (theItr);
+}
+d814 5
+a818 5
+WitPipSeqEl * theSeqEl1,
+WitPipSeqEl * theSeqEl2)
+{
+return (theSeqEl1->isBefore (theSeqEl2));
+}
+d823 9
+a831 9
+const WitPipReqSrcStack & theReqSrcs,
+WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+{
+int                        totSeqEls;
+WitObjStItr <WitPipReqSrc> theReqSrcItr;
+WitPipReqSrc *             theReqSrc;
+int                        tempIdx;
+WitPipSeqElItr             theSeqElItr;
+WitPipSeqEl *              theSeqEl;
+d833 1
+a833 1
+totSeqEls = 0;
+d835 1
+a835 1
+theReqSrcs.attachItr (theReqSrcItr);
+d837 2
+a838 2
+while (theReqSrcItr.advance (theReqSrc))
+totSeqEls += theReqSrc->mySeqElVec_.length ();
+d840 1
+a840 1
+tempSeqElVec.resize (totSeqEls);
+d842 1
+a842 1
+tempIdx = -1;
+d844 1
+a844 1
+theReqSrcs.attachItr (theReqSrcItr);
+d846 3
+a848 3
+while (theReqSrcItr.advance (theReqSrc))
+{
+theReqSrc->attachSeqElItr (theSeqElItr);
+d850 3
+a852 3
+while (theSeqElItr.advance (theSeqEl))
+{
+tempIdx ++;
+d854 4
+a857 4
+tempSeqElVec[tempIdx] = theSeqEl;
+}
+}
+}
+d862 5
+a866 5
+const WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+{
+int nDistinct;
+int tempIdx;
+int theIdx;
+d868 1
+a868 1
+nDistinct = 1;
+d870 3
+a872 3
+for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+if (tempSeqElVec[tempIdx] != tempSeqElVec[tempIdx - 1])
+nDistinct ++;
+d874 1
+a874 1
+mySeqElVec_.resize (nDistinct);
+d876 1
+a876 1
+mySeqElVec_[0] = tempSeqElVec[0];
+d878 1
+a878 1
+theIdx = 0;
+d880 4
+a883 4
+for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+if (tempSeqElVec[tempIdx] != mySeqElVec_[theIdx])
+{
+theIdx ++;
+d885 3
+a887 3
+mySeqElVec_[theIdx] = tempSeqElVec[tempIdx];
+}
+}
+d894 9
+a902 9
+WitDemand * theDemand,
+WitPeriod   shipPer,
+int         theSeqNo):
+
+myDemand_   (theDemand),
+shipPerFor_ (shipPer),
+mySeqNo_    (theSeqNo)
+{
+}
+d907 2
+a908 2
+{
+}
+d913 2
+a914 2
+{
+witAssert (hasaShipment ());
+d916 3
+a918 3
+theDemand = myDemand_;
+shipPer   = shipPerFor_;
+}
+d923 3
+a925 3
+{
+return (mySeqNo_ < theSeqEl->mySeqNo_);
+}
+d930 21
+a950 21
+{
+WitDemand * theDemand;
+WitPeriod   shipPer;
+
+if (hasaShipment ())
+{
+getData (theDemand, shipPer);
+
+fprintf (theFile,
+"   %sDem %s, Per %d, Seq #%d\n",
+leadingBlanks,
+theDemand->demandName ().myCstring (),
+shipPer,
+mySeqNo_);
+}
+else
+fprintf (theFile,
+"   %sDem None,     Seq #%d\n",
+leadingBlanks,
+mySeqNo_);
+}
+@
+
+
+1.10
+log
+@Heuristic Adjustment
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d41 1
+a41 1
+      WitProbAssoc    (theProblem),
+d43 36
+a78 36
+      mySeqElVec_     (),
+      myReqSrcs_      (theProblem),
+      myVacReqSrc_    (NULL),
+      myPartReqs_     (),
+      myBopEntReqs_   (),
+      myReqSpecVec_   (),
+      nActReqSpecs_   (0),
+      maxActReqSpecs_ (0),
+      curReqList_     (myProblem ()),
+      myReqListItr_   (),
+      curReqSrc_      (NULL),
+      incReqVolCur_   (0.0)
+   {
+   WitPart *     thePart;
+   WitPeriod     fillPer;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+
+   buildSeqEls ();
+
+   myVacReqSrc_ = newReqSrcForSeqNo (mySeqElVec_.length () - 1);
+
+   myPartReqs_.allocate (myProblem ());
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (fillPer, myProblem ())
+         myPartReqs_.myPtrAt (thePart, fillPer) =
+            new WitPipReqList (myProblem ());
+
+   myBopEntReqs_.allocate (myProblem ());
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         myBopEntReqs_.myPtrAt (theBopEnt, execPer) =
+            new WitPipReqList (myProblem ());
+   }
+d83 7
+a89 7
+   {
+   int           theIdx;
+   WitPart *     thePart;
+   WitPeriod     fillPer;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+   int           theSeqNo;
+d91 2
+a92 2
+   for (theIdx = 0; theIdx < myReqSpecVec_.length (); theIdx ++)
+      delete myReqSpecVec_[theIdx];
+d94 1
+a94 1
+   myReqSpecVec_.clear ();
+d96 3
+a98 3
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         delete myBopEntReqs_.myPtrAt (theBopEnt, execPer);
+d100 1
+a100 1
+   myBopEntReqs_.clear ();
+d102 3
+a104 3
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (fillPer, myProblem ())
+         delete myPartReqs_.myPtrAt (thePart, fillPer);
+d106 1
+a106 1
+   myPartReqs_.clear ();
+d108 1
+a108 1
+   myVacReqSrc_ = NULL;
+d110 1
+a110 1
+   deleteContents (myReqSrcs_);
+d112 2
+a113 2
+   for (theSeqNo = 0; theSeqNo < mySeqElVec_.length (); theSeqNo ++)
+      delete mySeqElVec_[theSeqNo];
+d115 2
+a116 2
+   mySeqElVec_.clear ();
+   }
+d121 2
+a122 2
+   {
+   WitBopEntry * theBopEnt;
+d124 3
+a126 3
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         return true;
+d128 2
+a129 2
+   return false;
+   }
+d134 2
+a135 2
+   {
+   WitPipReqSrc * theReqSrc;
+d137 1
+a137 1
+   theReqSrc = new WitPipReqSrc (mySeqElVec_[theSeqNo]);
+d139 1
+a139 1
+   myReqSrcs_.push (theReqSrc);
+d141 2
+a142 2
+   return theReqSrc;
+   }
+d147 6
+a152 6
+      WitPart *      thePart,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc,
+      double         incReqVol)
+   {
+   witAssert (incReqVol > NET_TOL);
+d154 2
+a155 2
+   myPartReqs_.myElemAt (thePart, fillPer).push (theReqSrc, incReqVol);
+   }
+d160 6
+a165 6
+      WitBopEntry *  theBopEnt,
+      WitPeriod      execPer,
+      WitPipReqSrc * theReqSrc,
+      double         incExecVol)
+   {
+   witAssert (incExecVol > NET_TOL);
+d167 2
+a168 2
+   myBopEntReqs_.myElemAt (theBopEnt, execPer).push (theReqSrc, incExecVol);
+   }
+d173 3
+a175 3
+   {
+   theReqList.takeContentsFrom (curReqList_);
+   }
+d180 2
+a181 2
+   {
+   witAssert (curReqList_.isEmpty ());
+d183 1
+a183 1
+   curReqList_.takeContentsFrom (myPartReqs_.myElemAt (thePart, fillPer));
+d185 3
+a187 3
+   if (curReqList_.isNonEmpty ())
+      sortReqList ();
+   }
+d192 2
+a193 2
+   {
+   witAssert (hasReqsFor (theOpn, execPer));
+d195 1
+a195 1
+   witAssert (curReqList_.isEmpty ());
+d197 5
+a201 5
+   if (hasMultiExp (theOpn, execPer))
+      mergeReqs (theOpn, execPer);
+   else
+      loadReqsFromOne (theOpn, execPer);
+   }
+d206 3
+a208 3
+   {  
+   curReqList_.clear ();
+   }
+d213 2
+a214 2
+   {
+   curReqList_.attachItr (myReqListItr_);
+d216 3
+a218 3
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+d223 5
+a227 5
+      double &         netReqVol,
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol)
+   {
+   witAssert (not finishedReqListItr ());
+d229 1
+a229 1
+   witAssert (netReqVol > NET_TOL);
+d231 1
+a231 1
+   theReqSrc      = curReqSrc_;
+d233 1
+a233 1
+   incReqVol      = min (incReqVolCur_, netReqVol);
+d235 2
+a236 2
+   incReqVolCur_ -= incReqVol;
+   netReqVol     -= incReqVol;
+d238 2
+a239 2
+   if (incReqVolCur_ > NET_TOL)
+      return;
+d241 3
+a243 3
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+d248 11
+a258 11
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol)
+   {
+   witAssert (not finishedReqListItr ());
+
+   theReqSrc = curReqSrc_;
+   incReqVol = incReqVolCur_;
+
+   if (not myReqListItr_.advance (curReqSrc_, incReqVolCur_))
+      curReqSrc_ = NULL;
+   }
+d263 3
+a265 3
+   {
+   return (curReqSrc_ == NULL);
+   }
+d270 5
+a274 5
+   {
+   myMsgFac () ("pipSizesMsg",
+      maxActReqSpecs_,
+      myReqSpecVec_.length ());
+   }
+d279 6
+a284 6
+   {
+   WitDemTripStack theShipSeq (myProblem ());
+   int             theSeqNo;
+   WitDemand *     theDemand;
+   WitPeriod       shipPer;
+   double          incShipVol;
+d286 1
+a286 1
+   myProblem ()->myPipMgr ()->getShipSeq (theShipSeq);
+d288 1
+a288 1
+   mySeqElVec_.resize (theShipSeq.nElements () + 1);
+d290 1
+a290 1
+   theSeqNo = -1;
+d292 3
+a294 3
+   while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+      {
+      theSeqNo ++;
+d296 2
+a297 2
+      mySeqElVec_[theSeqNo] = new WitPipSeqEl (theDemand, shipPer, theSeqNo);
+      }
+d299 1
+a299 1
+   theSeqNo ++;
+d301 2
+a302 2
+   mySeqElVec_[theSeqNo] = new WitPipSeqEl (NULL, -1, theSeqNo);
+   }
+d307 3
+a309 3
+   {
+   WitBopEntry * expBopEnt;
+   WitBopEntry * theBopEnt;
+d311 1
+a311 1
+   expBopEnt = NULL;
+d313 4
+a316 4
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (expEligible (theBopEnt, execPer))
+         {
+         expBopEnt = theBopEnt;
+d318 2
+a319 2
+         break;
+         }
+d321 1
+a321 1
+   witAssert (expBopEnt != NULL);
+d323 1
+a323 1
+   curReqList_.takeContentsFrom (myBopEntReqs_.myElemAt (expBopEnt, execPer));
+d325 1
+a325 1
+   curReqList_.reverse ();
+d327 3
+a329 3
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqList (theOpn, execPer);
+   }
+d334 7
+a340 5
+   {
+   WitBopEntry *     theBopEnt;
+   double            incExecVol;
+   WitPipReqSrc *    theReqSrc;
+   WitPipReqSrcStack theReqSrcs (myProblem ());
+d342 2
+a343 1
+   witAssert (theOpn->bop ().nElements () > 1);
+d345 2
+a346 2
+   forEachEl (theBopEnt, theOpn->bop ())
+      myBopEntReqs_.myElemAt (theBopEnt, execPer).reverse ();
+d348 3
+a350 2
+   if (myGlobalComp ()->printDebug ())
+      prtBopEntReqs (theOpn, execPer);
+d352 2
+a353 3
+   while (true)
+      {
+      incExecVol = minIncReqVol (theOpn, execPer);
+d355 1
+a355 2
+      if (incExecVol < 0.0)
+         break;
+d357 1
+a357 1
+      extractReqSrcs (theOpn, execPer, incExecVol, theReqSrcs);
+d359 1
+a359 1
+      theReqSrc = new WitPipReqSrc (theReqSrcs);
+d361 2
+a362 4
+      myReqSrcs_.push (theReqSrc);
+      
+      curReqList_.push (theReqSrc, incExecVol);
+      }
+d364 2
+a365 2
+   sortReqList ();
+   }
+d370 20
+a389 20
+   {
+   double        minVol;
+   WitBopEntry * theBopEnt;
+   double        incReqVol;
+
+   witAssert (theOpn->bop ().nElements () > 1);
+
+   minVol = -1.0;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         {
+         incReqVol =
+            myBopEntReqs_.myElemAt (theBopEnt, execPer).firstValue ();
+
+         if (minVol < 0.0)
+            minVol = incReqVol;
+         else
+            setToMin (minVol, incReqVol);
+         }
+d391 2
+a392 2
+   return minVol;
+   }
+d397 29
+a425 29
+      WitOperation *      theOpn,
+      WitPeriod           execPer,
+      double              deltaIncReqVol,
+      WitPipReqSrcStack & theReqSrcs)
+   {
+   WitBopEntry *  theBopEnt;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   witAssert (deltaIncReqVol > NET_TOL);
+
+   theReqSrcs.clear ();
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (myBopEntReqs_.myElemAt (theBopEnt, execPer).isNonEmpty ())
+         {
+         myBopEntReqs_.myElemAt (theBopEnt, execPer).
+            pop (theReqSrc, incReqVol);
+
+         if (incReqVol - deltaIncReqVol > NET_TOL)
+            myBopEntReqs_.myElemAt (theBopEnt, execPer).
+               push (theReqSrc, incReqVol - deltaIncReqVol);
+
+         theReqSrcs.push (theReqSrc);
+         }
+      else
+         if (expEligible (theBopEnt, execPer))
+            theReqSrcs.push (myVacReqSrc_);
+   }
+d430 17
+a446 17
+   {
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqListBeforeSort ();
+
+   loadReqSpecVec ();
+
+   sort (
+        myReqSpecVec_,
+        nActReqSpecs_,
+      & WitPipReqMgr::compareReqSpecs,
+        this);
+
+   unloadReqSpecVec ();
+
+   if (myGlobalComp ()->printDebug ())
+      prtCurReqListAfterSort ();
+   }
+d451 4
+a454 4
+   {
+   int            theIdx;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+d456 1
+a456 1
+   witAssert (nActReqSpecs_ == 0);
+d458 1
+a458 1
+   nActReqSpecs_ = curReqList_.nElements ();
+d460 1
+a460 1
+   setToMax (maxActReqSpecs_, nActReqSpecs_);
+d462 2
+a463 2
+   if (nActReqSpecs_ > myReqSpecVec_.length ())
+      expandReqSpecVec ();
+d465 1
+a465 1
+   theIdx = nActReqSpecs_;
+d467 3
+a469 3
+   while (curReqList_.pop (theReqSrc, incReqVol))
+      {
+      theIdx --;
+d471 3
+a473 3
+      myReqSpecVec_[theIdx]->setData (theReqSrc, incReqVol);
+      }
+   }
+d478 4
+a481 4
+   {
+   int                         oldVecLength;
+   WitObjStack <WitPipReqSpec> theReqSpecs (myProblem ());
+   int                         theIdx;
+d483 1
+a483 1
+   witAssert (nActReqSpecs_ > myReqSpecVec_.length ());
+d485 1
+a485 1
+   oldVecLength = myReqSpecVec_.length ();
+d487 2
+a488 2
+   for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+      theReqSpecs.push (myReqSpecVec_[theIdx]);
+d490 1
+a490 1
+   myReqSpecVec_.resize (2 * nActReqSpecs_);
+d492 2
+a493 2
+   for (theIdx = 0; theIdx < oldVecLength; theIdx ++)
+      theReqSpecs.pop  (myReqSpecVec_[theIdx]);
+d495 3
+a497 3
+   for (theIdx = oldVecLength; theIdx < myReqSpecVec_.length (); theIdx ++)
+      myReqSpecVec_[theIdx] = new WitPipReqSpec;
+   }
+d502 5
+a506 5
+      WitPipReqSpec * theReqSpec1,
+      WitPipReqSpec * theReqSpec2)
+   {
+   return theReqSpec1->belongsBefore (theReqSpec2);
+   }
+d511 18
+a528 18
+   {
+   int            theIdx;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+   WitPipReqSrc * prevReqSrc;
+   double         prevIncReqVol;
+
+   witAssert (nActReqSpecs_ > 0);
+
+   for (theIdx = nActReqSpecs_ - 1; theIdx >= 0; theIdx --)
+      {
+      myReqSpecVec_[theIdx]->getData (theReqSrc, incReqVol);
+      myReqSpecVec_[theIdx]->setData (NULL,      0.0);
+
+      if (curReqList_.isNonEmpty ())
+         if (curReqList_.firstObject ()->isEquivalentTo (theReqSrc))
+            {
+            curReqList_.pop  (prevReqSrc, prevIncReqVol);
+d530 2
+a531 2
+            incReqVol += prevIncReqVol;
+            }
+d533 2
+a534 2
+      curReqList_.push (theReqSrc, incReqVol);
+      }
+d536 2
+a537 2
+   nActReqSpecs_ = 0;
+   }
+d542 9
+a550 9
+   {
+   int           nEligible;
+   WitBopEntry * theBopEnt;
+
+   nEligible = 0;
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      if (expEligible (theBopEnt, execPer))
+         nEligible ++;
+d552 2
+a553 2
+   return (nEligible > 1);
+   }
+d558 4
+a561 4
+   {
+   if (theBopEnt->expAllowed ())
+      if (theBopEnt->execPerOKForExp (execPer))
+         return true;
+d563 2
+a564 2
+   return false;
+   }
+d569 4
+a572 4
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements before sorting and consolidation:\n");
+d574 2
+a575 2
+   prtReqList (curReqList_);
+   }
+d580 4
+a583 4
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements after sorting and consolidation:\n");
+d585 2
+a586 2
+   prtReqList (curReqList_);
+   }
+d591 6
+a596 6
+   {
+   fprintf (msgFile (), 
+      "\n"
+      "Requirements for Operation %s in Period %d:\n",
+      theOpn->operationName ().myCstring (),
+      execPer);
+d598 2
+a599 2
+   prtReqList (curReqList_);
+   }
+d604 34
+a637 34
+   {
+   WitBopEntry *    theBopEnt;
+   WitPipReqListItr theItr;
+   WitPipReqSrc *   theReqSrc;
+   double           incReqVol;
+   
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "Merging requirements for Operation %s in Period %d:\n",
+      theOpn->operationName ().myCstring (),
+      execPer);
+
+   forEachEl (theBopEnt, theOpn->bop ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "   BOP Entry #%d:\n",
+         theBopEnt->localIndex ());
+
+      myBopEntReqs_.myElemAt (theBopEnt, execPer).attachItr (theItr);
+
+      while (theItr.advance (theReqSrc, incReqVol))
+         {
+         fprintf (msgFile (),
+            "\n"
+            "      IncReqVol: %3.0f\n",
+            incReqVol);
+
+         theReqSrc->print (msgFile (), "      ");
+         }
+      }
+   }
+d642 19
+a660 19
+   {
+   WitPipReqListItr theItr;
+   WitPipReqSrc *   theReqSrc;
+   double           incReqVol;
+
+   witAssert (myGlobalComp ()->printDebug ());
+
+   theReqList.attachItr (theItr);
+
+   while (theItr.advance (theReqSrc, incReqVol))
+      {
+      fprintf (msgFile (),
+         "\n"
+         "   IncReqVol: %3.0f\n",
+         incReqVol);
+
+      theReqSrc->print (msgFile (), "   ");
+      }
+   }
+d667 4
+a670 4
+      myReqSrc_    (NULL),
+      myIncReqVol_ (0.0)
+   {
+   }
+d675 2
+a676 2
+   {
+   }
+d681 2
+a682 2
+   {
+   witAssert (incReqVol >= 0.0);
+d684 3
+a686 3
+   myReqSrc_    = theReqSrc;
+   myIncReqVol_ = incReqVol;
+   }
+d691 4
+a694 4
+   {
+   theReqSrc = myReqSrc_;
+   incReqVol = myIncReqVol_;
+   }
+d699 3
+a701 3
+   {
+   return myReqSrc_->belongsBefore (theReqSpec->myReqSrc_);
+   }
+d708 4
+a711 4
+      mySeqElVec_ (1)
+   {
+   mySeqElVec_[0] = theSeqEl;
+   }
+d716 3
+a718 3
+      mySeqElVec_ ()
+   {
+   WitPtrVec <WitPipSeqEl> tempSeqElVec;
+d720 1
+a720 1
+   witAssert (theReqSrcs.isNonEmpty ());
+d722 1
+a722 1
+   buildTempSeqElVec (theReqSrcs, tempSeqElVec);
+d724 4
+a727 4
+   sort (
+        tempSeqElVec,
+      & WitPipReqSrc::compareSeqEls,
+        this);
+d729 2
+a730 2
+   consolidateSeqEls (tempSeqElVec);
+   }
+d735 2
+a736 2
+   {
+   }
+d741 4
+a744 4
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl1;
+   WitPipSeqEl *  theSeqEl2;
+d746 1
+a746 1
+   attachSeqElItr (theItr);
+d748 4
+a751 4
+   while (theItr.advance (theSeqEl1))
+      {
+      if (theItr.myIdx () >= theReqSrc->mySeqElVec_.length ())
+         return false;
+d753 1
+a753 1
+      theSeqEl2 = theReqSrc->mySeqElVec_[theItr.myIdx ()];
+d755 2
+a756 2
+      if (theSeqEl1->isBefore (theSeqEl2))
+         return true;
+d758 3
+a760 3
+      if (theSeqEl2->isBefore (theSeqEl1))
+         return false;
+      }
+d762 2
+a763 2
+   if (mySeqElVec_.length () < theReqSrc->mySeqElVec_.length ())
+      return true;
+d765 2
+a766 2
+   return false;
+   }
+d771 3
+a773 3
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl;
+d775 2
+a776 2
+   if (mySeqElVec_.length () != theReqSrc->mySeqElVec_.length ())
+      return false;
+d778 1
+a778 1
+   attachSeqElItr (theItr);
+d780 3
+a782 3
+   while (theItr.advance (theSeqEl))
+      if (theSeqEl != theReqSrc->mySeqElVec_[theItr.myIdx ()])
+         return false;
+d784 2
+a785 2
+   return true;
+   }
+d790 13
+a802 13
+   {
+   WitPipSeqElItr theItr;
+   WitPipSeqEl *  theSeqEl;
+   
+   fprintf (theFile,
+      "%sReq Src:\n",
+      leadingBlanks);
+
+   attachSeqElItr (theItr);
+
+   while (theItr.advance (theSeqEl))
+      theSeqEl->print (theFile, leadingBlanks);
+   }
+d807 3
+a809 3
+   {
+   mySeqElVec_.attachItr (theItr);
+   }
+d814 5
+a818 5
+      WitPipSeqEl * theSeqEl1,
+      WitPipSeqEl * theSeqEl2)
+   {
+   return (theSeqEl1->isBefore (theSeqEl2));
+   }
+d823 9
+a831 9
+      const WitPipReqSrcStack & theReqSrcs,
+      WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+   {
+   int                        totSeqEls;
+   WitObjStItr <WitPipReqSrc> theReqSrcItr;
+   WitPipReqSrc *             theReqSrc;
+   int                        tempIdx;
+   WitPipSeqElItr             theSeqElItr;
+   WitPipSeqEl *              theSeqEl;
+d833 1
+a833 1
+   totSeqEls = 0;
+d835 1
+a835 1
+   theReqSrcs.attachItr (theReqSrcItr);
+d837 2
+a838 2
+   while (theReqSrcItr.advance (theReqSrc))
+      totSeqEls += theReqSrc->mySeqElVec_.length ();
+d840 1
+a840 1
+   tempSeqElVec.resize (totSeqEls);
+d842 1
+a842 1
+   tempIdx = -1;
+d844 1
+a844 1
+   theReqSrcs.attachItr (theReqSrcItr);
+d846 3
+a848 3
+   while (theReqSrcItr.advance (theReqSrc))
+      {
+      theReqSrc->attachSeqElItr (theSeqElItr);
+d850 3
+a852 3
+      while (theSeqElItr.advance (theSeqEl))
+         {
+         tempIdx ++;
+d854 4
+a857 4
+         tempSeqElVec[tempIdx] = theSeqEl;
+         }
+      }
+   }
+d862 5
+a866 5
+      const WitPtrVec <WitPipSeqEl> & tempSeqElVec)
+   {
+   int nDistinct;
+   int tempIdx;
+   int theIdx;
+d868 1
+a868 1
+   nDistinct = 1;
+d870 3
+a872 3
+   for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+      if (tempSeqElVec[tempIdx] != tempSeqElVec[tempIdx - 1])
+         nDistinct ++;
+d874 1
+a874 1
+   mySeqElVec_.resize (nDistinct);
+d876 1
+a876 1
+   mySeqElVec_[0] = tempSeqElVec[0];
+d878 1
+a878 1
+   theIdx = 0;
+d880 4
+a883 4
+   for (tempIdx = 1; tempIdx < tempSeqElVec.length (); tempIdx ++)
+      if (tempSeqElVec[tempIdx] != mySeqElVec_[theIdx])
+         {
+         theIdx ++;
+d885 3
+a887 3
+         mySeqElVec_[theIdx] = tempSeqElVec[tempIdx];
+         }
+   }
+d894 9
+a902 9
+         WitDemand * theDemand,
+         WitPeriod   shipPer,
+         int         theSeqNo):
+
+      myDemand_   (theDemand),
+      shipPerFor_ (shipPer),
+      mySeqNo_    (theSeqNo)
+   {
+   }
+d907 2
+a908 2
+   {
+   }
+d913 2
+a914 2
+   {
+   witAssert (hasaShipment ());
+d916 3
+a918 3
+   theDemand = myDemand_;
+   shipPer   = shipPerFor_;
+   }
+d923 3
+a925 3
+   {
+   return (mySeqNo_ < theSeqEl->mySeqNo_);
+   }
+d930 21
+a950 21
+   {
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+   
+   if (hasaShipment ())
+      {
+      getData (theDemand, shipPer);
+
+      fprintf (theFile,
+         "   %sDem %s, Per %d, Seq #%d\n",
+         leadingBlanks,
+         theDemand->demandName ().myCstring (),
+         shipPer,
+         mySeqNo_);
+      }
+   else
+      fprintf (theFile,
+         "   %sDem None,     Seq #%d\n",
+         leadingBlanks,
+         mySeqNo_);
+   }
+@
+
+
+1.9
+log
+@Changed source file names:
+   Global.h ==> GlobalComp.h
+   Global.C ==> GlobalComp.C
+@
+text
+@d30 1
+a30 1
+#include <Opn.h>
+@
+
+
+1.8
+log
+@ASAP Pegging Order
+@
+text
+@d28 1
+a28 1
+#include <Global.h>
+@
+
+
+1.7
+log
+@ASAP Pegging Order
+@
+text
+@a119 7
+bool WitPipReqMgr::hasReqsFor (WitPart * thePart, WitPeriod fillPer)
+   {
+   return myPartReqs_.myElemAt (thePart, fillPer).isNonEmpty ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.6
+log
+@ASAP Pegging Order
+@
+text
+@d181 1
+a181 1
+   curReqList_.passContentsTo (theReqList);
+d190 1
+a190 1
+   myPartReqs_.myElemAt (thePart, fillPer).passContentsTo (curReqList_);
+d330 1
+a330 1
+   myBopEntReqs_.myElemAt (expBopEnt, execPer).passContentsTo (curReqList_);
+@
+
+
+1.5
+log
+@ASAP Pegging Order
+@
+text
+@d179 7
+@
+
+
+1.4
+log
+@ASAP Pegging Order.
+@
+text
+@d41 1
+a41 1
+      WitProbAssoc      (theProblem),
+d43 12
+a54 14
+      mySeqElVec_       (),
+      myReqSrcs_        (theProblem),
+      myVacReqSrc_      (NULL),
+      myPartReqs_       (),
+      myBopEntReqs_     (),
+      myReqSpecVec_     (),
+      nActReqSpecs_     (0),
+      maxActReqSpecs_   (0),
+      curReqList_       (myProblem ()),
+      myReqListItr_     (),
+      curReqSrc_        (NULL),
+      incReqVolCur_     (0.0),
+      npoReqList_       (myProblem ()),
+      npoCurPegList_    ()
+a59 1
+   WitPeriod     pegPer;
+a77 8
+
+   if (myGlobalComp ()->newPipPggOrder ())
+      {
+      npoCurPegList_.allocate (myProblem ());
+
+      forEachPeriod (pegPer, myProblem ())
+         npoCurPegList_[pegPer] = new WitPipReqList (myProblem ());
+      }
+a90 3
+   if (myGlobalComp ()->newPipPggOrder ())
+      deleteContents (npoCurPegList_);
+
+a277 128
+void WitPipReqMgr::npoSortReqLists (WitMaterial * theMat)
+   {
+   WitPeriod reqPer;
+
+   forEachPeriod (reqPer, myProblem ())
+      {
+      loadCurReqList (theMat, reqPer);
+
+      curReqList_.passContentsTo (myPartReqs_.myElemAt (theMat, reqPer));
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::prepPegMatPerNpo (
+      WitMaterial * theMat,
+      WitPeriod     pegPer,
+      double        theStockVol)
+   {
+   double truncVol;
+   double netStockVol;
+
+   netStockVol = theStockVol;
+
+   npoTruncReqList  (npoReqList_, netStockVol, truncVol);
+
+   npoMergeReqLists (npoReqList_, myPartReqs_.myElemAt (theMat, pegPer));
+
+   npoReqList_.passContentsTo (curReqList_);
+
+   initReqListItr ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::postPegMatPerNpo ()
+   {
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   witAssert (npoReqList_.isEmpty ());
+
+   while (not finishedReqListItr ())
+      {
+      advanceReqListItr (theReqSrc, incReqVol);
+
+      npoReqList_.push (theReqSrc, incReqVol);
+      }
+
+   npoReqList_.reverse ();
+
+   clearCurReqList ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::postPegMatNpo (
+      WitMaterial *      theMat,
+      WitTVec <double> & netStockVol,
+      double &           unmatchVol)
+   {
+   WitPeriod     reqPer;
+   WitPipReqList unmatchedList (myProblem ());
+   double        truncVol;
+
+   npoReqList_.clear ();
+
+   unmatchVol = 0.0;
+
+   forEachPeriod (reqPer, myProblem ())
+      {
+      npoCurPegList_ (reqPer).reverse ();
+
+      npoMergeReqLists (unmatchedList, npoCurPegList_ (reqPer));
+
+      npoCurPegList_ (reqPer).clear ();
+
+      if (myGlobalComp ()->printDebug ())
+         npoPrtUnmatchedList (theMat, reqPer, unmatchedList);
+
+      npoMatchReqs (unmatchedList, myPartReqs_.myElemAt (theMat, reqPer));
+
+      npoTruncReqList (unmatchedList, netStockVol[reqPer], truncVol);
+
+      unmatchVol += truncVol;
+      }
+
+   unmatchVol += npoTotReqVol (unmatchedList);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::recPegMatPerNpo (
+      WitPeriod      pegPer,
+      double         pegVol,
+      WitPipReqSrc * theReqSrc)
+   {
+   WitPipReqSrc * poppedReqSrc;
+   double         poppedVol;
+
+   if (npoCurPegList_ (pegPer).isEmpty ())
+      npoCurPegList_ (pegPer).push (theReqSrc, pegVol);
+   else
+      {
+      npoCurPegList_ (pegPer).pop (poppedReqSrc, poppedVol);
+
+      if (poppedReqSrc->isEquivalentTo (theReqSrc))
+         npoCurPegList_ (pegPer).push (poppedReqSrc, poppedVol + pegVol);
+      else
+         {
+         npoCurPegList_ (pegPer).push (poppedReqSrc, poppedVol);
+         npoCurPegList_ (pegPer).push (theReqSrc,    pegVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoClearReqs (
+      WitMaterial * theMat,
+      WitPeriod     reqPer,
+      double &      totReqVol)
+   {
+   totReqVol = npoTotReqVol (myPartReqs_.myElemAt (theMat, reqPer));
+   }
+
+//------------------------------------------------------------------------------
+
+a662 224
+
+void WitPipReqMgr::npoTruncReqList (
+      WitPipReqList & theReqList,
+      double &        netBound,
+      double &        truncVol)
+   {
+   WitPipReqList  truncList (myProblem ());
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   truncVol = 0.0;
+
+   while (theReqList.isNonEmpty ())
+      {
+      if (netBound <= NET_TOL)
+         {
+         truncVol += npoTotReqVol (theReqList);
+
+         netBound = 0.0;
+
+         break;
+         }
+
+      theReqList.pop (theReqSrc, incReqVol);
+
+      if (incReqVol <= netBound)
+         netBound -= incReqVol;
+      else
+         {
+         truncVol += incReqVol - netBound;
+
+         incReqVol = netBound;
+
+         netBound  = 0.0;
+         }
+
+      truncList.push (theReqSrc, incReqVol);
+      }
+
+   truncList.reverse ();
+
+   truncList.passContentsTo (theReqList);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoMergeReqLists (
+            WitPipReqList & theReqList1,
+      const WitPipReqList & theReqList2)
+   {
+   WitPipReqListItr theItr2;
+   WitPipReqSrc *   theReqSrc1;
+   WitPipReqSrc *   theReqSrc2;
+   double           incReqVol1;
+   double           incReqVol2;
+   WitPipReqList    mergedList (myProblem ());
+
+   theReqList2.attachItr (theItr2);
+
+   npoPopOrNull (theReqSrc1, incReqVol1, theReqList1);
+   npoAdvOrNull (theReqSrc2, incReqVol2, theItr2);
+
+   while ((theReqSrc1 != NULL) and (theReqSrc2 != NULL))
+      if      (theReqSrc1->belongsBefore (theReqSrc2))
+         {
+         mergedList.push (theReqSrc1, incReqVol1);
+         npoPopOrNull    (theReqSrc1, incReqVol1, theReqList1);
+         }
+
+      else if (theReqSrc2->belongsBefore (theReqSrc1))
+         {
+         mergedList.push (theReqSrc2, incReqVol2);
+         npoAdvOrNull    (theReqSrc2, incReqVol2, theItr2);
+         }
+      else
+         {
+         mergedList.push (theReqSrc1, incReqVol1 + incReqVol2);
+         npoPopOrNull    (theReqSrc1, incReqVol1, theReqList1);
+         npoAdvOrNull    (theReqSrc2, incReqVol2, theItr2);
+         }
+
+   while (theReqSrc1 != NULL)
+      {
+      mergedList.push (theReqSrc1, incReqVol1);
+      npoPopOrNull    (theReqSrc1, incReqVol1, theReqList1);
+      }
+
+   while (theReqSrc2 != NULL)
+      {
+      mergedList.push (theReqSrc2, incReqVol2);
+      npoAdvOrNull    (theReqSrc2, incReqVol2, theItr2);
+      }
+
+   mergedList.reverse        ();
+   mergedList.passContentsTo (theReqList1);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoMatchReqs (
+      WitPipReqList & theReqList1,
+      WitPipReqList & theReqList2)
+   {
+   WitPipReqSrc * theReqSrc1;
+   WitPipReqSrc * theReqSrc2;
+   WitPipReqList  resultList1 (myProblem ());
+   WitPipReqList  resultList2 (myProblem ());
+   double         incReqVol1;
+   double         incReqVol2;
+
+   npoPopOrNull (theReqSrc1, incReqVol1, theReqList1);
+   npoPopOrNull (theReqSrc2, incReqVol2, theReqList2);
+
+   while ((theReqSrc1 != NULL) and (theReqSrc2 != NULL))
+      {
+      if      (theReqSrc1->belongsBefore (theReqSrc2))
+         {
+         resultList1.push (theReqSrc1, incReqVol1);
+         npoPopOrNull     (theReqSrc1, incReqVol1, theReqList1);
+         }
+
+      else if (theReqSrc2->belongsBefore (theReqSrc1))
+         {
+         resultList2.push (theReqSrc2, incReqVol2);
+         npoPopOrNull     (theReqSrc2, incReqVol2, theReqList2);
+         }
+
+      else
+         {
+         if      (incReqVol1 > incReqVol2 + NET_TOL)
+            resultList1.push (theReqSrc1, incReqVol1 - incReqVol2);
+
+         else if (incReqVol2 > incReqVol1 + NET_TOL)
+            resultList2.push (theReqSrc2, incReqVol2 - incReqVol1);
+
+         npoPopOrNull (theReqSrc1, incReqVol1, theReqList1);
+         npoPopOrNull (theReqSrc2, incReqVol2, theReqList2);
+         }
+      }
+
+   while (theReqSrc1 != NULL)
+      {
+      resultList1.push (theReqSrc1, incReqVol1);
+      npoPopOrNull     (theReqSrc1, incReqVol1, theReqList1);
+      }
+
+   while (theReqSrc2 != NULL)
+      {
+      resultList2.push (theReqSrc2, incReqVol2);
+      npoPopOrNull     (theReqSrc2, incReqVol2, theReqList2);
+      }
+
+   resultList1.reverse ();
+   resultList2.reverse ();
+
+   resultList1.passContentsTo (theReqList1);
+   resultList2.passContentsTo (theReqList2);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoPopOrNull (
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol,
+      WitPipReqList &  theReqList)
+   {
+   if (theReqList.isNonEmpty ())
+      theReqList.pop (theReqSrc, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      incReqVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoAdvOrNull (
+      WitPipReqSrc * &   theReqSrc,
+      double &           incReqVol,
+      WitPipReqListItr & theItr)
+   {
+   if (not theItr.advance (theReqSrc, incReqVol))
+      {
+      theReqSrc = NULL;
+      incReqVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitPipReqMgr::npoTotReqVol (WitPipReqList & theReqList)
+   {
+   double         totReqVol;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   totReqVol = 0.0;
+
+   while (theReqList.pop (theReqSrc, incReqVol))
+      totReqVol += incReqVol;
+
+   return totReqVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipReqMgr::npoPrtUnmatchedList (
+      WitMaterial *         theMat,
+      WitPeriod             reqPer,
+      const WitPipReqList & unmatchedList)
+   {
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (), 
+      "\n"
+      "Pegged but unmatched requirements for Material %s in Period %d:\n",
+      theMat->partName ().myCstring (),
+      reqPer);
+
+   prtReqList (unmatchedList);
+   }
+
+//------------------------------------------------------------------------------
+@
+
+
+1.3
+log
+@BOP entry execVol pegging.
+@
+text
+@d392 3
+a394 1
+   if (npoCurPegList_ (pegPer).pop (poppedReqSrc, poppedVol))
+d396 2
+a398 1
+         {
+a399 3
+
+         return;
+         }
+d401 1
+d403 2
+a405 2
+
+   npoCurPegList_ (pegPer).push (theReqSrc, pegVol);
+@
+
+
+1.2
+log
+@GPIP migration.
+@
+text
+@d1108 2
+a1109 3
+   WitPipSeqEl *  theSeqEl;
+   int            theSeqNo1;
+   int            theSeqNo2;
+d1113 1
+a1113 1
+   while (theItr.advance (theSeqEl))
+d1118 1
+a1118 3
+      theSeqNo1 = theSeqEl->mySeqNo ();
+
+      theSeqNo2 = theReqSrc->mySeqElVec_[theItr.myIdx ()]->mySeqNo ();
+d1120 1
+a1120 1
+      if (theSeqNo1 < theSeqNo2)
+d1123 1
+a1123 1
+      if (theSeqNo1 > theSeqNo2)
+a1157 2
+   WitDemand *    theDemand;
+   WitPeriod      shipPer;
+d1166 1
+a1166 16
+      if (theSeqEl->hasaShipment ())
+         {
+         theSeqEl->getData (theDemand, shipPer);
+
+         fprintf (theFile,
+            "   %sDem %s, Per %d, Seq #%d\n",
+            leadingBlanks,
+            theDemand->demandName ().myCstring (),
+            shipPer,
+            theSeqEl->mySeqNo ());
+         }
+      else
+         fprintf (theFile,
+            "   %sDem None,     Seq #%d\n",
+            leadingBlanks,
+            theSeqEl->mySeqNo ());
+d1182 1
+a1182 1
+   return (theSeqEl1->mySeqNo () < theSeqEl2->mySeqNo ());
+d1284 32
+@
+
+
+1.1
+log
+@GPIP migration.
+@
+text
+@d73 1
+a73 1
+            new WitGpipReqList (myProblem ());
+d80 1
+a80 1
+            new WitGpipReqList (myProblem ());
+d87 1
+a87 1
+         npoCurPegList_[pegPer] = new WitGpipReqList (myProblem ());
+d285 1
+a285 1
+   myMsgFac () ("gpipSizesMsg",
+d353 3
+a355 3
+   WitPeriod      reqPer;
+   WitGpipReqList unmatchedList (myProblem ());
+   double         truncVol;
+d746 4
+a749 4
+   WitBopEntry *     theBopEnt;
+   WitGpipReqListItr theItr;
+   WitPipReqSrc *    theReqSrc;
+   double            incReqVol;
+d782 1
+a782 1
+void WitPipReqMgr::prtReqList (const WitGpipReqList & theReqList)
+d784 3
+a786 3
+   WitGpipReqListItr theItr;
+   WitPipReqSrc *    theReqSrc;
+   double            incReqVol;
+d806 3
+a808 3
+      WitGpipReqList & theReqList,
+      double &         netBound,
+      double &         truncVol)
+d810 1
+a810 1
+   WitGpipReqList truncList (myProblem ());
+d851 2
+a852 2
+            WitGpipReqList & theReqList1,
+      const WitGpipReqList & theReqList2)
+d854 6
+a859 6
+   WitGpipReqListItr theItr2;
+   WitPipReqSrc *    theReqSrc1;
+   WitPipReqSrc *    theReqSrc2;
+   double            incReqVol1;
+   double            incReqVol2;
+   WitGpipReqList    mergedList (myProblem ());
+d904 2
+a905 2
+      WitGpipReqList & theReqList1,
+      WitGpipReqList & theReqList2)
+d909 2
+a910 2
+   WitGpipReqList resultList1 (myProblem ());
+   WitGpipReqList resultList2 (myProblem ());
+d968 1
+a968 1
+      WitGpipReqList & theReqList)
+d982 3
+a984 3
+      WitPipReqSrc * &    theReqSrc,
+      double &            incReqVol,
+      WitGpipReqListItr & theItr)
+d995 1
+a995 1
+double WitPipReqMgr::npoTotReqVol (WitGpipReqList & theReqList)
+d1012 3
+a1014 3
+      WitMaterial *          theMat,
+      WitPeriod              reqPer,
+      const WitGpipReqList & unmatchedList)
+@
+

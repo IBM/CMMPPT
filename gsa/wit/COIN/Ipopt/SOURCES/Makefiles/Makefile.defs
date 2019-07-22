@@ -1,0 +1,501 @@
+# Copyright (C) 2002, Carnegie Mellon University and others.
+# All Rights Reserved.
+# This code is published under the Common Public License.
+
+#  $Id: Makefile.defs,v 1.7 2002/09/16 23:06:51 andreasw Exp $
+
+#
+#  Global definitions for all Makefiles
+#
+#  Use the first section of this file to adapt the build process to
+#  your system.
+#
+#  Several keywords can be used in some of the definitions:
+#  OSDEFAULT:   Choose values depending on operating system (based on 'uname')
+#               The operating system has to be known in the OS section below.
+#               Currently we have Linux, IRIX, SunOS, OSF1, AIX.
+#  THISDIST :   This indicates that you want to compile third party code
+#               within the OBJECTS tree of this IPOPT distribution.  This
+#               assumes that you put the corresponding source code into the
+#               appropriate directories in SOURCES/OTHERS/*   See the
+#               INSTALL file for details.
+#  UNAVAILABLE: Use this key word, if you want to build without that
+#               particular library or third party code
+
+##############################################################################
+#                                                                            #
+#                         Location of source files                           #
+#                                                                            #
+##############################################################################
+
+# By default, the SOURCES base directory is assumed to be in
+# '../SOURCES/' with respect to the base directory of your building
+# directory (usually 'COIN/Ipopt/OBJECTS').  Change the following
+# definition if you want to divert from the default.  You can also
+# specify the desired directory in the environment variables
+# SRCROOTDIR.
+
+ifndef SRCROOTDIR
+  SRCROOTDIR := DEFAULT
+endif
+
+##############################################################################
+#                                                                            #
+#                      Destination for shared objects                        #
+#                                                                            #
+##############################################################################
+
+# If you set the following variable to an (existing) directory, most
+# libraries will be compiled as shared objects (instead of static
+# libraries), and copied into this directory.  This makes executables
+# smaller.  The executables will be linked, so that this directory is
+# included in the search path for shared objects during execution (if
+# you move those shared objects, you will have to set the environment
+# variable LD_LIBRARY_PATH accordingly).
+#
+# NOTE:  This has not yet been implemented for AIX
+
+# SOLIBDIR := $(OBJROOTDIR)/lib
+
+##############################################################################
+#                                                                            #
+#           Default definitions for compilers and commands                   #
+#                                                                            #
+##############################################################################
+
+CC        := OSDEFAULT    # name of the C compiler
+CXX       := OSDEFAULT    # name of the C++ compiler
+F77       := OSDEFAULT    # name of the Fortran 77 compiler
+FPP       := OSDEFAULT    # name of the Fortran preprocessor
+                          #   (generating output to stdout)
+FLAGS     := OSDEFAULT    # compilation flags common for Fortran, C, and C++
+                          # compilers
+                          # NOTE: This value is overwritten by the environment
+                          #       variables 'MY_FLAGS' if it is defined
+FFLAGS    := $(FLAGS)     # Flags for Fortran compiler
+                          #   (for GNU's g77, make sure you include
+                          #    '-fno-second-underscore')
+CFLAGS    := $(FLAGS)     # Flags for C compiler
+CXXFLAGS  := $(FLAGS)     # Flags for C++ compiler
+LNFLAGS   := OSDEFAULT    # Flags for linker (if envoked by CC or F77)
+CXXLNFLAGS:= OSDEFAULT    # Flags for linker (in envoked by CXX)
+CCLNLIBS  := OSDEFAULT    # Libraries necessary to link Fortran code with
+                          # C compiler
+CXXLNLIBS := OSDEFAULT    # Libraries necessary to link Fortran code with
+                          # C++ compiler
+DLLIB     := OSDEFAULT    # Library containing 'dlopen' etc., usually -ldl
+
+SOAR      := OSDEFAULT    # "Linker" for shared objects
+                          #  (e.g. "$(F77) -shared")
+SOARFLAGS := OSDEFAULT    # Flags for this "linker" (e.g. "$(FLAGS) -o")
+
+# In addition you may specify different compilers for some operating
+# systems (if you chose 'OSDEFAULT' above).
+
+# Currently implemented options
+# compiler := gcc   # For Linux: GNU compilers (default)
+# compiler := pgi   # For Linux: Portland compilers
+
+SHELL    = /bin/sh
+AR       = ar
+ARFLAGS  = ruv
+MAKE     = gmake          # this has to be the GNU make
+ECHO     = echo
+LN       = ln -s
+FIND     = find
+MKINSTALLDIRS = $(SRCROOTDIR)/Makefiles/mkinstalldirs
+
+PATCH    = patch <
+F2C      = f2c           # necessary if you want to use ADOL-C for Fortran
+                         # source code
+
+##############################################################################
+#                                                                            #
+#                  Libraries and third party source code                     #
+#                                                                            #
+#                  (See Section 2.4 in the INSTALL file)                     #
+#                                                                            #
+##############################################################################
+
+#
+#     BLAS library
+#     ------------
+
+#BLASLIB        := OSDEFAULT
+#BLASLIB        := -L/usr/local/lib -lblas
+#BLASLIB        := /usr/local/lib/libblas.a
+BLASLIB        := THISDIST
+
+# If the routine D1MACH is not included in the BLAS library, specify where
+# the object file d1mach.o is localted.  If you choose THISDIST and it is
+# needed (e.g. for Linux), make sure, the file SOURCES/OTHERS/BLAS/d1mach.f
+# exists.
+D1MACHOBJ      := THISDIST
+#D1MACHOBJ      := /usr/local/blas/d1mach.o
+
+#
+#     LAPACK library
+#     --------------
+
+#LAPACKLIB      := OSDEFAULT
+#LAPACKLIB      := -L/usr/local/lib -llapack
+#LAPACKLIB      := /usr/local/lib/liblapack.a
+LAPACKLIB      := THISDIST
+
+#
+#     Harwell Subroutines Library
+#     ---------------------------
+
+# If you don't have all routines available, you may exclude call to
+# certain routines from the calls (see DEFS below).
+
+HSLLIB         := THISDIST
+#HSLLIB         := -L/usr/local/lib -lhsl
+#HSLLIB         := /usr/local/lib/libhsl.a
+
+# The following specifies the name of the system dependent Harwell routine
+# fd05ad - you only need to specify it if HSLLIB = THISDIST
+FD05AD         := OSDEFAULT
+#FD05AD         := fd05ads
+
+# The following flags for the C preprocessor allows you to explicitly
+# exclude certain HSL routines.  For example, if you set
+# DEFS = -DNO_MA47
+# the calls to the Harwell routines MA47 will not be compiled.
+#
+# Possible options (and combinations of those) are:
+
+#DEFS += -DNO_MA27
+DEFS += -DNO_MA47
+DEFS += -DNO_MA57
+
+DEFS += -DNO_MA28
+DEFS += -DNO_MA48
+
+DEFS += -DNO_MC30
+#DEFS += -DNO_MC19
+
+DEFS += -DNO_MC35 -DNO_MC39
+
+# If you are using the old version of MA27 (not thread-safe and using COMMON
+# block), uncomment the following line
+#DEFS += -DOLD_MA27
+
+#
+#    TRON
+#    ----
+
+# Location of the TRON source code; see INSTALL file
+TRONSRCDIR     := THISDIST
+#TRONSRCDIR     := UNAVAILABLE
+
+#
+#    AMPL Solver Library
+#    -------------------
+
+# (only required if you build the AMPL solver)
+
+# Ampl Solver Library:
+ASLLIB         := THISDIST
+#ASLLIB         := /usr/local/ampl/solvers/amplsolver.a
+# Location of include files for ASL
+ASLSRCDIR      := THISDIST
+#ASLSRCDIR      := /usr/local/ampl/solvers
+# In some cases, ASL has to be build with special flags (e.g. for the PGI
+# compilers under Linux)
+ASLMAKEFLAGS   := OSDEFAULT
+
+# Here you can define the default size of the integer and real work space
+# for IPOPT in the AMPL interface:
+#DEFS += -DLENGTH_IW=10000000 -DLENGTH_RW=10000000
+
+#
+#    ADOL-C 
+#    ------
+
+# (only required if you use ADOL-C within the dynamic optimization for
+# the computation of derivatives of the DAE model)
+#
+#    Note:  If you use ADOL-C 1.8.7, you need to specify the flag -DOLDADOLC
+DEFS += -DOLDADOLC
+
+# ADOL-C Library
+ADOLCLIB       := THISDIST
+#ADOLCLIB       := /usr/local/lib/libad.a
+#ADOLCLIB       := -L/usr/local/lib -lad
+# Location of ADOL-C header files
+ADOLCSRCDIR    := THISDIST
+#ADOLCSRCDIR    := /usr/local/ADOLC18/SRC
+# The next variable defines the target for ADOL-C's install 'make' if it is
+# build within this distribution (ADOLCLIB := THISDIST)
+ADOLCINSTARGET := OSDEFAULT
+
+
+#
+#    DASPK
+#    -----
+
+# (only required for the simulation in DYNOPC)
+#
+DASPKLIB       := THISDIST
+
+##############################################################################
+##############################################################################
+#                                                                            #
+#           You should not have to edit anything below this line             #
+#                                                                            #
+##############################################################################
+##############################################################################
+
+# Get rid of annoying spaces
+CC             := $(strip $(CC))
+CXX            := $(strip $(CXX))
+F77            := $(strip $(F77))
+FPP            := $(strip $(FPP))
+FLAGS          := $(strip $(FLAGS))
+FFLAGS         := $(strip $(FFLAGS))
+CFLAGS         := $(strip $(CFLAGS))
+CXXFLAGS       := $(strip $(CXXFLAGS))
+LNFLAGS        := $(strip $(LNFLAGS))
+CXXLNFLAGS     := $(strip $(CXXLNFLAGS))
+CCLNLIBS       := $(strip $(CCLNLIBS))
+CXXLNLIBS      := $(strip $(CXXLNLIBS))
+DLLIB          := $(strip $(DLLIB))
+SOAR           := $(strip $(SOAR))
+SOARFLAGS      := $(strip $(SOARFLAGS))
+BLASLIB        := $(strip $(BLASLIB))
+D1MACHOBJ      := $(strip $(D1MACHOBJ))
+LAPACKLIB      := $(strip $(LAPACKLIB))
+HSLLIB         := $(strip $(HSLLIB))
+FD05AD         := $(strip $(FD05AD))
+TRONSRCDIR     := $(strip $(TRONSRCDIR))
+ASLLIB         := $(strip $(ASLLIB))
+ASLSRCDIR      := $(strip $(ASLSRCDIR))
+ASLMAKEFLAGS   := $(strip $(ASLMAKEFLAGS))
+ADOLCLIB       := $(strip $(ADOLCLIB))
+ADOLCINSTARGET := $(strip $(ADOLCINSTARGET))
+ADOLCSRCDIR    := $(strip $(ADOLCSRCDIR))
+compiler       := $(strip $(compiler))
+
+#
+#  Base directory for source code in this distribution
+#
+ifeq ($(SRCROOTDIR),DEFAULT)
+  SRCROOTDIR := $(shell cd $(OBJROOTDIR); pwd)/../SOURCES
+endif
+
+#
+#  Define directories for INDO's source and object code
+#
+DIST_IPOPT_IPOPT        = IPOPT/ipopt
+DIST_IPOPT_CUTE         = IPOPT/CUTEr_interface
+DIST_IPOPT_AUXIL        = IPOPT/auxil
+DIST_IPOPT_DOC          = ../doc
+#
+#  Dynamic Optimization
+#
+DIST_DYNOPT_DAE2NLP     = DYNOPT/dae2nlp
+DIST_DYNOPT_AUXIL       = DYNOPT/auxil
+DIST_DYNOPT_EXAMPLEDATA = DYNOPT/example_data
+DIST_DYNOPT_ADOLC2DAE   = DYNOPT/adolc2dae
+DIST_DYNOPT_ESO2DAE     = DYNOPT/ESO2dae
+DIST_DYNOPC_UTILS       = DYNOPT/DYNOPC/utils
+#
+#  Third party code
+#
+DIST_OTHERS_HSL         = OTHERS/HSL
+DIST_OTHERS_BLAS        = OTHERS/blas
+DIST_OTHERS_LAPACK      = OTHERS/lapack
+DIST_OTHERS_ADOLC       = OTHERS/ADOLC
+DIST_OTHERS_DASPK       = OTHERS/DASPK
+DIST_OTHERS_NLEQ1S      = OTHERS/nleq1s
+DIST_OTHERS_ASL         = OTHERS/ASL
+DIST_OTHERS_TRON        = OTHERS/TRON
+DIST_OTHERS_IDLGPROMS   = OTHERS/IDL_gPROMS
+
+#
+#  Location of Makedefs.* files
+#
+MAKEDEFSDIR = $(SRCROOTDIR)/Makefiles
+
+#
+#  Libraries build within INDO
+#
+IPOPTLIB     = $(OBJROOTDIR)/$(DIST_IPOPT_IPOPT)/libipopt.a
+CUTERLIB     = $(OBJROOTDIR)/$(DIST_IPOPT_CUTE)/libipoptcuter.a
+DAE2NLPLIB   = $(OBJROOTDIR)/$(DIST_DYNOPT_DAE2NLP)/libdae2nlp.a
+TRONLIB      = $(OBJROOTDIR)/$(DIST_OTHERS_TRON)/libtron.a
+ESO2DAELIB   = $(OBJROOTDIR)/$(DIST_DYNOPT_ESO2DAE)/libESO2dae.a
+IDLGPROMSLIB = $(OBJROOTDIR)/$(DIST_OTHERS_IDLGPROMS)/libIDL_gPROMS.a
+
+#
+#  Flags for automatic translation of Fortran code to C++ code that ADOL-C
+#  can understand, and the postprocesses executable
+#
+F2CFLAGS = -a -c -C++
+F2CPOST  = $(OBJROOTDIR)/$(DIST_DYNOPT_ADOLC2DAE)/f2c_post
+
+
+# List of all objects and libraries etc that can be rebuild within
+# the distribution
+DISTBUILD  = $(IPOPTLIB) $(DAE2NLPLIB) $(TRONLIB) $(F2CPOST)\
+	$(ESO2DAELIB) $(IDLGPROMSLIB) $(D1MACHOBJ)
+
+# List of all liraries that should be build as shared objects
+#    (if SOLIBDIR is set)
+SOLIBS  = $(IPOPTLIB) $(CUTERLIB) $(DAE2NLPLIB) $(TRONLIB) \
+	$(ESO2DAELIB) $(IDLGPROMSLIB)
+#
+# Set search path for source code and default search path for source files
+#
+SRCDIR = $(SRCROOTDIR)/$(THIS_DIST_DIR)
+VPATH  = $(SRCDIR)
+
+#
+#  FORTRAN Preprocessor definitions to exclude calls to unavailable
+#  subroutines
+#
+ifeq ($(TRONSRCDIR),UNAVAILABLE)
+  DEFS += -DNO_TRON
+  TRONLIB  =
+endif
+
+#
+#  Set variables for third party code directories to appropriate values if
+#  to be compiled within this build
+#
+ifeq ($(BLASLIB),THISDIST)
+  BLASLIB    := $(OBJROOTDIR)/$(DIST_OTHERS_BLAS)/libblas.a
+  DISTBUILD  += $(BLASLIB)
+  SOLIBS     += $(BLASLIB)
+  D1MACHOBJ  := 
+endif
+ifeq ($(LAPACKLIB),THISDIST)
+  LAPACKLIB  := $(OBJROOTDIR)/$(DIST_OTHERS_LAPACK)/liblapack.a
+  DISTBUILD  += $(LAPACKLIB)
+  SOLIBS     += $(LAPACKLIB)
+endif
+ifeq ($(HSLLIB),THISDIST)
+  HSLLIB     := $(OBJROOTDIR)/$(DIST_OTHERS_HSL)/libhsl.a
+  DISTBUILD  += $(HSLLIB)
+  SOLIBS     += $(HSLLIB)
+endif
+ifeq ($(TRONSRCDIR),THISDIST)
+  TRONSRCDIR := $(SRCROOTDIR)/$(DIST_OTHERS_TRON)/tron/src
+endif
+ifeq ($(ASLLIB),THISDIST)
+  ASLLIB     := $(OBJROOTDIR)/$(DIST_OTHERS_ASL)/amplsolver.a
+  DISTBUILD  += $(ASLLIB)
+endif
+ifeq ($(ASLSRCDIR),THISDIST)
+  ASLINCDIR  := $(SRCROOTDIR)/$(DIST_OTHERS_ASL)/solvers
+else
+  ASLINCDIR  := $(ASLSRCDIR)
+endif
+ifeq ($(ADOLCLIB),THISDIST)
+  ADOLCLIB   := $(OBJROOTDIR)/$(DIST_OTHERS_ADOLC)/libad.a
+  DISTBUILD  += $(ADOLCLIB)
+  SOLIBS     += $(ADOLCLIB)
+endif
+ifeq ($(ADOLCSRCDIR),THISDIST)
+  ADOLCSRCDIR := $(SRCROOTDIR)/$(DIST_OTHERS_ADOLC)/SRC
+endif
+ifeq ($(DASPKLIB),THISDIST)
+  DASPKLIB   := $(OBJROOTDIR)/$(DIST_OTHERS_DASPK)/libdaspk.a
+  DISTBUILD  += $(DASPKLIB)
+  SOLIBS     += $(DASPKLIB)
+endif
+
+##############################################################################
+#                                                                            #
+#               Now the operating system dependend definitions               #
+#                                                                            #
+##############################################################################
+
+UNAME = $(shell uname)
+ifneq (,$(findstring CYGWIN,$(UNAME)))
+  UNAME = CYGWIN
+endif
+
+#
+#  Mainly for debugging:  Check if environment variables have been set to
+#                         choose different flags - if so, rebuild everything
+#
+ifdef MY_FLAGS
+#  $(warning Environment variables 'MY_FLAGS' is set to '$(MY_FLAGS)')
+  FLAGS = $(MY_FLAGS)
+else
+  MY_FLAGS =
+endif
+
+ifeq ($(wildcard $(MAKEDEFSDIR)/Makedefs.$(UNAME)),)
+  $(warning No default settings exist for your operating system ($(UNAME)) )
+else
+  include $(MAKEDEFSDIR)/Makedefs.$(UNAME)
+endif
+
+OLD_FLAGS_FILE = ._TMP_OLD_FLAGS
+OLD_FLAGS := $(shell touch $(OLD_FLAGS_FILE); cat $(OLD_FLAGS_FILE))
+dummy := $(shell $(ECHO) $(FLAGS) $(DEFS) >$(OLD_FLAGS_FILE))
+ifneq ($(strip $(FLAGS) $(DEFS)),$(strip $(OLD_FLAGS)))
+  $(warning FLAGS has changed - I need to rebuild everything)
+  REBUILD := veryclean
+endif
+
+#
+#  Define special variables for linking with shared objects
+#
+#  LIBS is assumed to be all libraries necessary for linking the executable.
+#  In LNKLIBS then all .a are replaced my .so, if SOLIBDIR is defined,
+#     otherwise just like LIBS
+#  DEPLNKLIBS is the list of all entries in LNKLIBS are not like -L.. or -l..
+#  In LNKLIBFLAGSS are finally all definitions with explicit filenames replaced
+#     by -L and -l flags if they belong to DISTLIBS
+#
+LNKLIBS    = $(LIBS)
+DEPLIBS    = $(filter $(DISTBUILD), $(LIBS))
+ifdef SOLIBDIR
+#
+#  In definitions of the link flags LNKLIBS replace all shared objects
+#  libraries from absolute path names to real -L... -l... flags
+#
+#  Also make sure the list of libraries to be rebuild within distribution
+#  DEPBUILD has corresonding .so suffixes for shared objects libraries
+#
+  libchange  = $(filter $(SOLIBS), $(lib))
+  libkeep    = $(filter-out $(libchange), $(lib))
+  LNKLIBS    = -L$(SOLIBDIR) $(foreach lib, $(LIBS), \
+	$(patsubst lib%, -l%, $(notdir $(basename $(libchange)))) \
+	$(libkeep))
+  DEPLIBS    = $(foreach lib, $(filter $(DISTBUILD), $(LIBS)), \
+	$(patsubst %.a, %.so, $(libchange)) \
+	$(libkeep))
+endif
+
+
+
+#
+#  Common library combinations
+#
+LINALGLIBS = $(HSLLIB) $(HSLARCLIB) $(LAPACKLIB) \
+	$(BLASLIB) $(D1MACHOBJ)
+
+
+#
+#  Certain objects
+#
+NLEQ1SOBJ = $(OBJROOTDIR)/$(DIST_OTHERS_NLEQ1S)/nleq1s.o
+
+#
+#  Make sure some variables are empty (not defined by environment) in order
+#  to avoid certain problems in makefiles
+#
+LIB =
+SOLIB =
+
+#
+#  Allowed suffixes
+#
+.SUFFIXES: 
+.SUFFIXES: .c .cpp .f .F .o
+

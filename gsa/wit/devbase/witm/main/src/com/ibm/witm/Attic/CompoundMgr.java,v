@@ -1,0 +1,766 @@
+head	1.13;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.13
+date	2011.07.12.22.39.58;	author rjw;	state dead;
+branches;
+next	1.12;
+
+1.12
+date	2011.07.08.20.45.56;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.07.05.21.15.02;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.07.05.20.01.44;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.06.30.23.43.47;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.06.30.23.25.39;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.06.30.22.03.38;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.06.24.16.42.07;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.06.23.22.52.04;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.06.22.22.09.43;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.22.02.10.42;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.22.01.47.57;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.22.00.33.11;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@Compound ==> Tuple
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File CompoundMgr.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+
+/*******************************************************************************
+ * "Compound Manager"<br>
+ * A CompoundMgr is responsible for maintaining the Compounds of a particular
+ * CompoundCategory that belong to a particular Embodiment.
+ *******************************************************************************
+ */
+final class CompoundMgr extends ItemMgr <Compound>
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The dimensions of the CompoundCategory for this CompoundMgr.
+ *******************************************************************************
+ */
+   private final List <Category <?>> myDimensions;
+   
+/*******************************************************************************
+ * The Embodiment to which this CompoundMgr belongs.
+ *******************************************************************************
+ */
+   private final Embodiment myEmbodiment;
+   
+/*******************************************************************************
+ * myCompoundMap.get (theCoordList) is the Compound stored by this CompoundMgr
+ * whose coordinate list matches theCoordList, if any; otherwise null.
+ *******************************************************************************
+ */
+   private final HashMap <List <Item>, Compound> myCompoundMap;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the coordinate pattern that the
+ * Compounds in the slice are to match; otherwise null.
+ *******************************************************************************
+ */
+   private Item[] curPattern;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the Slice currently being
+ * built-up; otherwise null.
+ *******************************************************************************
+ */
+   private ArrayList <Compound> curSlice;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is coordinate list currently being
+ * built-up or used to look up the next Compound in the slice.
+ *******************************************************************************
+ */
+   private final ArrayList <Item> curCoordList;
+   
+/*******************************************************************************
+ * A buffer for building the result of toString for Compounds maintained by this
+ * CompoundMgr.
+ *******************************************************************************
+ */
+   private final StringBuilder myStringBuilder;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Populates the slice for getSlice with Compounds whose coordinates for
+ * indices < coordIdx match those in curCoordList and whose coordinate at
+ * coordIdx is theItem.
+ *******************************************************************************
+ */
+   private void popSliceWithItem (int coordIdx, Item theItem)
+      {
+      Compound theComp;
+      
+      curCoordList.set (coordIdx, theItem);
+         
+      if (coordIdx == myDimensions.size () - 1)
+         {
+         theComp = myCompoundMap.get (curCoordList);
+            
+         if (theComp != null)
+            curSlice.add (theComp);
+         }
+      else
+         {
+         popSliceFromIdx (coordIdx + 1);
+         }
+         
+      curCoordList.set (coordIdx, null);
+      }
+   
+/*******************************************************************************
+ * Populates the slice for getSlice with Compounds whose coordinates for
+ * indices < coordIdx match those in curCoordList.
+ *******************************************************************************
+ */
+   private void popSliceFromIdx (int coordIdx)
+      {
+      Category <?> theCat;
+      ItemMgr <?>  theItemMgr;
+      
+      if (curPattern[coordIdx] == null)
+         {
+         theCat     = myDimensions.get (coordIdx);
+      
+         theItemMgr = myEmbodiment.getItemMgr (theCat);
+      
+         for (Item theItem: theItemMgr.getInstances ())
+            {
+            popSliceWithItem (coordIdx, theItem);
+            }
+         }
+      else
+         {
+         popSliceWithItem (coordIdx, curPattern[coordIdx]);
+         }
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+   
+   CompoundMgr (CompoundCategory theCompCat, Embodiment theEmb)
+      {
+      int nDimens;
+      int theIdx;
+      
+      myDimensions  = theCompCat.getDimensions ();
+   
+      myEmbodiment  = theEmb;
+   
+      myCompoundMap = new HashMap <List <Item>, Compound> ();
+      
+      curPattern    = null;
+      curSlice      = null;
+      
+      nDimens       = myDimensions.size ();
+      
+      curCoordList  = new ArrayList <Item> (nDimens);
+      
+      for (theIdx = 0; theIdx < nDimens; theIdx ++)
+         curCoordList.add (null);
+      
+      myStringBuilder = new StringBuilder (100);
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Stores theComp in this CompoundMgr.
+ *******************************************************************************
+ */
+   void store (Compound theComp)
+      {
+      List <Item> theCoordList;
+      Compound    oldComp;
+      
+      storeInstance (theComp);
+      
+      theCoordList = theComp.getCoordinateList ();
+      
+      oldComp      = myCompoundMap.put (theCoordList, theComp);
+      
+      assert (oldComp == null);
+      }
+   
+/*******************************************************************************
+ * Builds the String to be used by theComp.toString ().
+ * 
+ * @@return The String
+ *******************************************************************************
+ */
+   String toStringFor (Compound theComp)
+      {
+      int    nCoords;
+      int    theIdx;
+      String theString;
+      
+      assert (myStringBuilder.length () == 0);
+      
+      myStringBuilder.append (theComp.getCompoundCategory ().getName ());
+      
+      myStringBuilder.append (" (");
+      
+      myStringBuilder.append (theComp.getCoordinateList ().get (0));
+      
+      nCoords = theComp.getCoordinateList ().size ();
+      
+      for (theIdx = 1; theIdx < nCoords; theIdx ++)
+         {
+         myStringBuilder.append (", ");
+      
+         myStringBuilder.append (theComp.getCoordinateList ().get (theIdx));
+         }
+      
+      myStringBuilder.append (")");
+      
+      theString = myStringBuilder.toString ();
+      
+      myStringBuilder.setLength (0);
+      
+      return theString;
+      }
+   
+/*******************************************************************************
+ * @@return The Compound stored by this CompoundMgr whose coordinate list matches
+ *         theCoordArr, if any; otherwise null.
+ *******************************************************************************
+ */
+   Compound getCompound (Item[] theCoordArr)
+      {
+      List <Item> theCoordList;
+      
+      theCoordList = Arrays.asList (theCoordArr);
+      
+      return myCompoundMap.get (theCoordList);
+      }
+   
+/*******************************************************************************
+ * Computes and returns a "slice": the set of all Compounds maintained by this
+ * CompoundMgr whose coordinates match thePattern.<br>
+ * The sparse algorithm is used.
+ *******************************************************************************
+ */
+   ArrayList <Compound> getSliceSparse (Item[] thePattern)
+      {
+      ArrayList <Compound> theSlice;
+      int                  theIdx;
+      Item                 theItem;
+      
+      theSlice = new ArrayList <Compound> ();
+      
+      loopThruComps:
+      for (Compound theComp: getInstances ())
+         {
+         for (theIdx = 0; theIdx < myDimensions.size (); theIdx ++)
+            if (thePattern[theIdx] != null)
+               {
+               theItem = theComp.getCoordinateList ().get (theIdx);
+               
+               if (theItem != thePattern[theIdx])
+                  continue loopThruComps;
+               }
+         
+         theSlice.add (theComp);
+         }
+      
+      return theSlice;
+      }
+   
+/*******************************************************************************
+ * Computes and returns a "slice": the set of all Compounds maintained by this
+ * CompoundMgr whose coordinates match thePattern.<br>
+ * The dense algorithm is used.
+ *******************************************************************************
+ */
+   ArrayList <Compound> getSliceDense (Item[] thePattern)
+      {
+      ArrayList <Compound> theSlice;
+      
+      curPattern = thePattern;
+      
+      curSlice   = new ArrayList <Compound> ();
+      
+      popSliceFromIdx (0);
+      
+      theSlice   = curSlice;
+      curPattern = null;
+      curSlice   = null;
+      
+      return theSlice;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.12
+log
+@Class ProblemMgr.
+@
+text
+@@
+
+
+1.11
+log
+@Implementation ==> Embodiment
+@
+text
+@d6 1
+a6 1
+package       com.ibm.witm;
+@
+
+
+1.10
+log
+@getSliceSparse
+@
+text
+@d16 1
+a16 1
+ * CompoundCategory that belong to a particular Implementation.
+d32 1
+a32 1
+ * The Implementation to which this CompoundMgr belongs.
+d35 1
+a35 1
+   private final Implementation myImplementation;
+d117 1
+a117 1
+         theItemMgr = myImplementation.getItemMgr (theCat);
+d134 1
+a134 1
+   CompoundMgr (CompoundCategory theCompCat, Implementation theImple)
+d139 1
+a139 1
+      myDimensions       = theCompCat.getDimensions ();
+d141 1
+a141 1
+      myImplementation   = theImple;
+d143 1
+a143 1
+      myCompoundMap      = new HashMap <List <Item>, Compound> ();
+d145 2
+a146 2
+      curPattern         = null;
+      curSlice           = null;
+d148 1
+a148 1
+      nDimens            = myDimensions.size ();
+d150 1
+a150 1
+      curCoordList       = new ArrayList <Item> (nDimens);
+d155 1
+a155 1
+      myStringBuilder    = new StringBuilder (100);
+@
+
+
+1.9
+log
+@//=== ==> /////
+@
+text
+@d234 2
+a235 1
+ * CompoundMgr whose coordinates match thePattern.
+d238 33
+a270 1
+   ArrayList <Compound> getSlice (Item[] thePattern)
+@
+
+
+1.8
+log
+@Re-arranged source code.
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d21 1
+a21 1
+//==============================================================================
+d23 1
+a23 1
+//==============================================================================
+d72 1
+a72 1
+//==============================================================================
+d74 1
+a74 1
+//==============================================================================
+d130 1
+a130 1
+//==============================================================================
+d132 1
+a132 1
+//==============================================================================
+d158 1
+a158 1
+//==============================================================================
+d160 1
+a160 1
+//==============================================================================
+d254 1
+a254 1
+//==============================================================================
+@
+
+
+1.7
+log
+@Various revisions.
+@
+text
+@d22 1
+a22 1
+// Package Internal
+d26 54
+a79 1
+ * Constructor.
+d82 52
+d158 4
+a180 36
+ * @@return The Compound stored by this CompoundMgr whose coordinate list matches
+ *         theCoordArr, if any; otherwise null.
+ *******************************************************************************
+ */
+   Compound getCompound (Item[] theCoordArr)
+      {
+      List <Item> theCoordList;
+      
+      theCoordList = Arrays.asList (theCoordArr);
+      
+      return myCompoundMap.get (theCoordList);
+      }
+   
+/*******************************************************************************
+ * Computes and returns a "slice": the set of all Compounds maintained by this
+ * CompoundMgr whose coordinates match thePattern.
+ *******************************************************************************
+ */
+   ArrayList <Compound> getSlice (Item[] thePattern)
+      {
+      ArrayList <Compound> theSlice;
+      
+      curPattern = thePattern;
+      
+      curSlice   = new ArrayList <Compound> ();
+      
+      popSliceFromIdx (0);
+      
+      theSlice   = curSlice;
+      curPattern = null;
+      curSlice   = null;
+      
+      return theSlice;
+      }
+   
+/*******************************************************************************
+a217 4
+//==============================================================================
+// Private
+//==============================================================================
+   
+d219 2
+a220 2
+ * Populates the slice for getSlice with Compounds whose coordinates for
+ * indices < coordIdx match those in curCoordList.
+d223 1
+a223 1
+   private void popSliceFromIdx (int coordIdx)
+d225 1
+a225 2
+      Category <?> theCat;
+      ItemMgr <?>  theItemMgr;
+d227 1
+a227 3
+      if (curPattern[coordIdx] == null)
+         {
+         theCat     = myDimensions.get (coordIdx);
+d229 1
+a229 11
+         theItemMgr = myImplementation.getItemMgr (theCat);
+      
+         for (Item theItem: theItemMgr.getInstances ())
+            {
+            popSliceWithItem (coordIdx, theItem);
+            }
+         }
+      else
+         {
+         popSliceWithItem (coordIdx, curPattern[coordIdx]);
+         }
+d233 2
+a234 3
+ * Populates the slice for getSlice with Compounds whose coordinates for
+ * indices < coordIdx match those in curCoordList and whose coordinate at
+ * coordIdx is theItem.
+d237 1
+a237 1
+   private void popSliceWithItem (int coordIdx, Item theItem)
+d239 11
+a249 1
+      Compound theComp;
+d251 1
+a251 15
+      curCoordList.set (coordIdx, theItem);
+         
+      if (coordIdx == myDimensions.size () - 1)
+         {
+         theComp = myCompoundMap.get (curCoordList);
+            
+         if (theComp != null)
+            curSlice.add (theComp);
+         }
+      else
+         {
+         popSliceFromIdx (coordIdx + 1);
+         }
+         
+      curCoordList.set (coordIdx, null);
+a253 47
+/*******************************************************************************
+ * The dimensions of the CompoundCategory for this CompoundMgr.
+ *******************************************************************************
+ */
+   private final List <Category <?>> myDimensions;
+   
+/*******************************************************************************
+ * The Implementation to which this CompoundMgr belongs.
+ *******************************************************************************
+ */
+   private final Implementation myImplementation;
+   
+/*******************************************************************************
+ * myCompoundMap.get (theCoordList) is the Compound stored by this CompoundMgr
+ * whose coordinate list matches theCoordList, if any; otherwise null.
+ *******************************************************************************
+ */
+   private final HashMap <List <Item>, Compound> myCompoundMap;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the coordinate pattern that the
+ * Compounds in the slice are to match; otherwise null.
+ *******************************************************************************
+ */
+   private Item[] curPattern;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the Slice currently being
+ * built-up; otherwise null.
+ *******************************************************************************
+ */
+   private ArrayList <Compound> curSlice;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is coordinate list currently being
+ * built-up or used to look up the next Compound in the slice.
+ *******************************************************************************
+ */
+   private final ArrayList <Item> curCoordList;
+   
+/*******************************************************************************
+ * A buffer for building the result of toString for Compounds maintained by this
+ * CompoundMgr.
+ *******************************************************************************
+ */
+   private final StringBuilder myStringBuilder;
+   
+@
+
+
+1.6
+log
+@Added tests for CompoundCategory of a CompoundCategory.
+Fixed a bug for this case.
+@
+text
+@a7 2
+import static com.ibm.witm.Utility.*;
+
+@
+
+
+1.5
+log
+@getSlice
+@
+text
+@d51 2
+d109 38
+d245 7
+@
+
+
+1.4
+log
+@Tuple ==> Compound
+@
+text
+@d10 1
+d17 1
+a17 1
+ * A CompoundMgr is is responsible for maintaining the Compounds of a particular
+d31 1
+a31 1
+   CompoundMgr ()
+d33 18
+a50 1
+      myCompoundMap = new HashMap <List <Item>, Compound> ();
+d85 22
+d112 66
+d184 21
+@
+
+
+1.3
+log
+@Compound ==> Tuple
+@
+text
+@d10 4
+d16 2
+a17 3
+ * A CompoundMgr is associated with a particular Fulfillment and a particular
+ * CompoundCategory is responsible for maintaining the Compounds of the
+ * CompoundCategory that belong to the Fulfillment.
+d20 1
+a20 1
+final class CompoundMgr
+d30 1
+a30 1
+   CompoundMgr (Fulfillment theFulfillment, CompoundCategory thePrimCat)
+d32 1
+a32 2
+      myFulfillment      = theFulfillment;
+      myCompoundCategory = thePrimCat;
+d36 1
+a36 5
+ * Factory method:<br>
+ * Constructs a new Compound that will be maintained by this CompoundMgr.
+ *   
+ * @@param  theElemArr The coordinate Elements for the Compound.
+ * @@return            The new Compound
+d39 1
+a39 1
+   Compound newCompound (Element[] theElemArr)
+d41 24
+a64 1
+      return new Compound (myFulfillment, myCompoundCategory, theElemArr);
+d72 2
+a73 8
+ * The Fulfillment to which this CompoundMgr belongs.
+ *******************************************************************************
+ */
+   @@SuppressWarnings("unused")
+   private final Fulfillment myFulfillment;
+   
+/*******************************************************************************
+ * The CompoundCategory of the Compounds maintained by this CompoundMgr.
+d76 1
+a76 2
+   @@SuppressWarnings("unused")
+   private final CompoundCategory myCompoundCategory;
+@
+
+
+1.2
+log
+@Created class Compound.
+@
+text
+@@
+
+
+1.1
+log
+@Created class CompoundMgr.
+@
+text
+@d33 13
+@
+

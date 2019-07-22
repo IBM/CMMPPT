@@ -1,0 +1,2055 @@
+head	1.14;
+access;
+symbols
+	sce_5_01_20080919:1.13
+	latest_sce_4_20_20060523:1.12.0.4
+	sce_4_20_20060523:1.12
+	latest_sce4_20_OSL:1.12.0.2
+	sce_4_20_OSL:1.12
+	sce_4_20_20051222:1.12
+	sce_4_10_30050426:1.12
+	sce_4_05_20040511:1.11
+	sce_4_00_20040201:1.10
+	nextGenBranch:1.8.0.2
+	nextGenRoot:1.8
+	sce_3_30_20030627:1.8
+	EndRw-branch:1.7.0.2
+	Root-of-EndRw:1.7
+	EndWitRw-branch:1.5.0.4
+	Root-of-EndWitRw:1.5
+	RwToStl-branch:1.5.0.2
+	Root-of-RwToStl:1.5
+	latest_sce_3_10_20010924:1.3.0.2
+	sce_3_10_20010924:1.3;
+locks; strict;
+comment	@ * @;
+
+
+1.14
+date	2009.12.08.13.58.36;	author ervolina;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2007.05.29.20.03.33;	author ervolina;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2005.02.15.20.45.01;	author ervolina;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.04.07.19.58.33;	author ervolina;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.01.22.02.47.48;	author ervolina;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.01.10.17.56.11;	author ervolina;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2003.01.15.19.36.58;	author rwToStl;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.12.17.13.52.34;	author fasano;	state Exp;
+branches
+	1.7.2.1;
+next	1.6;
+
+1.6
+date	2002.12.17.01.10.31;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2002.11.07.19.01.09;	author austel;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.12.03.02.42.40;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.09.17.14.09.41;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.09.14.21.58.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.09.13.20.44.34;	author fasano;	state Exp;
+branches;
+next	;
+
+1.7.2.1
+date	2003.01.08.17.43.18;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.14
+log
+@more fixes for 6.1
+@
+text
+@#ifndef SCEPEGGING
+#define SCEPEGGING
+
+
+#include <scenario/src/RWToSTLHelpers.h>
+
+
+
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+#include <wit/src/wit.h>
+
+// forward declarations
+class LgFrMultiPlantHelper;
+
+
+
+//---------------------------------------------------------------------------
+// Define a SCECollectable class that contains the pair const char * and an int
+//---------------------------------------------------------------------------
+class SceConstCharStar_Int //: public SCECollectable 
+{
+// RW2STL -   RWDECLARE_COLLECTABLE(SceConstCharStar_Int);
+public:
+
+  const char * getCharStar()const{return charStar_;};
+  void setCharStar(const char * cs){charStar_=cs;};
+
+  int getInt()const{return int_;};
+  void setInt(int i){int_=i;};
+
+  int compareTo(const SceConstCharStar_Int* col) const
+  {  
+    const SceConstCharStar_Int* rhs = (const SceConstCharStar_Int*)col;
+    int compareString = strcmp(getCharStar(),rhs->getCharStar());
+    if ( compareString != 0 ) return compareString;
+    if (getInt() == rhs->getInt()) return 0;
+    return getInt() > rhs->getInt() ? 1 : -1;
+  };
+  
+  virtual bool operator==(const SceConstCharStar_Int& c) const
+  { return isEqual(&c); };
+  
+  bool isEqual(const SceConstCharStar_Int* col) const
+  {  
+    return compareTo(col) == 0;
+  }
+
+  // Constructors
+  SceConstCharStar_Int():charStar_(0),int_(0){};
+  SceConstCharStar_Int(const char * cs, int i):charStar_(cs),int_(i){};
+
+  
+  SceConstCharStar_Int(const SceConstCharStar_Int& ci):charStar_(ci.charStar_),int_(ci.int_){};
+  SceConstCharStar_Int& operator=(const SceConstCharStar_Int& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+//      (this->SCECollectable::operator= ) (ci);
+      charStar_ = ci.charStar_;
+      int_ = ci.int_;
+    }
+    return *this;
+  };
+
+  virtual ~SceConstCharStar_Int(){};
+private:
+  const char * charStar_;
+  int int_;
+};
+
+
+
+//---------------------------------------------------------------------------
+// Define a SCECollectable class that contains a double
+//---------------------------------------------------------------------------
+class SceCollectableDouble { //: public SCECollectable {
+
+
+public:
+
+  SceCollectableDouble():dbl_(0.0){};
+  SceCollectableDouble(double f):dbl_(f){};
+  SceCollectableDouble(const SceCollectableDouble& ci):dbl_(ci.dbl_){};
+  SceCollectableDouble& operator=(const SceCollectableDouble& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+//      (this->SCECollectable::operator= ) (ci);
+      dbl_ = ci.dbl_;
+    }
+    return *this;
+  };
+
+  virtual ~SceCollectableDouble(){};
+
+
+  virtual int compareTo(const SceCollectableDouble*c)const
+  { 
+    const SceCollectableDouble* rhs = (const SceCollectableDouble*)c;
+    
+    return
+      (
+      // did not build because fabs was not defined but dblEps_ was comemnted out,
+      // so the expression was replaced by a simpler equivalent.
+      dbl() == rhs->dbl() //( fabs( dbl() - rhs->dbl() ) <= /*dblEps_*/ 0.0 )
+      ? 0
+      : ( ( dbl() < rhs->dbl() )
+      ? -1 
+      : 1
+      )
+      );
+  }
+  
+  virtual bool operator==(const SceCollectableDouble& c) const
+  { return isEqual(&c); };
+  
+  virtual bool isEqual(const SceCollectableDouble* c) const
+  { 
+    return compareTo(c) == 0;
+  }
+
+  virtual double	dbl() const {return dbl_;};
+
+  virtual double dbl(double value){dbl_=value;return value;};
+
+private:
+  double dbl_; 
+  
+  //static double dblEps_;
+};	  
+
+//double SceCollectableDouble::dblEps_ = .00001;
+
+struct CompareSceConstCharStar_IntStruct 
+{
+    bool operator()(const SceConstCharStar_Int& p, const SceConstCharStar_Int& q) const
+    {
+        return p.compareTo( &q ) < 0 ? true : false;
+    }
+};
+
+typedef std::map<SceConstCharStar_Int,
+                 SceCollectableDouble,
+                 CompareSceConstCharStar_IntStruct> PartNamePeriodConsVolDictionary;
+typedef std::pair<SceConstCharStar_Int,SceCollectableDouble> PartNamePeriodConsVolPair;
+
+class LgFrSortingPartScheduleFloat;
+
+
+
+class ScePIP {
+public:
+  
+  //----------------------------------------------------------
+  // For a a given demand over a range of shipment periods,
+  // return all the parts consumed to satisfy these shipments.
+  //
+  // The wit global attribute perfPIP must be true,
+  // because this method uses witGetDemandExecVolPIP
+  // and witGetDemandSubVolPIP, which require perfPIP
+  // to be true.  
+  // 
+  // It is anticipated that SCE will use this function with
+  // firstShipPeriod=0 and lastShipPeriod=nPeriods-1
+  // 
+  // The SCE definition of consVol is the wit consVol plus
+  // shipVol (sce::ConsVol = wit::consVol + wit::shipVol)
+  // This method will return either definition based on the
+  // the value of the parameter sceConsVol.
+  //
+  // If ignoreSubstituteUsage is true, then the consVols returned
+  // is the consumpution of parts if primary parts had been used
+  // rather than substitutes.  The consVols are computed from
+  // execVols even though there might be substitute consumption.
+  //
+  // The user of this method must free the returned storage
+  // using the following code or the equivalent:
+  //   for( int cp=0; cp<nConsParts; cp++ ) free(consPartList[cp]);
+  //   free(consPartList);
+  //   free(consPerList);
+  //   free(consVolList);
+  //----------------------------------------------------------
+
+
+  static
+  witReturnCode getDemandConsVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * PIPConsVolList
+   );
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandConsVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps,
+   bool sceConsVol = false,
+   bool ignoreSubstituteUsage = true 
+   );
+
+  static
+  witReturnCode getDemandConsVolPIP (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    bool sceConsVol,
+    bool ignoreSubstituteUsage,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+
+
+
+
+
+
+
+
+
+
+  static
+  witReturnCode getSupplyVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * PIPConsVolList
+   );
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getSupplyVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   );
+
+  static
+  witReturnCode getSupplyVolPIP (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+
+
+
+
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getProdVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   );
+
+  static
+  witReturnCode getProdVolPIP (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+
+
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getSideVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   );
+
+  static
+  witReturnCode getSideVolPIP (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+
+
+
+
+
+
+
+  //----------------------------------------------------------
+  // Return the execVol's PIP to demand in specified period.
+  // The execVols are returned in a PartSchedule.
+  // This is a bit wierd.
+  // It should be an OperaionSchedule, but this object does
+  // not exist.
+  //
+  // The computed execVols are added to opSched.
+  // That is the opSched is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandExecVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & opSched
+   );
+
+  static
+  witReturnCode getDemandInterplantVolPIP ( 
+					   WitRun * const wr,
+					   LgFrMultiPlantHelper * mpHelper,
+					   const char * const partName,
+					   const char * const demandName,
+					   const int firstShipPeriod,
+					   const int lastShipPeriod,
+					   LgFrSortingPartScheduleFloat & os,
+					   bool supplierPerspectiveInterplantPeg
+					   );
+
+  
+  
+  // constructor
+  ScePIP();
+  
+  
+  // destructor
+  ~ScePIP();
+  
+  // Self-test
+  static void test();
+  
+  
+private:
+  
+  // copy constructor  -- don't use!
+  ScePIP( const ScePIP& source );
+  
+  // assignment operator -- don't use!
+  ScePIP&
+    operator=(const ScePIP& rhs);
+  
+  static
+  void updateConsDict(
+    PartNamePeriodConsVolDictionary & consDict,
+    char * consumedPartName,
+    int consPeriod,
+    double deltaConsVol);
+  
+  static
+  void computeConsVolAndUpdateConsDict(
+    WitRun * wr,
+    char * consumedPartName,
+    float * consRate,
+    float fallout,
+    int * impactPeriod,
+    float execOrSubVol,
+    int execPeriod,
+    bool increment,
+    PartNamePeriodConsVolDictionary & consDict );
+  
+  static
+  void updateConsDictFromExecOrSubVolAndBom(
+    WitRun * wr, 
+    const char * opName,
+    int bomEntryIndex,
+    int execPeriod,
+    float execOrSubVol,
+    bool isExecVol,
+    PartNamePeriodConsVolDictionary & consDict);    
+  
+  static
+  witReturnCode getDemandExecVolPIP(
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    PartNamePeriodConsVolDictionary & execDict
+    );
+
+  static
+  witReturnCode getDemandInterplantVolPIP (
+					   WitRun * const wr,
+					   LgFrMultiPlantHelper * mpHelper,
+					   const char * const partName,
+					   const char * const demandName,
+					   const int firstShipPeriod,
+					   const int lastShipPeriod,
+					   PartNamePeriodConsVolDictionary & execDict,
+					   bool supplierPerspectiveInterplantPeg
+					   );
+
+
+  
+};
+
+
+
+
+
+#endif
+
+
+
+
+
+@
+
+
+1.13
+log
+@added function to report interplantPeg from perspective of supplier location.   basically, this shifts the interplant peg earlier to accomodate interplant lead-times
+@
+text
+@a183 49
+#if 0
+  static
+  witReturnCode getDemandConsVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * PIPConsVolList,
+   bool sceConsVol = false,
+   bool ignoreSubstituteUsage = true 
+   );
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandConsVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps,
+   bool sceConsVol,
+   bool ignoreSubstituteUsage = true 
+   );
+
+  static
+  witReturnCode getDemandConsVolPIP (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    bool sceConsVol,
+    bool ignoreSubstituteUsage,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+#endif
+
+a283 14
+#if 0
+  static
+  witReturnCode getProdVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * PIPConsVolList
+   );
+#endif
+a314 15
+#if 0
+  static
+  witReturnCode getSideVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * PIPConsVolList
+   );
+
+#endif
+@
+
+
+1.12
+log
+@preping for release 4.1
+@
+text
+@d4 1
+a4 1
+// RW2STL - inserted:
+d6 2
+a7 1
+// End of RW2STL - inserted includes.
+d15 5
+d446 13
+d519 14
+@
+
+
+1.11
+log
+@added ProdVol from ProdVol Peg files
+@
+text
+@d327 1
+a327 1
+
+d340 1
+d372 45
+@
+
+
+1.10
+log
+@permanently replaced Concurrent Pegging with Post Implosion pegging.
+Parameters stay the same though.
+@
+text
+@d277 6
+d323 49
+@
+
+
+1.9
+log
+@first level of PIP
+@
+text
+@a143 161
+class ScePegging {
+public:
+  
+  //----------------------------------------------------------
+  // For a a given demand over a range of shipment periods,
+  // return all the parts consumed to satisfy these shipments.
+  //
+  // The wit global attribute perfPegging must be true,
+  // because this method uses witGetDemandExecVolPegging
+  // and witGetDemandSubVolPegging, which require perfPegging
+  // to be true.  
+  // 
+  // It is anticipated that SCE will use this function with
+  // firstShipPeriod=0 and lastShipPeriod=nPeriods-1
+  // 
+  // The SCE definition of consVol is the wit consVol plus
+  // shipVol (sce::ConsVol = wit::consVol + wit::shipVol)
+  // This method will return either definition based on the
+  // the value of the parameter sceConsVol.
+  //
+  // If ignoreSubstituteUsage is true, then the consVols returned
+  // is the consumpution of parts if primary parts had been used
+  // rather than substitutes.  The consVols are computed from
+  // execVols even though there might be substitute consumption.
+  //
+  // The user of this method must free the returned storage
+  // using the following code or the equivalent:
+  //   for( int cp=0; cp<nConsParts; cp++ ) free(consPartList[cp]);
+  //   free(consPartList);
+  //   free(consPerList);
+  //   free(consVolList);
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * peggedConsVolList,
+   bool sceConsVol = false,
+   bool ignoreSubstituteUsage = true 
+   );
+
+  //----------------------------------------------------------
+  // This method is the same as the one above except that
+  // the computed consVol is returned in an LgFr 
+  // Part Scehdule (ps).
+  //
+  // The computed consVols are added to the ps.
+  // That is the ps is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps,
+   bool sceConsVol,
+   bool ignoreSubstituteUsage = true 
+   );
+
+
+  //----------------------------------------------------------
+  // Return the execVol's pegged to demand in specified period.
+  // The execVols are returned in a PartSchedule.
+  // This is a bit wierd.
+  // It should be an OperaionSchedule, but this object does
+  // not exist.
+  //
+  // The computed execVols are added to opSched.
+  // That is the opSched is not cleared.
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandExecVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & opSched
+   );
+  
+  
+  // constructor
+  ScePegging();
+  
+  
+  // destructor
+  ~ScePegging();
+  
+  // Self-test
+  static void test();
+  
+  
+private:
+  
+  // copy constructor  -- don't use!
+  ScePegging( const ScePegging& source );
+  
+  // assignment operator -- don't use!
+  ScePegging&
+    operator=(const ScePegging& rhs);
+  
+  static
+  void updateConsDict(
+    PartNamePeriodConsVolDictionary & consDict,
+    char * consumedPartName,
+    int consPeriod,
+    double deltaConsVol);
+  
+  static
+  void computeConsVolAndUpdateConsDict(
+    WitRun * wr,
+    char * consumedPartName,
+    float * consRate,
+    float fallout,
+    int * impactPeriod,
+    float execOrSubVol,
+    int execPeriod,
+    bool increment,
+    PartNamePeriodConsVolDictionary & consDict );
+  
+  static
+  void updateConsDictFromExecOrSubVolAndBom(
+    WitRun * wr, 
+    const char * opName,
+    int bomEntryIndex,
+    int execPeriod,
+    float execOrSubVol,
+    bool isExecVol,
+    PartNamePeriodConsVolDictionary & consDict);    
+  
+  static
+  witReturnCode getDemandConsVolPegging (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    bool sceConsVol,
+    bool ignoreSubstituteUsage,
+    PartNamePeriodConsVolDictionary & consDict
+    ); 
+
+  static
+  witReturnCode getDemandExecVolPegging (
+    WitRun * const wr,
+    const char * const partName,
+    const char * const demandName,
+    const int firstShipPeriod,
+    const int lastShipPeriod,
+    PartNamePeriodConsVolDictionary & execDict
+    );
+  
+};
+@
+
+
+1.8
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@a210 16
+#if 0  
+  //----------------------------------------------------------
+  // This method returns the volume of a part (consVol) that
+  // is consumed as a substitute the specified demand for each
+  // bomEntry.
+  //
+  //----------------------------------------------------------
+  static
+  witReturnCode getDemandSubsConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod
+   );
+#endif
+d305 260
+@
+
+
+1.7
+log
+@added code to ignore subs when pegging
+@
+text
+@d4 4
+d14 122
+d137 4
+a141 1
+class RWHashDictionary;
+d187 2
+a188 2
+   RWBoolean sceConsVol = FALSE,
+   RWBoolean ignoreSubstituteUsage = TRUE 
+d207 2
+a208 2
+   RWBoolean sceConsVol,
+   RWBoolean ignoreSubstituteUsage = TRUE 
+d271 1
+a271 1
+    RWHashDictionary & consDict,
+d285 2
+a286 2
+    RWBoolean increment,
+    RWHashDictionary & consDict );
+d295 2
+a296 2
+    RWBoolean isExecVol,
+    RWHashDictionary & consDict);    
+d305 3
+a307 3
+    RWBoolean sceConsVol,
+    RWBoolean ignoreSubstituteUsage,
+    RWHashDictionary & consDict
+d317 1
+a317 1
+    RWHashDictionary & execDict
+@
+
+
+1.7.2.1
+log
+@Roguewave is gone
+@
+text
+@a3 4
+// RW2STL - inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+
+a9 122
+//---------------------------------------------------------------------------
+// Define a SCECollectable class that contains the pair const char * and an int
+//---------------------------------------------------------------------------
+class SceConstCharStar_Int //: public SCECollectable 
+{
+// RW2STL -   RWDECLARE_COLLECTABLE(SceConstCharStar_Int);
+public:
+
+  const char * getCharStar()const{return charStar_;};
+  void setCharStar(const char * cs){charStar_=cs;};
+
+  int getInt()const{return int_;};
+  void setInt(int i){int_=i;};
+
+  int compareTo(const SceConstCharStar_Int* col) const
+  {  
+    const SceConstCharStar_Int* rhs = (const SceConstCharStar_Int*)col;
+    int compareString = strcmp(getCharStar(),rhs->getCharStar());
+    if ( compareString != 0 ) return compareString;
+    if (getInt() == rhs->getInt()) return 0;
+    return getInt() > rhs->getInt() ? 1 : -1;
+  };
+  
+  virtual bool operator==(const SceConstCharStar_Int& c) const
+  { return isEqual(&c); };
+  
+  bool isEqual(const SceConstCharStar_Int* col) const
+  {  
+    return compareTo(col) == 0;
+  }
+
+  // Constructors
+  SceConstCharStar_Int():charStar_(0),int_(0){};
+  SceConstCharStar_Int(const char * cs, int i):charStar_(cs),int_(i){};
+
+  
+  SceConstCharStar_Int(const SceConstCharStar_Int& ci):charStar_(ci.charStar_),int_(ci.int_){};
+  SceConstCharStar_Int& operator=(const SceConstCharStar_Int& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+//      (this->SCECollectable::operator= ) (ci);
+      charStar_ = ci.charStar_;
+      int_ = ci.int_;
+    }
+    return *this;
+  };
+
+  virtual ~SceConstCharStar_Int(){};
+private:
+  const char * charStar_;
+  int int_;
+};
+
+
+
+//---------------------------------------------------------------------------
+// Define a SCECollectable class that contains a double
+//---------------------------------------------------------------------------
+class SceCollectableDouble { //: public SCECollectable {
+
+
+public:
+
+  SceCollectableDouble():dbl_(0.0){};
+  SceCollectableDouble(double f):dbl_(f){};
+  SceCollectableDouble(const SceCollectableDouble& ci):dbl_(ci.dbl_){};
+  SceCollectableDouble& operator=(const SceCollectableDouble& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+//      (this->SCECollectable::operator= ) (ci);
+      dbl_ = ci.dbl_;
+    }
+    return *this;
+  };
+
+  virtual ~SceCollectableDouble(){};
+
+
+  virtual int compareTo(const SceCollectableDouble*c)const
+  { 
+    const SceCollectableDouble* rhs = (const SceCollectableDouble*)c;
+    
+    return
+      (
+      // did not build because fabs was not defined but dblEps_ was comemnted out,
+      // so the expression was replaced by a simpler equivalent.
+      dbl() == rhs->dbl() //( fabs( dbl() - rhs->dbl() ) <= /*dblEps_*/ 0.0 )
+      ? 0
+      : ( ( dbl() < rhs->dbl() )
+      ? -1 
+      : 1
+      )
+      );
+  }
+  
+  virtual bool operator==(const SceCollectableDouble& c) const
+  { return isEqual(&c); };
+  
+  virtual bool isEqual(const SceCollectableDouble* c) const
+  { 
+    return compareTo(c) == 0;
+  }
+
+  virtual double	dbl() const {return dbl_;};
+
+  virtual double dbl(double value){dbl_=value;return value;};
+
+private:
+  double dbl_; 
+  
+  //static double dblEps_;
+};	  
+
+//double SceCollectableDouble::dblEps_ = .00001;
+
+struct CompareSceConstCharStar_IntStruct 
+{
+    bool operator()(const SceConstCharStar_Int& p, const SceConstCharStar_Int& q) const
+    {
+        return p.compareTo( &q ) < 0 ? true : false;
+    }
+};
+a10 4
+typedef std::map<SceConstCharStar_Int,
+                 SceCollectableDouble,
+                 CompareSceConstCharStar_IntStruct> PartNamePeriodConsVolDictionary;
+typedef std::pair<SceConstCharStar_Int,SceCollectableDouble> PartNamePeriodConsVolPair;
+d12 1
+d58 2
+a59 2
+   bool sceConsVol = false,
+   bool ignoreSubstituteUsage = true 
+d78 2
+a79 2
+   bool sceConsVol,
+   bool ignoreSubstituteUsage = true 
+d142 1
+a142 1
+    PartNamePeriodConsVolDictionary & consDict,
+d156 2
+a157 2
+    bool increment,
+    PartNamePeriodConsVolDictionary & consDict );
+d166 2
+a167 2
+    bool isExecVol,
+    PartNamePeriodConsVolDictionary & consDict);    
+d176 3
+a178 3
+    bool sceConsVol,
+    bool ignoreSubstituteUsage,
+    PartNamePeriodConsVolDictionary & consDict
+d188 1
+a188 1
+    PartNamePeriodConsVolDictionary & execDict
+@
+
+
+1.6
+log
+@Added ability to exclude substitute parts in pegging
+@
+text
+@d35 5
+d59 1
+a59 1
+   RWBoolean considerSubstituteUsage = TRUE 
+d79 1
+a79 1
+   RWBoolean considerSubstituteUsage = TRUE 
+d177 1
+a177 1
+    RWBoolean considerSubstituteUsage,
+@
+
+
+1.5
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d4 4
+d53 2
+a54 1
+   RWBoolean sceConsVol = FALSE
+d73 18
+a90 1
+   RWBoolean sceConsVol
+d92 1
+d172 1
+@
+
+
+1.4
+log
+@Added execVol pegging similar to consVol pegging
+@
+text
+@d120 1
+a120 1
+  void ScePegging::computeConsVolAndUpdateConsDict(
+@
+
+
+1.3
+log
+@Added ability to get an LgFrSchedule of pegged consVols
+@
+text
+@d53 1
+a53 1
+  // This method is the same as the one above exept that
+d70 20
+d150 10
+@
+
+
+1.2
+log
+@added ability to optionally peg sce's notion of consVol to a demand
+@
+text
+@d9 1
+d38 1
+d51 19
+d92 1
+a92 1
+  
+d99 1
+d111 1
+d120 11
+@
+
+
+1.1
+log
+@Added consVol pegging
+@
+text
+@d24 5
+d46 2
+a47 1
+   float * * peggedConsVolList
+@
+

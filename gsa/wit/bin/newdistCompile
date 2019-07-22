@@ -1,0 +1,162 @@
+#!/usr/bin/perl
+
+use IPC::Open2;
+
+# Poor man's distributed make
+# This script compiles a bunch of files at the same time on different computers.
+# Adapted by Vernon Austel to perl.
+# Could easily be used for programs other than make.
+
+# Syntax:
+#   distmake listfile make_option_1 make_option_2 ...
+# where
+#   listfile is the name of a file containing the names of the files to be made
+#     separated by whitespace (usually a bunch of .o files)
+#   make_option_* are the options to be passed to make
+
+$slave="/u/wit/bin/newdistCompileSlave";
+
+open(COMMANDS, $ARGV[0]);
+shift;
+while (<COMMANDS>) {
+    chop;	# drop trailing newline
+    unshift @commands, $_;
+}
+close(COMMANDS);
+$ncommands=@commands;
+
+#print "commands ($ncommands): @commands\n";
+
+#$CWD=$ARGV[0];
+$CWD=`pwd`;
+chop $CWD;
+#print "CWD:  $CWD\n";
+shift;
+
+@make_options = @ARGV;
+
+#print "make_options:  @make_options\n";
+
+if ($ENV{"DS_SERVER_POOL"}) {
+    @hosts=split(" ", $ENV{"DS_SERVER_POOL"});
+} else {
+    @hosts=("dci1", "bulls");
+};
+
+$nhosts=@hosts;
+
+#print "hosts:  @hosts\n";
+
+$cleanMakeflags = `echo $MAKEFLAGS | /bin/sed 's/ -- / /' `;
+
+# use index as file descriptor - yucky, but just remember it.
+$i=0;
+for $host (@hosts) {
+    $fhi = "fhi$i";
+    $fho = "fho$i";
+
+    # Use ksh regardless of what shell the users uses.
+    # Lots of quoting.
+    # Quote "'ksh" so that whatever shell executes the ksh
+    #    command and its args as a single thing;
+    #    the -c is for ksh, not the user's shell.
+    # everything after -c has to be processed by ksh as one chunk,
+    # so we quote that, too, using single-quotes.
+    # Since it's inside the perl string, we need to escape it.
+    # I would quote the path, too, but this is getting very confusing;
+    # let's hope that the path doesn't contain spaces!
+    $rcommand = "rsh $host 'ksh -c \"";
+    $rcommand .= "export PATH=/usr/gnu/bin/:$ENV{PATH}; ";
+    $rcommand .= ". /u/wit/bin/setvars.ksh; ";
+    $rcommand .= "cd $CWD; ";
+    $rcommand .= "/usr/bin/perl $slave \" '";
+
+    print "RC: $rcommand\n";
+
+    # see perl descrption of "open" command
+    # opens a pipe, sort of like you expect.
+    $pid = open2($fhi, $fho, $rcommand);
+
+    # CHANGE ARRAY!
+    $host = "$host $i";
+    
+    $pid{$host} = $pid;
+    $fhi{$host} = $fhi;
+    $fho{$host} = $fho;
+    push(@fhi, $fhi);
+    push(@fho, $fho);
+
+    $i++;
+};
+
+$nhosts = $i;
+
+$rin=fhbits(@fhi);
+$win="";
+$ein="";
+
+$n_being_processed=0;
+
+# give each slave another job as they finish a job
+# I tried priming things by sending each slave a job
+# right away, but that complicates things.
+# For simplicity, I want one syscall to read or write
+# either 1) exactly one command to execute, or
+# 2) the result of executing exactly one command.
+# If I prime things, then the slave may print out two
+# results that are read with one call here by the master;
+# that throws off the cound of things being processed.
+# I could parse the result to see if more than one was
+# executed, but that seems more complex than it is worth.
+while (@commands || ($n_being_processed!=0)) {
+    $nfound = select($rout=$rin, $wout=$win, $eout=$ein, undef);
+
+    # for each slave that has written something to us...
+    for $host (@hosts) {
+	$fhi = $fhi{$host};
+	$fho = $fho{$host};
+
+	if (vec($rout,fileno($fhi),1)==1) {
+	    #print "reading from fileno($fhi)\n";
+	    sysread  $fhi, $_, 1000;
+
+	    if (!$host_started{$host}) {
+		# each slave writes an intro line - so we can start
+		# this loop by reading.
+		# just ignore this line.
+		$host_started{$host} = 1;
+	    } else {
+		# $_ contains both the command executed and its result
+		print "\n";
+		print "$host:\n";
+		print "$_";
+		$n_being_processed--;
+	    }
+
+	    # when we eventually run out of commands,
+	    # the loop will continue until we read the remaining
+	    # results in the above statement.
+	    
+	    if (@commands) {
+		$command = pop(@commands);
+		#print "writing \"$file\" to fileno($fho)\n";
+		syswrite $fho, "$command\n", 1000;
+		$n_being_processed++;
+	    }
+	}
+    }
+}
+
+# copied from Programming Perl, 2nd ed., p. 212
+# generates a bit vector for use with select
+sub fhbits {
+    my @fhlist = @_;
+    my $bits;
+    for (@fhlist) {
+	#printf "setting %d\n", fileno($_);
+	vec($bits, fileno($_), 1) = 1;
+    }
+    return $bits;
+}
+
+

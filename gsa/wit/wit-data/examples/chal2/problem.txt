@@ -1,0 +1,132 @@
+Problem Description of the "chal2" WIT Data Set
+-----------------------------------------------
+
+by Bob Wittrock
+Revised 6/2/95
+
+The "chal2" data set is a WIT input data file that I designed as the basis
+of the "WIT Challenge" project. The idea of the WIT Challenge is roughly
+as follows: Marketers of PRM would go to a conference/trade show and present
+potential customers of PRM with the "WIT Challenge", a kind of contest:
+
+* First, implosion and other PRM concepts would be explained to the contestant.
+* Next, the contestant would be presented with a small implosion problem.
+* The contestant would propose a solution, i.e., a production and shipment
+  schedule.
+* The proposed solution would be entered into the WIT Challenge program, a
+  LgFr application.
+* Using the evaluation capabilities of WIT, the program would inform the
+  contestant whether or not the proposed solution is feasible.
+* If the solution is feasible, the program would inform the contestant of the
+  resulting objective function value.
+* The contestant might be allowed to make mulitiple entries.
+* The contestant who proposes the feasible solution with the highest
+  objective function value "wins". We may perhaps offer a prize for this.
+
+I designed the chal2 data set as the implosion problem for this contest.
+This document describes various aspects of this problem. This information
+should be useful in building the Challenge program and is information
+we should be willing to provide to the contestants. A companion document,
+"solution.txt" describes the nature of the solution, including why
+I believe it would probably be very hard for a contestant to solve
+optimally. This information should not be provided to contestants. Anyone
+wishing to be a test contestant for the Challange should avoid reading
+ths solution document and also should avoid running WIT on the data set.
+However, some people in the project should read the solution document,
+epecially, anyone who will be directly involved in designing or
+implementing the challenge program, so they won't be in the dark.
+
+The problem has 12 parts:
+
+   1 Capacity:       LaborHour
+   3 Raw Materials:  Raw1
+                     Raw2
+                     Raw3
+   3 Subassemblies   Assemble1
+                     Assemble2
+                     Assemble3
+   5 Final Products: Final1
+                     Final2
+                     Final3
+                     Final4
+                     Final5
+
+The current names of parts are abstract. If anyone wants to suggest a
+concrete set of names, that would be good.
+
+There are 5 demands, one on each final product, all called "Sales".
+
+There are 3 periods.
+
+The supply of LaborHour is the same in all periods. Supplies of all other
+parts (the material parts) are in period 0 only, essencially on-hand
+inventory. There is no supply of the final products, but there is supply
+of all raw materials and subassemblies.
+
+The demand is simple: 1000 units of each final product in period 2.
+
+I have hand drawings of the bill-of-manufacturing broken down into its two
+portions: the bill-of-materials and the bill-of-capacities. If anyone wants
+a copy, please stop by my office.
+
+The bill-of-materials structure (i.e. excluding the capacity, LaborHour)
+has some simple properties: There are 3 levels: the final products at the
+top, the subassemblies in the middle and raw materials at the bottom.
+The final products all have a cycleTime of 2 and the subassemplies all have
+a cycleTime of 1. There is at most one BOM entry connecting any product to
+any material part. The lead time (cycleTime - usageTime) for each BOM entry
+follows a very simple pattern, described in the following chart:
+
+Produced  Consumed  Lead
+Part      Part      Time
+--------  --------  ----
+Final*    Assem*    1
+Assem*    Raw*      1
+Final*    Raw*      2
+
+
+There are two substitute BOM entries.
+
+While there is only one capacity, LaborHour, there is no pattern to its use.
+Some products have multiple BOM entries consuming LaborHour, each with a
+different usageTime. This reflects that labor is used at varying and
+multiple times within a product's cycleTime.
+
+usageRates are small positive integers.
+
+Objective #1 is used. The main contributor to the objective is the
+shipment reward, which is 200 for demands on all final products
+except Final5, which has a shipment reward of 100. There is also a small
+cost for scrapping and for stocking, enough to make scrapping inappropriate
+and to discourage building ahead without need. There is no backlog cost,
+i.e., cumulative shipment reward, but this is irrelavant, since all demand is
+in the last period. There is no production cost or substitution cost.
+
+At first, it may seem that there is too much for the contestant to specify.
+There are 8 prodVols for products + 2 prodVols for substitutes + 5 shipVols,
+all in 3 periods, for a total of 45 variables to completely specify a
+solution. But since the demand is 0 before period 2, so must be the shipments.
+As for shipment in period 2, it's clear that best thing to do is to ship the
+total produced by period 2, up to the demandVol. Thus the contestant needn't
+specify the shipment schedule at all. Since the cycleTimes of all final
+products are 2, they can only be produced in period 2. Since the cycleTimes
+of all subassemblies are 1, they cannot be produced in period 0. Furthermore,
+the only reason to produce a subassembly is to provide supply for a final
+product, and the lead time for consuming a subassembly to produce a final
+product is 1. Thus there is no reason to build a subassembly in period 2, and
+so subassemblies would only be built in period 1. But this is just-in-time
+(JIT) production of the subassemblies and can be deterimined by a
+straight-forward explosion type calcuation. Thus the contestant needn't
+specify prodVols for subassemblies. As to the substitutes, they would only
+have a positive prodVol in the periods in which the product is being produced,
+in period 2 in one case and period 1 in the other.
+
+This leaves only 7 independent variables that the user actually needs
+to specify: the prodVol in period 2 for the 5 final products and the prodVol
+in the appropriate period for each of the 2 substitutes. The challange
+program could be designed to input these 7 numbers and compute the other 38,
+passing the whole resulting solution to WIT for evaluation.
+
+Note: while non-integer solutions are possible, there is an optimal
+solution that happens to be all integer and so it is reasonable to have the
+challenge program accept only integers.

@@ -1,0 +1,2496 @@
+head	1.17;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.17
+date	2011.09.28.23.49.26;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.09.24.00.27.46;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.08.30.20.17.34;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2010.10.01.18.59.12;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.09.30.19.54.05;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.09.30.18.24.07;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.09.29.23.17.13;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.09.29.22.21.22;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.09.29.22.07.52;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2010.09.29.20.57.00;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.09.29.17.53.12;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2010.09.28.22.38.18;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2010.09.28.21.54.07;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2010.09.24.22.57.29;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2010.09.24.20.17.20;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2010.09.24.19.42.26;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2010.09.24.18.17.21;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.17
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "HeurModifier.C"
+//
+// Contains the implementation of class HeurModifier
+//------------------------------------------------------------------------------
+
+#include <HeurModifier.h>
+#include <HeurAllMgr.h>
+#include <GlobalComp.h>
+#include <Capacity.h>
+#include <Operation.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <BoundSet.h>
+#include <IVRealArg.h>
+#include <AvailSched.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class HeurModifier.
+//------------------------------------------------------------------------------
+
+WitHeurModifier::WitHeurModifier (WitAvailSched * theAvailSched):
+
+      WitProbAssoc      (theAvailSched),
+      myAvailSched_     (theAvailSched),
+      toChkCapPairs_    (myProblem ()),
+      toChkOpnPairs_    (myProblem ()),
+      toChkBomEntPairs_ (myProblem ()),
+      toChkMats_        (myProblem ()),
+      toChkDemands_     (myProblem ()),
+      chkNeededMat_     (myProblem (), false),
+      chkNeededDemand_  (myProblem (), false)
+   {
+   checkPreconditions ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitHeurModifier::~WitHeurModifier ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modifyForExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForExecVol (theOpn, theVec);
+   modAvailForExecVol (theOpn, theVec);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modifyForSubVol (
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForSubVol (theSub, theVec);
+   modAvailForSubVol (theSub, theVec);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modifyForShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForShipVol (theDemand, theVec);
+   modAvailForShipVol (theDemand, theVec);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkFeasibility ()
+   {
+   checkCapPairs    ();
+   checkMats        ();
+   checkOpnPairs    ();
+   checkBomEntPairs ();
+   checkDemands     ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkPreconditions ()
+   {
+   if (not myGlobalComp ()->                    selectionRecovery     ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "selectionRecovery",   true);
+
+   if (    myGlobalComp ()->                    skipFailures          ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "skipFailures",        false);
+
+   if (    myGlobalComp ()->                    perfPegging           ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "perfPegging",         false);
+
+   if (    myGlobalComp ()->                    computeCriticalList   ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "computeCriticalList", false);
+
+   if (    myGlobalComp ()->                    pgdCritListMode       ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "pgdCritListMode",     false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::recNeedsForExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod     execPer;
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     impactPer;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theOpn->execVol ()[execPer])
+         {
+         toChkOpnPairs_.push (theOpn, execPer);
+
+         forEachEl (theBomEnt, theOpn->bom ())
+            {
+            if (not theBomEnt->mySubEntries ().isEmpty ())
+               {
+               toChkBomEntPairs_.push (theBomEnt, execPer);
+               }
+
+            if (theBomEnt->inEffect (execPer))
+               {
+               thePart   = theBomEnt->myPart       ();
+               impactPer = theBomEnt->impactPeriod ()[execPer];
+
+               recPartPairNeed (thePart, impactPer);
+               }
+            }
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            {
+            if (theBopEnt->inEffect (execPer))
+               {
+               thePart   = theBopEnt->myPart       ();
+               impactPer = theBopEnt->impactPeriod ()[execPer];
+
+               recPartPairNeed (thePart, impactPer);
+               }
+            }
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::recNeedsForSubVol (
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+   WitPeriod     consPer;
+
+   theBomEnt = theSub->myBomEnt ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theSub->subVol ()[execPer])
+         {
+         toChkBomEntPairs_.push (theBomEnt, execPer);
+
+         if (theSub->inEffect (execPer))
+            {
+            consPer = theSub->impactPeriod ()[execPer];
+
+            recPartPairNeed (theSub->myPart (), consPer);
+            }
+
+         if (theBomEnt->inEffect (execPer))
+            {
+            consPer = theBomEnt->impactPeriod ()[execPer];
+
+            recPartPairNeed (theBomEnt->myPart (), consPer);
+            }
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::recNeedsForShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod shipPer;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      if (theVec[shipPer] != theDemand->shipVol ()[shipPer])
+         {
+         if (not chkNeededDemand_ (theDemand))
+            {
+            chkNeededDemand_ (theDemand) = true;
+
+            toChkDemands_.push (theDemand);
+            }
+
+         recPartPairNeed (theDemand->demandedPart (), shipPer);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::recPartPairNeed (WitPart * thePart, WitPeriod thePer)
+   {
+   WitMaterial * theMat;
+
+   theMat = thePart->thisMat ();
+
+   if (theMat != NULL)
+      {
+      if (not chkNeededMat_ (theMat))
+         {
+         chkNeededMat_ (theMat) = true;
+
+         toChkMats_.push (theMat);
+         }
+      }
+   else
+      {
+      toChkCapPairs_.push (thePart, thePer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modAvailForExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod     execPer;
+   double        deltaExecVol;
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     impactPer;
+   double        deltaAvailVol;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaExecVol =
+           theVec            [execPer]
+         - theOpn->execVol ()[execPer];
+
+      if (fabs (deltaExecVol) < NET_TOL)
+         continue;
+
+      forEachEl (theBomEnt, theOpn->bom ())
+         {
+         if (not theBomEnt->inEffect (execPer))
+            continue;
+
+         thePart       =   theBomEnt->myPart       ();
+         impactPer     =   theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = - theBomEnt->effConsRate  ()[execPer] * deltaExecVol;
+
+         myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+
+      forEachEl (theBopEnt, theOpn->bop ())
+         {
+         if (not theBopEnt->inEffect (execPer))
+            continue;
+
+         thePart       = theBopEnt->myPart       ();
+         impactPer     = theBopEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBopEnt->effProdRate  ()[execPer] * deltaExecVol;
+
+         myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modAvailForSubVol (
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitPart *     theSubPart;
+   WitBomEntry * theBomEnt;
+   WitPart *     theBomPart;
+   WitPeriod     execPer;
+   double        deltaSubVol;
+   WitPeriod     consPer;
+   double        deltaAvailVol;
+
+   theSubPart = theSub   ->myPart   ();
+   theBomEnt  = theSub   ->myBomEnt ();
+   theBomPart = theBomEnt->myPart   ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaSubVol =
+           theVec           [execPer]
+         - theSub->subVol ()[execPer];
+
+      if (fabs (deltaSubVol) < NET_TOL)
+         continue;
+
+      if (theSub->inEffect (execPer))
+         {
+         consPer       =   theSub->impactPeriod ()[execPer];
+         deltaAvailVol = - theSub->effConsRate  ()[execPer] * deltaSubVol;
+
+         myAvailSched_->addToIncAvailVol (theSubPart, consPer, deltaAvailVol);
+         }
+
+      if (theBomEnt->inEffect (execPer))
+         {
+         consPer       = theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBomEnt->effConsRate  ()[execPer] * deltaSubVol;
+
+         myAvailSched_->addToIncAvailVol (theBomPart, consPer, deltaAvailVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::modAvailForShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   WitPart * thePart;
+   WitPeriod shipPer;
+   double    deltaShipVol;
+
+   thePart = theDemand->demandedPart ();
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      deltaShipVol =
+           theVec               [shipPer]
+         - theDemand->shipVol ()[shipPer];
+
+      if (fabs (deltaShipVol) < NET_TOL)
+         continue;
+
+      myAvailSched_->addToIncAvailVol (thePart, shipPer, - deltaShipVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkCapPairs ()
+   {
+   WitPart *     thePart;
+   WitPeriod     thePer;
+   WitCapacity * theCap;
+
+   while (toChkCapPairs_.pop (thePart, thePer))
+      {
+      theCap = thePart->thisCap ();
+
+      witAssert (theCap != NULL);
+
+      checkScrapCon (theCap, thePer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkMats ()
+   {
+   WitMaterial * theMat;
+
+   while (toChkMats_.pop (theMat))
+      {
+      chkNeededMat_ (theMat) = false;
+
+      checkScrapCon (theMat);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkOpnPairs ()
+   {
+   WitOperation * theOpn;
+   WitPeriod      execPer;
+
+   while (toChkOpnPairs_.pop (theOpn, execPer))
+      {
+      checkNonExecCon (theOpn, execPer);
+      checkExecHUBCon (theOpn, execPer); 
+      checkLotSizeCon (theOpn, execPer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkBomEntPairs ()
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+
+   while (toChkBomEntPairs_.pop (theBomEnt, execPer))
+      {
+      checkSubCon (theBomEnt, execPer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkDemands ()
+   {
+   WitDemand * theDemand;
+
+   while (toChkDemands_.pop (theDemand))
+      {
+      chkNeededDemand_ (theDemand) = false;
+
+      checkCumShipCon (theDemand);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkScrapCon (WitCapacity * theCap, WitPeriod thePer)
+   {
+   double theScrapVol;
+
+   theScrapVol = myAvailSched_->incAvailVol (theCap, thePer);
+
+   if (theScrapVol < - FEAS_TOL)
+      {
+      myMsgFac () ("modHeurScrapViolSmsg",
+         theCap->partName (),
+         thePer,
+         theScrapVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkScrapCon (WitMaterial * theMat)
+   {
+   double    cumAvail;
+   WitPeriod thePer;
+
+   cumAvail = 0.0;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      cumAvail += myAvailSched_->incAvailVol (theMat, thePer);
+
+      if (cumAvail < - FEAS_TOL)
+         {
+         myMsgFac () ("modHeurScrapViolSmsg",
+            theMat->partName (),
+            thePer,
+            cumAvail);
+         }
+
+      if (not theMat->canStock (thePer))
+         cumAvail = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkNonExecCon (WitOperation * theOpn, WitPeriod execPer)
+   {
+   if (not theOpn->executable ()[execPer])
+      if (theOpn->execVol ()[execPer] > 0.0)
+         {
+         myMsgFac () ("modHeurNonExecViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theOpn->execVol ()[execPer]);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkExecHUBCon (WitOperation * theOpn, WitPeriod execPer)
+   {
+   double hardUBVal;
+   double violation;
+
+   if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+      {
+      hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+
+      violation = positivePart (theOpn->execVol ()[execPer] - hardUBVal);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurExecHUBViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theOpn->execVol ()[execPer],
+            hardUBVal,
+            violation);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkLotSizeCon (WitOperation * theOpn, WitPeriod execPer)
+   {
+   double delta;
+   double violation;
+
+   delta     = theOpn->lotSizeDelta (execPer, theOpn->execVol ()[execPer], 0.0);
+
+   violation = positivePart (delta);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("modHeurLotSizeViolSmsg",
+         theOpn->operationName (),
+         execPer,
+         theOpn->execVol ()[execPer],
+         violation);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkSubCon (WitBomEntry * theBomEnt, WitPeriod execPer)
+   {
+   double        sumSubVols;
+   WitSubEntry * theSub;
+   double        theExecVol;
+   double        violation;
+
+   sumSubVols = 0.0;
+
+   forEachEl (theSub, theBomEnt->mySubEntries ())
+      {
+      sumSubVols += theSub->subVol ()[execPer];
+      }
+
+   theExecVol = theBomEnt->myOperation ()->execVol ()[execPer];
+
+   violation  = positivePart (sumSubVols - theExecVol);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("modHeurSubViolSmsg",
+         theBomEnt->myOperationName (),
+         theBomEnt->localIndex      (),
+         execPer,
+         theExecVol,
+         sumSubVols,
+         violation);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkCumShipCon (WitDemand * theDemand)
+   {
+   double    cumDemandVol;
+   double    cumShipVol;
+   WitPeriod shipPer;
+   double    violation;
+
+   cumDemandVol = 0.0;
+   cumShipVol   = 0.0;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      cumDemandVol += theDemand->demandVol ()[shipPer];
+      cumShipVol   += theDemand->shipVol   ()[shipPer];
+
+      violation     = positivePart (cumShipVol - cumDemandVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurCumShipViolSmsg",
+            theDemand->demandedPartName (),
+            theDemand->demandName       (),
+            shipPer,
+            cumShipVol,
+            cumDemandVol,
+            violation);
+         }
+      }
+   }
+@
+
+
+1.16
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.15
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d35 12
+a46 12
+WitProbAssoc      (theAvailSched),
+myAvailSched_     (theAvailSched),
+toChkCapPairs_    (myProblem ()),
+toChkOpnPairs_    (myProblem ()),
+toChkBomEntPairs_ (myProblem ()),
+toChkMats_        (myProblem ()),
+toChkDemands_     (myProblem ()),
+chkNeededMat_     (myProblem (), false),
+chkNeededDemand_  (myProblem (), false)
+{
+checkPreconditions ();
+}
+d51 2
+a52 2
+{
+}
+d57 6
+a62 6
+WitOperation *       theOpn,
+const WitIVRealArg & theVec)
+{
+recNeedsForExecVol (theOpn, theVec);
+modAvailForExecVol (theOpn, theVec);
+}
+d67 6
+a72 6
+WitSubEntry *        theSub,
+const WitIVRealArg & theVec)
+{
+recNeedsForSubVol (theSub, theVec);
+modAvailForSubVol (theSub, theVec);
+}
+d77 6
+a82 6
+WitDemand *          theDemand,
+const WitIVRealArg & theVec)
+{
+recNeedsForShipVol (theDemand, theVec);
+modAvailForShipVol (theDemand, theVec);
+}
+d87 7
+a93 7
+{
+checkCapPairs    ();
+checkMats        ();
+checkOpnPairs    ();
+checkBomEntPairs ();
+checkDemands     ();
+}
+d98 16
+a113 16
+{
+if (not myGlobalComp ()->                    selectionRecovery     ())
+myMsgFac () ("boolAttInvForModHeurSmsg", "selectionRecovery",   true);
+
+if (    myGlobalComp ()->                    skipFailures          ())
+myMsgFac () ("boolAttInvForModHeurSmsg", "skipFailures",        false);
+
+if (    myGlobalComp ()->                    perfPegging           ())
+myMsgFac () ("boolAttInvForModHeurSmsg", "perfPegging",         false);
+
+if (    myGlobalComp ()->                    computeCriticalList   ())
+myMsgFac () ("boolAttInvForModHeurSmsg", "computeCriticalList", false);
+
+if (    myGlobalComp ()->                    pgdCritListMode       ())
+myMsgFac () ("boolAttInvForModHeurSmsg", "pgdCritListMode",     false);
+}
+d118 44
+a161 44
+WitOperation *       theOpn,
+const WitIVRealArg & theVec)
+{
+WitPeriod     execPer;
+WitBomEntry * theBomEnt;
+WitBopEntry * theBopEnt;
+WitPart *     thePart;
+WitPeriod     impactPer;
+
+forEachPeriod (execPer, myProblem ())
+{
+if (theVec[execPer] != theOpn->execVol ()[execPer])
+{
+toChkOpnPairs_.push (theOpn, execPer);
+
+forEachEl (theBomEnt, theOpn->bom ())
+{
+if (not theBomEnt->mySubEntries ().isEmpty ())
+{
+toChkBomEntPairs_.push (theBomEnt, execPer);
+}
+
+if (theBomEnt->inEffect (execPer))
+{
+thePart   = theBomEnt->myPart       ();
+impactPer = theBomEnt->impactPeriod ()[execPer];
+
+recPartPairNeed (thePart, impactPer);
+}
+}
+
+forEachEl (theBopEnt, theOpn->bop ())
+{
+if (theBopEnt->inEffect (execPer))
+{
+thePart   = theBopEnt->myPart       ();
+impactPer = theBopEnt->impactPeriod ()[execPer];
+
+recPartPairNeed (thePart, impactPer);
+}
+}
+}
+}
+}
+d166 31
+a196 31
+WitSubEntry *        theSub,
+const WitIVRealArg & theVec)
+{
+WitBomEntry * theBomEnt;
+WitPeriod     execPer;
+WitPeriod     consPer;
+
+theBomEnt = theSub->myBomEnt ();
+
+forEachPeriod (execPer, myProblem ())
+{
+if (theVec[execPer] != theSub->subVol ()[execPer])
+{
+toChkBomEntPairs_.push (theBomEnt, execPer);
+
+if (theSub->inEffect (execPer))
+{
+consPer = theSub->impactPeriod ()[execPer];
+
+recPartPairNeed (theSub->myPart (), consPer);
+}
+
+if (theBomEnt->inEffect (execPer))
+{
+consPer = theBomEnt->impactPeriod ()[execPer];
+
+recPartPairNeed (theBomEnt->myPart (), consPer);
+}
+}
+}
+}
+d201 20
+a220 20
+WitDemand *          theDemand,
+const WitIVRealArg & theVec)
+{
+WitPeriod shipPer;
+
+forEachPeriod (shipPer, myProblem ())
+{
+if (theVec[shipPer] != theDemand->shipVol ()[shipPer])
+{
+if (not chkNeededDemand_ (theDemand))
+{
+chkNeededDemand_ (theDemand) = true;
+
+toChkDemands_.push (theDemand);
+}
+
+recPartPairNeed (theDemand->demandedPart (), shipPer);
+}
+}
+}
+d225 2
+a226 2
+{
+WitMaterial * theMat;
+d228 1
+a228 1
+theMat = thePart->thisMat ();
+d230 14
+a243 14
+if (theMat != NULL)
+{
+if (not chkNeededMat_ (theMat))
+{
+chkNeededMat_ (theMat) = true;
+
+toChkMats_.push (theMat);
+}
+}
+else
+{
+toChkCapPairs_.push (thePart, thePer);
+}
+}
+d248 45
+a292 45
+WitOperation *       theOpn,
+const WitIVRealArg & theVec)
+{
+WitPeriod     execPer;
+double        deltaExecVol;
+WitBomEntry * theBomEnt;
+WitBopEntry * theBopEnt;
+WitPart *     thePart;
+WitPeriod     impactPer;
+double        deltaAvailVol;
+
+forEachPeriod (execPer, myProblem ())
+{
+deltaExecVol =
+theVec            [execPer]
+- theOpn->execVol ()[execPer];
+
+if (fabs (deltaExecVol) < NET_TOL)
+continue;
+
+forEachEl (theBomEnt, theOpn->bom ())
+{
+if (not theBomEnt->inEffect (execPer))
+continue;
+
+thePart       =   theBomEnt->myPart       ();
+impactPer     =   theBomEnt->impactPeriod ()[execPer];
+deltaAvailVol = - theBomEnt->effConsRate  ()[execPer] * deltaExecVol;
+
+myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+}
+
+forEachEl (theBopEnt, theOpn->bop ())
+{
+if (not theBopEnt->inEffect (execPer))
+continue;
+
+thePart       = theBopEnt->myPart       ();
+impactPer     = theBopEnt->impactPeriod ()[execPer];
+deltaAvailVol = theBopEnt->effProdRate  ()[execPer] * deltaExecVol;
+
+myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+}
+}
+}
+d297 41
+a337 41
+WitSubEntry *        theSub,
+const WitIVRealArg & theVec)
+{
+WitPart *     theSubPart;
+WitBomEntry * theBomEnt;
+WitPart *     theBomPart;
+WitPeriod     execPer;
+double        deltaSubVol;
+WitPeriod     consPer;
+double        deltaAvailVol;
+
+theSubPart = theSub   ->myPart   ();
+theBomEnt  = theSub   ->myBomEnt ();
+theBomPart = theBomEnt->myPart   ();
+
+forEachPeriod (execPer, myProblem ())
+{
+deltaSubVol =
+theVec           [execPer]
+- theSub->subVol ()[execPer];
+
+if (fabs (deltaSubVol) < NET_TOL)
+continue;
+
+if (theSub->inEffect (execPer))
+{
+consPer       =   theSub->impactPeriod ()[execPer];
+deltaAvailVol = - theSub->effConsRate  ()[execPer] * deltaSubVol;
+
+myAvailSched_->addToIncAvailVol (theSubPart, consPer, deltaAvailVol);
+}
+
+if (theBomEnt->inEffect (execPer))
+{
+consPer       = theBomEnt->impactPeriod ()[execPer];
+deltaAvailVol = theBomEnt->effConsRate  ()[execPer] * deltaSubVol;
+
+myAvailSched_->addToIncAvailVol (theBomPart, consPer, deltaAvailVol);
+}
+}
+}
+d342 21
+a362 21
+WitDemand *          theDemand,
+const WitIVRealArg & theVec)
+{
+WitPart * thePart;
+WitPeriod shipPer;
+double    deltaShipVol;
+
+thePart = theDemand->demandedPart ();
+
+forEachPeriod (shipPer, myProblem ())
+{
+deltaShipVol =
+theVec               [shipPer]
+- theDemand->shipVol ()[shipPer];
+
+if (fabs (deltaShipVol) < NET_TOL)
+continue;
+
+myAvailSched_->addToIncAvailVol (thePart, shipPer, - deltaShipVol);
+}
+}
+d367 14
+a380 14
+{
+WitPart *     thePart;
+WitPeriod     thePer;
+WitCapacity * theCap;
+
+while (toChkCapPairs_.pop (thePart, thePer))
+{
+theCap = thePart->thisCap ();
+
+witAssert (theCap != NULL);
+
+checkScrapCon (theCap, thePer);
+}
+}
+d385 2
+a386 2
+{
+WitMaterial * theMat;
+d388 7
+a394 7
+while (toChkMats_.pop (theMat))
+{
+chkNeededMat_ (theMat) = false;
+
+checkScrapCon (theMat);
+}
+}
+d399 11
+a409 11
+{
+WitOperation * theOpn;
+WitPeriod      execPer;
+
+while (toChkOpnPairs_.pop (theOpn, execPer))
+{
+checkNonExecCon (theOpn, execPer);
+checkExecHUBCon (theOpn, execPer);
+checkLotSizeCon (theOpn, execPer);
+}
+}
+d414 9
+a422 9
+{
+WitBomEntry * theBomEnt;
+WitPeriod     execPer;
+
+while (toChkBomEntPairs_.pop (theBomEnt, execPer))
+{
+checkSubCon (theBomEnt, execPer);
+}
+}
+d427 2
+a428 2
+{
+WitDemand * theDemand;
+d430 7
+a436 7
+while (toChkDemands_.pop (theDemand))
+{
+chkNeededDemand_ (theDemand) = false;
+
+checkCumShipCon (theDemand);
+}
+}
+d441 2
+a442 2
+{
+double theScrapVol;
+d444 1
+a444 1
+theScrapVol = myAvailSched_->incAvailVol (theCap, thePer);
+d446 8
+a453 8
+if (theScrapVol < - FEAS_TOL)
+{
+myMsgFac () ("modHeurScrapViolSmsg",
+theCap->partName (),
+thePer,
+theScrapVol);
+}
+}
+d458 22
+a479 22
+{
+double    cumAvail;
+WitPeriod thePer;
+
+cumAvail = 0.0;
+
+forEachPeriod (thePer, myProblem ())
+{
+cumAvail += myAvailSched_->incAvailVol (theMat, thePer);
+
+if (cumAvail < - FEAS_TOL)
+{
+myMsgFac () ("modHeurScrapViolSmsg",
+theMat->partName (),
+thePer,
+cumAvail);
+}
+
+if (not theMat->canStock (thePer))
+cumAvail = 0.0;
+}
+}
+d484 10
+a493 10
+{
+if (not theOpn->executable ()[execPer])
+if (theOpn->execVol ()[execPer] > 0.0)
+{
+myMsgFac () ("modHeurNonExecViolSmsg",
+theOpn->operationName (),
+execPer,
+theOpn->execVol ()[execPer]);
+}
+}
+d498 21
+a518 21
+{
+double hardUBVal;
+double violation;
+
+if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+{
+hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+
+violation = positivePart (theOpn->execVol ()[execPer] - hardUBVal);
+
+if (violation > FEAS_TOL)
+{
+myMsgFac () ("modHeurExecHUBViolSmsg",
+theOpn->operationName (),
+execPer,
+theOpn->execVol ()[execPer],
+hardUBVal,
+violation);
+}
+}
+}
+d523 17
+a539 17
+{
+double delta;
+double violation;
+
+delta     = theOpn->lotSizeDelta (execPer, theOpn->execVol ()[execPer], 0.0);
+
+violation = positivePart (delta);
+
+if (violation > FEAS_TOL)
+{
+myMsgFac () ("modHeurLotSizeViolSmsg",
+theOpn->operationName (),
+execPer,
+theOpn->execVol ()[execPer],
+violation);
+}
+}
+d544 28
+a571 28
+{
+double        sumSubVols;
+WitSubEntry * theSub;
+double        theExecVol;
+double        violation;
+
+sumSubVols = 0.0;
+
+forEachEl (theSub, theBomEnt->mySubEntries ())
+{
+sumSubVols += theSub->subVol ()[execPer];
+}
+
+theExecVol = theBomEnt->myOperation ()->execVol ()[execPer];
+
+violation  = positivePart (sumSubVols - theExecVol);
+
+if (violation > FEAS_TOL)
+{
+myMsgFac () ("modHeurSubViolSmsg",
+theBomEnt->myOperationName (),
+theBomEnt->localIndex      (),
+execPer,
+theExecVol,
+sumSubVols,
+violation);
+}
+}
+d576 28
+a603 28
+{
+double    cumDemandVol;
+double    cumShipVol;
+WitPeriod shipPer;
+double    violation;
+
+cumDemandVol = 0.0;
+cumShipVol   = 0.0;
+
+forEachPeriod (shipPer, myProblem ())
+{
+cumDemandVol += theDemand->demandVol ()[shipPer];
+cumShipVol   += theDemand->shipVol   ()[shipPer];
+
+violation     = positivePart (cumShipVol - cumDemandVol);
+
+if (violation > FEAS_TOL)
+{
+myMsgFac () ("modHeurCumShipViolSmsg",
+theDemand->demandedPartName (),
+theDemand->demandName       (),
+shipPer,
+cumShipVol,
+cumDemandVol,
+violation);
+}
+}
+}
+@
+
+
+1.14
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d35 12
+a46 12
+      WitProbAssoc      (theAvailSched),
+      myAvailSched_     (theAvailSched),
+      toChkCapPairs_    (myProblem ()),
+      toChkOpnPairs_    (myProblem ()),
+      toChkBomEntPairs_ (myProblem ()),
+      toChkMats_        (myProblem ()),
+      toChkDemands_     (myProblem ()),
+      chkNeededMat_     (myProblem (), false),
+      chkNeededDemand_  (myProblem (), false)
+   {
+   checkPreconditions ();
+   }
+d51 2
+a52 2
+   {
+   }
+d57 6
+a62 6
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForExecVol (theOpn, theVec);
+   modAvailForExecVol (theOpn, theVec);
+   }
+d67 6
+a72 6
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForSubVol (theSub, theVec);
+   modAvailForSubVol (theSub, theVec);
+   }
+d77 6
+a82 6
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   recNeedsForShipVol (theDemand, theVec);
+   modAvailForShipVol (theDemand, theVec);
+   }
+d87 7
+a93 7
+   {
+   checkCapPairs    ();
+   checkMats        ();
+   checkOpnPairs    ();
+   checkBomEntPairs ();
+   checkDemands     ();
+   }
+d98 16
+a113 16
+   {
+   if (not myGlobalComp ()->                    selectionRecovery     ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "selectionRecovery",   true);
+
+   if (    myGlobalComp ()->                    skipFailures          ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "skipFailures",        false);
+
+   if (    myGlobalComp ()->                    perfPegging           ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "perfPegging",         false);
+
+   if (    myGlobalComp ()->                    computeCriticalList   ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "computeCriticalList", false);
+
+   if (    myGlobalComp ()->                    pgdCritListMode       ())
+      myMsgFac () ("boolAttInvForModHeurSmsg", "pgdCritListMode",     false);
+   }
+d118 44
+a161 44
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod     execPer;
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     impactPer;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theOpn->execVol ()[execPer])
+         {
+         toChkOpnPairs_.push (theOpn, execPer);
+
+         forEachEl (theBomEnt, theOpn->bom ())
+            {
+            if (not theBomEnt->mySubEntries ().isEmpty ())
+               {
+               toChkBomEntPairs_.push (theBomEnt, execPer);
+               }
+
+            if (theBomEnt->inEffect (execPer))
+               {
+               thePart   = theBomEnt->myPart       ();
+               impactPer = theBomEnt->impactPeriod ()[execPer];
+
+               recPartPairNeed (thePart, impactPer);
+               }
+            }
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            {
+            if (theBopEnt->inEffect (execPer))
+               {
+               thePart   = theBopEnt->myPart       ();
+               impactPer = theBopEnt->impactPeriod ()[execPer];
+
+               recPartPairNeed (thePart, impactPer);
+               }
+            }
+         }
+      }
+   }
+d166 31
+a196 31
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+   WitPeriod     consPer;
+
+   theBomEnt = theSub->myBomEnt ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theSub->subVol ()[execPer])
+         {
+         toChkBomEntPairs_.push (theBomEnt, execPer);
+
+         if (theSub->inEffect (execPer))
+            {
+            consPer = theSub->impactPeriod ()[execPer];
+
+            recPartPairNeed (theSub->myPart (), consPer);
+            }
+
+         if (theBomEnt->inEffect (execPer))
+            {
+            consPer = theBomEnt->impactPeriod ()[execPer];
+
+            recPartPairNeed (theBomEnt->myPart (), consPer);
+            }
+         }
+      }
+   }
+d201 20
+a220 20
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod shipPer;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      if (theVec[shipPer] != theDemand->shipVol ()[shipPer])
+         {
+         if (not chkNeededDemand_ (theDemand))
+            {
+            chkNeededDemand_ (theDemand) = true;
+
+            toChkDemands_.push (theDemand);
+            }
+
+         recPartPairNeed (theDemand->demandedPart (), shipPer);
+         }
+      }
+   }
+d225 2
+a226 2
+   {
+   WitMaterial * theMat;
+d228 1
+a228 1
+   theMat = thePart->thisMat ();
+d230 14
+a243 14
+   if (theMat != NULL)
+      {
+      if (not chkNeededMat_ (theMat))
+         {
+         chkNeededMat_ (theMat) = true;
+
+         toChkMats_.push (theMat);
+         }
+      }
+   else
+      {
+      toChkCapPairs_.push (thePart, thePer);
+      }
+   }
+d248 45
+a292 45
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod     execPer;
+   double        deltaExecVol;
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     impactPer;
+   double        deltaAvailVol;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaExecVol =
+           theVec            [execPer]
+         - theOpn->execVol ()[execPer];
+
+      if (fabs (deltaExecVol) < NET_TOL)
+         continue;
+
+      forEachEl (theBomEnt, theOpn->bom ())
+         {
+         if (not theBomEnt->inEffect (execPer))
+            continue;
+
+         thePart       =   theBomEnt->myPart       ();
+         impactPer     =   theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = - theBomEnt->effConsRate  ()[execPer] * deltaExecVol;
+
+         myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+
+      forEachEl (theBopEnt, theOpn->bop ())
+         {
+         if (not theBopEnt->inEffect (execPer))
+            continue;
+
+         thePart       = theBopEnt->myPart       ();
+         impactPer     = theBopEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBopEnt->effProdRate  ()[execPer] * deltaExecVol;
+
+         myAvailSched_->addToIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+      }
+   }
+d297 41
+a337 41
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitPart *     theSubPart;
+   WitBomEntry * theBomEnt;
+   WitPart *     theBomPart;
+   WitPeriod     execPer;
+   double        deltaSubVol;
+   WitPeriod     consPer;
+   double        deltaAvailVol;
+
+   theSubPart = theSub   ->myPart   ();
+   theBomEnt  = theSub   ->myBomEnt ();
+   theBomPart = theBomEnt->myPart   ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaSubVol =
+           theVec           [execPer]
+         - theSub->subVol ()[execPer];
+
+      if (fabs (deltaSubVol) < NET_TOL)
+         continue;
+
+      if (theSub->inEffect (execPer))
+         {
+         consPer       =   theSub->impactPeriod ()[execPer];
+         deltaAvailVol = - theSub->effConsRate  ()[execPer] * deltaSubVol;
+
+         myAvailSched_->addToIncAvailVol (theSubPart, consPer, deltaAvailVol);
+         }
+
+      if (theBomEnt->inEffect (execPer))
+         {
+         consPer       = theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBomEnt->effConsRate  ()[execPer] * deltaSubVol;
+
+         myAvailSched_->addToIncAvailVol (theBomPart, consPer, deltaAvailVol);
+         }
+      }
+   }
+d342 21
+a362 21
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   WitPart * thePart;
+   WitPeriod shipPer;
+   double    deltaShipVol;
+
+   thePart = theDemand->demandedPart ();
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      deltaShipVol =
+           theVec               [shipPer]
+         - theDemand->shipVol ()[shipPer];
+
+      if (fabs (deltaShipVol) < NET_TOL)
+         continue;
+
+      myAvailSched_->addToIncAvailVol (thePart, shipPer, - deltaShipVol);
+      }
+   }
+d367 14
+a380 14
+   {
+   WitPart *     thePart;
+   WitPeriod     thePer;
+   WitCapacity * theCap;
+
+   while (toChkCapPairs_.pop (thePart, thePer))
+      {
+      theCap = thePart->thisCap ();
+
+      witAssert (theCap != NULL);
+
+      checkScrapCon (theCap, thePer);
+      }
+   }
+d385 2
+a386 2
+   {
+   WitMaterial * theMat;
+d388 7
+a394 7
+   while (toChkMats_.pop (theMat))
+      {
+      chkNeededMat_ (theMat) = false;
+
+      checkScrapCon (theMat);
+      }
+   }
+d399 11
+a409 11
+   {
+   WitOperation * theOpn;
+   WitPeriod      execPer;
+
+   while (toChkOpnPairs_.pop (theOpn, execPer))
+      {
+      checkNonExecCon (theOpn, execPer);
+      checkExecHUBCon (theOpn, execPer); 
+      checkLotSizeCon (theOpn, execPer);
+      }
+   }
+d414 9
+a422 9
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+
+   while (toChkBomEntPairs_.pop (theBomEnt, execPer))
+      {
+      checkSubCon (theBomEnt, execPer);
+      }
+   }
+d427 2
+a428 2
+   {
+   WitDemand * theDemand;
+d430 7
+a436 7
+   while (toChkDemands_.pop (theDemand))
+      {
+      chkNeededDemand_ (theDemand) = false;
+
+      checkCumShipCon (theDemand);
+      }
+   }
+d441 2
+a442 2
+   {
+   double theScrapVol;
+d444 1
+a444 1
+   theScrapVol = myAvailSched_->incAvailVol (theCap, thePer);
+d446 8
+a453 8
+   if (theScrapVol < - FEAS_TOL)
+      {
+      myMsgFac () ("modHeurScrapViolSmsg",
+         theCap->partName (),
+         thePer,
+         theScrapVol);
+      }
+   }
+d458 22
+a479 22
+   {
+   double    cumAvail;
+   WitPeriod thePer;
+
+   cumAvail = 0.0;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      cumAvail += myAvailSched_->incAvailVol (theMat, thePer);
+
+      if (cumAvail < - FEAS_TOL)
+         {
+         myMsgFac () ("modHeurScrapViolSmsg",
+            theMat->partName (),
+            thePer,
+            cumAvail);
+         }
+
+      if (not theMat->canStock (thePer))
+         cumAvail = 0.0;
+      }
+   }
+d484 10
+a493 10
+   {
+   if (not theOpn->executable ()[execPer])
+      if (theOpn->execVol ()[execPer] > 0.0)
+         {
+         myMsgFac () ("modHeurNonExecViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theOpn->execVol ()[execPer]);
+         }
+   }
+d498 21
+a518 21
+   {
+   double hardUBVal;
+   double violation;
+
+   if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+      {
+      hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+
+      violation = positivePart (theOpn->execVol ()[execPer] - hardUBVal);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurExecHUBViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theOpn->execVol ()[execPer],
+            hardUBVal,
+            violation);
+         }
+      }
+   }
+d523 17
+a539 17
+   {
+   double delta;
+   double violation;
+
+   delta     = theOpn->lotSizeDelta (execPer, theOpn->execVol ()[execPer], 0.0);
+
+   violation = positivePart (delta);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("modHeurLotSizeViolSmsg",
+         theOpn->operationName (),
+         execPer,
+         theOpn->execVol ()[execPer],
+         violation);
+      }
+   }
+d544 28
+a571 28
+   {
+   double        sumSubVols;
+   WitSubEntry * theSub;
+   double        theExecVol;
+   double        violation;
+
+   sumSubVols = 0.0;
+
+   forEachEl (theSub, theBomEnt->mySubEntries ())
+      {
+      sumSubVols += theSub->subVol ()[execPer];
+      }
+
+   theExecVol = theBomEnt->myOperation ()->execVol ()[execPer];
+
+   violation  = positivePart (sumSubVols - theExecVol);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("modHeurSubViolSmsg",
+         theBomEnt->myOperationName (),
+         theBomEnt->localIndex      (),
+         execPer,
+         theExecVol,
+         sumSubVols,
+         violation);
+      }
+   }
+d576 28
+a603 28
+   {
+   double    cumDemandVol;
+   double    cumShipVol;
+   WitPeriod shipPer;
+   double    violation;
+
+   cumDemandVol = 0.0;
+   cumShipVol   = 0.0;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      cumDemandVol += theDemand->demandVol ()[shipPer];
+      cumShipVol   += theDemand->shipVol   ()[shipPer];
+
+      violation     = positivePart (cumShipVol - cumDemandVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurCumShipViolSmsg",
+            theDemand->demandedPartName (),
+            theDemand->demandName       (),
+            shipPer,
+            cumShipVol,
+            cumDemandVol,
+            violation);
+         }
+      }
+   }
+@
+
+
+1.13
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d378 1
+a378 1
+      checkAvailCon (theCap, thePer);
+d392 1
+a392 1
+      checkAvailCon (theMat);
+d440 1
+a440 1
+void WitHeurModifier::checkAvailCon (WitCapacity * theCap, WitPeriod thePer)
+d442 1
+a442 1
+   double netAvail;
+d444 1
+a444 1
+   netAvail = myAvailSched_->incAvailVol (theCap, thePer);
+d446 1
+a446 1
+   if (netAvail < - FEAS_TOL)
+d448 1
+a448 1
+      myMsgFac () ("modHeurAvailViolSmsg",
+d451 1
+a451 1
+         netAvail);
+d457 1
+a457 1
+void WitHeurModifier::checkAvailCon (WitMaterial * theMat)
+d459 1
+a459 1
+   double    netAvail;
+d462 1
+a462 1
+   netAvail = 0.0;
+d466 1
+a466 1
+      netAvail += myAvailSched_->incAvailVol (theMat, thePer);
+d468 1
+a468 1
+      if (netAvail < - FEAS_TOL)
+d470 1
+a470 1
+         myMsgFac () ("modHeurAvailViolSmsg",
+d473 1
+a473 1
+            netAvail);
+d477 1
+a477 1
+         netAvail = 0.0;
+@
+
+
+1.12
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d37 1
+a37 1
+      toChkPartPairs_   (myProblem ()),
+d40 1
+d42 1
+d89 1
+d226 14
+a239 1
+   if (thePart->thisCap () != NULL)
+d241 1
+a241 1
+      toChkPartPairs_.push (thePart, thePer);
+d372 1
+a372 1
+   while (toChkPartPairs_.pop (thePart, thePer))
+d384 14
+d457 26
+@
+
+
+1.11
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d168 1
+d177 14
+d284 1
+a284 1
+   WitPart *     subPart;
+d286 1
+a286 1
+   WitPart *     bomPart;
+d292 3
+a294 3
+   subPart   = theSub   ->myPart   ();
+   theBomEnt = theSub   ->myBomEnt ();
+   bomPart   = theBomEnt->myPart   ();
+d310 1
+a310 1
+         myAvailSched_->addToIncAvailVol (subPart, consPer, deltaAvailVol);
+d318 1
+a318 1
+         myAvailSched_->addToIncAvailVol (bomPart, consPer, deltaAvailVol);
+@
+
+
+1.10
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d120 1
+d145 11
+@
+
+
+1.9
+log
+@Modifiable Heuristic Allocation
+@
+text
+@a49 1
+   checkFeasibility ();
+d58 1
+a58 1
+   identifyForExecVol (theOpn, theVec);
+d68 1
+a68 1
+   identifyForSubVol (theSub, theVec);
+d78 1
+a78 1
+   identifyForShipVol (theDemand, theVec);
+d114 1
+a114 1
+void WitHeurModifier::identifyForExecVol (
+d141 1
+a141 1
+               identifyPartPair (thePart, impactPer);
+d150 1
+a150 1
+void WitHeurModifier::identifyForSubVol (
+d170 1
+a170 1
+void WitHeurModifier::identifyForShipVol (
+d187 1
+a187 1
+         identifyPartPair (theDemand->demandedPart (), shipPer);
+d194 1
+a194 1
+void WitHeurModifier::identifyPartPair (WitPart * thePart, WitPeriod thePer)
+@
+
+
+1.8
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d59 1
+a59 1
+   identForExecVol    (theOpn, theVec);
+d69 1
+a69 1
+   identForSubVol    (theSub, theVec);
+d79 1
+a79 1
+   identForShipVol    (theDemand, theVec);
+d115 1
+a115 1
+void WitHeurModifier::identForExecVol (
+d121 2
+d136 8
+d151 1
+a151 1
+void WitHeurModifier::identForSubVol (
+d171 1
+a171 1
+void WitHeurModifier::identForShipVol (
+d188 1
+a188 1
+         identPartPair (theDemand->demandedPart (), shipPer);
+d195 1
+a195 1
+void WitHeurModifier::identPartPair (WitPart * thePart, WitPeriod thePer)
+@
+
+
+1.7
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d19 1
+d37 1
+d87 1
+d178 1
+a178 1
+         return;
+d185 10
+d314 18
+d347 44
+d451 1
+a451 1
+void WitHeurModifier::checkBomEntPairs ()
+a452 2
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+d458 3
+a460 1
+   while (toChkBomEntPairs_.pop (theBomEnt, execPer))
+d462 2
+a463 1
+      sumSubVols = 0.0;
+d465 1
+a465 4
+      forEachEl (theSub, theBomEnt->mySubEntries ())
+         {
+         sumSubVols += theSub->subVol ()[execPer];
+         }
+d467 1
+a467 1
+      theExecVol = theBomEnt->myOperation ()->execVol ()[execPer];
+d469 9
+a477 12
+      violation  = positivePart (sumSubVols - theExecVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurSubViolSmsg",
+            theBomEnt->myOperationName (),
+            theBomEnt->localIndex      (),
+            execPer,
+            theExecVol,
+            sumSubVols,
+            violation);
+         }
+d483 1
+a483 1
+void WitHeurModifier::checkDemands ()
+d485 7
+a491 5
+   WitDemand * theDemand;
+   double      cumDemandVol;
+   double      cumShipVol;
+   WitPeriod   shipPer;
+   double      violation;
+d493 1
+a493 1
+   while (toChkDemands_.pop (theDemand))
+d495 2
+a496 1
+      chkNeededDemand_ (theDemand) = false;
+d498 1
+a498 2
+      cumDemandVol = 0.0;
+      cumShipVol   = 0.0;
+d500 1
+a500 1
+      forEachPeriod (shipPer, myProblem ())
+d502 7
+a508 15
+         cumDemandVol += theDemand->demandVol ()[shipPer];
+         cumShipVol   += theDemand->shipVol   ()[shipPer];
+
+         violation     = positivePart (cumShipVol - cumDemandVol);
+
+         if (violation > FEAS_TOL)
+            {
+            myMsgFac () ("modHeurCumDemandViolSmsg",
+               theDemand->demandedPartName (),
+               theDemand->demandName       (),
+               shipPer,
+               cumShipVol,
+               cumDemandVol,
+               violation);
+            }
+@
+
+
+1.6
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d57 1
+a57 1
+   indForExecVol      (theOpn, theVec);
+d67 1
+a67 1
+   indForSubVol      (theSub, theVec);
+d77 1
+a77 1
+   indForShipVol      (theDemand);
+d112 1
+a112 1
+void WitHeurModifier::indForExecVol (
+d138 1
+a138 1
+void WitHeurModifier::indForSubVol (
+d158 3
+a160 1
+void WitHeurModifier::indForShipVol (WitDemand * theDemand)
+d162 3
+a164 1
+   if (not chkNeededDemand_ (theDemand))
+d166 5
+a170 1
+      chkNeededDemand_ (theDemand) = true;
+d172 5
+a176 1
+      toChkDemands_.push (theDemand);
+@
+
+
+1.5
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d34 6
+a39 4
+      WitProbAssoc   (theAvailSched),
+      myAvailSched_  (theAvailSched),
+      myOpnPairs_    (myProblem ()),
+      myBomEntPairs_ (myProblem ())
+d48 1
+a48 1
+   delayedFeasCheck ();
+d77 1
+a77 1
+   checkForShipVol    (theDemand, theVec);
+d83 1
+a83 1
+void WitHeurModifier::delayedFeasCheck ()
+d87 1
+a111 34
+void WitHeurModifier::checkForShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   double    cumDemandVol;
+   double    cumShipVol;
+   WitPeriod shipPer;
+   double    violation;
+
+   cumDemandVol = 0.0;
+   cumShipVol   = 0.0;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      cumDemandVol += theDemand->demandVol ()[shipPer];
+      cumShipVol   += theVec                 [shipPer];
+
+      violation     = positivePart (cumShipVol - cumDemandVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurCumDemandViolSmsg",
+            theDemand->demandedPartName (),
+            theDemand->demandName       (),
+            shipPer,
+            cumShipVol,
+            cumDemandVol,
+            violation);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+d123 1
+a123 1
+         myOpnPairs_.push (theOpn, execPer);
+d129 1
+a129 1
+               myBomEntPairs_.push (theBomEnt, execPer);
+d151 1
+a151 1
+         myBomEntPairs_.push (theBomEnt, execPer);
+d158 12
+d294 1
+a294 1
+   while (myOpnPairs_.pop (theOpn, execPer))
+d373 1
+a373 1
+   while (myBomEntPairs_.pop (theBomEnt, execPer))
+d398 38
+@
+
+
+1.4
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d37 1
+a37 3
+      myBomEntPairs_ (myProblem ()),
+      inOpnPairs_    (),
+      inBomEntPairs_ ()
+a39 3
+
+   inOpnPairs_   .allocate1D (myProblem ());
+   inBomEntPairs_.allocate1D (myProblem ());
+d154 1
+a154 1
+         pushUnique (myOpnPairs_, inOpnPairs_, theOpn, execPer);
+d160 1
+a160 1
+               pushUnique (myBomEntPairs_, inBomEntPairs_, theBomEnt, execPer);
+d182 1
+a182 1
+         pushUnique (myBomEntPairs_, inBomEntPairs_, theBomEnt, execPer);
+a188 22
+template <typename ConcComp>
+         void WitHeurModifier::pushUnique (
+      WitPairStack <ConcComp, WitPeriod> & thePairs,
+      WitSchedule  <ConcComp, bool> &      theSched,
+      ConcComp *                           theConcComp,
+      WitPeriod                            thePer)
+   {
+   if (not theSched (theConcComp).isAllocated ())
+      {
+      theSched (theConcComp).allocate (myProblem (), false);
+      }
+
+   if (not theSched (theConcComp)[thePer])
+      {
+      thePairs.push (theConcComp, thePer);
+
+      theSched (theConcComp)[thePer] = true;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+a314 2
+      inOpnPairs_ (theOpn)[execPer] = false;
+
+a393 2
+      inBomEntPairs_ (theBomEnt)[execPer] = false;
+
+@
+
+
+1.3
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d34 6
+a39 4
+      WitProbAssoc     (theAvailSched),
+      myAvailSched_    (theAvailSched),
+      pairsToSubCheck_ (myProblem ()),
+      toSubCheck_      ()
+d43 2
+a44 1
+   toSubCheck_.allocate1D (myProblem ());
+a59 1
+   checkForExecVol    (theOpn, theVec);
+d88 2
+a89 1
+   checkSubCons ();
+a113 19
+void WitHeurModifier::checkForExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod execPer;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theOpn->execVol ()[execPer])
+         {
+         checkNonExecCon (theOpn, execPer, theVec[execPer]);
+         checkExecHUBCon (theOpn, execPer, theVec[execPer]); 
+         checkLotSizeCon (theOpn, execPer, theVec[execPer]);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+a147 69
+void WitHeurModifier::checkNonExecCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   if (not theOpn->executable ()[execPer])
+      if (theValue > 0.0)
+         {
+         myMsgFac () ("modHeurNonExecViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theValue);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkExecHUBCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   double hardUBVal;
+   double violation;
+
+   if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+      {
+      hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+
+      violation = positivePart (theValue - hardUBVal);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("modHeurExecHUBViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theValue,
+            hardUBVal,
+            violation);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurModifier::checkLotSizeCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   double delta;
+   double violation;
+
+   delta     = theOpn->lotSizeDelta (execPer, theValue, 0.0);
+
+   violation = positivePart (delta);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("modHeurLotSizeViolSmsg",
+         theOpn->operationName (),
+         execPer,
+         theValue,
+         violation);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+d159 2
+d165 1
+a165 1
+               pushUnique (pairsToSubCheck_, toSubCheck_, theBomEnt, execPer);
+d187 1
+a187 1
+         pushUnique (pairsToSubCheck_, toSubCheck_, theBomEnt, execPer);
+d335 78
+a412 1
+void WitHeurModifier::checkSubCons ()
+d421 1
+a421 1
+   while (pairsToSubCheck_.pop (theBomEnt, execPer))
+d423 1
+a423 1
+      toSubCheck_ (theBomEnt)[execPer] = false;
+@
+
+
+1.2
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d94 1
+a94 1
+      myMsgFac () ("boolAttInvForHeurAdjSmsg", "selectionRecovery",   true);
+d97 1
+a97 1
+      myMsgFac () ("boolAttInvForHeurAdjSmsg", "skipFailures",        false);
+d100 1
+a100 1
+      myMsgFac () ("boolAttInvForHeurAdjSmsg", "perfPegging",         false);
+d103 1
+a103 1
+      myMsgFac () ("boolAttInvForHeurAdjSmsg", "computeCriticalList", false);
+d106 1
+a106 1
+      myMsgFac () ("boolAttInvForHeurAdjSmsg", "pgdCritListMode",     false);
+d151 1
+a151 1
+         myMsgFac () ("heurAdjCumDemandViolSmsg",
+d172 1
+a172 1
+         myMsgFac () ("heurAdjNonExecViolSmsg",
+d197 1
+a197 1
+         myMsgFac () ("heurAdjExecHUBViolSmsg",
+d223 1
+a223 1
+      myMsgFac () ("heurAdjLotSizeViolSmsg",
+d444 1
+a444 1
+         myMsgFac () ("heurAdjSubViolSmsg",
+@
+
+
+1.1
+log
+@Modifiable heuristic allocation
+@
+text
+@d37 1
+a37 1
+      toSubCheck_      (myProblem (), false)
+d40 2
+d57 3
+a59 3
+   checkForExecVol  (theOpn, theVec);
+   planForExecVol   (theOpn, theVec);
+   reviseForExecVol (theOpn, theVec);
+d68 2
+a69 2
+   planForSubVol   (theSub, theVec);
+   reviseForSubVol (theSub, theVec);
+d78 2
+a79 2
+   checkForShipVol  (theDemand, theVec);
+   reviseForShipVol (theDemand, theVec);
+d233 1
+a233 1
+void WitHeurModifier::planForExecVol (
+d248 1
+a248 1
+               planToSubCheck (theBomEnt, execPer);
+d257 1
+a257 1
+void WitHeurModifier::planForSubVol (
+d261 4
+a264 1
+   WitPeriod execPer;
+d270 1
+a270 1
+         planToSubCheck (theSub->myBomEnt (), execPer);
+d277 6
+a282 3
+void WitHeurModifier::planToSubCheck (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer)
+d284 1
+a284 1
+   if (not toSubCheck_ (theBomEnt)[execPer])
+d286 6
+a291 1
+      pairsToSubCheck_.push (theBomEnt, execPer);
+d293 1
+a293 1
+      toSubCheck_ (theBomEnt)[execPer] = true;
+d299 1
+a299 1
+void WitHeurModifier::reviseForExecVol (
+d348 1
+a348 1
+void WitHeurModifier::reviseForSubVol (
+d393 1
+a393 1
+void WitHeurModifier::reviseForShipVol (
+d427 1
+a427 1
+   while (pairsToSubCheck_.isNonEmpty ())
+a428 2
+      pairsToSubCheck_.pop (theBomEnt, execPer);
+
+@
+

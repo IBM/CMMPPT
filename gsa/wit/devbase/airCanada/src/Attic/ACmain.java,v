@@ -1,0 +1,250 @@
+head	1.2;
+access;
+symbols
+	Start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.2
+date	2002.10.31.19.33.24;	author yingdong;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2002.10.31.16.59.39;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.10.31.16.59.39;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Moved Java Classes from src directory to AirCanada directory
+@
+text
+@package com.ibm.mathsci.witApplications.airCanada;
+
+import java.net.*;
+import java.sql.*;
+import java.util.*;
+import java.io.*;
+import java.text.DateFormat;
+
+
+/**
+ * @@author JPF2
+ *
+ * Air Canada Main Program
+ */
+public class ACmain {
+
+	public static void main(String[] args)throws Exception  {
+		
+		try {
+		  Calendar cal = GregorianCalendar.getInstance();
+		  DateFormat dateFormatter = DateFormat.getDateInstance(DateFormat.DEFAULT);
+		  
+		  // Create instance of planning problem
+		  ACmaintenance acm = new ACmaintenance();
+		
+		  // Set number of periods in planning horizon
+		  acm.setPlanningHorizon(26);
+		  int ph = acm.getPlanningHorizon();
+		
+		  // Tell ACM about data in Period Resource Table
+		  
+          // Load the jdbc-odbc bridge driver
+		  Class.forName ("sun.jdbc.odbc.JdbcOdbcDriver");
+
+          // Attempt to connect to a driver.  Each one
+		  // of the registered drivers will be loaded until
+		  // one is found that can process this URL
+	      String url   = "jdbc:odbc:WIT_HM-list";
+		  Connection con = DriverManager.getConnection (url, "","");
+
+ 		  // If we were unable to connect, an exception
+		  // would have been thrown.  So, if we get here,
+		  // we are successfully connected to the URL
+
+		  // Get the DatabaseMetaData object and display
+		  // some information about the connection
+		  DatabaseMetaData dma = con.getMetaData ();
+		  System.out.println("\nConnected to " + dma.getURL());
+		  System.out.println("Driver       " +	dma.getDriverName());
+		  System.out.println("Version      " +	dma.getDriverVersion());
+		  System.out.println("");
+
+		  // Create a Statement object so we can submit
+		  // SQL statements to the driver
+		  Statement stmt = con.createStatement ();
+
+		  // Set up Period manager class
+		  ResultSet rs = stmt.executeQuery ("SELECT Min(SchedStartDate) FROM [Events and Resource Consumption$]");		  
+          rs.next();
+          java.util.Date sdate = rs.getDate(1);
+          ACperiods perMgr = new ACperiods(sdate,ph);
+          System.out.println(DateFormat.getDateInstance().format(sdate));
+          rs.close();
+
+		  // Submit a query, creating a ResultSet object
+		  // containing PeriodResource Table data
+		  rs = stmt.executeQuery ("SELECT * FROM [Available Resources$]");
+
+		  // Loop once for each row of PeriodResource Table
+		  boolean more = rs.next ();
+	      while (more) {
+
+		    // Get data from row and pass to acm object
+		    String ri = rs.getString("resourceId");
+            java.util.Date date = rs.getDate("date");
+		    int p = perMgr.periodNumber(date);
+		    float lh = rs.getFloat("laborHours");		    
+	
+		    acm.addPeriodResource(ri,p,lh);
+
+		    // Fetch the next result set row
+		    more = rs.next ();
+	      }
+
+          // Close result set
+		  rs.close();  
+		  
+		  // Get data from MaintenanceEvent Table
+		  rs = stmt.executeQuery ("SELECT MtceEventId,SchedStartDate FROM [Events and Resource Consumption$]");		  
+		  
+		  // Loop once for each row of Maintenance Table
+		  more = rs.next ();
+	      while (more) {
+
+		    // Get data from row and pass to acm object
+		    String mei = rs.getString("MtceEventId");
+		    java.util.Date date = rs.getDate("SchedStartDate");
+		    
+		    int p=-1;
+		    try {
+		       p = perMgr.periodNumber(date);
+		 
+		       acm.addMaintenanceEvent(mei);
+		       int earliestPeriod = p-1;
+		       if( earliestPeriod<0 ) earliestPeriod=0;
+
+		       acm.setMaintenanceEventRequiredCompletionPeriods(mei,p,earliestPeriod,p);
+		    }
+		    catch (ACexception periodExp) {
+		    	System.out.println("Error adding MaintenanceEvent");
+		    	System.out.println("      Maintenance event: "+mei);
+		    	System.out.println("      Date: "+DateFormat.getDateInstance().format(date));
+		    	System.out.println("      "+periodExp.getMessage());
+		    }
+		    // Fetch the next result set row
+		    more = rs.next ();
+	      }
+	      
+          // Close result set
+		  rs.close(); 
+		  
+		  // Get data from LaborConsumption Table
+		  rs = stmt.executeQuery ("SELECT [Available Resources$].resourceId,[Available Resources$].period,[Events and Resource Consumption$].laborHours,[Events and Resource Consumption$].mtceEventId FROM [Available Resources$],[Events and Resource Consumption$]");		  
+		  
+		  // Loop once for each row of LaborConsumption Table
+		  Map map = new HashMap();
+		  more = rs.next ();
+	      while (more) {
+
+		    // Get data from row and pass to acm object
+		    int p = rs.getInt("period");
+		    float lh = rs.getFloat("laborHours");
+		    String ri = rs.getString("resourceId");
+		    String mei = rs.getString("mtceEventId");
+		    
+		    ACstringPair key = new ACstringPair(ri,mei);
+		    
+		    if ( !map.containsKey(key) ) {
+		    	// add entry
+		    	float [] lhs = new float[ph];
+		    	lhs[p] = lh;
+		    	map.put(key,lhs);
+		    }
+		    else {
+		    	float [] lhs = (float[])map.get(key);
+		    	lhs[p] = lh;
+		    }	 
+
+		    // Fetch the next result set row
+		    more = rs.next ();
+	      }
+	      for (Iterator i=map.entrySet().iterator(); i.hasNext(); ) {
+            Map.Entry e = (Map.Entry) i.next();
+            ACstringPair key = (ACstringPair)e.getKey();
+            float [] lhs = (float[])e.getValue();
+            System.out.println(e.getKey() + ": " + e.getValue());
+           }
+
+	      
+          // Close result set
+		  rs.close(); 
+		  
+		  // sql statement and db connection
+  		  stmt.close();
+		  con.close();		  
+		  
+		}
+		catch ( ACexception e ) {
+			e.printStackTrace();			
+		}
+		
+	    catch (SQLException ex) {
+
+	    	// A SQLException was generated.  Catch it and
+		    // display the error information.  Note that there
+		    // could be multiple error objects chained
+		    // together
+
+        	System.out.println ("\n*** SQLException caught ***\n");
+
+        	while (ex != null) {
+		      System.out.println ("SQLState: " + ex.getSQLState ());
+		      System.out.println ("Message:  " + ex.getMessage ());
+	          System.out.println ("Vendor:   " + ex.getErrorCode ());
+		      ex = ex.getNextException ();
+		      System.out.println ("");
+		    }
+	    }
+	    
+    	catch (java.lang.Exception ex) {
+
+    		// Got some other type of exception.  Dump it.
+
+    		ex.printStackTrace ();
+    	}
+
+
+	}
+}
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@@
+
+
+1.1.1.1
+log
+@Initial Import
+@
+text
+@@

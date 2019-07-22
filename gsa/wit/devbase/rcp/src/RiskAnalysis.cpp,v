@@ -1,0 +1,1068 @@
+head	1.15;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.15
+date	2004.08.19.16.57.40;	author gresh;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2004.08.19.15.52.57;	author gresh;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2004.08.18.16.17.01;	author gresh;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.08.18.14.52.46;	author gresh;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.08.05.17.54.04;	author dpc;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.08.05.09.49.31;	author gresh;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.08.04.19.13.48;	author gresh;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.08.04.18.19.53;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.08.04.18.18.05;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.08.04.17.25.50;	author gresh;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.08.04.17.11.05;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.08.04.16.42.31;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.08.04.14.34.36;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.08.03.18.46.15;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.08.03.17.50.03;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.15
+log
+@change uncertainty
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#pragma warning(disable:4290)
+#endif
+
+#include <assert.h>
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
+#include <vector>
+#include <float.h>
+
+
+#include "globalAttrFile.h"
+#include "engagementFile.h"
+//#include "matchFile.h"
+#include "gnrlMatchFile.h"
+#include "gnrlResourceFile.h"
+#include "gnrlBomFile.h"
+#include "prioritySubsFile.h"
+#include "toFromSubsFile.h"
+#include "baseSubs.h"
+#include "engagementAppData.h"
+#include "bomAppData.h"
+#include "resourceAppData.h"
+#include "resourceIdPriorityFile.h"
+#include "rcpProblem.h"
+#include "gnrlResourceActionFile.h"
+#include "populateRCP.h"
+#include "rcpOpt.h"
+#include "rcpOptCal.h"
+#include "rcpProblem.h"
+
+// Function Prototypes. Function definitions is in this file.
+int random_range(int lowest_number, int highest_number);
+std::string createEngagementName(std::vector<std::string> resourceAttributeVector);
+
+
+
+int doSupplyPolicy();
+int doDemandGapGlut();
+int doDemandGapGlutRealSupply();
+int createFakeData();
+int main (int argc, char * argv[])
+{
+  //return doSupplyPolicy();
+  return doDemandGapGlut();
+  //return doDemandGapGlutRealSupply();
+  //return createFakeData();
+}
+int doSupplyPolicy() {
+  int D1start, D1end, D2start, D2end;
+  D1start = 80;
+  D1end = 120;
+  D2start = 160;
+  D2end = 240;
+  
+  int numiterations = 75;
+  
+  RcpOptCalendar rcpcal;
+
+
+  std::string inputDirectory, outputDirectory;
+  std::cout << "riskanalysis" << std::endl;
+  inputDirectory = outputDirectory = "../data/er5_test11";
+          
+  // do solve in loop to acquire information
+  int seed = 5;
+
+
+  int D1quant, D2quant;
+  std::vector<float> benchQtyA, benchQtyB, benchQtyC, benchQtyD;
+  std::vector<float> obj_values;
+  std::vector<int> total_bench;
+  std::vector<int> demand1, demand2;
+  std::vector<std::string> Aresource,Bresource,Cresource,Dresource;
+  Aresource.push_back("A");
+  Bresource.push_back("B");
+  Cresource.push_back("C");
+  Dresource.push_back("D");
+  std::vector<float> Asupply, Bsupply, Csupply, Dsupply;
+  float   asupply, bsupply, csupply, dsupply;
+  float obj_value;
+  int TotalBench;
+    
+    
+  std::string outfileBaseName = "riskAnalysis";
+  
+
+  double policy[10];
+  policy[0] = 0.8;
+  policy[1] = 0.85;
+  policy[2] = 0.90;
+  policy[3] = 0.95;
+  policy[4] = 1.0;
+  policy[5] = 1.05;
+  policy[6] = 1.1;
+  policy[7] = 1.15;
+  policy[8] = 1.2;
+  policy[9] = 1.25;
+
+  char outfileName[100];
+  
+
+  for (int j=0; j<10; j++) {
+    srand(seed);
+    RCPproblem prob;
+    sprintf(outfileName,"%s%j.csv",outfileBaseName.c_str(),j);
+    FILE * outfilePtr = fopen(outfileName,"w");
+
+    populate(prob, inputDirectory, outputDirectory, rcpcal);
+
+    fprintf(outfilePtr,"\"demand1\",\"demand2\",\"totalBench\",\"objValue\"\n");
+    //also want to reset the supply quantities
+    Asupply = prob.getResourceSupplyQuantity(Aresource);
+    asupply = (float)(Asupply[0]*policy[j]);
+    prob.setResourceSupplyQuantity(Aresource,0,asupply);
+    prob.setBenchResourceSupplyQuantity(Aresource,0,asupply);
+
+        
+    Bsupply = prob.getResourceSupplyQuantity(Bresource);
+    bsupply = (float)(Bsupply[0]*policy[j]);
+    prob.setResourceSupplyQuantity(Bresource,0,bsupply);
+    prob.setBenchResourceSupplyQuantity(Bresource,0,bsupply);
+        
+    Csupply = prob.getResourceSupplyQuantity(Cresource);
+    csupply = (float)(Csupply[0]*policy[j]);
+    prob.setResourceSupplyQuantity(Cresource,0,csupply);
+    prob.setBenchResourceSupplyQuantity(Cresource,0,csupply);
+        
+    Dsupply = prob.getResourceSupplyQuantity(Dresource);
+    dsupply = (float)(Dsupply[0]*policy[j]);
+    prob.setResourceSupplyQuantity(Dresource,0,dsupply);
+    prob.setBenchResourceSupplyQuantity(Dresource,0,dsupply);
+
+    demand1.clear();
+    demand2.clear();
+    total_bench.clear();
+    obj_values.clear();
+    float avgBench, avgDemand1, avgDemand2, avgObj;
+    avgBench = 0;
+    avgDemand1 = 0;
+    avgDemand2 = 0; 
+    avgObj = 0;
+    int i;
+    for (i=0; i<numiterations; i++) {
+        //need to do something here to reset the demands
+        D1quant = random_range(D1start, D1end);
+        D2quant = random_range(D2start, D2end);
+        demand1.push_back(D1quant);
+        demand2.push_back(D2quant);
+        prob.setEngagementQuantity("D1",D1quant);       
+        prob.setEngagementQuantity("D2",D2quant);       
+        
+        prob.setResourceSupplyQuantity(Aresource,0,asupply);
+        prob.setResourceSupplyQuantity(Bresource,0,bsupply);
+        prob.setResourceSupplyQuantity(Cresource,0,csupply);
+        prob.setResourceSupplyQuantity(Dresource,0,dsupply);
+        prob.setBenchResourceSupplyQuantity(Aresource,0,asupply);
+        prob.setBenchResourceSupplyQuantity(Bresource,0,bsupply);
+        prob.setBenchResourceSupplyQuantity(Cresource,0,csupply);
+        prob.setBenchResourceSupplyQuantity(Dresource,0,dsupply);
+       
+        prob.resourceAction();
+        
+        //need to do something here to extract the quantities and save them
+        obj_value = prob.getObjValue();
+        obj_values.push_back(obj_value);
+        benchQtyA = prob.getResourceBenchQuantity(Aresource);
+        float foo1 = benchQtyA[0];
+        benchQtyB = prob.getResourceBenchQuantity(Bresource);
+        foo1 = benchQtyB[0];
+        benchQtyC = prob.getResourceBenchQuantity(Cresource);
+        foo1 = benchQtyC[0];
+        benchQtyD = prob.getResourceBenchQuantity(Dresource);
+        foo1 = benchQtyD[0];
+        TotalBench = (int)(benchQtyA[0]+benchQtyB[0]+benchQtyC[0]+benchQtyD[0]);
+        total_bench.push_back(TotalBench);
+    }
+
+    for (i=0; i<numiterations; i++) {
+       fprintf(outfilePtr,"%d,%d,%d,%f\n",demand1.at(i),demand2.at(i),total_bench.at(i),obj_values.at(i));
+       avgBench = avgBench + total_bench.at(i);
+       avgDemand1 = avgDemand1 + demand1.at(i);
+       avgDemand2 = avgDemand2 + demand2.at(i);
+       avgObj = avgObj + obj_values.at(i);
+    }
+
+    fprintf(outfilePtr,"policy = %f \n", policy[j]);
+    fprintf(outfilePtr,"avg demand1 = %f \n", avgDemand1/numiterations);
+    fprintf(outfilePtr,"avg demand2 = %f \n", avgDemand2/numiterations);
+    fprintf(outfilePtr,"avg bench = %f \n", avgBench/numiterations);
+    fprintf(outfilePtr,"avg objective = %f \n", avgObj/numiterations);
+    fclose(outfilePtr);
+  }
+  return 0;
+}
+int doDemandGapGlutRealSupply() {
+  //the point of this example is to allow variability on each instance of
+  //demand and to investigate matching policies
+  //supply is set to actual supply and demand is randomized
+  
+  int D1start, D1end, D2start, D2end;
+  D1start = 80;
+  D1end = 120;
+  D2start = 160;
+  D2end = 240;
+  
+  //int numiterations = 3;
+  int numiterations = 25;
+  
+  RcpOptCalendar rcpcal;
+  rcpcal.setStartMonth(6);
+  rcpcal.setStartYear(2004);
+
+  std::string inputDirectory, outputDirectory;
+  std::cout << "riskanalysis" << std::endl;
+  inputDirectory = outputDirectory = "../data/real";
+          
+  // do solve in loop to acquire information
+  int seed = 5;
+
+
+
+  std::vector<float> supply, demand;
+  float obj_value;
+  int TotalBench;
+    
+    
+  std::string outfileBaseName = "riskAnalysisRealSupply";
+  
+
+
+
+  char outfileName[100];
+  
+
+  srand(seed);
+
+  float totalGap = 0;
+  float totalGlut = 0;
+  
+  RCPproblem prob;
+  populate(prob, inputDirectory, outputDirectory, rcpcal);  
+  int numidentifiers = prob.getResourceIdentifierNames().size();
+  //I need to read the match file because populate calls an attribute
+  //"unmatched" if the match flag is off
+  std::vector<int> globalMatchVector(numidentifiers);
+  {
+    // Read match File 
+    std::string matchFileName = inputDirectory + "/match.csv";
+    RCPgnrlMatchFile matchFile(matchFileName,numidentifiers);
+    RCPgnrlMatchFileIterator matchFileIter(matchFile);
+    matchFileIter(); 
+    
+
+    for (int i=0; i<numidentifiers; i++) {
+       std::string attributeMatchName = prob.getResourceIdentifierNames()[i]+"Match";
+       int matchValue = matchFileIter.fieldOnRecordAsInt(attributeMatchName);
+       globalMatchVector[i] = matchValue;
+    }
+  }  
+ 
+  sprintf(outfileName,"%s.csv",outfileBaseName.c_str());
+  FILE * outfilePtr = fopen(outfileName,"w");
+  fprintf(outfilePtr,"\"iteration\",\"gap\",\"glut\"\n");  
+  for (int i=0; i<numiterations; i++) {
+    //RCPproblem prob;
+
+    //populate(prob, inputDirectory, outputDirectory, rcpcal);
+
+
+    
+    //read the bom file and randomize the demand
+    std::string bomFileName = inputDirectory + "/demand.csv";
+    int numidentifiers = prob.getResourceIdentifierNames().size();
+    RCPgnrlBomFile bomFile(bomFileName,numidentifiers,false, false, RcpOptCalendar::MONTH_YEAR);
+    RCPgnrlBomFileIterator bomFileIter(bomFile);
+    
+    std::vector<std::string> resourceAttributeValues(numidentifiers);
+    // loop once for each record in bom file
+    for ( ; bomFileIter()!=NULL; ) {
+      RCPvectorString resourceIdValues;      
+      
+      for (int j=0; j<numidentifiers; j++) {
+         std::string attributeName = prob.getResourceIdentifierNames()[j];
+         std::string attributeValue = bomFileIter.fieldOnRecord(attributeName);
+         if (globalMatchVector[j]==0)
+             attributeValue = "unmatched"; 
+         resourceAttributeValues[j]=attributeValue;
+      }
+      
+      //std::string engagementName = bomFileIter.fieldOnRecord("engagementName");
+      std::string engagementName = createEngagementName(resourceAttributeValues);
+      int period;
+      int month = bomFileIter.monthAsInt();
+      int year = bomFileIter.yearAsInt();
+      period = rcpcal.computePeriodFromMonthAndYear(month, year);
+      float usageQuantity =  bomFileIter.usageQuantityAsFloat();
+      // test to ensure that resource exist
+      //now randomize bom usage quantity
+      float fraction = random_range(900,1100)/1000.;
+      //float fraction = random_range(999,1001)/1000.;
+      usageQuantity = usageQuantity*fraction;
+      prob.setBomUsageQuantity(engagementName,resourceAttributeValues,period,usageQuantity);
+
+    }
+    prob.gapGlut();
+    //extract the gap and glut info for this interation. Accumulate
+    std::vector<RCPvectorString> names;
+    //get the vector of resource ID names
+    prob.getResourceNames(names);
+    int gap_this_round=0;
+    int glut_this_round=0;
+    for (int j=0; j<names.size(); j++) {
+       std::vector<float> gapQty = prob.getResourceGapQuantity(names[j]);
+       std::vector<float> glutQty = prob.getResourceGlutQuantity(names[j]);
+       for (int jj=0; jj<gapQty.size(); jj++) {
+          gap_this_round = gap_this_round+gapQty[jj];
+          glut_this_round = glut_this_round+glutQty[jj];
+       }
+    }
+    totalGap = totalGap+gap_this_round;
+    totalGlut = totalGlut+glut_this_round;
+
+    fprintf(outfilePtr,"%d,%d,%d\n",i, gap_this_round, glut_this_round);
+
+  }
+  float avgGap = totalGap/numiterations;
+  float avgGlut = totalGlut/numiterations;
+  fprintf(outfilePtr,"avg gap = %f\n",avgGap);
+  fprintf(outfilePtr,"avg glut = %f\n",avgGlut);
+  for (int i=0; i<prob.getResourceIdentifierNames().size(); i++) {
+     fprintf(outfilePtr,"match for %s = %d\n",prob.getResourceIdentifierNames()[i].c_str(), globalMatchVector[i]);
+  }
+  fclose(outfilePtr);
+  return 0;
+}
+int createFakeData() {
+  //the point of this example is to create a set of "random" data for
+  //experimentation
+  //inputDirectory =  "../data/test1";
+          
+  int seed = 5;
+
+    
+ 
+  char outfileName[100];
+  
+
+  srand(seed);
+  int numJR, numSS, numRT, numGR, numLOB;
+  int numPeriods = 1;
+  numJR=5;
+  numSS=5;
+  numRT=3;
+  numGR=2;
+  numLOB=4;
+  std::vector<std::string> JR;
+  JR.push_back("jr1");
+  JR.push_back("jr2");
+  JR.push_back("jr3");
+  JR.push_back("jr4");
+  JR.push_back("jr5");
+  std::vector<std::string> SS;
+  SS.push_back("ss1");
+  SS.push_back("ss2");
+  SS.push_back("ss3");
+  SS.push_back("ss4");
+  SS.push_back("ss5");
+  std::vector<std::string> RT;
+  RT.push_back("IBM");
+  RT.push_back("CONT");
+  RT.push_back("SUPP");
+  std::vector<std::string> GR;
+  GR.push_back("N");
+  GR.push_back("Y");
+  std::vector<std::string> LOB;
+  LOB.push_back("ITS");
+  LOB.push_back("eBHS");
+  LOB.push_back("SO");
+  LOB.push_back("BCS");
+  
+  FILE * outfilePtr = fopen("demand.csv","w");
+  fprintf(outfilePtr,"\"jobRole\",\"skillSet\",\"resourceType\",\"globalResource\",\"LoB\",\"period\",\"usageQuantity\"\n");  
+  float demand;
+  for (int i=0; i<numPeriods; i++) {
+    for (int j=0; j<numJR; j++) {
+       for (int k=0; k<numSS; k++) {
+          for (int l=0; l<numRT; l++) {
+             for (int m=0; m<numGR; m++) {
+                for (int n=0; n<numLOB; n++) {
+                    demand = random_range(15, 25);
+                    fprintf(outfilePtr,"%s,%s,%s,%s,%s,%d,%f\n",JR.at(j).c_str(), SS.at(k).c_str(), RT.at(l).c_str(), GR.at(m).c_str(), LOB.at(n).c_str(), i, demand);
+                }
+             }
+          }
+       }
+     }
+  }
+  fclose(outfilePtr);                
+  return 0;
+}
+int doDemandGapGlut() {
+  //the point of this example is to allow variability on each instance of
+  //demand and to investigate matching policies
+  //supply is set to mean demand
+  
+  int D1start, D1end, D2start, D2end;
+  D1start = 80;
+  D1end = 120;
+  D2start = 160;
+  D2end = 240;
+  
+  //int numiterations = 3;
+  int numiterations = 15;
+  
+  RcpOptCalendar rcpCal;
+  //rcpcal.setStartMonth(6);
+  //rcpcal.setStartYear(2004);
+
+  std::string inputDirectory, outputDirectory;
+  std::cout << "riskanalysis" << std::endl;
+  inputDirectory = outputDirectory = "../data/test1";
+          
+  // do solve in loop to acquire information
+  int seed = 5;
+
+
+
+  std::vector<float> supply, demand;
+  float obj_value;
+  int TotalBench;
+    
+    
+  std::string outfileBaseName = "riskAnalysis";
+  
+
+
+
+  char outfileName[100];
+  
+
+  srand(seed);
+
+  //this directory should have an EMPTY supply file
+  float totalGap = 0;
+  float totalGlut = 0;
+  RcpOptCalendar::CalendarType calendarType = RcpOptCalendar::PERIOD;
+  rcpCal.setCalendarType(calendarType);
+  
+  std::string globalAttrFileName = inputDirectory + "/globalAttr.csv";
+  RCPglobalAttrFile globalAttrFile(globalAttrFileName);
+  if ( globalAttrFile.keyExists("calendarType") ) {
+      std::string ct = globalAttrFile.fieldAsString("calendarType","attrValue");
+      if ( ct=="period" )
+        calendarType = RcpOptCalendar::PERIOD;
+      else if ( ct=="monthYear" )  {     
+        calendarType = RcpOptCalendar::MONTH_YEAR;
+        rcpCal.setCalendarType(calendarType);
+      
+        // need to get the starting month and year
+        int startmonth, startyear;
+        startmonth = globalAttrFile.fieldAsInt("startMonth","attrValue");
+        rcpCal.setStartMonth(startmonth);
+        startyear = globalAttrFile.fieldAsInt("startYear","attrValue");
+        rcpCal.setStartYear(startyear);
+      }
+    }
+  RCPproblem prob;
+  populate(prob, inputDirectory, outputDirectory, rcpCal);  
+  int numidentifiers = prob.getResourceIdentifierNames().size();
+  //I need to read the match file because populate calls an attribute
+  //"unmatched" if the match flag is off
+  std::vector<int> globalMatchVector(numidentifiers);
+  {
+    // Read match File 
+    std::string matchFileName = inputDirectory + "/match.csv";
+    RCPgnrlMatchFile matchFile(matchFileName,numidentifiers);
+    RCPgnrlMatchFileIterator matchFileIter(matchFile);
+    matchFileIter(); 
+    
+
+    for (int i=0; i<numidentifiers; i++) {
+       std::string attributeMatchName = prob.getResourceIdentifierNames()[i]+"Match";
+       int matchValue = matchFileIter.fieldOnRecordAsInt(attributeMatchName);
+       globalMatchVector[i] = matchValue;
+    }
+  }  
+ 
+  sprintf(outfileName,"%s.csv",outfileBaseName.c_str());
+  FILE * outfilePtr = fopen(outfileName,"w");
+  fprintf(outfilePtr,"\"iteration\",\"gap\",\"glut\"\n");  
+  for (int i=0; i<numiterations; i++) {
+    //RCPproblem prob;
+
+    //populate(prob, inputDirectory, outputDirectory, rcpcal);
+
+
+    
+    //read the bom file but treat it as a supply file
+    std::string bomFileName = inputDirectory + "/demand.csv";
+    int numidentifiers = prob.getResourceIdentifierNames().size();
+    RCPgnrlBomFile bomFile(bomFileName,numidentifiers,false, false, rcpCal.getCalendarType());
+    RCPgnrlBomFileIterator bomFileIter(bomFile);
+    
+    std::vector<std::string> resourceAttributeValues(numidentifiers);
+    // loop once for each record in bom file
+    for ( ; bomFileIter()!=NULL; ) {
+      RCPvectorString resourceIdValues;      
+      
+      for (int j=0; j<numidentifiers; j++) {
+         std::string attributeName = prob.getResourceIdentifierNames()[j];
+         std::string attributeValue = bomFileIter.fieldOnRecord(attributeName);
+         if (globalMatchVector[j]==0)
+             attributeValue = "unmatched"; 
+         resourceAttributeValues[j]=attributeValue;
+      }
+      
+      //std::string engagementName = bomFileIter.fieldOnRecord("engagementName");
+      std::string engagementName = createEngagementName(resourceAttributeValues);
+      int period;
+      if (rcpCal.getCalendarType()==RcpOptCalendar::PERIOD)
+         period = bomFileIter.periodAsInt();
+      else {
+         period = rcpCal.computePeriodFromMonthAndYear(bomFileIter.monthAsInt(), bomFileIter.yearAsInt());
+      }
+      float usageQuantity =  bomFileIter.usageQuantityAsFloat();
+      // test to ensure that resource exist
+      if ( !prob.resourceExists(resourceAttributeValues) ) {
+        // Resource does not exist. add it.
+
+       prob.addResource(resourceAttributeValues);
+      }
+      prob.setResourceSupplyQuantity(resourceAttributeValues,period,usageQuantity);
+      if (period == 0){
+         prob.setBenchResourceSupplyQuantity(resourceAttributeValues,0,usageQuantity);
+      }
+      prob.setResourceFixedCost(resourceAttributeValues,period,1.0);
+      prob.setResourceAcquireCost(resourceAttributeValues,100.0);
+      prob.setResourceReleaseCost(resourceAttributeValues,1000000.0); 
+
+      //now randomize bom usage quantity
+      float fraction = random_range(800,1200)/1000.;
+      //float fraction = random_range(999,1001)/1000.;
+      usageQuantity = usageQuantity*fraction;
+      prob.setBomUsageQuantity(engagementName,resourceAttributeValues,period,usageQuantity);
+
+    }
+    prob.gapGlut();
+    //extract the gap and glut info for this interation. Accumulate
+    std::vector<RCPvectorString> names;
+    //get the vector of resource ID names
+    prob.getResourceNames(names);
+    int gap_this_round=0;
+    int glut_this_round=0;
+    for (int j=0; j<names.size(); j++) {
+       std::vector<float> gapQty = prob.getResourceGapQuantity(names[j]);
+       std::vector<float> glutQty = prob.getResourceGlutQuantity(names[j]);
+       for (int jj=0; jj<gapQty.size(); jj++) {
+          gap_this_round = gap_this_round+gapQty[jj];
+          glut_this_round = glut_this_round+glutQty[jj];
+       }
+    }
+    totalGap = totalGap+gap_this_round;
+    totalGlut = totalGlut+glut_this_round;
+
+    fprintf(outfilePtr,"%d,%d,%d\n",i, gap_this_round, glut_this_round);
+
+  }
+  float avgGap = totalGap/numiterations;
+  float avgGlut = totalGlut/numiterations;
+  fprintf(outfilePtr,"avg gap = %f\n",avgGap);
+  fprintf(outfilePtr,"avg glut = %f\n",avgGlut);
+  for (int i=0; i<prob.getResourceIdentifierNames().size(); i++) {
+     fprintf(outfilePtr,"match for %s = %d\n",prob.getResourceIdentifierNames()[i].c_str(), globalMatchVector[i]);
+  }
+  fclose(outfilePtr);
+  return 0;
+}
+
+int random_range(int lowest_number, int highest_number)
+{
+    int temp;
+    if(lowest_number > highest_number){
+        temp=lowest_number;
+        highest_number = lowest_number;
+        lowest_number = temp;
+    }
+
+    int range = highest_number - lowest_number + 1;
+    int r = rand();
+    return lowest_number + int(range * (float)r/(RAND_MAX + 1.0));
+}
+
+//std::string createEngagementName(std::vector<std::string> resourceAttributeVector) {
+//  std::string retVal;
+//  int numAttributes = resourceAttributeVector.size();
+//  for (int i=0; i<numAttributes; i++) {
+//    std::string attributeValue = resourceAttributeVector.at(i);
+//    retVal = retVal +  attributeValue + " ";
+ // }
+ // return retVal;
+//}@
+
+
+1.14
+log
+@a way to create a fake data set
+@
+text
+@d547 1
+a547 1
+      float fraction = random_range(900,1100)/1000.;
+@
+
+
+1.13
+log
+@fixed the computation of avg. gap glut
+@
+text
+@d45 2
+d50 3
+a52 1
+  doDemandGapGlut();
+d201 1
+a201 1
+int doDemandGapGlut() {
+d204 1
+a204 1
+  //supply is set to mean demand
+d221 1
+a221 1
+  inputDirectory = outputDirectory = "../data/test";
+d233 1
+a233 1
+  std::string outfileBaseName = "riskAnalysis";
+a242 1
+  //this directory should have an EMPTY supply file
+d271 1
+a271 1
+    RCPproblem prob;
+d273 1
+a273 1
+    populate(prob, inputDirectory, outputDirectory, rcpcal);
+d277 1
+a277 1
+    //read the bom file but treat it as a supply file
+d302 229
+@
+
+
+1.12
+log
+@removed some unused methods in populate, and added a new function to riskanalysis
+@
+text
+@d208 1
+d316 1
+a334 2
+       totalGap = totalGap+gap_this_round;
+       totalGlut = totalGlut+glut_this_round;
+d336 3
+@
+
+
+1.11
+log
+@Change scope of for loop counter
+@
+text
+@a24 2
+//#include "bomFile.h"
+//#include "gnrlSubsFile.h"
+d35 1
+d39 1
+d43 3
+a45 3
+
+int
+main (int argc, char * argv[])
+d47 4
+a50 2
+
+
+d90 10
+a99 10
+  policy[0] = 0.6;
+  policy[1] = 0.8;
+  policy[2] = 0.9;
+  policy[3] = 1.0;
+  policy[4] = 1.1;
+  policy[5] = 1.2;
+  policy[6] = 1.4;
+  policy[7] = 1.125;
+  policy[8] = 1.15;
+  policy[9] = 1.175;
+d107 2
+a111 2
+    sprintf(outfileName,"%s%d.csv",outfileBaseName.c_str(),j);
+    FILE * outfilePtr = fopen(outfileName,"w");
+d115 1
+a115 1
+    asupply = Asupply[0]*policy[j];
+d121 1
+a121 1
+    bsupply = Bsupply[0]*policy[j];
+d126 1
+a126 1
+    csupply = Csupply[0]*policy[j];
+d131 1
+a131 1
+    dsupply = Dsupply[0]*policy[j];
+d197 152
+d364 9
+a372 2
+
+
+@
+
+
+1.10
+log
+@modified the example to have bigger numbers
+@
+text
+@d95 3
+a97 3
+  policy[7] = 1.8;
+  policy[8] = 2.5;
+  policy[9] = 3.0;
+d101 1
+a101 1
+  srand(seed);
+d103 1
+d142 2
+a143 1
+    for (int i=0; i<numiterations; i++) {
+d178 1
+a178 1
+    for (int i=0; i<numiterations; i++) {
+@
+
+
+1.9
+log
+@found another bug
+@
+text
+@d50 4
+a53 4
+  D1start = 8;
+  D1end = 12;
+  D2start = 16;
+  D2end = 24;
+@
+
+
+1.8
+log
+@changed the first array entry back to 0.4
+@
+text
+@d88 3
+a90 3
+  policy[0] = 0.4;
+  policy[1] = 0.6;
+  policy[2] = 0.8;
+d92 4
+a95 4
+  policy[4] = 1.2;
+  policy[5] = 1.4;
+  policy[6] = 1.6;
+  policy[7] = 2.0;
+d150 9
+a158 1
+        
+d181 1
+a181 1
+       avgObj = avgObj + obj_values.at(0);
+@
+
+
+1.7
+log
+@need to set the appropriate appdata; in particular BENCHresourcesupplyquantity
+@
+text
+@d88 1
+a88 1
+  policy[0] = 2.0;
+@
+
+
+1.6
+log
+@more computations
+@
+text
+@d88 1
+a88 1
+  policy[0] = 0.4;
+d101 1
+a101 1
+
+d104 1
+a104 1
+    srand(seed);
+a111 1
+    float foo = Asupply[0];
+d114 2
+a115 2
+    Asupply = prob.getResourceSupplyQuantity(Aresource);
+    foo = Asupply[0];
+d120 1
+d125 1
+d130 1
+d157 1
+d159 1
+d161 1
+d163 1
+@
+
+
+1.5
+log
+@need to clear the vectors before reusing
+@
+text
+@d55 1
+a55 1
+  int numiterations = 50;
+d66 1
+a66 1
+  srand(seed);
+d87 1
+a87 1
+  double policy[8];
+d96 2
+d102 1
+a102 1
+  for (int j=0; j<8; j++) {
+d104 1
+d134 5
+d164 4
+d171 4
+@
+
+
+1.4
+log
+@more changes
+@
+text
+@d47 10
+d99 1
+a99 5
+  int D1start, D1end, D2start, D2end;
+  D1start = 8;
+  D1end = 12;
+  D2start = 16;
+  D2end = 24;
+d109 1
+d112 2
+d127 5
+a131 1
+    for (int i=0; i<50; i++) {
+d154 1
+a154 1
+    for (int i=0; i<50; i++) {
+@
+
+
+1.3
+log
+@Threw in a (float) to prevent integer overflow in the random calculation.
+@
+text
+@d42 1
+a42 1
+//  bool witOK=true;
+d49 1
+a49 1
+  RCPproblem prob;
+a52 1
+  populate(prob, inputDirectory, outputDirectory, rcpcal);
+d68 2
+d74 43
+a116 3
+  std::string outfilename = "riskAnalysis.csv";
+  FILE * outfilePtr = fopen(outfilename.c_str(),"w");
+  fprintf(outfilePtr,"\"demand1\",\"demand2\",\"totalBench\",\"objValue\"\n");
+d118 1
+a118 1
+  for (int i=0; i<10; i++) {
+d120 2
+a121 2
+        D1quant = random_range(8,12);
+        D2quant = random_range(16,24);
+d127 1
+d139 1
+a139 1
+  }
+d141 1
+a141 1
+  for (int i=0; i<10; i++) {
+d143 4
+a147 2
+
+  fclose(outfilePtr);
+@
+
+
+1.2
+log
+@a little more sophisticated
+@
+text
+@d42 1
+a42 1
+  bool witOK=true;
+d59 1
+a59 1
+  float D1quant, D2quant;
+d117 2
+a118 1
+    return lowest_number + int(range * rand()/(RAND_MAX + 1.0));
+@
+
+
+1.1
+log
+@a main program which is a start to allowing accumulated statistics to be
+gathered
+@
+text
+@d8 4
+a11 1
+
+d13 1
+a13 1
+
+d39 1
+a39 1
+void testingMessage( const char * const msg );
+d48 6
+a53 6
+ {
+    RCPproblem prob;
+    std::string inputDirectory, outputDirectory;
+    std::cout << "riskanalysis" << std::endl;
+    inputDirectory = outputDirectory = "../data/er5_test11";
+    populate(prob, inputDirectory, outputDirectory, rcpcal);
+d55 23
+a77 2
+    // do solve in loop to acquire information
+    for (int i=0; i<10; i++) {
+d79 6
+a84 2
+        prob.setEngagementQuantity("D1",3);       
+        prob.setEngagementQuantity("D2",4);       
+d89 12
+a100 3
+        
+ 
+    }
+d103 1
+a103 1
+  //need to write out the saved data
+d105 13
+@
+

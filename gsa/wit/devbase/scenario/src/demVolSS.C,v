@@ -1,0 +1,429 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	UsedBySCE:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.46;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.31;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.37;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.37;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.27;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+#include <iostream>
+
+#include <scenario/src/demVolSS.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/sortSchd.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/machdep.h>
+#include <scenario/src/demdSchP.h>
+
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrDemandVolumeScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  LgFrDemand demand;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( demand, tv );
+
+  // Loop once for each demand
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+
+     demand = setOfDemands()[i];
+
+     // Make itemTimeVec
+     itv.item( demand );
+     itv.timeVecFloat(
+           wipPtr_->timeVec( setOfDemands()[i] )   );
+
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+
+     
+  }
+
+}
+
+// Update (propogate) a demand change to wip 
+void 
+LgFrDemandVolumeScheduleStrategy::update(
+          const LgFrItemTimeVecPairFloat & newITV)
+{
+  wipPtr_->timeVec(newITV.demand(), newITV.timeVecFloat());
+
+  // inform dependent objects that the demandVol has changed. 
+  //  we don't have to do this anymore as wip (through
+  //  LgFrUserInputModification) will do it for us
+  //  via the updateFrom method.
+	
+}
+
+// Demand Volumes are mutable
+bool
+LgFrDemandVolumeScheduleStrategy::isMutable()
+const
+{
+ return true;
+}
+
+// Demand Volume TimeVecs mustn't contain any negative values
+LgFrValidity
+LgFrDemandVolumeScheduleStrategy::validity(
+    const LgFrTimeVecFloat& proposedTimeVec)
+const
+{
+  int i;
+  // return false upon locating the first negative value
+  for ( i=0; i<proposedTimeVec.length(); i++ ) {
+    if ( proposedTimeVec[i] < 0.0 ) {
+      return INVALID;
+    }
+  }
+  return VALID;
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrDemandVolumeScheduleStrategy::clone()
+const
+{
+  LgFrDemandVolumeScheduleStrategy* newInst = 
+      new LgFrDemandVolumeScheduleStrategy(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with a new Scenario
+LgFrAttributeScheduleStrategy *
+LgFrDemandVolumeScheduleStrategy::clone(LgFrScenario & newScenario)
+const
+{
+  LgFrDemandVolumeScheduleStrategy* newInst = 
+      new LgFrDemandVolumeScheduleStrategy(*this, newScenario);
+  return (newInst);
+}
+
+// Assignment operator
+LgFrDemandVolumeScheduleStrategy &
+LgFrDemandVolumeScheduleStrategy::operator=(
+	  const LgFrDemandVolumeScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrDemandScheduleStrategy::operator= ) (rhs);
+    wipPtr_ = rhs.wipPtr_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrDemandVolumeScheduleStrategy::
+   LgFrDemandVolumeScheduleStrategy (
+      const LgFrDemandVolumeScheduleStrategy & source)
+:  LgFrDemandScheduleStrategy( source ),
+   wipPtr_( source.wipPtr_ ), 
+   id_(__LGFRDEMANDVOLUMESCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with new Scenario
+LgFrDemandVolumeScheduleStrategy::
+   LgFrDemandVolumeScheduleStrategy (
+      const LgFrDemandVolumeScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrDemandScheduleStrategy(
+         source, 
+         newScenario ),
+   wipPtr_( &(workingImplosionProblem(newScenario)) ),
+   id_(__LGFRDEMANDVOLUMESCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrDemandVolumeScheduleStrategy::
+   LgFrDemandVolumeScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrDemandScheduleStrategy( 
+      LgFrAttributeScheduleStrategy::setOfDemands(scenario),
+                               &(userInputModification(scenario)) ),
+   wipPtr_( &(workingImplosionProblem(scenario)) ),
+   id_(__LGFRDEMANDVOLUMESCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrDemandVolumeScheduleStrategy::
+   LgFrDemandVolumeScheduleStrategy ()
+:  LgFrDemandScheduleStrategy( LgFrSetOfDemands() ),
+   wipPtr_( 0 ),
+   id_(__LGFRDEMANDVOLUMESCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrDemandVolumeScheduleStrategy::
+   ~LgFrDemandVolumeScheduleStrategy ()
+{
+  // Nothing to do here
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrDemandVolumeScheduleStrategy methods.
+void
+LgFrDemandVolumeScheduleStrategy::test()
+{
+}
+
+// test LgFrDemandVolumeScheduleStrategy methods.
+// Expects the data in testScenario to come from
+// "/u/implode/wit/data/examples/diner12/wit.data"
+void
+LgFrDemandVolumeScheduleStrategy::contextTest
+    (LgFrScenario                & testScenario,
+     LgFrWorkingImplosionProblem & wip,			// testScenario's 
+     LgFrSetOfDemands            & sod)			// testScenario's 
+{
+  int i;
+
+  // Test constructor
+  LgFrDemandVolumeScheduleStrategy cs1(testScenario);
+
+  // Test copy constructor
+  LgFrDemandVolumeScheduleStrategy cs2(cs1);
+
+  // Test assignment operator
+  LgFrDemandVolumeScheduleStrategy cs3;
+  cs3 = cs2;
+
+  {
+    // Test clone method
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+
+    // Test destructor
+    delete cs4Ptr;
+  }
+  
+  // Test populate. 
+  LgFrSortingDemandScheduleFloatSmartPointer schedule;
+  const LgFrSortingDemandScheduleFloat & constSchedule = *schedule;
+  cs1.populate( *schedule );
+  for ( i=0; i<sod.size(); i++ ) {
+     assert( sod[i] == constSchedule[i].demand() );
+     assert( wip.timeVec(sod[i]) == constSchedule[i].timeVecFloat() );
+  }
+
+  // Test popluate with zeroFilter.  Should produce an empty schedule
+  LgFrZeroTimeVecFilterStrategy zeroFilter;
+  schedule->filterStrategy( zeroFilter );
+  cs1.populate( *schedule );
+
+  for ( i=0; i<schedule->size(); i++ ) {
+     assert(  !(constSchedule[i].timeVecFloat() == 0.0)  );
+  }
+
+  // Test the update() method
+  LgFrDemand aDemand(sod[0]);
+  LgFrItemTimeVecPairFloat anITV(aDemand, 
+                                constSchedule[0].timeVecFloat() + 2.5);
+  cs1.update(anITV);
+  cs1.populate(*schedule);
+  assert(anITV.timeVecFloat() == constSchedule[0].timeVecFloat());
+
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d3 5
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 3
+a3 1
+#include <iostream.h>
+d26 2
+a27 1
+  for ( size_t i=0; i<setOfDemands().entries(); i++ ) {
+d63 1
+a63 1
+RWBoolean
+d67 1
+a67 1
+ return TRUE;
+a106 8
+// Return schedule strategy identifier
+isAReturnType
+LgFrDemandVolumeScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a111 1
+  assert( id_ == rhs.id_ );
+a127 1
+  assert( id_ == source.id_ );
+a140 1
+  assert( id_ == source.id_ );
+d161 1
+a161 1
+   wipPtr_( NULL ),
+a196 4
+  assert( cs1.id_ == __LGFRDEMANDVOLUMESCHEDULESTRATEGY );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFRDEMANDVOLUMESCHEDULESTRATEGY );
+a199 1
+  assert( cs2.isA() == __LGFRDEMANDVOLUMESCHEDULESTRATEGY );
+a203 1
+  assert( cs3.isA() == cs2.isA() );
+a207 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d217 1
+a217 1
+  for ( i=0; i<sod.entries(); i++ ) {
+d227 1
+a227 1
+  for ( i=0; i<schedule->entries(); i++ ) {
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 3
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d24 1
+a24 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+d60 1
+a60 1
+bool
+d64 1
+a64 1
+ return true;
+d104 8
+d117 1
+d134 1
+d148 1
+d169 1
+a169 1
+   wipPtr_( 0 ),
+d205 4
+d212 1
+d217 1
+d222 1
+d232 1
+a232 1
+  for ( i=0; i<sod.size(); i++ ) {
+d242 1
+a242 1
+  for ( i=0; i<schedule->size(); i++ ) {
+@
+

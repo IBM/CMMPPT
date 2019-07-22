@@ -1,0 +1,395 @@
+head	1.10;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.10
+date	2011.06.03.15.13.29;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.05.04.22.15.20;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.02.28.23.17.39;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.02.25.18.31.38;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2010.09.08.19.01.18;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.08.07.14.16.47;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.08.07.14.09.52;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.07.30.22.51.16;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.07.28.22.19.15;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2009.07.28.21.37.26;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Removed Pair and Quadruple.
+@
+text
+@
+//==============================================================================
+// Example WIT-J Application Program WitJDemo1.
+//
+// The program builds a trivial implosion problem, solves it with heuristic
+// implosion and displays the shipment schedule and the supplyVol PIP.
+//==============================================================================
+
+import        com.ibm.witj.*;
+import static com.ibm.witj.Attribute.*;
+import static com.ibm.witj.Part.Category.*;
+
+import                java.util.*;
+
+public final class WitJDemo1
+{
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+   public static void main (String[] theArgs)
+      {
+      WitJDemo1 theDemo;
+
+      theDemo = new WitJDemo1 ();
+
+      theDemo.performDemo ();
+      }
+
+//------------------------------------------------------------------------------
+// myProblem
+//
+// The WIT-J Problem for this WIT-J application.
+//------------------------------------------------------------------------------
+
+   private Problem myProblem = null;
+
+//------------------------------------------------------------------------------
+// Constructor
+//------------------------------------------------------------------------------
+
+   private WitJDemo1 ()
+      {
+      }
+
+//------------------------------------------------------------------------------
+// performDemo ()
+//------------------------------------------------------------------------------
+
+   private void performDemo ()
+      {
+      try
+         {
+         buildProblem ();
+
+         myProblem.heurImplode ();
+         myProblem.buildPip    ();
+
+         displaySolution ();
+
+         myProblem.deactivate ();
+
+         myProblem = null;
+         }
+
+      catch (WitjException theWitjException)
+         {
+         handleWitjException (theWitjException);
+         }
+      }
+
+//------------------------------------------------------------------------------
+// buildProblem ()
+//
+// Creates and populates myProblem.
+//------------------------------------------------------------------------------
+
+   private void buildProblem ()
+      {
+      Part      thePartA;
+      Operation theOpnB;
+      Part      thePartC;
+      Demand    theDemandD;
+      Demand    theDemandE;
+
+      myProblem = Problem.newInstance ();
+
+      myProblem.getMessageMgr ().setMesgFileName ("witj-demo1.wmsg");
+
+      myProblem.set (nPeriods,       2);
+      myProblem.set (pipSeqFromHeur, true);
+
+      thePartA   = Part     .newInstance (myProblem, "A",      CAPACITY);
+      theOpnB    = Operation.newInstance (myProblem, "B");
+                   BomEntry .newInstance (theOpnB,   thePartA);
+      thePartC   = Part     .newInstance (myProblem, "C",      MATERIAL);
+                   BopEntry .newInstance (theOpnB,   thePartC);
+      theDemandD = Demand   .newInstance (thePartC,  "D");
+      theDemandE = Demand   .newInstance (thePartC,  "E");
+
+      thePartC  .set (buildNstn, true);
+
+      thePartA  .set (supplyVol, new double[]{30,  0});
+      thePartC  .set (supplyVol, new double[]{30, 10});
+
+      theDemandD.set (demandVol, new double[]{20, 20});
+      theDemandE.set (demandVol, new double[]{20, 20});
+
+      theDemandD.setVectorToScalar (priority, 1);
+      theDemandE.setVectorToScalar (priority, 2);
+      }
+
+//------------------------------------------------------------------------------
+// displaySolution ()
+//
+// Displays the shipment schedule and the supplyVol pegging from PIP.
+//------------------------------------------------------------------------------
+
+   private void displaySolution ()
+      {
+      double[]                         shipVolArr;
+      int                              thePer;
+      ArrayList <PeggingTriple <Part>> supplyVolPip;
+
+      for (Demand theDemand: myProblem.getDemands ())
+         {
+         shipVolArr = theDemand.get (shipVol);
+
+         for (thePer = 0; thePer < 2; thePer ++)
+            {
+            if (shipVolArr[thePer] < .000001)
+               continue;
+
+            System.out.printf (
+               "%n"
+             + "Part %s, Demand %s, Period %d:          shipVol = %2.0f%n",
+               theDemand.getPart ().get (partName),
+               theDemand           .get (demandName),
+               thePer,
+               shipVolArr[thePer]);
+
+            supplyVolPip = theDemand.getSupplyVolPip (thePer);
+            
+            for (PeggingTriple <Part> theTriple: supplyVolPip)
+               {
+               System.out.printf (
+                  "Part %s,           Period %d: pegged supplyVol = %2.0f%n",
+                  theTriple.getRoot   ().get (partName),
+                  theTriple.getPeriod (),
+                  theTriple.getVolume ());
+               }
+            }
+         }
+      }
+
+//------------------------------------------------------------------------------
+// handleWitjException (theWitjException)
+//
+// Handles any exception thrown from WIT-J.
+//------------------------------------------------------------------------------
+
+   private void handleWitjException (WitjException theWitjException)
+      {
+      theWitjException.printStackTrace ();
+
+      if (! TerminalException.witjHasTerminated ())
+         {
+         if (myProblem != null)
+            {
+            if (myProblem.isActive ())
+               {
+               myProblem.deactivate ();
+               }
+
+            myProblem = null;
+            }
+         }
+
+      System.out.printf (
+         "%n"
+       + "WitJDemo1 is terminating due to the above exception.%n");
+
+      System.exit (3);
+      }
+}
+@
+
+
+1.9
+log
+@setValue ==> set
+getValue ==> get
+@
+text
+@d121 3
+a123 3
+      double[]                       shipVolArr;
+      int                            thePer;
+      ArrayList <AllocTriple <Part>> supplyVolPip;
+d144 1
+a144 1
+            for (AllocTriple <Part> theTriple: supplyVolPip)
+@
+
+
+1.8
+log
+@Revised the default values for coinSelected and cplexSelected.
+@
+text
+@d90 2
+a91 2
+      myProblem.setValue (nPeriods,       2);
+      myProblem.setValue (pipSeqFromHeur, true);
+d101 1
+a101 1
+      thePartC  .setValue (buildNstn, true);
+d103 2
+a104 2
+      thePartA  .setValue (supplyVol, new double[]{30,  0});
+      thePartC  .setValue (supplyVol, new double[]{30, 10});
+d106 2
+a107 2
+      theDemandD.setValue (demandVol, new double[]{20, 20});
+      theDemandE.setValue (demandVol, new double[]{20, 20});
+d127 1
+a127 1
+         shipVolArr = theDemand.getValue (shipVol);
+d137 2
+a138 2
+               theDemand.getPart ().getValue (partName),
+               theDemand.getValue (demandName),
+d148 1
+a148 1
+                  theTriple.getRoot   ().getValue (partName),
+@
+
+
+1.7
+log
+@Removed GlobalAspect.
+@
+text
+@d31 8
+a184 8
+
+//------------------------------------------------------------------------------
+// myProblem
+//
+// The WIT-J Problem for this WIT-J application.
+//------------------------------------------------------------------------------
+
+   Problem myProblem = null;
+@
+
+
+1.6
+log
+@Corrected a typo.
+@
+text
+@d82 2
+a83 2
+      myProblem.getGlobalAspect ().setValue (nPeriods,       2);
+      myProblem.getGlobalAspect ().setValue (pipSeqFromHeur, true);
+d128 2
+a129 1
+             + "Demand %s, Period %d:          shipVol = %2.0f%n",
+d139 1
+a139 1
+                  "Part   %s, Period %d: pegged supplyVol = %2.0f%n",
+@
+
+
+1.5
+log
+@Revised some comments.
+@
+text
+@d102 1
+a102 1
+      theDemandD.setVectorToScalar (priority, 2);
+@
+
+
+1.4
+log
+@Changed name of message file.
+@
+text
+@d3 1
+a3 1
+// Example WIT-J Application Program Demo1.
+d180 1
+a180 1
+// The Problem for this WIT-J application.
+@
+
+
+1.3
+log
+@Revised the building and running of Demo1 to a new approach.
+@
+text
+@d3 1
+a3 1
+// Example WIT-J Application Program WIT-J-Demo-1.
+d80 1
+a80 1
+      myProblem.getMessageMgr ().setMesgFileName ("wit-j-demo-1.wmsg");
+@
+
+
+1.2
+log
+@Re-organized files.
+@
+text
+@@
+
+
+1.1
+log
+@Simplified the build of WIT-J-Demo-1.
+@
+text
+@@
+

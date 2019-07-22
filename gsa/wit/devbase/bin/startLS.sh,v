@@ -1,0 +1,160 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	latest_sce4_20_OSL:1.1.1.1.0.12
+	sce_4_20_OSL:1.1.1.1
+	sce_4_05_20040511:1.1.1.1
+	sce_4_00_20040201:1.1.1.1
+	nextGenBranch:1.1.1.1.0.10
+	nextGenRoot:1.1.1.1
+	sce_3_30_20030627:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2000.02.23.17.02.55;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.23.17.02.55;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#!/bin/rexx
+/*
+ * Start LgFr license servers
+ */
+
+parse arg parms
+parse source . . executableName
+
+startServer.=0
+provideHelp=0
+stop=0
+
+do forever
+   parse var parms "-" parm parms
+   if parm="all" then do
+      startServer.aplan2=1
+      startServer.oryse=1
+      startServer.sentinel=1
+      end
+   else if parm="aplan2"   then startServer.aplan2=1
+   else if parm="oryse"    then startServer.oryse=1
+   else if parm="sentinel" then startServer.sentinel=1
+   else if parm="stop"     then stop=1
+   else do
+      provideHelp=1
+      leave
+   end
+   if strip(parms)="" then leave
+end
+
+if provideHelp then do
+  say executableName" - start LgFr license servers"
+  say "syntax:" executableName  "[-oryse] [-aplan2] [-sentinel] [-all] [-stop]"
+  say "         oryse    - start objectory"
+  say "         aplan2   - start aplan2"
+  say "         sentinel - start sentinel"
+  say "         all      - start all license servers"
+  say "         stop     - stop servers rather than starting them"
+  exit 
+end
+ 
+
+/* aplan2 */
+if startServer.aplan2 then do
+
+   PARENTDIR="/u/tauben/ap"
+   OS="aix3"
+   CPU="r6000"
+   DS_DIR = value( "DS_DIR",, "environment" )
+
+   if stop then do
+      /* shutdown license server */
+      say "Stopping aplan2 license server"
+      "rsh gustav" "yes |",
+                   PARENTDIR"/dtidir/dtilmd/"OS"/"CPU"/bin/lmdown -c",
+                   PARENTDIR"/dtidir/dtilicense.dat",
+
+      end
+   else do
+      /* start license server */
+      say "Starting aplan2 license server"
+      "rsh gustav" PARENTDIR"/dtidir/dtilmd/"OS"/"CPU"/bin/lmgrd -c",
+                   PARENTDIR"/dtidir/dtilicense.dat >/tmp/prm.dtilmd.log &"
+   end
+
+end
+
+
+/* oryse */
+if startServer.oryse then do
+
+   ORYHOME = value( "ORYHOME",, "environment" )
+
+   if stop then do
+      /* shutdown license server */
+      say "Stopping oryse license server is not supported by" executableName
+      end
+   else do
+      /* start license server */
+      say "Starting oryse license server"
+      "rsh mfglog2" ORYHOME"/ls/rs6000.aix3.2/LicenseServ -s",
+                    ORYHOME"/ls/Licenserc"
+   end
+
+end
+
+/* sentinel */
+if startServer.sentinel then do
+
+   if stop then do
+      /* shutdown license server */
+      say "Stopping sentinel license server"
+      "rsh ecyw yes | lmdown -c /u/dcwong/SE_HOME/license.dat"
+   end
+   else do
+      /* start license server */
+      say "Starting sentinel license server"
+      "rsh ecyw /u/dcwong/SE_HOME/bin/lmgrd",
+           "-c /u/dcwong/SE_HOME/license.dat",
+           "-l /tmp/lmgrd.log &"
+   end
+
+end
+
+@
+
+
+1.1.1.1
+log
+@Import bin
+@
+text
+@@

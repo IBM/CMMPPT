@@ -1,0 +1,1192 @@
+head	1.8;
+access;
+symbols
+	sce_5_01_20080919:1.4;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2011.09.28.23.50.07;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.09.24.00.28.32;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.08.30.20.18.07;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2010.09.10.22.10.41;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2008.01.25.00.19.22;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2008.01.09.19.35.47;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.01.08.20.44.22;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.01.08.18.36.50;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "ScenAttMgr.C"
+//
+// Contains the implementation of class ScenAttMgr.
+//------------------------------------------------------------------------------
+
+#include <ScenAttMgr.h>
+#include <ScenInputAtt.h>
+#include <ScenSolnAtt.h>
+#include <ScenMgr.h>
+#include <StochAttMgr.h>
+#include <DataWrit.h>
+#include <CompMgr.h>
+#include <Material.h>
+#include <Demand.h>
+#include <Operation.h>
+#include <SubEntry.h>
+#include <BoundSet.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class ScenAttMgr.
+//------------------------------------------------------------------------------
+
+WitScenAttMgr::WitScenAttMgr (WitStochModeMgr * theStochModeMgr):
+
+      WitStochAssoc       (theStochModeMgr),
+      myAbsScenInputAtts_ (),
+      myAbsScenSolnAtts_  (),
+      buildingInputAtts_  (false),
+      buildingSolnAtts_   (false),
+      supplyVol_          (),
+      scrapCost_          (),
+      stockCost_          (),
+      demandVol_          (),
+      shipReward_         (),
+      cumShipReward_      (),
+      execCost_           (),
+      subCost_            (),
+      hardLB_             (),
+      softLB_             (),
+      hardUB_             (),
+      scrapVol_           (),
+      stockVol_           (),
+      shipVol_            (),
+      cumShipVol_         (),
+      execVol_            (),
+      subVol_             (),
+      allMats_            (),
+      allDemands_         (),
+      allSubs_            (),
+      allBoundSets_       ()
+   {
+   listOwners         ();
+   buildScenInputAtts ();
+   buildScenSolnAtts  ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitScenAttMgr::~WitScenAttMgr ()
+   {
+   while (not myAbsScenSolnAtts_.isEmpty ())
+      delete myAbsScenSolnAtts_.get ();
+
+   while (not myAbsScenInputAtts_.isEmpty ())
+      delete myAbsScenInputAtts_.get ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::downloadInput ()
+   {
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->downloadData (myScenMgr ()->curScenario ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::uploadInput ()
+   {
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->uploadData (myScenMgr ()->curScenario ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::copyInputFrom (WitScenAttMgr * srcScenAttMgr)
+   {
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->copyDataFrom (srcScenAttMgr);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::writeCompData (WitScenario * theScenario, bool diffedSec)
+   {
+   WitComponent *       theComp;
+   WitDelComp *         theDelComp;
+   bool                 attWritten;
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theComp, myCompMgr ()->allComponents ())
+      {
+      theDelComp = theComp->thisDelComp ();
+
+      if (theDelComp == NULL)
+         continue;
+
+      attWritten = false;
+
+      forEachEl (theInputAtt, myAbsScenInputAtts_)
+         if (not theInputAtt->ownedByBoundSet ())
+            theInputAtt->
+               writeData (theComp, theScenario, diffedSec, attWritten);
+
+      if (attWritten)
+         myDataWriter ()->writeEndCommand ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::writeBoundSetData (
+      WitScenario * theScenario,
+      bool          diffedSec)
+   {
+   WitBoundSet *        theBoundSet;
+   bool                 attWritten;
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theBoundSet, allBoundSets_)
+      {
+      attWritten = false;
+
+      forEachEl (theInputAtt, myAbsScenInputAtts_)
+         if (theInputAtt->ownedByBoundSet ())
+            theInputAtt->
+               writeData (theBoundSet, theScenario, diffedSec, attWritten);
+
+      if (attWritten)
+         {
+         myDataWriter ()->writeFirstKeyWord ("endBounds");
+         myDataWriter ()->writeEndCommand ();
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::validateData ()
+   {
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->validateData ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::uploadSoln ()
+   {
+   WitAbsScenSolnAtt * theSolnAtt;
+
+   forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+      theSolnAtt->uploadData (myScenMgr ()->curScenario ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::clearSoln ()
+   {
+   WitAbsScenSolnAtt * theSolnAtt;
+
+   forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+      theSolnAtt->clearData ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::store (WitAbsScenInputAtt * theInputAtt)
+   {
+   stronglyAssert (buildingInputAtts_);
+
+   myAbsScenInputAtts_.append (theInputAtt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::store (WitAbsScenSolnAtt * theSolnAtt)
+   {
+   stronglyAssert (buildingSolnAtts_);
+
+   myAbsScenSolnAtts_.append (theSolnAtt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::listOwners ()
+   {
+   WitMaterial *  theMat;
+   WitDemand *    theDemand;
+   WitSubEntry *  theSub;
+   WitComponent * theComp;
+   WitBoundSet *  theBoundSet;
+
+   forEachMaterial (theMat, myProblem ())
+      allMats_.append (theMat);
+
+   forEachDemand (theDemand, myProblem ())
+      allDemands_.append (theDemand);
+
+   forEachSubEntry (theSub, myProblem ())
+      allSubs_.append (theSub);
+
+   forEachEl (theComp, myCompMgr ()->allComponents ())
+      {
+      theBoundSet = theComp->myBoundSet ();
+
+      if (theBoundSet != NULL)
+         allBoundSets_.append (theBoundSet);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::buildScenInputAtts ()
+   {
+   buildingInputAtts_ = true;
+
+   supplyVol_ =
+      new WitScenInputAtt      <WitPart> (this,
+                                         "supplyVol",
+                                 WitPart::defSupplyVol (),
+                               & WitPart::supplyVol,
+                               & WitPart::storeStochSupplyVol,
+                         & WitScenAttMgr::supplyVol);
+
+   scrapCost_ =
+      new WitScenInputAtt      <WitPart> (this,
+                                         "scrapCost",
+                                 WitPart::defScrapCost (),
+                               & WitPart::scrapCost,
+                               & WitPart::storeStochScrapCost,
+                         & WitScenAttMgr::scrapCost);
+
+   stockCost_ =
+      new WitScenInputAtt  <WitMaterial> (this,
+                                         "stockCost",
+                             WitMaterial::defStockCost (),
+                           & WitMaterial::stockCost,
+                           & WitMaterial::storeStochStockCost,
+                         & WitScenAttMgr::stockCost);
+
+   demandVol_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "demandVol",
+                               WitDemand::defDemandVol (),
+                             & WitDemand::demandVol,
+                             & WitDemand::storeStochDemandVol,
+                         & WitScenAttMgr::demandVol);
+
+   shipReward_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "shipReward",
+                               WitDemand::defShipReward (),
+                             & WitDemand::shipReward,
+                             & WitDemand::storeStochShipReward,
+                         & WitScenAttMgr::shipReward);
+
+   cumShipReward_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "cumShipReward",
+                               WitDemand::defCumShipReward (),
+                             & WitDemand::cumShipReward,
+                             & WitDemand::storeStochCumShipReward,
+                         & WitScenAttMgr::cumShipReward);
+
+   execCost_ =
+      new WitScenInputAtt <WitOperation> (this,
+                                         "execCost",
+                            WitOperation::defExecCost (),
+                          & WitOperation::execCost,
+                          & WitOperation::storeStochExecCost,
+                         & WitScenAttMgr::execCost);
+
+   subCost_ =
+      new WitScenInputAtt  <WitSubEntry> (this,
+                                         "subCost",
+                             WitSubEntry::defSubCost (),
+                           & WitSubEntry::subCost,
+                           & WitSubEntry::storeStochSubCost,
+                         & WitScenAttMgr::subCost);
+
+   hardLB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "hardLB",
+                            WitBoundSet::defHardLB (),
+                          & WitBoundSet::hardLB,
+                          & WitBoundSet::storeStochHardLB,
+                        & WitScenAttMgr::hardLB);
+
+   softLB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "softLB",
+                            WitBoundSet::defSoftLB (),
+                          & WitBoundSet::softLB,
+                          & WitBoundSet::storeStochSoftLB,
+                        & WitScenAttMgr::softLB);
+
+   hardUB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "hardUB",
+                            WitBoundSet::defHardUB (),
+                          & WitBoundSet::hardUB,
+                          & WitBoundSet::storeStochHardUB,
+                        & WitScenAttMgr::hardUB);
+
+   buildingInputAtts_ = false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitScenAttMgr::buildScenSolnAtts ()
+   {
+   buildingSolnAtts_ = true;
+
+   scrapVol_   =
+      new WitScenSolnAtt <WitPart>      (this,
+                                        "scrapVol",
+                        & WitPart::      storeStochScrapVol);
+
+   stockVol_   =
+      new WitScenSolnAtt <WitMaterial>  (this,
+                                        "stockVol",
+                        & WitMaterial::  storeStochStockVol);
+
+   shipVol_    =
+      new WitScenSolnAtt <WitDemand>    (this,
+                                        "shipVol",
+                        & WitDemand::    storeStochShipVol);
+
+   cumShipVol_ =
+      new WitScenSolnAtt <WitDemand>    (this,
+                                        "cumShipVol",
+                        & WitDemand::    storeStochCumShipVol);
+
+   execVol_    =
+      new WitScenSolnAtt <WitOperation> (this,
+                                        "execVol",
+                        & WitOperation:: storeStochExecVol);
+
+   subVol_     =
+      new WitScenSolnAtt <WitSubEntry>  (this,
+                                        "subVol",
+                        & WitSubEntry::  storeStochSubVol);
+
+   buildingSolnAtts_ = false;
+   }
+@
+
+
+1.7
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.6
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d35 31
+a65 31
+WitStochAssoc       (theStochModeMgr),
+myAbsScenInputAtts_ (),
+myAbsScenSolnAtts_  (),
+buildingInputAtts_  (false),
+buildingSolnAtts_   (false),
+supplyVol_          (),
+scrapCost_          (),
+stockCost_          (),
+demandVol_          (),
+shipReward_         (),
+cumShipReward_      (),
+execCost_           (),
+subCost_            (),
+hardLB_             (),
+softLB_             (),
+hardUB_             (),
+scrapVol_           (),
+stockVol_           (),
+shipVol_            (),
+cumShipVol_         (),
+execVol_            (),
+subVol_             (),
+allMats_            (),
+allDemands_         (),
+allSubs_            (),
+allBoundSets_       ()
+{
+listOwners         ();
+buildScenInputAtts ();
+buildScenSolnAtts  ();
+}
+d70 7
+a76 7
+{
+while (not myAbsScenSolnAtts_.isEmpty ())
+delete myAbsScenSolnAtts_.get ();
+
+while (not myAbsScenInputAtts_.isEmpty ())
+delete myAbsScenInputAtts_.get ();
+}
+d81 2
+a82 2
+{
+WitAbsScenInputAtt * theInputAtt;
+d84 3
+a86 3
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+theInputAtt->downloadData (myScenMgr ()->curScenario ());
+}
+d91 2
+a92 2
+{
+WitAbsScenInputAtt * theInputAtt;
+d94 3
+a96 3
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+theInputAtt->uploadData (myScenMgr ()->curScenario ());
+}
+d101 2
+a102 2
+{
+WitAbsScenInputAtt * theInputAtt;
+d104 3
+a106 3
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+theInputAtt->copyDataFrom (srcScenAttMgr);
+}
+d111 24
+a134 24
+{
+WitComponent *       theComp;
+WitDelComp *         theDelComp;
+bool                 attWritten;
+WitAbsScenInputAtt * theInputAtt;
+
+forEachEl (theComp, myCompMgr ()->allComponents ())
+{
+theDelComp = theComp->thisDelComp ();
+
+if (theDelComp == NULL)
+continue;
+
+attWritten = false;
+
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+if (not theInputAtt->ownedByBoundSet ())
+theInputAtt->
+writeData (theComp, theScenario, diffedSec, attWritten);
+
+if (attWritten)
+myDataWriter ()->writeEndCommand ();
+}
+}
+d139 23
+a161 23
+WitScenario * theScenario,
+bool          diffedSec)
+{
+WitBoundSet *        theBoundSet;
+bool                 attWritten;
+WitAbsScenInputAtt * theInputAtt;
+
+forEachEl (theBoundSet, allBoundSets_)
+{
+attWritten = false;
+
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+if (theInputAtt->ownedByBoundSet ())
+theInputAtt->
+writeData (theBoundSet, theScenario, diffedSec, attWritten);
+
+if (attWritten)
+{
+myDataWriter ()->writeFirstKeyWord ("endBounds");
+myDataWriter ()->writeEndCommand ();
+}
+}
+}
+d166 2
+a167 2
+{
+WitAbsScenInputAtt * theInputAtt;
+d169 3
+a171 3
+forEachEl (theInputAtt, myAbsScenInputAtts_)
+theInputAtt->validateData ();
+}
+d176 2
+a177 2
+{
+WitAbsScenSolnAtt * theSolnAtt;
+d179 3
+a181 3
+forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+theSolnAtt->uploadData (myScenMgr ()->curScenario ());
+}
+d186 2
+a187 2
+{
+WitAbsScenSolnAtt * theSolnAtt;
+d189 3
+a191 3
+forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+theSolnAtt->clearData ();
+}
+d196 2
+a197 2
+{
+stronglyAssert (buildingInputAtts_);
+d199 2
+a200 2
+myAbsScenInputAtts_.append (theInputAtt);
+}
+d205 2
+a206 2
+{
+stronglyAssert (buildingSolnAtts_);
+d208 2
+a209 2
+myAbsScenSolnAtts_.append (theSolnAtt);
+}
+d214 24
+a237 24
+{
+WitMaterial *  theMat;
+WitDemand *    theDemand;
+WitSubEntry *  theSub;
+WitComponent * theComp;
+WitBoundSet *  theBoundSet;
+
+forEachMaterial (theMat, myProblem ())
+allMats_.append (theMat);
+
+forEachDemand (theDemand, myProblem ())
+allDemands_.append (theDemand);
+
+forEachSubEntry (theSub, myProblem ())
+allSubs_.append (theSub);
+
+forEachEl (theComp, myCompMgr ()->allComponents ())
+{
+theBoundSet = theComp->myBoundSet ();
+
+if (theBoundSet != NULL)
+allBoundSets_.append (theBoundSet);
+}
+}
+d242 2
+a243 2
+{
+buildingInputAtts_ = true;
+d245 87
+a331 87
+supplyVol_ =
+new WitScenInputAtt      <WitPart> (this,
+"supplyVol",
+WitPart::defSupplyVol (),
+& WitPart::supplyVol,
+& WitPart::storeStochSupplyVol,
+& WitScenAttMgr::supplyVol);
+
+scrapCost_ =
+new WitScenInputAtt      <WitPart> (this,
+"scrapCost",
+WitPart::defScrapCost (),
+& WitPart::scrapCost,
+& WitPart::storeStochScrapCost,
+& WitScenAttMgr::scrapCost);
+
+stockCost_ =
+new WitScenInputAtt  <WitMaterial> (this,
+"stockCost",
+WitMaterial::defStockCost (),
+& WitMaterial::stockCost,
+& WitMaterial::storeStochStockCost,
+& WitScenAttMgr::stockCost);
+
+demandVol_ =
+new WitScenInputAtt    <WitDemand> (this,
+"demandVol",
+WitDemand::defDemandVol (),
+& WitDemand::demandVol,
+& WitDemand::storeStochDemandVol,
+& WitScenAttMgr::demandVol);
+
+shipReward_ =
+new WitScenInputAtt    <WitDemand> (this,
+"shipReward",
+WitDemand::defShipReward (),
+& WitDemand::shipReward,
+& WitDemand::storeStochShipReward,
+& WitScenAttMgr::shipReward);
+
+cumShipReward_ =
+new WitScenInputAtt    <WitDemand> (this,
+"cumShipReward",
+WitDemand::defCumShipReward (),
+& WitDemand::cumShipReward,
+& WitDemand::storeStochCumShipReward,
+& WitScenAttMgr::cumShipReward);
+
+execCost_ =
+new WitScenInputAtt <WitOperation> (this,
+"execCost",
+WitOperation::defExecCost (),
+& WitOperation::execCost,
+& WitOperation::storeStochExecCost,
+& WitScenAttMgr::execCost);
+
+subCost_ =
+new WitScenInputAtt  <WitSubEntry> (this,
+"subCost",
+WitSubEntry::defSubCost (),
+& WitSubEntry::subCost,
+& WitSubEntry::storeStochSubCost,
+& WitScenAttMgr::subCost);
+
+hardLB_ =
+new WitScenInputAtt <WitBoundSet> (this,
+"hardLB",
+WitBoundSet::defHardLB (),
+& WitBoundSet::hardLB,
+& WitBoundSet::storeStochHardLB,
+& WitScenAttMgr::hardLB);
+
+softLB_ =
+new WitScenInputAtt <WitBoundSet> (this,
+"softLB",
+WitBoundSet::defSoftLB (),
+& WitBoundSet::softLB,
+& WitBoundSet::storeStochSoftLB,
+& WitScenAttMgr::softLB);
+
+hardUB_ =
+new WitScenInputAtt <WitBoundSet> (this,
+"hardUB",
+WitBoundSet::defHardUB (),
+& WitBoundSet::hardUB,
+& WitBoundSet::storeStochHardUB,
+& WitScenAttMgr::hardUB);
+d333 2
+a334 2
+buildingInputAtts_ = false;
+}
+d339 2
+a340 2
+{
+buildingSolnAtts_ = true;
+d342 29
+a370 29
+scrapVol_   =
+new WitScenSolnAtt <WitPart>      (this,
+"scrapVol",
+& WitPart::      storeStochScrapVol);
+
+stockVol_   =
+new WitScenSolnAtt <WitMaterial>  (this,
+"stockVol",
+& WitMaterial::  storeStochStockVol);
+
+shipVol_    =
+new WitScenSolnAtt <WitDemand>    (this,
+"shipVol",
+& WitDemand::    storeStochShipVol);
+
+cumShipVol_ =
+new WitScenSolnAtt <WitDemand>    (this,
+"cumShipVol",
+& WitDemand::    storeStochCumShipVol);
+
+execVol_    =
+new WitScenSolnAtt <WitOperation> (this,
+"execVol",
+& WitOperation:: storeStochExecVol);
+
+subVol_     =
+new WitScenSolnAtt <WitSubEntry>  (this,
+"subVol",
+& WitSubEntry::  storeStochSubVol);
+d372 2
+a373 2
+buildingSolnAtts_ = false;
+}
+@
+
+
+1.5
+log
+@Heuristic Adjustment
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d35 31
+a65 31
+      WitStochAssoc       (theStochModeMgr),
+      myAbsScenInputAtts_ (),
+      myAbsScenSolnAtts_  (),
+      buildingInputAtts_  (false),
+      buildingSolnAtts_   (false),
+      supplyVol_          (),
+      scrapCost_          (),
+      stockCost_          (),
+      demandVol_          (),
+      shipReward_         (),
+      cumShipReward_      (),
+      execCost_           (),
+      subCost_            (),
+      hardLB_             (),
+      softLB_             (),
+      hardUB_             (),
+      scrapVol_           (),
+      stockVol_           (),
+      shipVol_            (),
+      cumShipVol_         (),
+      execVol_            (),
+      subVol_             (),
+      allMats_            (),
+      allDemands_         (),
+      allSubs_            (),
+      allBoundSets_       ()
+   {
+   listOwners         ();
+   buildScenInputAtts ();
+   buildScenSolnAtts  ();
+   }
+d70 7
+a76 7
+   {
+   while (not myAbsScenSolnAtts_.isEmpty ())
+      delete myAbsScenSolnAtts_.get ();
+
+   while (not myAbsScenInputAtts_.isEmpty ())
+      delete myAbsScenInputAtts_.get ();
+   }
+d81 2
+a82 2
+   {
+   WitAbsScenInputAtt * theInputAtt;
+d84 3
+a86 3
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->downloadData (myScenMgr ()->curScenario ());
+   }
+d91 2
+a92 2
+   {
+   WitAbsScenInputAtt * theInputAtt;
+d94 3
+a96 3
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->uploadData (myScenMgr ()->curScenario ());
+   }
+d101 2
+a102 2
+   {
+   WitAbsScenInputAtt * theInputAtt;
+d104 3
+a106 3
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->copyDataFrom (srcScenAttMgr);
+   }
+d111 24
+a134 24
+   {
+   WitComponent *       theComp;
+   WitDelComp *         theDelComp;
+   bool                 attWritten;
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theComp, myCompMgr ()->allComponents ())
+      {
+      theDelComp = theComp->thisDelComp ();
+
+      if (theDelComp == NULL)
+         continue;
+
+      attWritten = false;
+
+      forEachEl (theInputAtt, myAbsScenInputAtts_)
+         if (not theInputAtt->ownedByBoundSet ())
+            theInputAtt->
+               writeData (theComp, theScenario, diffedSec, attWritten);
+
+      if (attWritten)
+         myDataWriter ()->writeEndCommand ();
+      }
+   }
+d139 23
+a161 23
+      WitScenario * theScenario,
+      bool          diffedSec)
+   {
+   WitBoundSet *        theBoundSet;
+   bool                 attWritten;
+   WitAbsScenInputAtt * theInputAtt;
+
+   forEachEl (theBoundSet, allBoundSets_)
+      {
+      attWritten = false;
+
+      forEachEl (theInputAtt, myAbsScenInputAtts_)
+         if (theInputAtt->ownedByBoundSet ())
+            theInputAtt->
+               writeData (theBoundSet, theScenario, diffedSec, attWritten);
+
+      if (attWritten)
+         {
+         myDataWriter ()->writeFirstKeyWord ("endBounds");
+         myDataWriter ()->writeEndCommand ();
+         }
+      }
+   }
+d166 2
+a167 2
+   {
+   WitAbsScenInputAtt * theInputAtt;
+d169 3
+a171 3
+   forEachEl (theInputAtt, myAbsScenInputAtts_)
+      theInputAtt->validateData ();
+   }
+d176 2
+a177 2
+   {
+   WitAbsScenSolnAtt * theSolnAtt;
+d179 3
+a181 3
+   forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+      theSolnAtt->uploadData (myScenMgr ()->curScenario ());
+   }
+d186 2
+a187 2
+   {
+   WitAbsScenSolnAtt * theSolnAtt;
+d189 3
+a191 3
+   forEachEl (theSolnAtt, myAbsScenSolnAtts_)
+      theSolnAtt->clearData ();
+   }
+d196 2
+a197 2
+   {
+   stronglyAssert (buildingInputAtts_);
+d199 2
+a200 2
+   myAbsScenInputAtts_.append (theInputAtt);
+   }
+d205 2
+a206 2
+   {
+   stronglyAssert (buildingSolnAtts_);
+d208 2
+a209 2
+   myAbsScenSolnAtts_.append (theSolnAtt);
+   }
+d214 24
+a237 24
+   {
+   WitMaterial *  theMat;
+   WitDemand *    theDemand;
+   WitSubEntry *  theSub;
+   WitComponent * theComp;
+   WitBoundSet *  theBoundSet;
+
+   forEachMaterial (theMat, myProblem ())
+      allMats_.append (theMat);
+
+   forEachDemand (theDemand, myProblem ())
+      allDemands_.append (theDemand);
+
+   forEachSubEntry (theSub, myProblem ())
+      allSubs_.append (theSub);
+
+   forEachEl (theComp, myCompMgr ()->allComponents ())
+      {
+      theBoundSet = theComp->myBoundSet ();
+
+      if (theBoundSet != NULL)
+         allBoundSets_.append (theBoundSet);
+      }
+   }
+d242 2
+a243 2
+   {
+   buildingInputAtts_ = true;
+d245 87
+a331 87
+   supplyVol_ =
+      new WitScenInputAtt      <WitPart> (this,
+                                         "supplyVol",
+                                 WitPart::defSupplyVol (),
+                               & WitPart::supplyVol,
+                               & WitPart::storeStochSupplyVol,
+                         & WitScenAttMgr::supplyVol);
+
+   scrapCost_ =
+      new WitScenInputAtt      <WitPart> (this,
+                                         "scrapCost",
+                                 WitPart::defScrapCost (),
+                               & WitPart::scrapCost,
+                               & WitPart::storeStochScrapCost,
+                         & WitScenAttMgr::scrapCost);
+
+   stockCost_ =
+      new WitScenInputAtt  <WitMaterial> (this,
+                                         "stockCost",
+                             WitMaterial::defStockCost (),
+                           & WitMaterial::stockCost,
+                           & WitMaterial::storeStochStockCost,
+                         & WitScenAttMgr::stockCost);
+
+   demandVol_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "demandVol",
+                               WitDemand::defDemandVol (),
+                             & WitDemand::demandVol,
+                             & WitDemand::storeStochDemandVol,
+                         & WitScenAttMgr::demandVol);
+
+   shipReward_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "shipReward",
+                               WitDemand::defShipReward (),
+                             & WitDemand::shipReward,
+                             & WitDemand::storeStochShipReward,
+                         & WitScenAttMgr::shipReward);
+
+   cumShipReward_ =
+      new WitScenInputAtt    <WitDemand> (this,
+                                         "cumShipReward",
+                               WitDemand::defCumShipReward (),
+                             & WitDemand::cumShipReward,
+                             & WitDemand::storeStochCumShipReward,
+                         & WitScenAttMgr::cumShipReward);
+
+   execCost_ =
+      new WitScenInputAtt <WitOperation> (this,
+                                         "execCost",
+                            WitOperation::defExecCost (),
+                          & WitOperation::execCost,
+                          & WitOperation::storeStochExecCost,
+                         & WitScenAttMgr::execCost);
+
+   subCost_ =
+      new WitScenInputAtt  <WitSubEntry> (this,
+                                         "subCost",
+                             WitSubEntry::defSubCost (),
+                           & WitSubEntry::subCost,
+                           & WitSubEntry::storeStochSubCost,
+                         & WitScenAttMgr::subCost);
+
+   hardLB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "hardLB",
+                            WitBoundSet::defHardLB (),
+                          & WitBoundSet::hardLB,
+                          & WitBoundSet::storeStochHardLB,
+                        & WitScenAttMgr::hardLB);
+
+   softLB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "softLB",
+                            WitBoundSet::defSoftLB (),
+                          & WitBoundSet::softLB,
+                          & WitBoundSet::storeStochSoftLB,
+                        & WitScenAttMgr::softLB);
+
+   hardUB_ =
+      new WitScenInputAtt <WitBoundSet> (this,
+                                        "hardUB",
+                            WitBoundSet::defHardUB (),
+                          & WitBoundSet::hardUB,
+                          & WitBoundSet::storeStochHardUB,
+                        & WitScenAttMgr::hardUB);
+d333 2
+a334 2
+   buildingInputAtts_ = false;
+   }
+d339 2
+a340 2
+   {
+   buildingSolnAtts_ = true;
+d342 29
+a370 29
+   scrapVol_   =
+      new WitScenSolnAtt <WitPart>      (this,
+                                        "scrapVol",
+                        & WitPart::      storeStochScrapVol);
+
+   stockVol_   =
+      new WitScenSolnAtt <WitMaterial>  (this,
+                                        "stockVol",
+                        & WitMaterial::  storeStochStockVol);
+
+   shipVol_    =
+      new WitScenSolnAtt <WitDemand>    (this,
+                                        "shipVol",
+                        & WitDemand::    storeStochShipVol);
+
+   cumShipVol_ =
+      new WitScenSolnAtt <WitDemand>    (this,
+                                        "cumShipVol",
+                        & WitDemand::    storeStochCumShipVol);
+
+   execVol_    =
+      new WitScenSolnAtt <WitOperation> (this,
+                                        "execVol",
+                        & WitOperation:: storeStochExecVol);
+
+   subVol_     =
+      new WitScenSolnAtt <WitSubEntry>  (this,
+                                        "subVol",
+                        & WitSubEntry::  storeStochSubVol);
+d372 2
+a373 2
+   buildingSolnAtts_ = false;
+   }
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@d25 1
+a25 1
+#include <Opn.h>
+@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@a18 1
+#include <StochModeMgr.h>
+d35 1
+a35 3
+      WitProbAssoc        (theStochModeMgr),
+      myStochModeMgr_     (theStochModeMgr),
+      myScenMgr_          (theStochModeMgr->myScenMgr ()),
+d85 1
+a85 1
+      theInputAtt->downloadData (myScenMgr_->curScenario ());
+d95 1
+a95 1
+      theInputAtt->uploadData (myScenMgr_->curScenario ());
+d180 1
+a180 1
+      theSolnAtt->uploadData (myScenMgr_->curScenario ());
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@a21 1
+#include <ObjStageMgr.h>
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d22 1
+a22 1
+#include <StageMgr.h>
+@
+

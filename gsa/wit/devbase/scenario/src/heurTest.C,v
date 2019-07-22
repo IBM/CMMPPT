@@ -1,0 +1,204 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.4
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.2
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.2.0.10
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.2.0.8
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.6
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.4
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.2.0.2
+	sce_3_10_20010924:1.2
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.08.05.12.49.22;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.08.10.23.02.05;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.43;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.43;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Changed ablsolute path to relative path name.
+@
+text
+@// Test witHeurImplode with hard upper bounds on prodBounds.
+
+
+#include <iostream.h>
+#include <stdlib.h>
+#include <scenario/src/testScen.h>
+#include <scenario/src/timeVecs.h>
+
+
+int
+main ()
+{
+  int i;
+
+  LgFrInitialProblemFromFile
+      initProb( "../../../../wit/wit-data/brenda/denise/wit.data" );
+  LgFrTestScenario testScenario(initProb);
+  LgFrWorkingImplosionProblem &wip ( testScenario.workingImplosionProblem() );
+  LgFrLastProblemSolved       &lps ( testScenario.lastProblemSolved() );
+  LgFrSetOfParts              &sop ( testScenario.setOfParts() );
+  LgFrSetOfDemands            &sod ( testScenario.setOfDemands() );
+  LgFrImplode                 implode( lps );
+
+  // Setup production schedule
+  LgFrSortingPartScheduleFloat mutableProdVol;
+  const LgFrSortingPartScheduleFloat & prodVol = mutableProdVol;
+  LgFrProductionScheduleStrategy prodSS(testScenario);
+  mutableProdVol.attributeScheduleStrategy(prodSS);
+
+  // Schedule to save hard upper bounds production schedule
+  LgFrSortingPartScheduleFloat mutableHubPB;
+  const LgFrSortingPartScheduleFloat & hubPB = mutableHubPB;
+ 
+  lps.computeCriticalList( TRUE );
+
+  lps.heurImplode();
+
+  // Set the production bounds to production volume
+  for (i=0; i<sop.entries(); i=i+1 ) {
+ 
+     if ( lps.category( &sop[i] ) == LgFrPRODUCT ) {
+        LgFrTimeVecFloat newBounds( lps.numberOfPeriods() );
+        newBounds=prodVol[ sop[i] ].timeVecFloat();
+        mutableHubPB.insertKeyAndValue( sop[i], newBounds );
+        lps.productionBounds( &sop[i], 
+            NULL, NULL, &hubPB[ sop[i] ].timeVecFloat() );
+     }
+
+  }
+
+
+  // Loop, testing to ensure production bounds are not violated and
+  // then set new production bounds. 
+  for ( int testNum=0; testNum<1000; testNum++ ) {
+
+     lps.heurImplode();
+
+     // Test that bound not violated
+     for (i=0; i<hubPB.entries(); i++ ) {
+         assert( 
+                prodVol[hubPB[i].part()].timeVecFloat() <= 
+                hubPB[i].timeVecFloat() 
+               );
+     }
+
+     // Check for exit criteria of all upper prod bounds being 0.
+     RWBoolean allZero = TRUE;
+     for (i=0; i<hubPB.entries(); i++ ) {
+        if ( !( hubPB[i].timeVecFloat() == 0.0) ) {
+           allZero=FALSE;
+           break;
+        }
+     }
+     if ( allZero ) break;
+
+     // Set new upper production bound for some part
+     for ( ;; ) {
+ 
+        // Pick a random part
+        i = rand() % sop.entries();
+
+        // Check to see if the i'th part is a product
+        if ( lps.category( &sop[i] ) == LgFrPRODUCT ) 
+
+           // Check to see if prodBounds are already zero
+           if ( !(hubPB[ sop[i] ].timeVecFloat() == 0.0) ) {
+
+              // Set a new upper production bound i'th part
+              LgFrTimeVecFloat newBounds( lps.numberOfPeriods() );
+              newBounds=prodVol[ sop[i] ].timeVecFloat()  *  .75;
+              mutableHubPB.insertKeyAndValue( sop[i], newBounds );
+              lps.productionBounds( &sop[i], 
+                  NULL, NULL, &hubPB[ sop[i] ].timeVecFloat() );
+
+              cout <<"Implosion " <<testNum <<endl;
+              cout <<"  new UpperProdBounds: " 
+                   <<hubPB[ sop[i] ].format() <<endl;
+              break;
+
+           }
+
+     }
+
+   }
+}
+@
+
+
+1.2
+log
+@Updated so unitTest reads files from
+  /u/wit/wit-data
+instead of
+  /u/implode/data
+With these changes unitTest is running correctly on Windows
+@
+text
+@d16 1
+a16 1
+      initProb( "/u/wit/wit-data/brenda/denise/wit.data" );
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d16 1
+a16 1
+      initProb( "/u/implode/wit/data/brenda/denise/wit.data" );
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

@@ -1,0 +1,287 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2004.11.08.23.23.20;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.10.28.03.38.50;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.11.17.44.09;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Fixed up to recognize and test for records with duplicate keys.
+@
+text
+@#ifndef ECCdemandFile_h
+#define ECCdemandFile_h
+
+#include "scoFile.h"
+
+
+class ECCdemandFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(demand);
+  getFieldH(material);
+  getIntFieldH(period);
+  getFloatFieldH(demVol);
+  getFloatFieldH(contribution);
+  getFloatFieldH(minShipVol);
+  
+  // preferred constructor
+  ECCdemandFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("mtm");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(6);
+    commentRecords(true);
+    
+    // don't normally call initialize here, but doing this for eastman
+    // to make sure duplicate records are found.
+    initialize();  
+  };
+  
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & demand,
+    const std::string & material,
+    int period) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = demand+uniqueString()+material+uniqueString()+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ECCdemandFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ECCdemandFile file("../data/example1/demand.csv");
+    
+    // Test reading first record
+
+    assert( file.demand(0) == "US Tow" );
+    assert( file.material(0) == "Tow" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.contributionAsFloat(0) == 31. );
+    assert( file.demVolAsFloat(0) == 200. );
+    assert( file.minShipVolAsFloat(0) == 0. );
+
+    assert( file.demand(2) == "US Tow" );
+    assert( file.material(2) == "Tow" );
+    assert( file.periodAsInt(2) == 3 );
+    assert( file.contributionAsFloat(2) == 29. );
+    assert( file.demVolAsFloat(2) == 220. );
+    assert( file.minShipVolAsFloat(2) == 0. );
+
+    // Test reading record by key    
+    assert( file.demVolAsFloat(file.key("Europe Tow","Tow",3)) == 155.f );
+
+    int nr = file.numRecords();
+    assert( nr == 30 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      demand(recNum),
+      material(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ECCdemandFile();
+  
+  // copy constructor  -- don't use!
+  ECCdemandFile( const ECCdemandFile& source );
+  
+  // assignment operator -- don't use!
+  ECCdemandFile&
+  operator=(const ECCdemandFile& rhs);
+
+  
+};
+
+
+
+class ECCdemandFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  
+  getFieldFileWithIteratorH(demand);
+  getFieldFileWithIteratorH(material);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(contribution);
+  getFloatFieldFileWithIteratorH(demVol);
+  getFloatFieldFileWithIteratorH(minShipVol);
+  
+  // preferred constructor
+  ECCdemandFileIterator(const ECCdemandFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ECCdemandFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ECCdemandFile file("../data/example1/demand.csv");
+    ECCdemandFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.demand() == "US Tow" );
+        assert( fileIter.material() == "Tow" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.contributionAsFloat() == 31. );
+        assert( fileIter.demVolAsFloat() == 200. );
+        assert( fileIter.minShipVolAsFloat() == 0. );
+        
+        
+      }   
+      else if ( recNo == 1 ) {
+        
+        assert( fileIter.demand() == "US Tow" );
+        assert( fileIter.material() == "Tow" );
+        assert( fileIter.periodAsInt() == 2 );
+        assert( fileIter.contributionAsFloat() == 30. );
+        assert( fileIter.demVolAsFloat() == 210. );
+        assert( fileIter.minShipVolAsFloat() == 0. );        
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ECCdemandFileIterator();
+  
+  // copy constructor  -- don't use!
+  ECCdemandFileIterator( const ECCdemandFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ECCdemandFileIterator&
+  operator=(const ECCdemandFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.2
+log
+@Updated to match fileFormats document and current acetyl stream model
+@
+text
+@d31 4
+@
+
+
+1.1
+log
+@Added files to read demand.csv
+@
+text
+@d11 2
+a12 2
+  getFieldH(product);
+  getFieldH(demLoc);
+a13 1
+  getFloatFieldH(profit);
+d15 1
+d36 2
+a37 2
+    const std::string & product,
+    const std::string & demLoc,
+d42 1
+a42 1
+    std::string retVal = product+"$+&"+demLoc+"$+&"+periodchar;
+d56 2
+a57 2
+    assert( file.product(0) == "p1" );
+    assert( file.demLoc(0) == "northAmerica" );
+d59 2
+a60 2
+    assert( file.profitAsFloat(0) == 12. );
+    assert( file.demVolAsFloat(0) == 34. );
+d63 6
+a68 6
+    assert( file.product(2) == "p2" );
+    assert( file.demLoc(2) == "europe" );
+    assert( file.periodAsInt(2) == 1 );
+    assert( file.profitAsFloat(2) == 56. );
+    assert( file.demVolAsFloat(2) == 78. );
+    assert( file.minShipVolAsFloat(2) == 23. );
+d71 1
+a71 1
+    assert( file.demVolAsFloat(file.key("p1","europe",1)) == 79.f );
+d73 2
+a74 1
+    assert( file.numRecords() == 3 );
+d84 2
+a85 2
+      product(recNum),
+      demLoc(recNum),
+d112 2
+a113 2
+  getFieldFileWithIteratorH(product);
+  getFieldFileWithIteratorH(demLoc);
+d115 1
+a115 1
+  getFloatFieldFileWithIteratorH(profit);
+d138 2
+a139 2
+        assert( fileIter.product() == "p1" );
+        assert( fileIter.demLoc() == "northAmerica" );
+d141 2
+a142 2
+        assert( fileIter.profitAsFloat() == 12. );
+        assert( fileIter.demVolAsFloat() == 34. );
+d146 9
+@
+

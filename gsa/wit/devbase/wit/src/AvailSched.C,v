@@ -1,0 +1,1737 @@
+head	1.7;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.7
+date	2011.09.28.23.49.02;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.09.24.00.27.19;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.08.30.20.17.15;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2010.09.13.21.13.19;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2010.09.10.23.22.42;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2010.09.10.23.17.46;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2010.09.10.20.30.57;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "AvailSched.C"
+//
+// Contains the implementation of class AvailSched.
+//------------------------------------------------------------------------------
+
+#include <AvailSched.h>
+#include <HeurAtor.h>
+#include <SsrMgr.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <BoundSet.h>
+#include <Post.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class AvailSched.
+//------------------------------------------------------------------------------
+
+WitAvailSched::WitAvailSched (WitHeurAtor * theHeurAtor):
+
+      WitProbAssoc (theHeurAtor),
+
+      myHeurAtor_  (theHeurAtor),
+      mySsrMgr_    (NULL),
+      incAvailVol_ (myProblem (), 0.0),
+      lastDecPer_  (myProblem (), -1),
+      uncondSR_    (myProblem (), false),
+      selectiveSR_ (myProblem (), false)
+   {
+   WitPart * thePart;
+
+   if (myHeurAtor_->userHeurStart ())
+      {
+      myMsgFac () ("userHeurStartMsg");
+
+      initForUHS ();
+
+      verifyUhsNNScrapCon ();
+      }
+   else
+      forEachPart (thePart, myProblem ())
+         incAvailVol_ (thePart) = thePart->supplyVol ();
+
+   initStockRealloc ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitAvailSched::~WitAvailSched ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::attachSsrMgr ()
+   {
+   mySsrMgr_ = myHeurAtor_->mySsrMgr ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::netWoSR (
+      WitPart * thePart,
+      WitPeriod reqPer,
+      double &  theReqVol)
+   {
+   WitMaterial * theMat;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   theMat = thePart->thisMat ();
+
+   if (theMat != NULL)
+      netMatWoSR      (theMat,  reqPer, theReqVol);
+   else
+      netWithIncAvail (thePart, reqPer, theReqVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::netWithIncAvail (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double &  theReqVol)
+   {
+   double deltaVol;
+
+   deltaVol = min (theReqVol, incAvailVol_ (thePart)[thePer]);
+
+   if (deltaVol < NET_TOL)
+      return;
+
+   theReqVol -= deltaVol;
+
+   addToIncAvailVol (thePart, thePer, - deltaVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::netMatWoSR (
+      WitMaterial * theMat,
+      WitPeriod     reqPer,
+      double &      theReqVol)
+   {
+   double allVol;
+   double totReqVol;
+   double availVol;
+   double deltaVol;
+
+   allVol    = allocedVol (theMat, reqPer, false);
+
+   totReqVol = theReqVol + allVol;
+
+   availVol  = availToNet (theMat, reqPer, totReqVol, 0.0);
+
+   deltaVol  = 
+      (availVol == totReqVol)?
+         theReqVol:
+         availVol - allVol;
+
+   if (deltaVol < NET_TOL)
+      return;
+
+   theReqVol -= deltaVol;
+
+   addToIncAvailVol (theMat, reqPer, - deltaVol);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPeriod WitAvailSched::netAndRoll (
+      WitMaterial * theMat, 
+      WitPeriod     reqPer,
+      double &      theReqVol,
+      double &      rollVol,
+      bool &        bddSsrSplit)
+   {
+   double    allVol;
+   WitPeriod rollPer;
+
+   witAssert (eitherSR (theMat));
+
+   witAssert (theReqVol >= NET_TOL);
+
+   if (selectiveSR_ (theMat))
+      allVol = allocedVol (theMat, reqPer, true);
+   else
+      allVol = 0.0;
+
+   rollVol = availToNet (theMat, reqPer, theReqVol, allVol);
+
+   if (rollVol < NET_TOL)
+      return -1;
+
+   theReqVol -= rollVol;
+
+   rollPer    = rollPeriod (theMat, reqPer);
+
+   if (selectiveSR_ (theMat))
+      {
+      mySsrMgr_->adjReqAndRollForSS (
+         theMat,
+         rollPer,
+         theReqVol,
+         rollVol,
+         bddSsrSplit);
+
+      if (rollVol < NET_TOL)
+         return -1;
+      }
+
+   addToIncAvailVol (theMat, reqPer, - rollVol);
+
+   if (rollPer >= 0)
+      addToIncAvailVol (theMat, rollPer, rollVol);
+
+   return rollPer;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::reserveAchStSLB (
+      WitMaterial * theMat, 
+      WitPeriod     thePer,
+      double &      unachVol)
+   {
+   double resVol;
+
+   witAssert (myGlobalComp ()->respectStockSLBs ());
+
+   witAssert (not theMat->mandEC ()[thePer]);
+
+   unachVol = theMat->stockBounds ()->softLB ()[thePer];
+
+   witAssert (unachVol >= NET_TOL);
+
+   resVol   = availToNet (theMat, thePer, unachVol, 0.0);
+
+   if (resVol <= NET_TOL)
+      return;
+
+   addToIncAvailVol    (theMat, thePer,     - resVol);
+
+   if (thePer < lastPeriod ())
+      addToIncAvailVol (theMat, thePer + 1, + resVol);
+
+   unachVol -= resVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::addToIncAvailVol (
+      WitPart * thePart, 
+      WitPeriod thePer, 
+      double    deltaAvailVol)
+   {
+   WitMaterial * theMat;
+
+   double & incAvailVolRef = incAvailVol_ (thePart)[thePer];
+
+   myHeurAtor_->saveVal (incAvailVolRef);
+
+   incAvailVolRef += deltaAvailVol;
+
+   if (incAvailVolRef >= - NET_TOL)
+      return;
+
+   theMat = thePart->thisMat ();
+
+   if (theMat != NULL)
+      if (thePer > lastDecPer_ (theMat))
+         {
+         myHeurAtor_->saveVal (lastDecPer_ (theMat));
+
+         lastDecPer_ (theMat) = thePer;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::print ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   fprintf (msgFile (),
+      "\n"
+      "----------------------\n"
+      "Availability Schedule:\n"
+      "----------------------\n"
+      "\n");
+
+   forEachPart (thePart, myProblem ())
+      {
+      fprintf (msgFile (),
+         "Part \"%s\":\n",
+         thePart->partName ().myCstring ());
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         fprintf (msgFile (),
+            "   Period %d: IncAvail: %3.0f\n",
+            thePer,
+            incAvailVol_ (thePart)[thePer]);
+         }
+
+      fprintf (msgFile (),"\n");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::initForUHS ()
+   {
+   WitTVec <double> prodVolVec;
+   WitTVec <double> consVolVec;
+   WitTVec <double> nonSubVolVec;
+   WitTVec <double> subVolVec;
+   WitPart *        thePart;
+   WitBomEntry *    theBomEnt;
+   WitSubEntry *    theSub;
+   WitPeriod        thePer;
+   double           incAvVol;
+   WitDemand *      theDemand;
+
+   prodVolVec  .allocate (myProblem (), 0.0);
+   consVolVec  .allocate (myProblem (), 0.0);
+   nonSubVolVec.allocate (myProblem (), 0.0);
+   subVolVec   .allocate (myProblem (), 0.0);
+
+   forEachPart (thePart, myProblem ())
+      {
+      myProblem ()->myPostprocessor ()->compProdVol (thePart, prodVolVec);
+
+      consVolVec = 0.0;
+
+      forEachEl (theBomEnt, thePart->consumingBomEntries ())
+         {
+         myProblem ()->
+            myPostprocessor ()->
+               compNonSubVol (theBomEnt, nonSubVolVec);
+
+         theBomEnt->incConsVol (consVolVec, nonSubVolVec);
+         }
+
+      forEachEl (theSub, thePart->consumingSubEntries ())
+         {
+         subVolVec = theSub->subVol ();
+
+         theSub->incConsVol (consVolVec, subVolVec);
+         }
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         incAvVol =
+              thePart->supplyVol ()[thePer]
+            + prodVolVec           [thePer]
+            - consVolVec           [thePer];
+
+         forEachEl (theDemand, thePart->myDemands ())
+            incAvVol -= theDemand->shipVol ()[thePer];
+
+         addToIncAvailVol (thePart, thePer, incAvVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::verifyUhsNNScrapCon ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    availVol;
+   double    maxViol;
+   WitPart * mvPart;
+   WitPeriod mvPer;
+
+   maxViol = FEAS_TOL;
+   mvPart  = NULL;
+   mvPer   = -1;
+
+   forEachPart (thePart, myProblem ())
+      {
+      availVol = 0.0;
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         availVol += incAvailVol_ (thePart)[thePer];
+
+         if (- availVol > maxViol)
+            {
+            maxViol = - availVol;
+            mvPart  =   thePart;
+            mvPer   =   thePer;
+            }
+
+         setToMax (availVol, 0.0);
+
+         if (not thePart->canStock (thePer))
+            availVol = 0.0;
+         }
+      }
+
+   if (mvPart != NULL)
+      {
+      myMsgFac () ("uhsConViolIntroWmsg");
+
+      myMsgFac () ("uhsNNScrapConViolWmsg",
+         maxViol,
+         mvPart->partName (),
+         mvPer,
+         - maxViol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::initStockRealloc ()
+   {
+   WitMaterial * theMat;
+
+   if (myGlobalComp ()->oldSR ())
+      {
+      myMsgFac () ("oldSRMsg");
+
+      forEachMaterial (theMat, myProblem ())
+         if (not theMat->producingBopEntries ().isEmpty ())
+            uncondSR_ (theMat) = true; 
+      }
+   else if (myGlobalComp ()->stockReallocation ())
+      {
+      myMsgFac () ("stockReMsg");
+
+      forEachMaterial (theMat, myProblem ())
+         {
+         if (theMat->producingBopEntries ().isEmpty ())
+            continue;
+
+         if (unlimitedBuildAhead (theMat))
+            uncondSR_    (theMat) = true; 
+         else
+            selectiveSR_ (theMat) = true;
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitAvailSched::unlimitedBuildAhead (WitMaterial * theMat)
+   {
+   WitPeriod thePer;
+
+   if    (not theMat->buildNstn ())
+      if (not theMat->buildAsap ())
+         return false;
+
+   forEachPeriod (thePer, myProblem ())
+      if (theMat->buildAheadUB ()[thePer] < thePer)
+         return false;
+
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+// allocedVol
+//
+// Note that mandECs can be ignored: When one occurs, the allocated volume will
+// have to be zero anyway.
+//------------------------------------------------------------------------------
+
+double WitAvailSched::allocedVol (
+      WitMaterial * theMat,
+      WitPeriod     reqPer,
+      bool          forSR)
+   {
+   WitPeriod thePer;
+   double    allVol;
+   double    incAvVol;
+
+   allVol = 0.0;
+
+   for (thePer = lastDecPer_ (theMat); thePer > reqPer; thePer --)
+      {
+      incAvVol = incAvailVol_ (theMat)[thePer];
+
+      if (incAvVol < - NET_TOL)
+         {
+         if (forSR)
+            if (srAllowedFrom (theMat, thePer))
+               continue;
+
+         allVol += - incAvVol;
+         }
+      else if (incAvVol > NET_TOL)
+         {
+         allVol -= incAvVol;
+
+         setToMax (allVol, 0.0);
+         }
+      }
+
+   return allVol;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitAvailSched::availToNet (
+      WitMaterial * theMat, 
+      WitPeriod     reqPer,
+      double        theReqVol,
+      double        allVol)
+   {
+   double    availVol;
+   WitPeriod thePer;
+   double    theIncAvailVol;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   availVol = - allVol;
+
+   for (thePer = reqPer; thePer >= 0; thePer --)
+      {
+      if (thePer < reqPer)
+         if (theMat->mandEC ()[thePer])
+            return availVol;
+
+      theIncAvailVol = incAvailVol_ (theMat)[thePer];
+
+      if (theIncAvailVol == 0.0)
+         continue;
+
+      availVol += theIncAvailVol;
+
+      if (availVol >= theReqVol - NET_TOL)
+         return theReqVol;
+      }
+
+   return availVol;
+   }
+
+//------------------------------------------------------------------------------
+
+WitPeriod WitAvailSched::rollPeriod (WitMaterial * theMat, WitPeriod fromPer)
+   {
+   WitPeriod thePer;
+
+   if (fromPer < lastDecPer_ (theMat))
+      for (thePer = fromPer + 1; thePer < nPeriods (); thePer ++)
+         {
+         if (theMat->mandEC ()[thePer - 1])
+            break;
+
+         if (srAllowedFrom (theMat, thePer))
+            if (incAvailVol_ (theMat)[thePer] < - NET_TOL)
+               return thePer;
+         }
+
+   return -1;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitAvailSched::srAllowedFrom (WitMaterial * theMat, WitPeriod thePer)
+   {
+   return
+      uncondSR_    (theMat)? true:
+      selectiveSR_ (theMat)? mySsrMgr_->srAllowedFrom (theMat, thePer):
+                             false;
+   }
+@
+
+
+1.6
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.5
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d31 1
+a31 1
+WitProbAssoc (theHeurAtor),
+d33 20
+a52 20
+myHeurAtor_  (theHeurAtor),
+mySsrMgr_    (NULL),
+incAvailVol_ (myProblem (), 0.0),
+lastDecPer_  (myProblem (), -1),
+uncondSR_    (myProblem (), false),
+selectiveSR_ (myProblem (), false)
+{
+WitPart * thePart;
+
+if (myHeurAtor_->userHeurStart ())
+{
+myMsgFac () ("userHeurStartMsg");
+
+initForUHS ();
+
+verifyUhsNNScrapCon ();
+}
+else
+forEachPart (thePart, myProblem ())
+incAvailVol_ (thePart) = thePart->supplyVol ();
+d54 2
+a55 2
+initStockRealloc ();
+}
+d60 2
+a61 2
+{
+}
+d66 3
+a68 3
+{
+mySsrMgr_ = myHeurAtor_->mySsrMgr ();
+}
+d73 15
+a87 15
+WitPart * thePart,
+WitPeriod reqPer,
+double &  theReqVol)
+{
+WitMaterial * theMat;
+
+witAssert (theReqVol >= NET_TOL);
+
+theMat = thePart->thisMat ();
+
+if (theMat != NULL)
+netMatWoSR      (theMat,  reqPer, theReqVol);
+else
+netWithIncAvail (thePart, reqPer, theReqVol);
+}
+d92 5
+a96 5
+WitPart * thePart,
+WitPeriod thePer,
+double &  theReqVol)
+{
+double deltaVol;
+d98 1
+a98 1
+deltaVol = min (theReqVol, incAvailVol_ (thePart)[thePer]);
+d100 2
+a101 2
+if (deltaVol < NET_TOL)
+return;
+d103 1
+a103 1
+theReqVol -= deltaVol;
+d105 2
+a106 2
+addToIncAvailVol (thePart, thePer, - deltaVol);
+}
+d111 8
+a118 8
+WitMaterial * theMat,
+WitPeriod     reqPer,
+double &      theReqVol)
+{
+double allVol;
+double totReqVol;
+double availVol;
+double deltaVol;
+d120 1
+a120 1
+allVol    = allocedVol (theMat, reqPer, false);
+d122 1
+a122 1
+totReqVol = theReqVol + allVol;
+d124 1
+a124 1
+availVol  = availToNet (theMat, reqPer, totReqVol, 0.0);
+d126 4
+a129 4
+deltaVol  =
+(availVol == totReqVol)?
+theReqVol:
+availVol - allVol;
+d131 2
+a132 2
+if (deltaVol < NET_TOL)
+return;
+d134 1
+a134 1
+theReqVol -= deltaVol;
+d136 2
+a137 2
+addToIncAvailVol (theMat, reqPer, - deltaVol);
+}
+d142 8
+a149 8
+WitMaterial * theMat,
+WitPeriod     reqPer,
+double &      theReqVol,
+double &      rollVol,
+bool &        bddSsrSplit)
+{
+double    allVol;
+WitPeriod rollPer;
+d151 1
+a151 1
+witAssert (eitherSR (theMat));
+d153 1
+a153 1
+witAssert (theReqVol >= NET_TOL);
+d155 4
+a158 4
+if (selectiveSR_ (theMat))
+allVol = allocedVol (theMat, reqPer, true);
+else
+allVol = 0.0;
+d160 1
+a160 1
+rollVol = availToNet (theMat, reqPer, theReqVol, allVol);
+d162 2
+a163 2
+if (rollVol < NET_TOL)
+return -1;
+d165 1
+a165 1
+theReqVol -= rollVol;
+d167 1
+a167 1
+rollPer    = rollPeriod (theMat, reqPer);
+d169 8
+a176 8
+if (selectiveSR_ (theMat))
+{
+mySsrMgr_->adjReqAndRollForSS (
+theMat,
+rollPer,
+theReqVol,
+rollVol,
+bddSsrSplit);
+d178 3
+a180 3
+if (rollVol < NET_TOL)
+return -1;
+}
+d182 1
+a182 1
+addToIncAvailVol (theMat, reqPer, - rollVol);
+d184 2
+a185 2
+if (rollPer >= 0)
+addToIncAvailVol (theMat, rollPer, rollVol);
+d187 2
+a188 2
+return rollPer;
+}
+d193 5
+a197 5
+WitMaterial * theMat,
+WitPeriod     thePer,
+double &      unachVol)
+{
+double resVol;
+d199 1
+a199 1
+witAssert (myGlobalComp ()->respectStockSLBs ());
+d201 1
+a201 1
+witAssert (not theMat->mandEC ()[thePer]);
+d203 1
+a203 1
+unachVol = theMat->stockBounds ()->softLB ()[thePer];
+d205 1
+a205 1
+witAssert (unachVol >= NET_TOL);
+d207 1
+a207 1
+resVol   = availToNet (theMat, thePer, unachVol, 0.0);
+d209 2
+a210 2
+if (resVol <= NET_TOL)
+return;
+d212 1
+a212 1
+addToIncAvailVol    (theMat, thePer,     - resVol);
+d214 2
+a215 2
+if (thePer < lastPeriod ())
+addToIncAvailVol (theMat, thePer + 1, + resVol);
+d217 2
+a218 2
+unachVol -= resVol;
+}
+d223 5
+a227 5
+WitPart * thePart,
+WitPeriod thePer,
+double    deltaAvailVol)
+{
+WitMaterial * theMat;
+d229 1
+a229 1
+double & incAvailVolRef = incAvailVol_ (thePart)[thePer];
+d231 1
+a231 1
+myHeurAtor_->saveVal (incAvailVolRef);
+d233 1
+a233 1
+incAvailVolRef += deltaAvailVol;
+d235 2
+a236 2
+if (incAvailVolRef >= - NET_TOL)
+return;
+d238 1
+a238 1
+theMat = thePart->thisMat ();
+d240 4
+a243 4
+if (theMat != NULL)
+if (thePer > lastDecPer_ (theMat))
+{
+myHeurAtor_->saveVal (lastDecPer_ (theMat));
+d245 3
+a247 3
+lastDecPer_ (theMat) = thePer;
+}
+}
+d252 28
+a279 28
+{
+WitPart * thePart;
+WitPeriod thePer;
+
+fprintf (msgFile (),
+"\n"
+"----------------------\n"
+"Availability Schedule:\n"
+"----------------------\n"
+"\n");
+
+forEachPart (thePart, myProblem ())
+{
+fprintf (msgFile (),
+"Part \"%s\":\n",
+thePart->partName ().myCstring ());
+
+forEachPeriod (thePer, myProblem ())
+{
+fprintf (msgFile (),
+"   Period %d: IncAvail: %3.0f\n",
+thePer,
+incAvailVol_ (thePart)[thePer]);
+}
+
+fprintf (msgFile (),"\n");
+}
+}
+d284 53
+a336 53
+{
+WitTVec <double> prodVolVec;
+WitTVec <double> consVolVec;
+WitTVec <double> nonSubVolVec;
+WitTVec <double> subVolVec;
+WitPart *        thePart;
+WitBomEntry *    theBomEnt;
+WitSubEntry *    theSub;
+WitPeriod        thePer;
+double           incAvVol;
+WitDemand *      theDemand;
+
+prodVolVec  .allocate (myProblem (), 0.0);
+consVolVec  .allocate (myProblem (), 0.0);
+nonSubVolVec.allocate (myProblem (), 0.0);
+subVolVec   .allocate (myProblem (), 0.0);
+
+forEachPart (thePart, myProblem ())
+{
+myProblem ()->myPostprocessor ()->compProdVol (thePart, prodVolVec);
+
+consVolVec = 0.0;
+
+forEachEl (theBomEnt, thePart->consumingBomEntries ())
+{
+myProblem ()->
+myPostprocessor ()->
+compNonSubVol (theBomEnt, nonSubVolVec);
+
+theBomEnt->incConsVol (consVolVec, nonSubVolVec);
+}
+
+forEachEl (theSub, thePart->consumingSubEntries ())
+{
+subVolVec = theSub->subVol ();
+
+theSub->incConsVol (consVolVec, subVolVec);
+}
+
+forEachPeriod (thePer, myProblem ())
+{
+incAvVol =
+thePart->supplyVol ()[thePer]
++ prodVolVec           [thePer]
+- consVolVec           [thePer];
+
+forEachEl (theDemand, thePart->myDemands ())
+incAvVol -= theDemand->shipVol ()[thePer];
+
+addToIncAvailVol (thePart, thePer, incAvVol);
+}
+}
+}
+d341 45
+a385 45
+{
+WitPart * thePart;
+WitPeriod thePer;
+double    availVol;
+double    maxViol;
+WitPart * mvPart;
+WitPeriod mvPer;
+
+maxViol = FEAS_TOL;
+mvPart  = NULL;
+mvPer   = -1;
+
+forEachPart (thePart, myProblem ())
+{
+availVol = 0.0;
+
+forEachPeriod (thePer, myProblem ())
+{
+availVol += incAvailVol_ (thePart)[thePer];
+
+if (- availVol > maxViol)
+{
+maxViol = - availVol;
+mvPart  =   thePart;
+mvPer   =   thePer;
+}
+
+setToMax (availVol, 0.0);
+
+if (not thePart->canStock (thePer))
+availVol = 0.0;
+}
+}
+
+if (mvPart != NULL)
+{
+myMsgFac () ("uhsConViolIntroWmsg");
+
+myMsgFac () ("uhsNNScrapConViolWmsg",
+maxViol,
+mvPart->partName (),
+mvPer,
+- maxViol);
+}
+}
+d390 2
+a391 2
+{
+WitMaterial * theMat;
+d393 24
+a416 24
+if (myGlobalComp ()->oldSR ())
+{
+myMsgFac () ("oldSRMsg");
+
+forEachMaterial (theMat, myProblem ())
+if (not theMat->producingBopEntries ().isEmpty ())
+uncondSR_ (theMat) = true;
+}
+else if (myGlobalComp ()->stockReallocation ())
+{
+myMsgFac () ("stockReMsg");
+
+forEachMaterial (theMat, myProblem ())
+{
+if (theMat->producingBopEntries ().isEmpty ())
+continue;
+
+if (unlimitedBuildAhead (theMat))
+uncondSR_    (theMat) = true;
+else
+selectiveSR_ (theMat) = true;
+}
+}
+}
+d421 2
+a422 2
+{
+WitPeriod thePer;
+d424 7
+a430 7
+if    (not theMat->buildNstn ())
+if (not theMat->buildAsap ())
+return false;
+
+forEachPeriod (thePer, myProblem ())
+if (theMat->buildAheadUB ()[thePer] < thePer)
+return false;
+d432 2
+a433 2
+return true;
+}
+d443 29
+a471 29
+WitMaterial * theMat,
+WitPeriod     reqPer,
+bool          forSR)
+{
+WitPeriod thePer;
+double    allVol;
+double    incAvVol;
+
+allVol = 0.0;
+
+for (thePer = lastDecPer_ (theMat); thePer > reqPer; thePer --)
+{
+incAvVol = incAvailVol_ (theMat)[thePer];
+
+if (incAvVol < - NET_TOL)
+{
+if (forSR)
+if (srAllowedFrom (theMat, thePer))
+continue;
+
+allVol += - incAvVol;
+}
+else if (incAvVol > NET_TOL)
+{
+allVol -= incAvVol;
+
+setToMax (allVol, 0.0);
+}
+}
+d473 2
+a474 2
+return allVol;
+}
+d479 29
+a507 29
+WitMaterial * theMat,
+WitPeriod     reqPer,
+double        theReqVol,
+double        allVol)
+{
+double    availVol;
+WitPeriod thePer;
+double    theIncAvailVol;
+
+witAssert (theReqVol >= NET_TOL);
+
+availVol = - allVol;
+
+for (thePer = reqPer; thePer >= 0; thePer --)
+{
+if (thePer < reqPer)
+if (theMat->mandEC ()[thePer])
+return availVol;
+
+theIncAvailVol = incAvailVol_ (theMat)[thePer];
+
+if (theIncAvailVol == 0.0)
+continue;
+
+availVol += theIncAvailVol;
+
+if (availVol >= theReqVol - NET_TOL)
+return theReqVol;
+}
+d509 2
+a510 2
+return availVol;
+}
+d515 2
+a516 2
+{
+WitPeriod thePer;
+d518 10
+a527 10
+if (fromPer < lastDecPer_ (theMat))
+for (thePer = fromPer + 1; thePer < nPeriods (); thePer ++)
+{
+if (theMat->mandEC ()[thePer - 1])
+break;
+
+if (srAllowedFrom (theMat, thePer))
+if (incAvailVol_ (theMat)[thePer] < - NET_TOL)
+return thePer;
+}
+d529 2
+a530 2
+return -1;
+}
+d535 6
+a540 6
+{
+return
+uncondSR_    (theMat)? true:
+selectiveSR_ (theMat)? mySsrMgr_->srAllowedFrom (theMat, thePer):
+false;
+}
+@
+
+
+1.4
+log
+@Heuristic Adjustment
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d31 1
+a31 1
+      WitProbAssoc (theHeurAtor),
+d33 20
+a52 20
+      myHeurAtor_  (theHeurAtor),
+      mySsrMgr_    (NULL),
+      incAvailVol_ (myProblem (), 0.0),
+      lastDecPer_  (myProblem (), -1),
+      uncondSR_    (myProblem (), false),
+      selectiveSR_ (myProblem (), false)
+   {
+   WitPart * thePart;
+
+   if (myHeurAtor_->userHeurStart ())
+      {
+      myMsgFac () ("userHeurStartMsg");
+
+      initForUHS ();
+
+      verifyUhsNNScrapCon ();
+      }
+   else
+      forEachPart (thePart, myProblem ())
+         incAvailVol_ (thePart) = thePart->supplyVol ();
+d54 2
+a55 2
+   initStockRealloc ();
+   }
+d60 2
+a61 2
+   {
+   }
+d66 3
+a68 3
+   {
+   mySsrMgr_ = myHeurAtor_->mySsrMgr ();
+   }
+d73 15
+a87 15
+      WitPart * thePart,
+      WitPeriod reqPer,
+      double &  theReqVol)
+   {
+   WitMaterial * theMat;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   theMat = thePart->thisMat ();
+
+   if (theMat != NULL)
+      netMatWoSR      (theMat,  reqPer, theReqVol);
+   else
+      netWithIncAvail (thePart, reqPer, theReqVol);
+   }
+d92 5
+a96 5
+      WitPart * thePart,
+      WitPeriod thePer,
+      double &  theReqVol)
+   {
+   double deltaVol;
+d98 1
+a98 1
+   deltaVol = min (theReqVol, incAvailVol_ (thePart)[thePer]);
+d100 2
+a101 2
+   if (deltaVol < NET_TOL)
+      return;
+d103 1
+a103 1
+   theReqVol -= deltaVol;
+d105 2
+a106 2
+   addToIncAvailVol (thePart, thePer, - deltaVol);
+   }
+d111 8
+a118 8
+      WitMaterial * theMat,
+      WitPeriod     reqPer,
+      double &      theReqVol)
+   {
+   double allVol;
+   double totReqVol;
+   double availVol;
+   double deltaVol;
+d120 1
+a120 1
+   allVol    = allocedVol (theMat, reqPer, false);
+d122 1
+a122 1
+   totReqVol = theReqVol + allVol;
+d124 1
+a124 1
+   availVol  = availToNet (theMat, reqPer, totReqVol, 0.0);
+d126 4
+a129 4
+   deltaVol  = 
+      (availVol == totReqVol)?
+         theReqVol:
+         availVol - allVol;
+d131 2
+a132 2
+   if (deltaVol < NET_TOL)
+      return;
+d134 1
+a134 1
+   theReqVol -= deltaVol;
+d136 2
+a137 2
+   addToIncAvailVol (theMat, reqPer, - deltaVol);
+   }
+d142 8
+a149 8
+      WitMaterial * theMat, 
+      WitPeriod     reqPer,
+      double &      theReqVol,
+      double &      rollVol,
+      bool &        bddSsrSplit)
+   {
+   double    allVol;
+   WitPeriod rollPer;
+d151 1
+a151 1
+   witAssert (eitherSR (theMat));
+d153 1
+a153 1
+   witAssert (theReqVol >= NET_TOL);
+d155 4
+a158 4
+   if (selectiveSR_ (theMat))
+      allVol = allocedVol (theMat, reqPer, true);
+   else
+      allVol = 0.0;
+d160 1
+a160 1
+   rollVol = availToNet (theMat, reqPer, theReqVol, allVol);
+d162 2
+a163 2
+   if (rollVol < NET_TOL)
+      return -1;
+d165 1
+a165 1
+   theReqVol -= rollVol;
+d167 1
+a167 1
+   rollPer    = rollPeriod (theMat, reqPer);
+d169 8
+a176 8
+   if (selectiveSR_ (theMat))
+      {
+      mySsrMgr_->adjReqAndRollForSS (
+         theMat,
+         rollPer,
+         theReqVol,
+         rollVol,
+         bddSsrSplit);
+d178 3
+a180 3
+      if (rollVol < NET_TOL)
+         return -1;
+      }
+d182 1
+a182 1
+   addToIncAvailVol (theMat, reqPer, - rollVol);
+d184 2
+a185 2
+   if (rollPer >= 0)
+      addToIncAvailVol (theMat, rollPer, rollVol);
+d187 2
+a188 2
+   return rollPer;
+   }
+d193 5
+a197 5
+      WitMaterial * theMat, 
+      WitPeriod     thePer,
+      double &      unachVol)
+   {
+   double resVol;
+d199 1
+a199 1
+   witAssert (myGlobalComp ()->respectStockSLBs ());
+d201 1
+a201 1
+   witAssert (not theMat->mandEC ()[thePer]);
+d203 1
+a203 1
+   unachVol = theMat->stockBounds ()->softLB ()[thePer];
+d205 1
+a205 1
+   witAssert (unachVol >= NET_TOL);
+d207 1
+a207 1
+   resVol   = availToNet (theMat, thePer, unachVol, 0.0);
+d209 2
+a210 2
+   if (resVol <= NET_TOL)
+      return;
+d212 1
+a212 1
+   addToIncAvailVol    (theMat, thePer,     - resVol);
+d214 2
+a215 2
+   if (thePer < lastPeriod ())
+      addToIncAvailVol (theMat, thePer + 1, + resVol);
+d217 2
+a218 2
+   unachVol -= resVol;
+   }
+d223 5
+a227 5
+      WitPart * thePart, 
+      WitPeriod thePer, 
+      double    deltaAvailVol)
+   {
+   WitMaterial * theMat;
+d229 1
+a229 1
+   double & incAvailVolRef = incAvailVol_ (thePart)[thePer];
+d231 1
+a231 1
+   myHeurAtor_->saveVal (incAvailVolRef);
+d233 1
+a233 1
+   incAvailVolRef += deltaAvailVol;
+d235 2
+a236 2
+   if (incAvailVolRef >= - NET_TOL)
+      return;
+d238 1
+a238 1
+   theMat = thePart->thisMat ();
+d240 4
+a243 4
+   if (theMat != NULL)
+      if (thePer > lastDecPer_ (theMat))
+         {
+         myHeurAtor_->saveVal (lastDecPer_ (theMat));
+d245 3
+a247 3
+         lastDecPer_ (theMat) = thePer;
+         }
+   }
+d252 28
+a279 28
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   fprintf (msgFile (),
+      "\n"
+      "----------------------\n"
+      "Availability Schedule:\n"
+      "----------------------\n"
+      "\n");
+
+   forEachPart (thePart, myProblem ())
+      {
+      fprintf (msgFile (),
+         "Part \"%s\":\n",
+         thePart->partName ().myCstring ());
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         fprintf (msgFile (),
+            "   Period %d: IncAvail: %3.0f\n",
+            thePer,
+            incAvailVol_ (thePart)[thePer]);
+         }
+
+      fprintf (msgFile (),"\n");
+      }
+   }
+d284 53
+a336 53
+   {
+   WitTVec <double> prodVolVec;
+   WitTVec <double> consVolVec;
+   WitTVec <double> nonSubVolVec;
+   WitTVec <double> subVolVec;
+   WitPart *        thePart;
+   WitBomEntry *    theBomEnt;
+   WitSubEntry *    theSub;
+   WitPeriod        thePer;
+   double           incAvVol;
+   WitDemand *      theDemand;
+
+   prodVolVec  .allocate (myProblem (), 0.0);
+   consVolVec  .allocate (myProblem (), 0.0);
+   nonSubVolVec.allocate (myProblem (), 0.0);
+   subVolVec   .allocate (myProblem (), 0.0);
+
+   forEachPart (thePart, myProblem ())
+      {
+      myProblem ()->myPostprocessor ()->compProdVol (thePart, prodVolVec);
+
+      consVolVec = 0.0;
+
+      forEachEl (theBomEnt, thePart->consumingBomEntries ())
+         {
+         myProblem ()->
+            myPostprocessor ()->
+               compNonSubVol (theBomEnt, nonSubVolVec);
+
+         theBomEnt->incConsVol (consVolVec, nonSubVolVec);
+         }
+
+      forEachEl (theSub, thePart->consumingSubEntries ())
+         {
+         subVolVec = theSub->subVol ();
+
+         theSub->incConsVol (consVolVec, subVolVec);
+         }
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         incAvVol =
+              thePart->supplyVol ()[thePer]
+            + prodVolVec           [thePer]
+            - consVolVec           [thePer];
+
+         forEachEl (theDemand, thePart->myDemands ())
+            incAvVol -= theDemand->shipVol ()[thePer];
+
+         addToIncAvailVol (thePart, thePer, incAvVol);
+         }
+      }
+   }
+d341 45
+a385 45
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    availVol;
+   double    maxViol;
+   WitPart * mvPart;
+   WitPeriod mvPer;
+
+   maxViol = FEAS_TOL;
+   mvPart  = NULL;
+   mvPer   = -1;
+
+   forEachPart (thePart, myProblem ())
+      {
+      availVol = 0.0;
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         availVol += incAvailVol_ (thePart)[thePer];
+
+         if (- availVol > maxViol)
+            {
+            maxViol = - availVol;
+            mvPart  =   thePart;
+            mvPer   =   thePer;
+            }
+
+         setToMax (availVol, 0.0);
+
+         if (not thePart->canStock (thePer))
+            availVol = 0.0;
+         }
+      }
+
+   if (mvPart != NULL)
+      {
+      myMsgFac () ("uhsConViolIntroWmsg");
+
+      myMsgFac () ("uhsNNScrapConViolWmsg",
+         maxViol,
+         mvPart->partName (),
+         mvPer,
+         - maxViol);
+      }
+   }
+d390 2
+a391 2
+   {
+   WitMaterial * theMat;
+d393 24
+a416 24
+   if (myGlobalComp ()->oldSR ())
+      {
+      myMsgFac () ("oldSRMsg");
+
+      forEachMaterial (theMat, myProblem ())
+         if (not theMat->producingBopEntries ().isEmpty ())
+            uncondSR_ (theMat) = true; 
+      }
+   else if (myGlobalComp ()->stockReallocation ())
+      {
+      myMsgFac () ("stockReMsg");
+
+      forEachMaterial (theMat, myProblem ())
+         {
+         if (theMat->producingBopEntries ().isEmpty ())
+            continue;
+
+         if (unlimitedBuildAhead (theMat))
+            uncondSR_    (theMat) = true; 
+         else
+            selectiveSR_ (theMat) = true;
+         }
+      }
+   }
+d421 2
+a422 2
+   {
+   WitPeriod thePer;
+d424 7
+a430 7
+   if    (not theMat->buildNstn ())
+      if (not theMat->buildAsap ())
+         return false;
+
+   forEachPeriod (thePer, myProblem ())
+      if (theMat->buildAheadUB ()[thePer] < thePer)
+         return false;
+d432 2
+a433 2
+   return true;
+   }
+d443 29
+a471 29
+      WitMaterial * theMat,
+      WitPeriod     reqPer,
+      bool          forSR)
+   {
+   WitPeriod thePer;
+   double    allVol;
+   double    incAvVol;
+
+   allVol = 0.0;
+
+   for (thePer = lastDecPer_ (theMat); thePer > reqPer; thePer --)
+      {
+      incAvVol = incAvailVol_ (theMat)[thePer];
+
+      if (incAvVol < - NET_TOL)
+         {
+         if (forSR)
+            if (srAllowedFrom (theMat, thePer))
+               continue;
+
+         allVol += - incAvVol;
+         }
+      else if (incAvVol > NET_TOL)
+         {
+         allVol -= incAvVol;
+
+         setToMax (allVol, 0.0);
+         }
+      }
+d473 2
+a474 2
+   return allVol;
+   }
+d479 29
+a507 29
+      WitMaterial * theMat, 
+      WitPeriod     reqPer,
+      double        theReqVol,
+      double        allVol)
+   {
+   double    availVol;
+   WitPeriod thePer;
+   double    theIncAvailVol;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   availVol = - allVol;
+
+   for (thePer = reqPer; thePer >= 0; thePer --)
+      {
+      if (thePer < reqPer)
+         if (theMat->mandEC ()[thePer])
+            return availVol;
+
+      theIncAvailVol = incAvailVol_ (theMat)[thePer];
+
+      if (theIncAvailVol == 0.0)
+         continue;
+
+      availVol += theIncAvailVol;
+
+      if (availVol >= theReqVol - NET_TOL)
+         return theReqVol;
+      }
+d509 2
+a510 2
+   return availVol;
+   }
+d515 2
+a516 2
+   {
+   WitPeriod thePer;
+d518 10
+a527 10
+   if (fromPer < lastDecPer_ (theMat))
+      for (thePer = fromPer + 1; thePer < nPeriods (); thePer ++)
+         {
+         if (theMat->mandEC ()[thePer - 1])
+            break;
+
+         if (srAllowedFrom (theMat, thePer))
+            if (incAvailVol_ (theMat)[thePer] < - NET_TOL)
+               return thePer;
+         }
+d529 2
+a530 2
+   return -1;
+   }
+d535 6
+a540 6
+   {
+   return
+      uncondSR_    (theMat)? true:
+      selectiveSR_ (theMat)? mySsrMgr_->srAllowedFrom (theMat, thePer):
+                             false;
+   }
+@
+
+
+1.3
+log
+@Heuristic Adjustment
+@
+text
+@d251 32
+@
+
+
+1.2
+log
+@Heuristic Adjustment
+@
+text
+@a64 10
+void WitAvailSched::updateForAdjust ()
+   {
+   incAvailVol_.allocate (myProblem (), 0.0);
+   lastDecPer_ .allocate (myProblem (), -1);
+
+   initForUHS ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.1
+log
+@Heuristic Adjustment
+@
+text
+@d235 1
+a235 1
+      double    deltaVol)
+d243 1
+a243 1
+   incAvailVolRef += deltaVol;
+@
+

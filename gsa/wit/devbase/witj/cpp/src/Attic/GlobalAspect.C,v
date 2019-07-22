@@ -1,0 +1,536 @@
+head	1.15;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.15
+date	2011.02.25.16.06.48;	author rjw;	state dead;
+branches;
+next	1.14;
+
+1.14
+date	2010.04.23.22.41.22;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.04.20.20.55.06;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.04.20.16.36.58;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.04.19.20.48.01;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.04.17.00.20.18;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.04.15.21.33.55;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2010.04.13.23.10.42;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.04.12.22.28.17;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.06.04.23.04.21;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.05.29.17.59.38;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.04.16.21.08.38;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.04.15.23.33.27;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.03.13.19.32.18;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.03.13.16.36.07;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.15
+log
+@Moved GlobalAspect responsibilities to class Problem.
+Removed class GlobalAspect.
+@
+text
+@//------------------------------------------------------------------------------
+// WIT-J C++ Source File GlobalAspect.C.
+//
+// Contains the implementation of class GlobalAspect.
+//------------------------------------------------------------------------------
+
+#include   <GlobalAspect.h>
+#include    <Coordinator.h>
+#include         <Demand.h>
+#include <AllocTripleVec.h>
+#include    <WitVecOwner.h>
+#include      <StringVec.h>
+#include <WitStrVecOwner.h>
+
+#include            <wit.h>
+
+#include         <string>
+
+//------------------------------------------------------------------------------
+
+WitJ::GlobalAspect::GlobalAspect (Coordinator * theCoord):
+
+      Component (theCoord),
+      nPeriods_ (0)
+   {
+   clearData ();
+
+   theCoord->store (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::GlobalAspect::~GlobalAspect ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::GlobalAspect * WitJ::GlobalAspect::asGlobalAspect ()
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::setNPeriods (int theInt)
+   {
+   nPeriods_ = theInt;
+
+   if (! extractInProgress ())
+      witSetNPeriods (getWitRun (), theInt);
+   }
+
+//------------------------------------------------------------------------------
+
+int WitJ::GlobalAspect::getNPeriods ()
+   {
+   return nPeriods_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::getPipSeq (AllocTripleVec * theTripleVec)
+   {
+   int       nTriples;
+   char * *  partNameWitStrVec;
+   char * *  demandNameWitStrVec;
+   int *     thePeriodWitVec;
+   double *  theVolumeWitVec;
+   int       theIdx;
+   Demand *  theDemand;
+
+   witGetPipSeqDbl (
+      getWitRun (),
+    & nTriples,
+    & partNameWitStrVec,
+    & demandNameWitStrVec,
+    & thePeriodWitVec,
+    & theVolumeWitVec);
+
+   theTripleVec->resize              (nTriples);
+   theTripleVec->acquirePeriodWitVec (thePeriodWitVec);
+   theTripleVec->acquireVolumeWitVec (theVolumeWitVec);
+
+   for (theIdx = 0; theIdx < nTriples; theIdx ++)
+      {
+      theDemand  =
+         getCoordinator ()->
+            findDemand (
+               partNameWitStrVec  [theIdx],
+               demandNameWitStrVec[theIdx]);
+
+      theTripleVec->setComponent (theIdx, theDemand);
+      }
+
+   freeWitStrVec (demandNameWitStrVec, nTriples);
+   freeWitStrVec (partNameWitStrVec,   nTriples);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::clearData ()
+   {
+   nPeriods_ = 26;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::setOptInitMethod (const char * theMethodNameCStr)
+   {
+   std::string theMethodName;
+   witAttr     theMethodAttr;
+
+   theMethodName = theMethodNameCStr;
+
+   theMethodAttr =
+      (theMethodName == "ACCELERATED")?   WitACC_OPT_INIT_METHOD:
+      (theMethodName ==   "HEURISTIC")?  WitHEUR_OPT_INIT_METHOD:
+      (theMethodName ==    "SCHEDULE")? WitSCHED_OPT_INIT_METHOD:
+      (theMethodName ==       "CRASH")? WitCRASH_OPT_INIT_METHOD:
+                                                            NULL;
+
+   EXCEPTION_ASSERT (theMethodAttr != NULL);
+
+   witSetOptInitMethod (getWitRun (), theMethodAttr);
+   }
+
+//------------------------------------------------------------------------------
+ 
+const char * WitJ::GlobalAspect::getOptInitMethod ()
+   {
+   witAttr theMethodAttr;
+
+   witGetOptInitMethod (getWitRun (), & theMethodAttr);
+
+   return
+      (theMethodAttr ==   WitACC_OPT_INIT_METHOD)? "ACCELERATED":
+      (theMethodAttr ==  WitHEUR_OPT_INIT_METHOD)?   "HEURISTIC":
+      (theMethodAttr == WitSCHED_OPT_INIT_METHOD)?    "SCHEDULE":
+      (theMethodAttr == WitCRASH_OPT_INIT_METHOD)?       "CRASH":
+                                                       "INVALID";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::setObjectiveList (const StringVec & theObjNameVec)
+   {
+   witSetObjectiveList (
+      getWitRun                    (),
+      theObjNameVec.getLength      (),
+      theObjNameVec.getCStringCVec ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::getObjectiveList (WitStrVecOwner & theObjNameWSVO)
+   {
+   int      theLength;
+   char * * theObjNameWSV;
+
+   witGetObjectiveList (
+      getWitRun (),
+    & theLength,
+    & theObjNameWSV);
+
+   theObjNameWSVO.acquireWitStrVec (theObjNameWSV, theLength);
+   }
+@
+
+
+1.14
+log
+@Multi-Obj Mode.
+@
+text
+@@
+
+
+1.13
+log
+@Multi-Obj Mode
+@
+text
+@d13 1
+d153 15
+@
+
+
+1.12
+log
+@Multi-Obj Mode
+@
+text
+@d11 1
+a11 1
+#include         <VecWoa.h>
+@
+
+
+1.11
+log
+@Multi-Obj Mode
+@
+text
+@a11 1
+#include      <StrVecWoa.h>
+d65 2
+a66 2
+   StrVecWoa partNameVecWoa   (nTriples);
+   StrVecWoa demandNameVecWoa (nTriples);
+d75 2
+a76 2
+      partNameVecWoa  .getCVecAddr (),
+      demandNameVecWoa.getCVecAddr (),
+d89 2
+a90 2
+               partNameVecWoa  [theIdx],
+               demandNameVecWoa[theIdx]);
+d94 3
+@
+
+
+1.10
+log
+@Multi-Obj Mode
+@
+text
+@d68 2
+a69 2
+   int *     thePeriodCVec;
+   double *  theVolumeCVec;
+d78 2
+a79 2
+    & thePeriodCVec,
+    & theVolumeCVec);
+d81 3
+a83 1
+   theTripleVec->acquireData (nTriples, thePeriodCVec, theVolumeCVec);
+@
+
+
+1.9
+log
+@Multi-Obj Mode
+@
+text
+@d11 1
+a11 1
+#include      <StringWoa.h>
+d65 1
+a65 1
+   int       nTriples         (0);
+d68 2
+d76 4
+a79 4
+      partNameVecWoa     .getCVecAddr (),
+      demandNameVecWoa   .getCVecAddr (),
+      theTripleVec->getPeriodCVecAddr (),
+      theTripleVec->getVolumeCVecAddr ());
+d81 1
+a81 1
+   theTripleVec->setNTriples (nTriples);
+@
+
+
+1.8
+log
+@Implemented String StdAttImps.
+@
+text
+@d13 1
+d136 10
+@
+
+
+1.7
+log
+@Multi-Obj Mode
+@
+text
+@a100 28
+void WitJ::GlobalAspect::setTitle (const char * theCStr)
+   {
+   witSetTitle (getWitRun (), theCStr);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::getTitle (StringWoa & theStringWoa)
+   {
+   witGetTitle (getWitRun (), theStringWoa.getCStrAddr ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::setSolverLogFileName (const char * theCStr)
+   {
+   witSetSolverLogFileName (getWitRun (), theCStr);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::getSolverLogFileName (StringWoa & theStringWoa)
+   {
+   witGetSolverLogFileName (getWitRun (), theStringWoa.getCStrAddr ());
+   }
+
+//------------------------------------------------------------------------------
+
+a134 14
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::setObjectiveListSpec (const char * theCStr)
+   {
+   witSetObjectiveListSpec (getWitRun (), theCStr);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::GlobalAspect::getObjectiveListSpec (StringWoa & theStringWoa)
+   {
+   witGetObjectiveListSpec (getWitRun (), theStringWoa.getCStrAddr ());
+   }
+@
+
+
+1.6
+log
+@Changed handling of Lists of AllocTriples to avoid call-backs.
+@
+text
+@d163 14
+@
+
+
+1.5
+log
+@Changed name of clear methods to clearData.
+@
+text
+@d7 6
+a12 6
+#include    <GlobalAspect.h>
+#include     <Coordinator.h>
+#include          <Demand.h>
+#include <AllocTripleList.h>
+#include       <StringWoa.h>
+#include       <StrVecWoa.h>
+d14 1
+a14 1
+#include             <wit.h>
+d16 1
+a16 1
+#include          <string>
+d62 1
+a62 1
+void WitJ::GlobalAspect::getPipSeq (AllocTripleList * theTripleList)
+d64 5
+a68 11
+   int             nTriples         (0);
+   StrVecWoa       partNameVecWoa   (nTriples);
+   StrVecWoa       demandNameVecWoa (nTriples);
+   VecWoa <int>    theShipPerVecWoa;
+   VecWoa <double> incShipVolVecWoa;
+   int             theIdx;
+   const char *    partName;
+   const char *    demandName;
+   int             shipPer;
+   double          incShipVol;
+   Demand *        theDemand;
+d73 4
+a76 4
+      partNameVecWoa  .getCVecAddr (),
+      demandNameVecWoa.getCVecAddr (),
+      theShipPerVecWoa.getCVecAddr (),
+      incShipVolVecWoa.getCVecAddr ());
+d78 1
+a78 1
+   theTripleList->prepareForTriples (nTriples);
+d82 5
+a86 4
+      partName   = partNameVecWoa  [theIdx];
+      demandName = demandNameVecWoa[theIdx];
+      shipPer    = theShipPerVecWoa[theIdx];
+      incShipVol = incShipVolVecWoa[theIdx];
+d88 1
+a88 3
+      theDemand  = getCoordinator ()->findDemand (partName, demandName);
+
+      theTripleList->addTriple (theDemand, shipPer, incShipVol);
+@
+
+
+1.4
+log
+@theProblem.clear ().
+@
+text
+@d25 1
+a25 1
+   clear ();
+d101 1
+a101 1
+void WitJ::GlobalAspect::clear ()
+@
+
+
+1.3
+log
+@Moved findInstsnce functions into class Component.
+@
+text
+@d23 1
+a23 1
+      nPeriods_ (26)
+d25 2
+d101 7
+@
+
+
+1.2
+log
+@Changed name of Element classes in Java and C++ to Component.
+@
+text
+@d91 1
+a91 2
+      theDemand  =
+         Demand::findInstance (getCoordinator (), partName, demandName);
+@
+
+
+1.1
+log
+@Changed name of GlobalComponent classes to GlobalAspect.
+@
+text
+@d22 1
+a22 1
+      Element   (theCoord),
+@
+

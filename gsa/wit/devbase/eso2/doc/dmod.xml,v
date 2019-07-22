@@ -1,0 +1,333 @@
+head	1.5;
+access;
+symbols
+	abandoningEtnParts:1.5
+	beforeEtnParts:1.5
+	eso2InitialFileFormats:1.5
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.5
+date	2002.11.02.12.33.31;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.11.02.11.09.10;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.11.02.03.52.11;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.02.02.47.51;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.01.17.14.24;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.11.01.17.14.24;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Added code to read etnCspData file
+@
+text
+@<?xml version="1.0"?>
+<!DOCTYPE DataModelDefinitions SYSTEM "dmod.dtd">
+
+<DataModelDefinitions>
+
+
+
+<!--=======================--> 
+<!-- GlobalData: some global attributes of the model --> 
+<!--     We will run the engine multiple times ...   --> 
+<!--      ... Each run sets the wfmv_scaling_factor to a different value  --> 
+<!--      ... wfmv_scaling_factor is a percentage discount against wholesale fair market value (wfmv)  --> 
+<!--      ... At each decreasing clip of wfmv_scaling_factor, the solution should   --> 
+<!--          offer up more economically justified part supply.   ISC/Gars/IGF can then -->
+<!--          determine best price-point.   Plus, this gives the business the analytics to  -->
+<!--          determine how/when/feasiblility of escalating to get critical supply from GARS when it  -->
+<!--          might be economically unjustified in the model.     -->
+ <dataModel name="GlobalData" >
+  <field name="wfmv_scaling_factors" type="FloatVec" defaultVal="none" /> 
+  </dataModel>
+  <!--=======================-->
+
+
+<!--=======================--> 
+<!-- MtmData:      Basic data regarding MTM (supply, wfmv, etc) --> 
+<!--  supply and period:  quantity available on given period --> 
+<!--  wfmv is wholesale fair market value of the Mtm ... (cost of purchasing machine from IGF)  --> 
+<!--  supply_perishability is a flag: 1 means the Mtm supply must perish if it's not used in the period it's avail   --> 
+<!--       the first cut of this model is that you can't rollover ANYTHING from one period to the next.   --> 
+<!--       Thought is that we can set mand_ec = 1-supply_perishability and run ONE multi-period wit model.   --> 
+<!--       Customer thinks in terms of solving each period independently.   --> 
+<!--  wit notes: mtm partnames are mtm+plantLoc ... however ... might need to be mtm+plantLoc+period   --> 
+<!--          (see MtmDemanBomData comments)   --> 
+ <dataModel name="MtmData"> 
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="mtm+plantLoc" paramFileMapping="neverUsed">
+  <field name="mtm" type="String" defaultVal="none" /> 
+  <field name="plantLoc" type="String" defaultVal="none" /> 
+  <field name="period" type="int" defaultVal="none" /> 
+  <field name="supply" type="Float" defaultVal="0f" /> 
+  <field name="wfmv" type="Float" defaultVal="0f" /> 
+  <field name="supply_perishability" type="Boolean" defaultVal="1"/>
+  </dataModel>
+
+
+<!--=======================--> 
+<!-- FeatureData:      Basic data regarding Feature  --> 
+<!--  similar to MtmData and could even be combined, if necessary  --> 
+ <dataModel name="FeatureData" 
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="feature+plantLoc" paramFileMapping="neverUsed">
+  <field name="feature" type="String" defaultVal="none" /> 
+  <field name="plantLoc" type="String" defaultVal="none" /> 
+  <field name="period" type="int" defaultVal="none" /> 
+  <field name="supply" type="Float" defaultVal="0f" /> 
+  <field name="wfmv" type="Float" defaultVal="0f" /> 
+  <field name="supply_perishability" type="Boolean" defaultVal="1"/>
+  </dataModel>
+
+
+
+<!--=======================--> 
+<!-- PartDemandData:     Basic data regarding Part Demands --> 
+<!--  demandVol and period:  quantity of part requested  by period  --> 
+<!--  custLoc:  customer plant loc (or external/oem customer name)   --> 
+<!--  plantLoc:  gars plant location code where demand is sourced to   --> 
+<!--  wac is the price per piece that the customer loc will pay for the part  --> 
+<!--  demand_perishability: a flag indicating whether unsatisfied demand quantity perishes.   --> 
+<!--       default is 1, so that all demand perishes.   --> 
+  <dataModel
+    name="PartDemandData"
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="part+customer+plantLoc+period"  paramFileMapping="partDemandFile">
+    <field name="part" type="String" defaultVal="none"/>
+    <field name="custLoc" type="String" defaultVal="none"/>
+    <field name="plantLoc" type="String" defaultVal="none"/>
+    <field name="period" type="int" defaultVal="none" />
+    <field name="demandVol" type="Float" defaultVal="0f"/>
+    <field name="wac" type="Float" defaultVal="0f"/>
+    <field name="demand_perishability" type="Boolean" defaultVal="1"/>
+  </dataModel>
+
+
+<!--=================================================-->
+<!-- MtmDemanBomData: Bom for de-manufacturing the MTM's --> 
+<!--  prodRate change each period   --> 
+<!--  all supply and demand must perish ... supply-demand must only match in given period   --> 
+<!--  we can either run iteratively by period, or, use mand-ec to enforce   --> 
+<!--  Note: this reqt may change in future ... in which case, we need  wit parts of the form -->
+<!--        mtm+plantLoc+period    --> 
+<!-- In wit model, these data elements are BOP records: operation is de-manufacturing of the    --> 
+<!--       MTM into component parts    --> 
+<!-- Note: the child is not a current_level ec    --> 
+<!--       MTM into component parts    --> 
+  <dataModel
+    name="MtmDemanBomData"
+    isSCEOutput="false"
+    hasUniqueKeys="false"
+    storageKey="mtm+part+plantLoc"
+    paramFileMapping="demanFile"
+    >
+    <field name="mtm" type="String" defaultVal="none"/>
+    <field name="part" type="String" defaultVal="none"/>
+    <field name="plantLoc" type="String" defaultVal="none"/>
+    <field name="period" type="int" defaultVal=none/>
+    <field name="prodRate" type="Float" defaultVal="1.0f"/>
+    <field name="usageTime" type="Float" defaultVal="0.0f"/>
+  </dataModel>
+
+
+  <!--=================================================-->
+  <!-- EtnCspData: EC-chaining structure for bringing downlevel parts  --> 
+  <!--             up to a current level EC   --> 
+  <!-- Each record is a single link of the EC chain.   If a part needs 6 levels of EC chains to -->
+  <!-- bring it to useable level, then either:     -->   
+  <!--     1) the structure must be collapsed to a single link and the prod_rate and cost should -->
+  <!--        be aggregated     -->   
+  <!--     2) you pass in 6 records to the model.  This inflates the model, but it may be necessary -->
+  <!--        if there is any branching in  the structure (ie, a downlevel can be ec'd to multiple parts)  -->
+  <!--        (note, that we could provide support for parsing utilities, whether it's internal to the engine -->
+  <!--        or external utility script) -->
+  <!-- In wit model, these data elements form: a bom, bop,and operation    --> 
+  <!--       MTM into component parts    --> 
+  <!-- prod_rate: addresses yield or multipliers     --> 
+  <!-- cost: rework cost if any (per downlevel)     --> 
+  <dataModel
+    name="EtnCspData"
+    isSCEOutput="false"
+    hasUniqueKeys="false"
+    storageKey="upLevelPart+downlevel+plantLoc+period"
+    paramFileMapping="etnFile"
+    >
+    <field name="upLevelPart" type="String" defaultVal="none"/>
+    <field name="downLevelPart" type="String" defaultVal="none"/>
+    <field name="plantLoc" type="String" defaultVal="none"/>
+    <field name="period" type="int" defaultVal="PAST"/>
+    <field name="prodRate" type="Float" defaultVal="1.0f"/>
+    <field name="cost" type="Float" defaultVal="0.0f"/>
+  </dataModel>
+
+
+  <!--=======================-->
+  <!-- this is not needed for core solver -->
+  <dataModel
+    name="CalendarData"
+    isSCEOutput="false"
+    hasUniqueKeys="true"
+    storageKey="periodStart"
+    paramFileMapping="calendarFile"
+    >
+    <field name="periodNumber" type="Integer" defaultVal="none"/>
+    <field name="periodStartDate" type="date" defaultVal="none"/>
+    <field name="length" type="Float" defaultVal="0f"/>
+  </dataModel>
+
+
+
+</DataModelDefinitions> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+@
+
+
+1.4
+log
+@Added code to read mtmDemanBomData file
+@
+text
+@d127 1
+a127 1
+    storageKey="new+downlevel+plantLoc+period"
+d130 2
+a131 2
+    <field name="new" type="String" defaultVal="none"/>
+    <field name="downlevel" type="String" defaultVal="none"/>
+d133 2
+a134 3
+    <field name="start_period" type="int" defaultVal="PAST"/>
+    <field name="end_period" type="int" defaultVal="PAST"/>
+    <field name="prod_rate" type="Float" defaultVal="1.0f"/>
+@
+
+
+1.3
+log
+@Added code to read partDemandData file
+@
+text
+@d83 1
+a83 1
+<!--  usage_rates change each period   --> 
+d102 3
+a104 4
+    <field name="prod_rate" type="Float" defaultVal="1.0f"/>
+    <field name="usage_time" type="Float" defaultVal="0.0f"/>
+    <field name="start_period" type="int" defaultVal="PAST"/>
+    <field name="end_period" type="int" defaultVal="FUTURE"/>
+@
+
+
+1.2
+log
+@changed pdf to be plantLoc or custLoc
+@
+text
+@d62 1
+a62 1
+<!--  demand and period:  quantity of part requested  by period  --> 
+d70 1
+a70 1
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="part+customer+plantLoc"  paramFileMapping="partDemandFile">
+d75 1
+a75 1
+    <field name="demand" type="Float" defaultVal="0f"/>
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d32 1
+a32 1
+<!--  wit notes: mtm partnames are mtm+pdf ... however ... might need to be mtm+pdf+period   --> 
+d35 1
+a35 1
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="mtm+pdf" paramFileMapping="neverUsed">
+d37 1
+a37 1
+  <field name="pdf" type="String" defaultVal="none" /> 
+d49 1
+a49 1
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="feature+pdf" paramFileMapping="neverUsed">
+d51 1
+a51 1
+  <field name="pdf" type="String" defaultVal="none" /> 
+d63 2
+a64 2
+<!--  customer:  customer plant loc (or external/oem customer name)   --> 
+<!--  pdf:  gars plant location code where demand is sourced to   --> 
+d70 1
+a70 1
+          isSCEOutput="false" hasUniqueKeys="true" storageKey="part+customer+pdf"  paramFileMapping="partDemandFile">
+d72 2
+a73 2
+    <field name="customer" type="String" defaultVal="none"/>
+    <field name="pdf" type="String" defaultVal="none"/>
+d87 1
+a87 1
+<!--        mtm+pdf+period    --> 
+d96 1
+a96 1
+    storageKey="mtm+part+pdf"
+d101 1
+a101 1
+    <field name="pdf" type="String" defaultVal="none"/>
+d128 1
+a128 1
+    storageKey="new+downlevel+pdf+period"
+d133 1
+a133 1
+    <field name="pdf" type="String" defaultVal="none"/>
+@
+
+
+1.1.1.1
+log
+@Initial Import
+@
+text
+@@

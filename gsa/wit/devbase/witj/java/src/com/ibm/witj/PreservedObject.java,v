@@ -1,0 +1,665 @@
+head	1.14;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.14
+date	2011.05.02.18.32.30;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.02.25.16.07.09;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2009.09.30.18.02.09;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2009.09.29.21.50.27;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2009.09.29.20.43.57;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2009.09.29.19.33.01;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2009.09.29.19.09.25;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2009.09.25.23.44.30;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.09.25.22.42.43;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.06.05.15.08.23;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.05.12.19.29.51;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.05.12.15.57.58;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.05.11.22.20.34;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.05.05.20.17.07;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.14
+log
+@Reduced heading comments.
+@
+text
+@
+//==============================================================================
+// WIT-J Java Source File PreservedObject.java.
+//==============================================================================
+
+package       com.ibm.witj;
+
+import static com.ibm.witj.Utility.*;
+
+import       java.util.*;
+
+//==============================================================================
+// Class PreservedObject
+//
+// A PreservedObject is a public object that is withheld from
+// garbage-collection until it is deactivated.
+//
+// At any point in time, a PreservedObject is in an "active" state or an
+// "inactive" state:
+//
+// * Initially, a PreservedObject is "active" (just after construction).
+// * When its deactivate method is called, it enters into its "inactive" state.
+// * From that point, on it remains in its "inactive" state.
+//
+// Most of the public methods of any PreservedObject subclass are allowed to be
+// called only when the PreservedObject is in an active state. The exceptions
+// to this rule are the following methods, which may be called regardless of
+// whether or not the PreservedObject is active:
+//
+// * isActive ()
+// * All methods inherited from class Object
+//
+// If  any other public method is called when the PreservedObject is inactive,
+// a StatusQuoException is thrown.
+// 
+// When a PreservedObject is in an inactive state, the following conditions
+// hold:
+// 
+// * It no longer owns any C++ objects.
+// * All PreservedObjects that it owns are inactive.
+// * There are no references to it from active PreservedObjects.
+// * There are no static references to it from WIT-J.
+//
+// The deactivate method is responsible for putting the PreservedObject into
+// this state.
+//
+// When a PreservedObject is active, WIT-J maintains a static reference to it
+// (perhaps indirectly). This prevents the PreservedObject from being garbage
+// collected while it is active, which, in turn, prevents the C++ objects
+// that it owns from becoming memory leaks. The deactivate method removes this
+// static reference and deletes all C++ objects that the PreservedObject owns.
+// Thus when a PreservedObject is inactive and all references to it from the
+// application program are removed, it is ready for safe garbage collection.
+//
+// Class Hierarchy:
+//
+// ThreadedObject
+//    PreservedObject
+//       MessageMgr
+//       Component
+//          Problem
+//          Part
+//          Demand
+//          Operation
+//          BomEntry
+//          Substitute
+//          BopEntry
+//==============================================================================
+
+public abstract class PreservedObject extends ThreadedObject
+{
+//==============================================================================
+// Public Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// toString ().
+//
+// Override from class Object.
+//------------------------------------------------------------------------------
+
+   public final synchronized String toString ()
+      {
+      try
+         {
+         notAllowedWhenTerminated ("PreservedObject.toString");
+
+         return
+            active?
+               toStringActive ():
+               "Inactive " + getClass ().getSimpleName ();
+         }
+
+      catch (Throwable              theThrowable)
+         {
+         throw getExceptionToThrow (theThrowable);
+         }
+      }
+
+//------------------------------------------------------------------------------
+// Accessors.
+//------------------------------------------------------------------------------
+
+   public final boolean isActive ()
+      {
+      try
+         {
+         checkThread ("PreservedObject.isActive");
+
+         return active;
+         }
+
+      catch (Throwable              theThrowable)
+         {
+         throw getExceptionToThrow (theThrowable);
+         }
+      }
+
+//==============================================================================
+// Protected Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// finalize ()
+//
+// Override from class Object.
+//------------------------------------------------------------------------------
+
+   protected final void finalize () throws Throwable
+      {
+      assert (! active);
+
+      super.finalize ();
+      }
+
+//==============================================================================
+// Package-Internal Constructor
+//==============================================================================
+
+   PreservedObject (Coordinator theCoord)
+      {
+      myCoordinator = theCoord;
+      }
+
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// toStringActive ().
+//
+// Returns the value for toString () for this PreservedObject when it is active.
+//------------------------------------------------------------------------------
+
+   abstract String toStringActive ();
+
+//------------------------------------------------------------------------------
+// deactivate ().
+//
+// "Deactivates" this PreservedObject, i.e., puts it into an inactive state.
+// See the comment at the top of this class declaration.
+//------------------------------------------------------------------------------
+
+   void deactivate ()
+      {
+      assert (active);
+
+      active = false;
+      }
+
+//------------------------------------------------------------------------------
+// mustBeActive (methName)
+//
+// Verifies that this PreservedObject is currently active.
+// Performs a Thread-check on this PreservedObject.
+//
+// Arguments:
+//    methName: The name of the method.
+//------------------------------------------------------------------------------
+
+   final void mustBeActive (String methName)
+      {
+      checkThread (methName);
+
+      if (! active)
+         throw
+            new StatusQuoException (
+               "   A method that requires an active PreservedObject was\n"
+             + "   called with an inactive PreservedObject.\n"
+             + "\n"
+             + "      Method: " + methName + "\n"
+             + "      Object: " + this);
+      }
+
+//------------------------------------------------------------------------------
+// mustBeActive (theArg, argName, methName)
+//
+// Verifies that a PreservedObject argument to a method is non-null and active.
+// Performs a Thread-check on theArg.
+//
+// Arguments:
+//    theArg:   The argument being checked.
+//    argName:  The name of the argument being checked.
+//    methName: The name of the method.
+//------------------------------------------------------------------------------
+
+   static void mustBeActive (
+         PreservedObject theArg,
+         String          argName,
+         String          methName)
+      {
+      checkThread (theArg, argName, methName);
+
+      if (! theArg.active)
+         throw
+            new StatusQuoException (
+               "   An inactive PreservedObject was passed as an argument to\n"
+             + "   a method that requires an active PreservedObject.\n"
+             + "\n"
+             + "      Method:         " + methName + "\n"
+             + "      Argument:       " + argName  + "\n"
+             + "      Argument Value: " + theArg);
+      }
+
+//------------------------------------------------------------------------------
+// removeInactive (theArrayList)
+//
+// Removes all inactive PreservedObjects from theArrayList.
+// Reduces the capacity of theArrayList to its new size.
+//------------------------------------------------------------------------------
+
+   static
+      <P extends PreservedObject>
+         void removeInactive (ArrayList <P> theArrayList)
+      {
+      ArrayList <P> activeObjects;
+
+      activeObjects = new ArrayList <P> (theArrayList.size ());
+
+      for (P theP: theArrayList)
+         {
+         if (theP.active)
+            activeObjects.add (theP);
+         }
+
+      theArrayList.clear          ();
+      theArrayList.trimToSize     ();
+      theArrayList.ensureCapacity (activeObjects.size ());
+      
+      for (P theP: activeObjects)
+         {
+         theArrayList.add (theP);
+         }
+      }
+
+//------------------------------------------------------------------------------
+// activeOnly (theHashMap)
+//
+// Creates and returns a copy of theHashMap with all mappings to inactive
+// PreservedObjects removed.
+//------------------------------------------------------------------------------
+
+   static
+      <P extends PreservedObject>
+         HashMap <String, P>
+            activeOnly (HashMap <String, P> theHashMap)
+      {
+      HashMap <String, P> tmpHashMap;
+
+      tmpHashMap = new HashMap <String, P> (theHashMap);
+
+      for (String theKey: theHashMap.keySet ())
+         {
+         if (! tmpHashMap.get    (theKey).active)
+               tmpHashMap.remove (theKey);
+         }
+
+      return new HashMap <String, P> (tmpHashMap);
+      }
+
+//------------------------------------------------------------------------------
+// Accessors.
+//------------------------------------------------------------------------------
+
+   final Coordinator getCoordinator ()
+      {
+      return myCoordinator;
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// active.
+//
+// True, iff this PreservedObject is currently active
+//------------------------------------------------------------------------------
+
+   private boolean active = true;
+
+//------------------------------------------------------------------------------
+// myCoordinator
+//
+// The Coordinator for this PreservedObject.
+//------------------------------------------------------------------------------
+
+   private final Coordinator myCoordinator;
+
+//==============================================================================
+}
+@
+
+
+1.13
+log
+@Moved GlobalAspect responsibilities to class Problem.
+Removed class GlobalAspect.
+@
+text
+@a3 2
+//
+// Contains the declaration of class PreservedObject.
+@
+
+
+1.12
+log
+@Further implementation of class ThreadedObject.
+@
+text
+@a60 1
+//       Problem
+d63 1
+a63 1
+//          GlobalAspect
+@
+
+
+1.11
+log
+@Implemented theThreadedObject.checkThread (...).
+@
+text
+@d85 1
+a85 1
+   public final String toString ()
+d111 1
+a111 1
+         notAllowedWhenTerminated ("PreservedObject.isActive");
+d177 2
+a178 1
+// Verifies that the PreservedObject is currently active.
+d186 1
+a186 1
+      notAllowedWhenTerminated (methName);
+d202 1
+d215 1
+a215 1
+      mustBeNonNull (theArg, argName, methName);
+@
+
+
+1.10
+log
+@Initial implementation of class ThreadedObject.
+@
+text
+@d191 1
+a191 1
+             + "   called with an inactive PreservedObject\n"
+@
+
+
+1.9
+log
+@Implememented thePreservedObject.getThread ().
+@
+text
+@d17 1
+a17 1
+// A PreservedObject is a piblic object that is withheld from
+d59 12
+a70 11
+// PreservedObject
+//    Problem
+//    MessageMgr
+//    Component
+//       GlobalAspect
+//       Part
+//       Demand
+//       Operation
+//       BomEntry
+//       Substitute
+//       BopEntry
+d73 1
+a73 1
+public abstract class PreservedObject
+a103 21
+// getThread ()
+//
+// Returns the Thread in which this PreservedObject was created.
+//------------------------------------------------------------------------------
+
+   public final synchronized Thread getThread ()
+      {
+      try
+         {
+         notAllowedWhenTerminated ("PreservedObject.getThread");
+
+         return myCoordinator.getThread ();
+         }
+
+      catch (Throwable              theThrowable)
+         {
+         throw getExceptionToThrow (theThrowable);
+         }
+      }
+
+//------------------------------------------------------------------------------
+@
+
+
+1.8
+log
+@Implemented class PreservedInternal and made several classes extend it
+   instead of class PreservedObject.
+@
+text
+@d103 21
+@
+
+
+1.7
+log
+@Moved myCoordinator to PreservedObject.
+@
+text
+@d17 2
+a18 2
+// A PreservedObject is an object that is withheld from garbage-collection until
+// it is deactivated.
+a59 1
+//    Coordinator
+a60 4
+//    AttImp
+//       StdAttImp
+//       CustAttImp
+//          {Anonymous Inner Classes}
+a69 15
+//    CppObjRep
+//       ProblemCOR
+//       CoordinatorCOR
+//       AttBldrCOR
+//       AttCOR
+//       MessageMgrCOR
+//       ComponentCOR
+//          GlobalAspectCOR
+//          PartCOR
+//          DemandCOR
+//          OperationCOR
+//          BomEntryCOR
+//          SubstituteCOR
+//          BopEntryCOR
+//       AllocTripleVecCOR
+a151 12
+// setCoordinatorToThis ()
+//
+// Sets the Coordinator for this PreservedObject to be this PreservedObject.
+// Valid only if this PreservedObject is a Coordinator.
+//------------------------------------------------------------------------------
+
+   void setCoordinatorToThis ()
+      {
+      myCoordinator = (Coordinator) this;
+      }
+
+//------------------------------------------------------------------------------
+d308 1
+a308 1
+   private Coordinator myCoordinator;
+@
+
+
+1.6
+log
+@Implemented thePreservedObject.getCoordinator ().
+@
+text
+@d162 1
+a162 1
+   PreservedObject ()
+d164 1
+d172 1
+a172 1
+// getCoordinator ()
+d174 2
+a175 1
+// Returns the Coordinator for this PreservedObject.
+d178 4
+a181 1
+   abstract Coordinator getCoordinator ();
+d313 9
+d334 8
+@
+
+
+1.5
+log
+@Changed the name each native method that creates a C++ object to
+   createCppObject.
+@
+text
+@d60 1
+a61 1
+//    Coordinator
+d171 8
+@
+
+
+1.4
+log
+@Replaced the throwExceptionFor method with getExeceptionToThrow.
+@
+text
+@d89 1
+@
+
+
+1.3
+log
+@Changed name of Java class WitjException to GeneralException.
+@
+text
+@d115 1
+a115 1
+      catch (Throwable theThrowable)
+d117 1
+a117 3
+         throwExceptionFor (theThrowable);
+
+         return null;
+d134 1
+a134 1
+      catch (Throwable theThrowable)
+d136 1
+a136 3
+         throwExceptionFor (theThrowable);
+
+         return false;
+@
+
+
+1.2
+log
+@Revised some comments.
+@
+text
+@d117 3
+a119 1
+         throw getWitjExceptionFor (theThrowable);
+d138 3
+a140 1
+         throw getWitjExceptionFor (theThrowable);
+@
+
+
+1.1
+log
+@Changed name of Java class RetainedObject to PreservedObject.
+@
+text
+@d17 2
+a18 2
+// A PreservedObject is an object that is made unavailable for
+// garbage-collection until it is deactivated.
+@
+

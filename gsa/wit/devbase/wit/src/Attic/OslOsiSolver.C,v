@@ -1,0 +1,741 @@
+head	1.4;
+access;
+symbols
+	sce_3_30_20030627:1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.07.28.23.37.47;	author rjw;	state dead;
+branches;
+next	1.3;
+
+1.3
+date	2003.07.18.23.38.06;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.07.16.19.18.15;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.06.05.19.48.20;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Continued implementation of opt with COIN.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OslOsiSolver.C"
+//
+// Contains the main and dummy implementations of class OslOsiSolver.
+//------------------------------------------------------------------------------
+
+#include <OslOsiSolver.h>
+#include <OptComp.h>
+#include <OptModel.h>
+#include <OptCon.h>
+#include <OptVar.h>
+#include <OptImp.h>
+#include <OptStarter.h>
+#include <MsgFrag.h>
+#include <MsgFac.h>
+#include <Timing.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// Main implementation of class OslOsiSolver.
+//------------------------------------------------------------------------------
+
+#if USE_COIN
+
+#include <coin/OsiOslSolverInterface.hpp>
+
+#define INVALID_RET_VAL -444555
+
+//------------------------------------------------------------------------------
+
+WitOslOsiSolver::WitOslOsiSolver (WitOptModel * theOptModel):
+
+      WitOsiSolver      (theOptModel),
+
+      myOsiOslSI_       (NULL),
+      retVal_           (INVALID_RET_VAL),
+      presolveFileName_ ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOslOsiSolver::~WitOslOsiSolver ()
+   {
+   WitTimer::enterSection ("coin");
+
+   delete myOsiOslSI_;
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::solve ()
+   {
+   WitTimer::enterSection ("coin");
+
+   if (myOptImploder ()->accelerated ())
+      myMsgFac () ("reSolveLpMsg", "OSL/OSI");
+   else
+      {
+      if (myOptModel ()->isaMIP ())
+         myMsgFac () ("solveMipMsg", "OSL/OSI");
+      else
+         myMsgFac () ("solveLpMsg", "OSL/OSI");
+
+      createSI ();
+
+      passFixedModel ();
+      }
+
+   passFlexibleModel ();
+
+   writeMps ();
+
+   if (myOptImploder ()->stopOpt () == 2)
+      {
+      WitTimer::leaveSection ("coin");
+
+      return;
+      }
+
+   if (myOptModel ()->isaMIP ())
+      solveMIP ();
+   else if (myOptImploder ()->accelerated ())
+      solveLpAcc ();
+   else
+      solveLpUnAcc ();
+
+   myMsgFac () ("optSolnFoundMsg");
+
+   storePrimalSoln ();
+
+   if (myOptModel ()->needDual ())
+      storeDualSoln ();
+
+   if (myOptImploder ()->printMask () > 0)
+      printSoln ();
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::createSI ()
+   {
+   myOsiOslSI_ = new OsiOslSolverInterface;
+
+   retVal_ =
+      ekk_setLogfileName (
+         myOslModel (), 
+         myOptComp ()->oslMesgFileName ().myCstring ());
+
+   checkRetVal ("ekk_setLogfileName");
+
+   retVal_ = ekk_mset (myOslModel (), 1, 256, 0, 0, 9999, 0);
+      
+   checkRetVal ("ekk_mset");
+
+   retVal_ = ekk_setIlinelen (myOslModel (), 90);
+   
+   checkRetVal ("ekk_setIlinelen");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::passFixedModel ()
+   {
+   WitOsiSolver::passFixedModel ();
+
+   retVal_ = ekk_setImaxfactor (myOslModel (), 500);
+
+   checkRetVal ("ekk_setImaxfactor");
+
+   if (myOptModel ()->isaMIP ())
+      markIntVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::markIntVars ()
+   {
+   WitOptVar *     theOptVar;
+   int             nIntVars;
+   WitVector <int> theIndices;
+   int             theIdx;
+
+   nIntVars = 0;
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      if (theOptVar->isAnIntVar ())
+         nIntVars ++;
+
+   theIndices.resize (nIntVars, -1);
+
+   theIdx = -1;
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      if (theOptVar->isAnIntVar ())
+         {
+         theIdx ++;
+
+         theIndices[theIdx] = theOptVar->index ();
+         }
+
+   myOsiOslSI_->setInteger (theIndices.myCvector (), theIndices.length ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::solveMIP ()
+   {
+   solveLpUnAcc ();
+
+   retVal_ = ekk_messagePrintOff (myOslModel (), 105);
+
+   checkRetVal ("ekk_messagePrintOff");
+
+   retVal_ = ekk_messagePrintOff (myOslModel (), 114);
+
+   checkRetVal ("ekk_messagePrintOff");
+
+   retVal_ = ekk_branchAndBound (myOslModel (), NULL, NULL);
+
+   checkRetVal ("ekk_branchAndBound");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::solveLpUnAcc ()
+   {
+   passInitSoln ();
+
+   scale ();
+
+   preSolve ();
+
+   crash ();
+
+   primalSimplex ();
+
+   postSolve ();
+
+   primalSimplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::solveLpAcc ()
+   {
+   ekk_primalSimplex (myOslModel (), 0);
+
+   checkProbStat ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::scale ()
+   {
+   retVal_ = ekk_scale (myOslModel ());
+
+   checkRetVal ("ekk_scale");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::preSolve ()
+   {
+   char * theFileName;
+
+   if (myOptModel ()->isaMIP ())
+      retVal_ = ekk_preSolve (myOslModel (), 3, NULL);
+   else
+      {
+      theFileName = tempFileName ("witpr");
+
+      presolveFileName_.copyCstring (theFileName);
+
+      portableFree (theFileName);
+
+      retVal_ = ekk_preSolve (myOslModel (), 3, presolveFileName_.myCstring ());
+      }
+
+   if (retVal_ == 1)
+      myOptModel ()->reportInfeasible ();
+
+   checkRetVal ("ekk_preSolve");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::crash ()
+   {
+   if (not myOptComp ()->crashOptStarter ()->isChosen ())
+      return;
+
+   retVal_ = ekk_crash (myOslModel (), 3);
+
+   checkRetVal ("ekk_crash");
+   }
+
+//------------------------------------------------------------------------------
+    
+void WitOslOsiSolver::primalSimplex ()
+   {
+   ekk_primalSimplex (myOslModel (), 3);
+      //
+      // The return value is ignored; it seems to be the same as probstat.
+
+   checkProbStat ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::postSolve ()
+   {
+   const char * fileName;
+
+   fileName =
+      myOptModel ()->isaMIP ()?
+         NULL:
+         presolveFileName_.myCstring ();
+
+   if (myOptComp ()->postSolveRecovery ())
+      postSolveWithRec (fileName);
+   else
+      retVal_ = ekk_postSolve (myOslModel (), fileName);
+
+   if (not myOptModel ()->isaMIP ())
+      remove (presolveFileName_.myCstring ());
+
+   checkRetVal ("ekk_postSolve");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::postSolveWithRec (const char * saveFile)
+   {
+   int i,nrow=ekk_getInumrows(myOslModel ()),
+      ncol=ekk_getInumcols(myOslModel ());
+   int * cstat = const_cast <int *> (ekk_colstat(myOslModel ()));
+   int * rstat = const_cast <int *> (ekk_rowstat(myOslModel ()));
+   double * csol = const_cast <double *> (ekk_colsol(myOslModel ()));
+   double * rsol = const_cast <double *> (ekk_rowacts(myOslModel ()));
+   int * cstatx=ekk_int(ncol);
+   int * rstatx=ekk_int(nrow);
+   double * csolx=ekk_double(ncol);
+   double * rsolx=ekk_double(nrow);
+   const double * rowlower = ekk_rowlower(myOslModel ());
+   const double * rowupper = ekk_rowupper(myOslModel ());
+   double * collower = const_cast <double *> (ekk_collower(myOslModel ()));
+   double * colupper = const_cast <double *> (ekk_colupper(myOslModel ()));
+
+   for (i=0;i<nrow;i++) {
+     if(rowupper[i]-rowlower[i]>1.0e-7) {
+       rstatx[i]=rstat[i];
+       rsolx[i]=rsol[i];
+     } else {
+       rstatx[i]=-1;
+       rsolx[i]=rowlower[i];
+     }
+   }
+
+   for (i=0;i<ncol;i++) {
+     if(colupper[i]-collower[i]>1.0e-7) {
+       cstatx[i]=cstat[i];
+       csolx[i]=csol[i];
+     } else {
+       cstatx[i]=-1;
+       csolx[i]=collower[i];
+     }
+   }
+
+   retVal_ = ekk_postSolve(myOslModel (),saveFile);
+
+   if (retVal_ != 0) {
+     double * cup=ekk_double(ncol);
+     double * clo=ekk_double(ncol);
+
+     if (DEVELOPMENT)
+        myMsgFac () ("postSolveRecMsg");
+
+     memcpy(cup,colupper,ncol*sizeof(double));
+     memcpy(clo,collower,ncol*sizeof(double));
+
+     for (i=0;i<ncol;i++) {
+       if(colupper[i]-collower[i]>1.0e-7) {
+         if (cstatx[i]!=-1) {
+           csol[i]=csolx[i];
+           if (colupper[i]>csol[i])
+             colupper[i] = csol[i];
+           if (collower[i]<csol[i])
+             collower[i] = csol[i];
+         }
+       } else {
+         csol[i]=collower[i];
+       }
+     }
+
+     ekk_preSolve(myOslModel (),16,saveFile);
+     ekk_setImaxiter(myOslModel (),ekk_getIiternum(myOslModel ())+1000000);
+     ekk_primalSimplex(myOslModel (),3);
+     retVal_=ekk_postSolve(myOslModel (),saveFile);
+     memcpy(colupper,cup,ncol*sizeof(double));
+     memcpy(collower,clo,ncol*sizeof(double));
+     ekk_free(cup);
+     ekk_free(clo);
+   }
+
+   ekk_free(csolx);
+   ekk_free(cstatx);
+   ekk_free(rsolx);
+   ekk_free(rstatx);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::printSoln ()
+   {
+   retVal_ =
+      ekk_setIprtinfomask (myOslModel (), myOptImploder ()->printMask ());
+
+   checkRetVal ("ekk_setIprtinfomask");
+
+   retVal_ = ekk_printSolution (myOslModel ());
+
+   checkRetVal ("ekk_printSolution");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::checkProbStat ()
+   {
+   int probStat;
+
+   const WitMsgFragID statFragID [] =
+      {
+      "iprobstat0Frag",
+      "iprobstat1Frag",
+      "iprobstat2Frag",
+      "iprobstat3Frag",
+      "iprobstat4Frag",
+      "iprobstat5Frag",
+      "iprobstat6Frag",
+      };
+
+   probStat = ekk_getIprobstat (myOslModel ());
+
+   if (probStat == 0)
+      return;
+
+   if (probStat == 1)
+      myOptModel ()->reportInfeasible ();
+
+   if (probStat == 2)
+      myOptModel ()->reportUnbounded ();
+
+   if ((probStat < 0) or (probStat >= NumberElem (statFragID)))
+      myMsgFac () ("oslOptimalNotFoundFmsg",
+         probStat,
+         myMsgFac ().myFrag ("iprobstatRangeErrorFrag"));
+   else
+      myMsgFac () ("oslOptimalNotFoundFmsg",
+         probStat,
+         myMsgFac ().myFrag (statFragID[probStat]));
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::checkRetPtr (const void * thePtr, const char * funcName)
+   {
+   if (thePtr == NULL)
+      {
+      delete myOsiOslSI_;
+
+      myOsiOslSI_ = NULL;
+
+      myMsgFac () ("oslErrorSmsg", funcName);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::checkRetVal (const char * funcName)
+   {
+   stronglyAssert (retVal_ != INVALID_RET_VAL);
+
+   if (retVal_ != 0)
+      {
+      delete myOsiOslSI_;
+
+      myOsiOslSI_ = NULL;
+
+      myMsgFac () ("oslErrorSmsg", funcName);
+      }
+
+   retVal_ = INVALID_RET_VAL;
+   }
+
+//------------------------------------------------------------------------------
+
+EKKModel * WitOslOsiSolver::myOslModel ()
+   {
+   witAssert (myOsiOslSI_ != NULL);
+
+   return myOsiOslSI_->getModelPtr ();
+   }
+
+//------------------------------------------------------------------------------
+
+OsiSolverInterface * WitOslOsiSolver::myOsiSI ()
+   {
+   return myOsiOslSI_;
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // USE_COIN
+
+//------------------------------------------------------------------------------
+// Dummy implementation of class OslOsiSolver.
+//------------------------------------------------------------------------------
+
+#if ! USE_COIN
+
+//------------------------------------------------------------------------------
+
+WitOslOsiSolver::WitOslOsiSolver (WitOptModel * theOptModel):
+
+      WitOsiSolver      (theOptModel),
+
+      myOsiOslSI_       (NULL),
+      retVal_           (0),
+      presolveFileName_ ()
+   {
+   myMsgFac () ("osiOslNYAvailSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitOslOsiSolver::~WitOslOsiSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::solve ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+OsiSolverInterface * WitOslOsiSolver::myOsiSI ()
+   {
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // Not USE_COIN
+
+//------------------------------------------------------------------------------
+
+#endif // OPT_IMPLODE
+@
+
+
+1.3
+log
+@Continued implementation of opt with COIN.
+@
+text
+@@
+
+
+1.2
+log
+@Improved the procedure for building WIT with COIN.
+@
+text
+@d77 1
+a77 1
+      createSolverItf ();
+d115 1
+a115 1
+void WitOslOsiSolver::createSolverItf ()
+a176 127
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::passFlexibleModel ()
+   {
+   passConBounds ();
+   passVarBounds ();
+   passObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::passConBounds ()
+   {
+   int                nCons;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptCon *        theOptCon;
+   int                conIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nCons = myOptModel ()->nOptCons ();
+
+   indexVec.resize (nCons + 1);
+   boundVec.resize (nCons * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptCon, myOptModel ()->myOptCons ())
+      {
+      conIdx = theOptCon->index ();
+
+      witAssert (bndIdx == conIdx * 2);
+
+      indexVec[conIdx]     = conIdx;
+
+      boundVec[bndIdx]     = theOptCon->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptCon->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiOslSI_->setRowSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nCons,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::passVarBounds ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptVar *        theOptVar;
+   int                varIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   boundVec.resize (nVars * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      varIdx = theOptVar->index ();
+
+      witAssert (bndIdx == varIdx * 2);
+
+      indexVec[varIdx]     = varIdx;
+
+      boundVec[bndIdx]     = theOptVar->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptVar->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiOslSI_->setColSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOslOsiSolver::passObjCoeffs ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> objVec;
+   WitOptVar *        theOptVar;
+   int                theIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   objVec  .resize (nVars);
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      theIdx           = theOptVar->index ();
+
+      indexVec[theIdx] = theIdx;
+
+      objVec  [theIdx] = static_cast <double> (theOptVar->mainObjCoeffVal ());
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiOslSI_->setObjCoeffSet (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      objVec.myCvector ());
+@
+
+
+1.1
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d69 1
+a69 1
+      myMsgFac () ("reSolveLpMsg", "OSI/OSL");
+d73 1
+a73 1
+         myMsgFac () ("solveMipMsg", "OSI/OSL");
+d75 1
+a75 1
+         myMsgFac () ("solveLpMsg", "OSI/OSL");
+@
+

@@ -1,0 +1,351 @@
+head	1.6;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.6
+date	2011.06.06.16.39.05;	author rjw;	state dead;
+branches;
+next	1.5;
+
+1.5
+date	2011.06.03.22.23.42;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.31.19.26.17;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.27.23.55.10;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.24.21.09.36;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.24.18.46.14;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Element     ==> Item
+ElementType ==> ItemTYpe
+@
+text
+@
+//==============================================================================
+// WIT-M Source File ElementType.java.
+//==============================================================================
+
+package       com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+
+/*******************************************************************************
+ * An ElementType represents a conceptual grouping of similar Elements. Each
+ * Element belongs to a particular ElementType and all Elements that belong
+ * to a given ElementType are treated uniformly by WIT-M. An
+ * ElementType will belong to a Scheme and is considered to be a defining
+ * aspect of the Scheme.
+ *******************************************************************************
+ */
+public abstract class ElementType
+{
+//==============================================================================
+// Public
+//==============================================================================
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new Property <V> that will be associated with this
+ * ElementType.
+ * 
+ * @@param theValueType The value type of the Property
+ * @@param theName      The name       of the Property
+ * @@return             The new Property <V>
+ * 
+ * @@throws NullPointerException  If any argument is null
+ * @@throws IllegalStateException If the Scheme to which this ElementType
+ *                               belongs is frozen
+ *******************************************************************************
+ */
+   public final <V> Property <V> newProperty (
+         Class <V> theValueType,
+         String    theName)
+      {
+      prohibitNull (theValueType, "theValueType");
+      prohibitNull (theName,      "theName");
+      
+      myScheme.prohibitFrozen ();
+      
+      for (ElementType theElType: myScheme.getPrimitiveTypes ())
+         {
+         theElType.prohibitDupPropName (theName);
+         }
+      
+      for (ElementType theElType: myScheme.getTupleTypes ())
+         {
+         theElType.prohibitDupPropName (theName);
+         }
+      
+      return new Property <V> (this, theValueType, theName);
+      }
+
+/*******************************************************************************
+ * Accessor.
+ * 
+ * @@return The name of this ElementType
+ *******************************************************************************
+ */
+   public final String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * Accessor.
+ * 
+ * @@return The Scheme to which this ElementType belongs
+ *******************************************************************************
+ */
+   public final Scheme getScheme ()
+      {
+      return myScheme;
+      }
+
+//==============================================================================
+// Package-Internal
+//==============================================================================
+   
+/*******************************************************************************
+ * Constructor.
+ *******************************************************************************
+ */
+   ElementType (Scheme theScheme, String theName)
+      {
+      assert (theScheme != null);
+      assert (theName   != null);
+      
+      myScheme     = theScheme;
+      myName       = theName;
+      myProperties = new ArrayList <Property <?>> ();
+      }
+
+/*******************************************************************************
+ * Stores theProperty in this ElementType.
+ *******************************************************************************
+ */
+   <V> void store (Property <V> theProperty)
+      {
+      myProperties.add (theProperty);
+      }
+
+/*******************************************************************************
+ * Prints the Properties of this ElementType to theStream.
+ *******************************************************************************
+ */
+   final void printProperties (PrintStream theStream)
+      {
+      for (Property <?> theProp: myProperties)
+         theProp.print (theStream);
+      }
+
+/*******************************************************************************
+ * @@return The # of Properties associated with this ElementType.
+ *******************************************************************************
+ */
+   final int getNProperties ()
+      {
+      return myProperties.size ();
+      }
+
+/*******************************************************************************
+ * Verifies that the Scheme of this ElementType matches the Scheme of the
+ * current Implementation.
+ *******************************************************************************
+ */
+   void requireSchemeMatchesCurImp ()
+      {
+      if (getScheme () != curImplementation ().getScheme ())
+         {
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to an ElementType method where the Scheme of the\n"
+             + "   ElementType does not match the Scheme of the current\n"
+             + "   Implementation.\n"
+             + "\n"
+             + "      ElementType:            "
+             +                                                myName     + "\n"
+             + "         Scheme:              "
+             +                                   getScheme ().getName () + "\n"
+             + "      Current Implementation: "
+             +              curImplementation ()             .getName () + "\n"
+             + "         Scheme:              "
+             +              curImplementation ().getScheme ().getName () + "\n"
+               );
+         }
+      }
+
+//==============================================================================
+// Private
+//==============================================================================
+   
+/*******************************************************************************
+ * Verifies that theName does not duplicate the name of an existing Property in
+ * this ElementType.<br>
+ * To be called by newProperty (...).
+ *******************************************************************************
+ */
+   private final void prohibitDupPropName (String theName)
+      {
+      for (Property <?> theProp: myProperties)
+         {
+         if (theProp.getName ().equals (theName))
+            {
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   theElType.newProperty (theValueType, theName) was\n"
+                + "   called where theName duplicates the name of an\n"
+                + "   existing Property in the Scheme.\n"
+                + "\n"
+                + "      Duplicate Name: \"" + theName + "\"\n");
+            }
+         }
+      }
+
+/*******************************************************************************
+ * The Scheme of the WIT model to which this ElementType belongs
+ *******************************************************************************
+ */
+   private final Scheme myScheme;
+   
+/*******************************************************************************
+ * The name of this ElementType
+ *******************************************************************************
+ */
+   private final String myName;
+   
+/*******************************************************************************
+ * A list of all Properties that belong to this ElementType.
+ *******************************************************************************
+ */
+   private final ArrayList <Property <?>> myProperties;
+
+//==============================================================================
+}
+@
+
+
+1.5
+log
+@Moved some factory methods.
+@
+text
+@@
+
+
+1.4
+log
+@Embodiment ==> Implementation
+@
+text
+@d132 1
+a132 1
+ * Verifies that the Scheme of this PrimitiveType matches the Scheme of the
+d136 1
+a136 3
+void requireSchemeMatchesCurImp()
+   {
+   if (getScheme () != curImplementation ().getScheme ())
+d138 19
+a156 12
+      throw
+         new IllegalStateException (
+            "\n\n"
+          + "   Call to an ElementType method where the Scheme of the\n"
+          + "   ElementType does not match the Scheme of the current\n"
+          + "   Implementation.\n"
+          + "\n"
+          + "      ElementType:            "                      + myName     + "\n"
+          + "         Scheme:              "         + getScheme ().getName () + "\n"
+          + "      Current Implementation: " + curImplementation ().getName () + "\n"
+          + "         Scheme:              "
+          +                       curImplementation ().getScheme ().getName () + "\n");
+a157 1
+   }
+@
+
+
+1.3
+log
+@theTupleType.getAll
+@
+text
+@d133 1
+a133 1
+ * current Embodiment.
+d136 1
+a136 1
+void requireSchemeMatchesCurEmb()
+d138 1
+a138 1
+   if (getScheme () != curEmbodiment ().getScheme ())
+d145 1
+a145 1
+          + "   Embodiment.\n"
+d147 5
+a151 5
+          + "      ElementType:        "                  + myName     + "\n"
+          + "         Scheme:          "     + getScheme ().getName () + "\n"
+          + "      Current Embodiment: " + curEmbodiment ().getName () + "\n"
+          + "         Scheme:          "
+          +                   curEmbodiment ().getScheme ().getName () + "\n");
+@
+
+
+1.2
+log
+@Storing of objects.
+@
+text
+@d131 24
+@
+
+
+1.1
+log
+@Category ==> Type
+@
+text
+@a44 2
+      Property <V> theProp;
+      
+d60 1
+a60 5
+      theProp = new Property <V> (this, theValueType, theName);
+      
+      myProperties.add (theProp);
+      
+      return theProp;
+d104 9
+@
+

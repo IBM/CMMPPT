@@ -1,0 +1,88 @@
+##############################################################################
+# You should not need to edit this file.
+##############################################################################
+
+# The path to the root of the install directory structure.
+# include files will be installed in ${InstallDir}/include, libraries in 
+# ${InstallDir}/lib, executables in ${InstallDir}/bin.
+InstallDir := $(CoinDir)
+
+##############################################################################
+
+CXXFLAGS += $(OPTFLAG)
+CXXFLAGS += -Iinclude
+
+###############################################################################
+
+space:= $(empty) $(empty)
+OptVersion := $(subst $(space),_,$(OptLevel))
+
+TARGETDIR := $(UNAME)$(OptVersion)
+DEPDIR := dep
+
+VPATH := . : include : Junk : ${TARGETDIR} : ${DEPDIR}
+
+LIBOBJ := $(addprefix $(TARGETDIR)/, $(LIBSRC:.cpp=.o))
+LIBDEP := $(addprefix $(DEPDIR)/, $(LIBSRC:.cpp=.d))
+
+###############################################################################
+
+CXXFLAGS += $(addprefix -I,$(ExtraIncDir))
+CXXFLAGS += $(addprefix -D,${ExtraDefine})
+
+###############################################################################
+
+FULL_LIBNAME = lib$(LIBNAME)$(OptVersion)$(LIBEXT)
+
+###############################################################################
+# This one must be right before the rules
+
+include ${MakefileDir}/Makefile.rules
+
+###############################################################################
+
+.DELETE_ON_ERROR:
+
+.PHONY: library lib$(LIBNAME) clean doc install
+
+#==============================================================================
+
+library : $(TARGETDIR)/$(FULL_LIBNAME)
+
+#==============================================================================
+
+$(TARGETDIR)/$(FULL_LIBNAME): $(LIBOBJ)
+	@rm -rf Junk
+	@echo ""
+	@echo Creating library $(notdir $@)
+	@mkdir -p $(TARGETDIR)
+	@rm -f $@
+	@$(LD) $@ $(LIBLDFLAGS) $(LIBOBJ)
+
+#==============================================================================
+
+install: ${InstallDir}/lib/lib$(LIBNAME)$(LIBEXT)
+
+${InstallDir}/lib/lib$(LIBNAME)$(LIBEXT): ${InstallDir}/lib/$(FULL_LIBNAME)
+	@rm -f ${InstallDir}/lib/lib$(LIBNAME)$(LIBEXT)
+	@( cd ${InstallDir}/lib; ${LN} $(FULL_LIBNAME) lib$(LIBNAME)$(LIBEXT) )
+
+#==============================================================================
+
+${InstallDir}/lib/$(FULL_LIBNAME): $(TARGETDIR)/$(FULL_LIBNAME)
+	@echo "Installing include files..."
+	@mkdir -p ${InstallDir}/include
+	@${CP} include/*.hpp ${InstallDir}/include
+	@echo "Installing libraries..."
+	@mkdir -p ${InstallDir}/lib
+	@${CP} $(TARGETDIR)/$(FULL_LIBNAME) ${InstallDir}/lib
+
+###############################################################################
+
+%::
+	@mkdir -p Junk
+	touch Junk/$(notdir $@)
+
+###############################################################################
+
+-include $(LIBDEP)

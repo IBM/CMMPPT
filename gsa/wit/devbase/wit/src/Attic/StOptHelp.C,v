@@ -1,0 +1,305 @@
+head	1.7;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.7
+date	2007.07.27.21.08.52;	author rjw;	state dead;
+branches;
+next	1.6;
+
+1.6
+date	2007.07.27.19.53.38;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.07.27.18.58.03;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.07.27.16.33.32;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.07.26.21.39.50;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.07.26.21.09.28;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.07.26.19.23.36;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "StOptHelp.C"
+//
+// Contains:
+//    The implementation of class ScenPer.
+//    The implementation of class template StOptElMgr <DerComp, StOptEl>
+//    The explicit instantiation of        StOptElMgr <DerComp, StOptEl>
+//------------------------------------------------------------------------------
+
+#include <ScenPer.h>
+#include <StochImpOP.h>
+#include <StOptElMgr.h>
+#include <ScenMgr.h>
+#include <Scenario.h>
+#include <StVars.h>
+#include <StCons.h>
+#include <Part.h>
+#include <Opn.h>
+#include <PtrSched.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class ScenPer.
+//------------------------------------------------------------------------------
+
+WitScenPer::WitScenPer (WitProblem * theProblem):
+
+      WitProbAssoc  (theProblem),
+      myStochImpOP_ (NULL),
+      myScenario_   (NULL),
+      myPer_        (-1)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitScenPer::WitScenPer (
+         WitStochImpOP * theStochImpOP,
+         WitScenario *   theScenario,
+         WitPeriod       thePer):
+
+      WitProbAssoc  (theStochImpOP->myProblem ()),
+      myStochImpOP_ (theStochImpOP),
+      myScenario_   (theScenario),
+      myPer_        (thePer)
+   {
+   }
+ 
+//------------------------------------------------------------------------------
+
+WitScenPer::~WitScenPer ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class template StOptElMgr <DerComp, StOptEl>.
+//------------------------------------------------------------------------------
+
+template <typename DerComp, typename StOptEl> 
+         WitStOptElMgr <DerComp, StOptEl>::WitStOptElMgr (
+            WitStochImpOP * theStochImpOP):
+
+      WitProbAssoc  (theStochImpOP->myProblem ()),
+      myStochImpOP_ (theStochImpOP),
+      mySched_      (myProblem ())
+   {
+   WitScenario * theScenario;
+
+   forEachEl (theScenario, myStochImpOP_->myScenMgr ()->myScenarios ())
+      {
+      mySched_.setMapFor (theScenario, * new WitPtrSched <DerComp, StOptEl>);
+
+      mySched_ (theScenario).allocate1D (myProblem ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename DerComp, typename StOptEl> 
+         WitStOptElMgr <DerComp, StOptEl>::~WitStOptElMgr ()
+   {
+   WitScenario * theScenario;
+
+   forEachEl (theScenario, myStochImpOP_->myScenMgr ()->myScenarios ())
+      delete & mySched_ (theScenario);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename DerComp, typename StOptEl> 
+      void WitStOptElMgr <DerComp, StOptEl>::createMyElFor (
+         WitScenario * theScenario,
+         DerComp *     theDerComp,
+         WitPeriod     thePer)
+   {
+   WitScenPer * theScenPer;
+   StOptEl *    theStOptEl;
+
+   theScenPer = myStochImpOP_->myScenPerSched ().myPtrAt (theScenario, thePer);
+
+   theStOptEl = new StOptEl (theDerComp, theScenPer);
+
+   if (not mySched_ (theScenario).myPtrTVecAt (theDerComp).isAllocated ())
+      mySched_ (theScenario).myPtrTVecAt (theDerComp).allocate (myProblem ());
+
+   witAssert (mySched_ (theScenario).myPtrAt (theDerComp, thePer) == NULL);
+
+   mySched_ (theScenario).myPtrAt (theDerComp, thePer) = theStOptEl;
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename DerComp, typename StOptEl> 
+      StOptEl * WitStOptElMgr <DerComp, StOptEl>::myElFor (
+         WitScenario * theScenario,
+         DerComp *     theDerComp,
+         WitPeriod     thePer)
+   {
+   if (mySched_ (theScenario).myPtrTVecAt (theDerComp).isAllocated ())
+      return mySched_ (theScenario).myPtrAt (theDerComp, thePer);
+   else
+      return NULL;
+   }
+
+//------------------------------------------------------------------------------
+// Explicit instantiation of class template StOptElMgr <DerComp, StOptEl>.
+//------------------------------------------------------------------------------
+
+template class WitStOptElMgr <WitPart,      WitStScrapVar>;
+template class WitStOptElMgr <WitOperation, WitStExecVar>;
+template class WitStOptElMgr <WitPart,      WitStResCon>;
+@
+
+
+1.6
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@d25 1
+d139 1
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@d24 1
+a24 1
+#include <DerStVars.h>
+@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@d25 1
+d136 1
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@d15 2
+a16 2
+//    The implementation of class template StOptElTable <DerComp, StOptEl>
+//    The explicit instantiation of        StOptElTable <DerComp, StOptEl>
+d21 1
+a21 1
+#include <StOptElTable.h>
+d62 1
+a62 1
+// Implementation of class template StOptElTable <DerComp, StOptEl>.
+d66 1
+a66 1
+         WitStOptElTable <DerComp, StOptEl>::WitStOptElTable (
+d86 1
+a86 1
+         WitStOptElTable <DerComp, StOptEl>::~WitStOptElTable ()
+d97 1
+a97 1
+      void WitStOptElTable <DerComp, StOptEl>::createMyElFor (
+d120 1
+a120 1
+      StOptEl * WitStOptElTable <DerComp, StOptEl>::myElFor (
+d132 1
+a132 1
+// Explicit instantiation of class template StOptElTable <DerComp, StOptEl>.
+d135 1
+a135 1
+template class WitStOptElTable <WitOperation, WitStExecVar>;
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d67 1
+a67 1
+            WitScenMgr * theScenMgr):
+d69 3
+a71 3
+      WitProbAssoc (theScenMgr->myProblem ()),
+      myScenMgr_   (theScenMgr),
+      mySched_     (myProblem ())
+d75 1
+a75 1
+   forEachEl (theScenario, myScenMgr_->myScenarios ())
+d90 1
+a90 1
+   forEachEl (theScenario, myScenMgr_->myScenarios ())
+d97 4
+a100 1
+      void WitStOptElTable <DerComp, StOptEl>::store (StOptEl * theStOptEl)
+d102 6
+a107 7
+   WitScenario * theScenario;
+   WitPeriod     thePer;
+   DerComp *     theDerComp;
+   
+   theScenario = theStOptEl->myScenPer ()->myScenario ();
+   thePer      = theStOptEl->myScenPer ()->myPer ();
+   theDerComp  = theStOptEl->myDerComp ();
+d120 1
+a120 1
+      StOptEl * WitStOptElTable <DerComp, StOptEl>::myStOptElFor (
+@
+

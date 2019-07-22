@@ -1,0 +1,1548 @@
+head	1.22;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.22
+date	2011.04.15.19.01.03;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2011.04.15.00.07.19;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2011.04.13.22.36.18;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2011.04.08.23.39.52;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2011.04.07.19.07.36;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.04.06.20.34.24;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.04.06.16.29.01;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.04.06.15.56.34;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.04.05.23.07.38;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.04.05.22.25.36;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.03.30.23.22.59;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.03.30.19.49.49;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.03.29.23.38.42;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.03.28.15.57.02;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.03.25.22.49.10;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.03.24.19.03.36;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.03.24.16.37.57;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.03.23.20.30.03;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.03.23.14.58.53;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.03.22.20.17.19;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.03.19.00.26.06;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.03.15.23.02.46;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.22
+log
+@Class template CORJOR
+@
+text
+@//------------------------------------------------------------------------------
+// WIT-J C++ Source File ArrayListJOR.C.
+//
+// Contains the implementation of the following clases and templates:
+//
+//    ArrayListJOR
+//    IntALJOR
+//    DblALJOR
+//    StringALJOR
+//    CompALJOR <C>
+//    DemandALJOR
+//    PeggingTripleALJOR
+//------------------------------------------------------------------------------
+
+#include <ArrayListJOR.h>
+#include <ComponentJOR.h>
+#include       <CORJOR.h>
+#include  <Coordinator.h>
+#include         <Part.h>
+#include       <Demand.h>
+#include    <Operation.h>
+#include    <StringVec.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class ArrayListJOR.
+//------------------------------------------------------------------------------
+
+_jmethodID * WitJ::ArrayListJOR::         clearJMeth_ = NULL;
+_jmethodID * WitJ::ArrayListJOR::ensureCapacityJMeth_ = NULL;
+_jmethodID * WitJ::ArrayListJOR::          sizeJMeth_ = NULL;
+_jmethodID * WitJ::ArrayListJOR::           addJMeth_ = NULL;
+_jmethodID * WitJ::ArrayListJOR::           getJMeth_ = NULL;
+
+//------------------------------------------------------------------------------
+
+void WitJ::ArrayListJOR::setUpJni (JNIEnv * theJNIEnv)
+   {
+   EXCEPTION_ASSERT (clearJMeth_ == NULL);
+
+   clearJMeth_ =
+      getJMethodID (
+         "java/util/ArrayList",
+         "clear",
+         "()V",
+         theJNIEnv);
+
+   ensureCapacityJMeth_ =
+      getJMethodID (
+         "java/util/ArrayList",
+         "ensureCapacity",
+         "(I)V",
+         theJNIEnv);
+
+   sizeJMeth_ =
+      getJMethodID (
+         "java/util/ArrayList",
+         "size",
+         "()I",
+         theJNIEnv);
+
+   addJMeth_ =
+      getJMethodID (
+         "java/util/ArrayList",
+         "add",
+         "(Ljava/lang/Object;)Z",
+         theJNIEnv);
+
+   getJMeth_ =
+      getJMethodID (
+         "java/util/ArrayList",
+         "get",
+         "(I)Ljava/lang/Object;",
+         theJNIEnv);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ArrayListJOR::clearAndAllocate (int minCapacity)
+   {
+   jint minCapJInt;
+
+   getJNIEnv ()->CallVoidMethod (myArrayListJObj_, clearJMeth_);
+
+   throwAnyJavaException ();
+
+   minCapJInt = minCapacity;
+
+   getJNIEnv ()->
+      CallVoidMethod (myArrayListJObj_, ensureCapacityJMeth_, minCapJInt);
+
+   throwAnyJavaException ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::ArrayListJOR::ArrayListJOR (
+         _jobject * theArrayListJObj,
+         JNIEnv *   theJNIEnv):
+
+      JniClient        (theJNIEnv),
+      myArrayListJObj_ (theArrayListJObj)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::ArrayListJOR::~ArrayListJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+int WitJ::ArrayListJOR::size ()
+   {
+   return getJNIEnv ()->CallIntMethod (myArrayListJObj_, sizeJMeth_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ArrayListJOR::add (_jobject * theJObject)
+   {
+   getJNIEnv ()->CallBooleanMethod (myArrayListJObj_, addJMeth_, theJObject);
+
+   throwAnyJavaException ();
+   }
+
+//------------------------------------------------------------------------------
+
+_jobject * WitJ::ArrayListJOR::get (int theIdx)
+   {
+   jint       theIdxJInt;
+   _jobject * theJObj;
+
+   theIdxJInt = theIdx;
+
+   theJObj =
+      getJNIEnv ()->CallObjectMethod (myArrayListJObj_, getJMeth_, theIdxJInt);
+
+   throwAnyJavaException ();
+
+   EXCEPTION_ASSERT (theJObj != NULL);
+
+   return theJObj;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class IntALJOR.
+//------------------------------------------------------------------------------
+
+_jmethodID * WitJ::IntALJOR::intValueJMeth_ = NULL;
+
+//------------------------------------------------------------------------------
+
+void WitJ::IntALJOR::setUpJni (JNIEnv * theJNIEnv)
+   {
+   intValueJMeth_ =
+      getJMethodID (
+         "java/lang/Integer",
+         "intValue",
+         "()I",
+         theJNIEnv);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::IntALJOR::IntALJOR (_jobject * theIntArrayListJObj, JNIEnv * theJNIEnv):
+
+      ArrayListJOR (theIntArrayListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::IntALJOR::~IntALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::IntALJOR::copyFrom (const int * theIntCVec, int theLength)
+   {
+   int         theIdx;
+    _jobject * theIntegerJObj;
+
+   clearAndAllocate (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theIntegerJObj = matchingIntegerJObj (theIntCVec[theIdx], getJNIEnv ());
+
+      add            (theIntegerJObj);
+
+      deleteLocalRef (theIntegerJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::IntALJOR::copyInto (std::vector <int> & theIntVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theIntegerJObj;
+   int        theInt;
+
+   theLength = size ();
+
+   theIntVec.clear ();
+
+   theIntVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theIntegerJObj = get (theIdx);
+
+      theInt = getJNIEnv ()->CallIntMethod (theIntegerJObj, intValueJMeth_);
+
+      throwAnyJavaException ();
+
+      theIntVec[theIdx] = theInt;
+
+      deleteLocalRef (theIntegerJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class DblALJOR.
+//------------------------------------------------------------------------------
+
+_jmethodID * WitJ::DblALJOR::doubleValueJMeth_ = NULL;
+
+//------------------------------------------------------------------------------
+
+void WitJ::DblALJOR::setUpJni (JNIEnv * theJNIEnv)
+   {
+   doubleValueJMeth_ =
+      getJMethodID (
+         "java/lang/Double",
+         "doubleValue",
+         "()D",
+         theJNIEnv);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::DblALJOR::DblALJOR (_jobject * theDblArrayListJObj, JNIEnv * theJNIEnv):
+
+      ArrayListJOR (theDblArrayListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::DblALJOR::~DblALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::DblALJOR::copyFrom (const double * theDblCVec, int theLength)
+   {
+   int         theIdx;
+    _jobject * theDoubleJObj;
+
+   clearAndAllocate (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theDoubleJObj = matchingDoubleJObj (theDblCVec[theIdx], getJNIEnv ());
+
+      add            (theDoubleJObj);
+
+      deleteLocalRef (theDoubleJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::DblALJOR::copyInto (std::vector <double> & theDblVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theDoubleJObj;
+   double     theDbl;
+
+   theLength = size ();
+
+   theDblVec.clear ();
+
+   theDblVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theDoubleJObj = get (theIdx);
+
+      theDbl =
+         getJNIEnv ()->CallDoubleMethod (theDoubleJObj, doubleValueJMeth_);
+
+      throwAnyJavaException ();
+
+      theDblVec[theIdx] = theDbl;
+
+      deleteLocalRef (theDoubleJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class StringALJOR.
+//------------------------------------------------------------------------------
+
+WitJ::StringALJOR::StringALJOR (
+         _jobject * theStringArrayListJObj,
+         JNIEnv *   theJNIEnv):
+
+      ArrayListJOR (theStringArrayListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::StringALJOR::~StringALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::StringALJOR::copyFrom (
+      const char * const * theCStrCVec,
+      int                  theLength)
+   {
+   int        theIdx;
+   _jstring * theJString;
+
+   clearAndAllocate (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theJString = newJString (theCStrCVec[theIdx]);
+
+      add            (theJString);
+
+      deleteLocalRef (theJString);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::StringALJOR::copyInto (StringVec & theStringVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theStringJObj;
+   _jstring * theJString;
+   int        theJStringLen;
+   int        theCStringLen;
+
+   theLength = size ();
+
+   theStringVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theStringJObj = get (theIdx);
+
+      theJString    = static_cast <_jstring *> (theStringJObj);
+
+      theJStringLen = getJNIEnv ()->GetStringLength    (theJString);
+      theCStringLen = getJNIEnv ()->GetStringUTFLength (theJString);
+
+      theStringVec.resizeAt (theIdx, theCStringLen);
+
+      getJNIEnv ()->
+         GetStringUTFRegion (
+            theJString,
+            0,
+            theJStringLen,
+            theStringVec[theIdx]);
+
+      throwAnyJavaException ();
+
+      theStringVec[theIdx][theCStringLen] = '\0';
+
+      deleteLocalRef (theStringJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class template CompALJOR <C>.
+//------------------------------------------------------------------------------
+
+template <typename C>
+      WitJ::CompALJOR <C>::CompALJOR (
+            _jobject * theCompArrayListJObj,
+            JNIEnv *   theJNIEnv):
+
+         ArrayListJOR (theCompArrayListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename C>
+      WitJ::CompALJOR <C>::~CompALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename C>
+      void WitJ::CompALJOR <C>::add (C * theC)
+   {
+   _jobject * theCompJObj;
+
+   theCompJObj = theC->getComponentJOR ()->getComponentJObj ();
+
+   ArrayListJOR::add (theCompJObj);
+   }
+
+//------------------------------------------------------------------------------
+// Explicit instantiation of class template CompALJOR <C>.
+//------------------------------------------------------------------------------
+
+namespace WitJ
+{
+template class CompALJOR <Part>;
+template class CompALJOR <Demand>;
+template class CompALJOR <Operation>;
+}
+
+//------------------------------------------------------------------------------
+// Implementation of class DemandALJOR.
+//------------------------------------------------------------------------------
+
+_jmethodID * WitJ::DemandALJOR::getDemandCORJMeth_ = NULL;
+
+//------------------------------------------------------------------------------
+
+void WitJ::DemandALJOR::setUpJni (JNIEnv * theJNIEnv)
+   {
+   getDemandCORJMeth_ =
+      getJMethodID (
+         "com/ibm/witj/Demand",
+         "getDemandCOR",
+         "()Lcom/ibm/witj/DemandCOR;",
+         theJNIEnv);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::DemandALJOR::DemandALJOR (
+         _jobject * theDemandArrayListJObj,
+         JNIEnv *   theJNIEnv):
+
+      ArrayListJOR (theDemandArrayListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::DemandALJOR::~DemandALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::DemandALJOR::populateIDVecs (
+      std::vector <const char *> & thePartNameVec,
+      std::vector <const char *> & theDemandNameVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theDemandCORJObj;
+   _jobject * theDemandJObj;
+   Demand *   theDemand;
+
+   theLength = size ();
+
+   thePartNameVec  .clear  ();
+   theDemandNameVec.clear  ();
+
+   thePartNameVec  .resize (theLength);
+   theDemandNameVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theDemandJObj = get (theIdx);
+
+      theDemandCORJObj =
+         getJNIEnv ()->CallObjectMethod (theDemandJObj, getDemandCORJMeth_);
+
+      throwAnyJavaException ();
+
+      theDemand =
+         CORJOR <Demand> (theDemandCORJObj, getJNIEnv ()).getCppObject ();
+
+      thePartNameVec  [theIdx] = theDemand->getPartName   ();
+      theDemandNameVec[theIdx] = theDemand->getDemandName ();
+
+      deleteLocalRef (theDemandJObj);
+      deleteLocalRef (theDemandCORJObj);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PeggingTripleALJOR.
+//------------------------------------------------------------------------------
+
+_jclass *    WitJ::PeggingTripleALJOR::ourPeggingTripleJCl_    = NULL;
+
+_jmethodID * WitJ::PeggingTripleALJOR::ctorPeggingTripleJMeth_ = NULL;
+
+//------------------------------------------------------------------------------
+
+void WitJ::PeggingTripleALJOR::setUpJni (JNIEnv * theJNIEnv)
+   {
+   ourPeggingTripleJCl_ =
+      newJClassGRef ("com/ibm/witj/PeggingTriple", theJNIEnv);
+
+   ctorPeggingTripleJMeth_ =
+      getJMethodID (
+         "com/ibm/witj/PeggingTriple",
+         "<init>",
+         "(Lcom/ibm/witj/Component;ID)V",
+         theJNIEnv);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::PeggingTripleALJOR::PeggingTripleALJOR (
+         _jobject * theTripleListJObj,
+         JNIEnv *   theJNIEnv):
+
+      ArrayListJOR (theTripleListJObj, theJNIEnv)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::PeggingTripleALJOR::~PeggingTripleALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::PeggingTripleALJOR::add (
+      Component * theComp,
+      int         thePeriod,
+      double      theVolume)
+   {
+   _jobject * theCompJObj;
+   _jobject * thePeggingTripleJObj;
+
+   theCompJObj = theComp->getComponentJOR ()->getComponentJObj ();
+
+   thePeggingTripleJObj =
+      getJNIEnv ()->
+         NewObject (
+            ourPeggingTripleJCl_,
+            ctorPeggingTripleJMeth_,
+            theCompJObj,
+            thePeriod,
+            theVolume);
+               
+   throwAnyJavaException ();
+
+   ArrayListJOR::add (thePeggingTripleJObj);
+
+   deleteLocalRef    (thePeggingTripleJObj);
+   }
+@
+
+
+1.21
+log
+@Class template CORJOR
+@
+text
+@d474 1
+d493 2
+a494 2
+         {
+         CORJOR <Demand> theDemandCJOR (theDemandCORJObj, getJNIEnv ());
+d496 2
+a497 3
+         thePartNameVec  [theIdx] = theDemandCJOR->getPartName   ();
+         theDemandNameVec[theIdx] = theDemandCJOR->getDemandName ();
+         }
+@
+
+
+1.20
+log
+@Removed namespace JniUtil.
+@
+text
+@a12 4
+//
+// Contains the explicit instantiation of the following class templates:
+//
+//    CompALJOR <C>
+d17 1
+a473 1
+   Demand *   theDemand;
+d492 2
+a493 1
+      theDemand = getDemand (theDemandCORJObj, getJNIEnv ());
+d495 3
+a497 2
+      thePartNameVec  [theIdx] = theDemand->getPartName   ();
+      theDemandNameVec[theIdx] = theDemand->getDemandName ();
+@
+
+
+1.19
+log
+@Removed C++ class JavaObjRep.
+@
+text
+@a20 1
+#include      <JniUtil.h>
+d496 1
+a496 1
+      theDemand = JniUtil::getDemand (theDemandCORJObj, getJNIEnv ());
+@
+
+
+1.18
+log
+@getExpCycle
+@
+text
+@d86 1
+a86 1
+   getJNIEnv ()->CallVoidMethod (getJObject (), clearJMeth_);
+d93 1
+a93 1
+      CallVoidMethod (getJObject (), ensureCapacityJMeth_, minCapJInt);
+d104 2
+a105 1
+      JavaObjRep (theArrayListJObj, theJNIEnv)
+d119 1
+a119 1
+   return getJNIEnv ()->CallIntMethod (getJObject (), sizeJMeth_);
+d126 1
+a126 1
+   getJNIEnv ()->CallBooleanMethod (getJObject (), addJMeth_, theJObject);
+d141 1
+a141 1
+      getJNIEnv ()->CallObjectMethod (getJObject (), getJMeth_, theIdxJInt);
+d416 1
+a416 1
+   _jobject * theCJObj;
+d418 1
+a418 1
+   theCJObj = getJObject (theC->getComponentJOR ());
+d420 1
+a420 1
+   ArrayListJOR::add (theCJObj);
+d556 1
+a556 1
+   theCompJObj = getJObject (theComp->getComponentJOR ());
+@
+
+
+1.17
+log
+@getPgdCritList
+@
+text
+@d25 1
+d223 2
+a225 2
+
+      theIntVec[theIdx] = theInt;
+d304 2
+a306 2
+
+      theDblVec[theIdx] = theDbl;
+d384 2
+a386 2
+
+      theStringVec[theIdx][theCStringLen] = '\0';
+d430 1
+a495 2
+      deleteLocalRef (theDemandJObj);
+
+a497 2
+      deleteLocalRef (theDemandCORJObj);
+
+d500 3
+@
+
+
+1.16
+log
+@intValue and doubleValue.
+@
+text
+@d428 1
+@
+
+
+1.15
+log
+@JNIEnv arguments.
+@
+text
+@d152 16
+d216 3
+a218 1
+      theIntegerJObj    = get (theIdx);
+d220 1
+a220 1
+      theInt            = intValue (theIntegerJObj);
+d232 16
+d296 4
+a299 1
+      theDoubleJObj     = get (theIdx);
+d301 1
+a301 1
+      theDbl            = doubleValue (theDoubleJObj);
+@
+
+
+1.14
+log
+@JniClient
+@
+text
+@d100 2
+a101 2
+         JNIEnv *   theJNIEnv,
+         _jobject * theArrayListJObj):
+d103 1
+a103 1
+      JavaObjRep (theJNIEnv, theArrayListJObj)
+d152 1
+a152 1
+WitJ::IntALJOR::IntALJOR (JNIEnv * theJNIEnv, _jobject * theIntArrayListJObj):
+d154 1
+a154 1
+      ArrayListJOR (theJNIEnv, theIntArrayListJObj)
+d214 1
+a214 1
+WitJ::DblALJOR::DblALJOR (JNIEnv * theJNIEnv, _jobject * theDblArrayListJObj):
+d216 1
+a216 1
+      ArrayListJOR (theJNIEnv, theDblArrayListJObj)
+d277 2
+a278 2
+         JNIEnv *   theJNIEnv,
+         _jobject * theStringArrayListJObj):
+d280 1
+a280 1
+      ArrayListJOR (theJNIEnv, theStringArrayListJObj)
+d358 2
+a359 2
+            JNIEnv *   theJNIEnv,
+            _jobject * theCompArrayListJObj):
+d361 1
+a361 1
+         ArrayListJOR (theJNIEnv, theCompArrayListJObj)
+d414 2
+a415 2
+         JNIEnv *   theJNIEnv,
+         _jobject * theDemandArrayListJObj):
+d417 1
+a417 1
+      ArrayListJOR (theJNIEnv, theDemandArrayListJObj)
+d493 2
+a494 2
+         JNIEnv *   theJNIEnv,
+         _jobject * theTripleListJObj):
+d496 1
+a496 1
+      ArrayListJOR (theJNIEnv, theTripleListJObj)
+@
+
+
+1.13
+log
+@Namespace JniUtil.
+@
+text
+@a44 1
+         theJNIEnv,
+d47 2
+a48 1
+         "()V");
+a51 1
+         theJNIEnv,
+d54 2
+a55 1
+         "(I)V");
+a58 1
+         theJNIEnv,
+d61 2
+a62 1
+         "()I");
+a65 1
+         theJNIEnv,
+d68 2
+a69 1
+         "(Ljava/lang/Object;)Z");
+a72 1
+         theJNIEnv,
+d75 2
+a76 1
+         "(I)Ljava/lang/Object;");
+a404 1
+         theJNIEnv,
+d407 2
+a408 1
+         "()Lcom/ibm/witj/DemandCOR;");
+d480 1
+a480 1
+      newJClassGRef (theJNIEnv, "com/ibm/witj/PeggingTriple");
+a483 1
+         theJNIEnv,
+d486 2
+a487 1
+         "(Lcom/ibm/witj/Component;ID)V");
+@
+
+
+1.12
+log
+@Revised set/get ObjectiveList for ArrayList <String>.
+@
+text
+@d21 1
+d175 1
+a175 1
+      theIntegerJObj = matchingIntegerJObj (theIntCVec[theIdx]);
+d237 1
+a237 1
+      theDoubleJObj = matchingDoubleJObj (theDblCVec[theIdx]);
+d458 1
+a458 1
+      theDemand = getJavaAccObj (theDemandCORJObj)->asDemand ();
+@
+
+
+1.11
+log
+@C++ class JavaObjRep.
+@
+text
+@d9 1
+d24 1
+d142 2
+d272 80
+@
+
+
+1.10
+log
+@Replaced C++ class CORJOR with ComponentJOR.
+@
+text
+@d82 1
+a82 1
+   getJNIEnv ()->CallVoidMethod (myArrayListJObj_, clearJMeth_);
+d89 1
+a89 1
+      CallVoidMethod (myArrayListJObj_, ensureCapacityJMeth_, minCapJInt);
+d100 1
+a100 2
+      JniClient        (theJNIEnv),
+      myArrayListJObj_ (theArrayListJObj)
+d114 1
+a114 1
+   return getJNIEnv ()->CallIntMethod (myArrayListJObj_, sizeJMeth_);
+d121 1
+a121 1
+   getJNIEnv ()->CallBooleanMethod (myArrayListJObj_, addJMeth_, theJObject);
+d136 1
+a136 1
+      getJNIEnv ()->CallObjectMethod (myArrayListJObj_, getJMeth_, theIdxJInt);
+d294 1
+a294 1
+   theCJObj = theC->getComponentJOR ()->getComponentJObj ();
+d312 16
+d350 1
+d366 4
+a369 1
+      theDemand     = getDemand (theDemandJObj);
+d373 4
+d386 21
+d428 1
+d431 2
+d434 9
+a442 1
+      theComp->getComponentJOR ()->newPeggingTripleJObj (thePeriod, theVolume);
+@
+
+
+1.9
+log
+@Changed name of class AllocTriple to PeggingTriple.
+@
+text
+@d19 1
+a19 1
+#include       <CORJOR.h>
+d171 1
+a171 1
+      theIntegerJObj = matchingIntegerLRef (theIntCVec[theIdx]);
+d233 1
+a233 1
+      theDoubleJObj = matchingDoubleLRef (theDblCVec[theIdx]);
+d295 1
+a295 1
+   theCJObj = CORJOR::getComponentLRef (theC);
+a297 2
+
+   deleteLocalRef    (theCJObj);
+d387 1
+a387 1
+      CORJOR::newPeggingTripleLRef (theComp, thePeriod, theVolume);
+@
+
+
+1.8
+log
+@ArrayListJOR
+@
+text
+@d11 1
+a11 1
+//    AllocTripleALJOR
+d362 1
+a362 1
+// Implementation of class AllocTripleALJOR.
+d365 1
+a365 1
+WitJ::AllocTripleALJOR::AllocTripleALJOR (
+d375 1
+a375 1
+WitJ::AllocTripleALJOR::~AllocTripleALJOR ()
+d381 1
+a381 1
+void WitJ::AllocTripleALJOR::add (
+d386 1
+a386 1
+   _jobject * theAllocTripleJObj;
+d388 2
+a389 2
+   theAllocTripleJObj =
+      CORJOR::newAllocTripleLRef (theComp, thePeriod, theVolume);
+d391 1
+a391 1
+   ArrayListJOR::add (theAllocTripleJObj);
+d393 1
+a393 1
+   deleteLocalRef    (theAllocTripleJObj);
+@
+
+
+1.7
+log
+@getComponentLRef
+@
+text
+@d4 1
+a4 1
+// Contains the implementation of the following clases:
+d10 2
+a11 1
+//    AllocTripleALJOR <C>
+a15 1
+//    AllocTripleALJOR <C>
+a77 17
+WitJ::ArrayListJOR::ArrayListJOR (
+         JNIEnv *   theJNIEnv,
+         _jobject * theArrayListJObj):
+
+      JniClient        (theJNIEnv),
+      myArrayListJObj_ (theArrayListJObj)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::ArrayListJOR::~ArrayListJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+d96 17
+d291 1
+a291 1
+      void WitJ::CompALJOR <C>::copyFrom (const std::vector <C *> & theCInstVec)
+a292 2
+   int        theLength;
+   int        theIdx;
+d295 19
+a313 1
+   theLength = theCInstVec.size ();
+d315 3
+a317 1
+   clearAndAllocate (theLength);
+d319 3
+a321 3
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theCJObj = CORJOR::getComponentLRef (theCInstVec[theIdx]);
+d323 1
+a323 1
+      add            (theCJObj);
+d325 2
+a326 2
+      deleteLocalRef (theCJObj);
+      }
+d331 3
+a333 6
+namespace WitJ
+{
+template <>
+      void CompALJOR <Demand>::copyDemandIDsInto (
+         std::vector <const char *> & thePartNameVec,
+         std::vector <const char *> & theDemandNameVec)
+a359 1
+}
+d362 1
+a362 1
+// Explicit instantiation of class template CompALJOR <C>.
+d365 3
+a367 5
+namespace WitJ
+{
+template class CompALJOR <Part>;
+template class CompALJOR <Demand>;
+}
+d369 1
+a369 10
+//------------------------------------------------------------------------------
+// Implementation of class template AllocTripleALJOR <C>.
+//------------------------------------------------------------------------------
+
+template <typename C>
+      WitJ::AllocTripleALJOR <C>::AllocTripleALJOR (
+            JNIEnv *   theJNIEnv,
+            _jobject * theAllocTripleALJObj):
+
+         ArrayListJOR (theJNIEnv, theAllocTripleALJObj)
+d375 1
+a375 2
+template <typename C>
+      WitJ::AllocTripleALJOR <C>::~AllocTripleALJOR ()
+d381 4
+a384 5
+template <typename C>
+      void WitJ::AllocTripleALJOR <C>::populateFrom (
+         const std::vector <C *> & theCInstVec,
+         const int *               thePeriodCVec,
+         const double *            theVolumeCVec)
+a385 2
+   int        theLength;
+   int        theIdx;
+d388 2
+a389 1
+   theLength = theCInstVec.size ();
+d391 1
+a391 1
+   clearAndAllocate (theLength);
+d393 1
+a393 12
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theAllocTripleJObj =
+         CORJOR::newAllocTripleLRef (
+            theCInstVec  [theIdx],
+            thePeriodCVec[theIdx],
+            theVolumeCVec[theIdx]);
+
+      add            (theAllocTripleJObj);
+
+      deleteLocalRef (theAllocTripleJObj);
+      }
+a394 9
+
+//------------------------------------------------------------------------------
+// Explicit instantiation of class template AllocTripleALJOR <C>.
+//------------------------------------------------------------------------------
+
+namespace WitJ
+{
+template class AllocTripleALJOR <Demand>;
+}
+@
+
+
+1.6
+log
+@newAllocTripleLRef
+@
+text
+@d171 1
+a171 1
+      theIntegerJObj = matchingIntegerJObj (theIntCVec[theIdx]);
+d233 1
+a233 1
+      theDoubleJObj = matchingDoubleJObj (theDblCVec[theIdx]);
+d303 1
+a303 1
+      theCJObj = CORJOR::getComponentJObj (theCInstVec[theIdx]);
+@
+
+
+1.5
+log
+@AllocTripleALJOR
+@
+text
+@d396 1
+a396 1
+         CORJOR::newAllocTriple (
+@
+
+
+1.4
+log
+@ArrayListJOR
+@
+text
+@d10 1
+d12 4
+a15 1
+// Contains the explicit instantiation of each of class template CompALJOR <C>.
+d97 1
+a97 1
+   jint minCapJint;
+d103 1
+a103 1
+   minCapJint = minCapacity;
+d106 1
+a106 1
+      CallVoidMethod (myArrayListJObj_, ensureCapacityJMeth_, minCapJint);
+d131 1
+a131 1
+   jint       theIdxJint;
+d134 1
+a134 1
+   theIdxJint = theIdx;
+d137 1
+a137 1
+      getJNIEnv ()->CallObjectMethod (myArrayListJObj_, getJMeth_, theIdxJint);
+a294 1
+   C *        theC;
+d303 1
+a303 3
+      theC     = theCInstVec[theIdx];
+
+      theCJObj = CORJOR::getComponentJObj (theC);
+d305 1
+a305 1
+      add (theCJObj);
+d356 59
+@
+
+
+1.3
+log
+@getCriticialList and eqHeurAlloc.
+@
+text
+@a73 33
+void WitJ::ArrayListJOR::copyFrom (
+      CompALJOR <Demand> &         theDemandALJOR,
+      std::vector <const char *> & thePartNameVec,
+      std::vector <const char *> & theDemandNameVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theDemandJObj;
+   Demand *   theDemand;
+
+   theLength = theDemandALJOR.size ();
+
+   thePartNameVec  .clear  ();
+   theDemandNameVec.clear  ();
+
+   thePartNameVec  .resize (theLength);
+   theDemandNameVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theDemandJObj = theDemandALJOR.get (theIdx);
+
+      theDemand     = theDemandALJOR.getDemand (theDemandJObj);
+
+      theDemandALJOR.deleteLocalRef (theDemandJObj);
+
+      thePartNameVec  [theIdx] = theDemand->getPartName   ();
+      theDemandNameVec[theIdx] = theDemand->getDemandName ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+d311 36
+d350 5
+a354 2
+template class WitJ::CompALJOR <WitJ::Part>;
+template class WitJ::CompALJOR <WitJ::Demand>;
+@
+
+
+1.2
+log
+@Revised the arguments to eqHeurAlloc.
+@
+text
+@d9 3
+a11 2
+//    PartALJOR
+//    DemandALJOR
+d74 33
+d298 1
+a298 1
+// Implementation of class PartALJOR.
+d301 4
+a304 3
+WitJ::PartALJOR::PartALJOR (
+         JNIEnv *   theJNIEnv,
+         _jobject * thePartArrayListJObj):
+d306 1
+a306 1
+      ArrayListJOR (theJNIEnv, thePartArrayListJObj)
+d312 2
+a313 1
+WitJ::PartALJOR::~PartALJOR ()
+d319 2
+a320 4
+void WitJ::PartALJOR::copyFrom (
+      const char * const * thePartNames,
+      int                  theLength,
+      Coordinator *        theCoordinator)
+d322 1
+d324 4
+a327 2
+   Part *     thePart;
+   _jobject * theCompJObj;
+d333 1
+a333 1
+      thePart     = theCoordinator->findPart (thePartNames[theIdx]);
+d335 1
+a335 1
+      theCompJObj = CORJOR::getComponentJObj (thePart);
+d337 1
+a337 1
+      add (theCompJObj);
+d339 1
+a339 1
+      deleteLocalRef (theCompJObj);
+d344 1
+a344 1
+// Implementation of class DemandALJOR.
+d347 2
+a348 45
+WitJ::DemandALJOR::DemandALJOR (
+         JNIEnv *   theJNIEnv,
+         _jobject * theDemandArrayListJObj):
+
+      ArrayListJOR (theJNIEnv, theDemandArrayListJObj)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::DemandALJOR::~DemandALJOR ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::DemandALJOR::copyInto (
+      std::vector <const char *> & thePartNameVec,
+      std::vector <const char *> & theDemandNameVec)
+   {
+   int        theLength;
+   int        theIdx;
+   _jobject * theDemandJObj;
+   Demand *   theDemand;
+
+   theLength = size ();
+
+   thePartNameVec  .clear  ();
+   theDemandNameVec.clear  ();
+
+   thePartNameVec  .resize (theLength);
+   theDemandNameVec.resize (theLength);
+
+   for (theIdx = 0; theIdx < theLength; theIdx ++)
+      {
+      theDemandJObj = get (theIdx);
+
+      theDemand     = getDemand (theDemandJObj);
+
+      deleteLocalRef (theDemandJObj);
+
+      thePartNameVec  [theIdx] = theDemand->getPartName   ();
+      theDemandNameVec[theIdx] = theDemand->getDemandName ();
+      }
+   }
+@
+
+
+1.1
+log
+@Name changes.
+@
+text
+@d4 1
+a4 1
+// Contains the implementation of the following clases and templetes:
+d8 3
+a10 3
+//    CompALJOR <C>
+//
+// Contains the explicit instantiation of class templates CompALJOR <C>.
+d15 1
+d17 1
+d23 1
+d25 1
+d27 1
+d33 1
+a33 3
+   _jclass * theArrayListJCl;
+
+   EXCEPTION_ASSERT (ensureCapacityJMeth_ == NULL);
+d35 6
+a40 1
+   theArrayListJCl = findJClass (theJNIEnv, "java/util/ArrayList");
+d43 12
+a54 1
+      getJMethodID (theJNIEnv, theArrayListJCl, "ensureCapacity", "(I)V");
+d57 26
+a82 1
+      getJMethodID (theJNIEnv, theArrayListJCl, "add", "(Ljava/lang/Object;)Z");
+d84 2
+a85 1
+   theJNIEnv->DeleteLocalRef (theArrayListJCl);
+d90 1
+a90 1
+void WitJ::ArrayListJOR::ensureCapacity (int minCapacity)
+d94 4
+d108 1
+a108 6
+WitJ::ArrayListJOR::ArrayListJOR (
+         JNIEnv *   theJNIEnv,
+         _jobject * theArrayListJObj):
+
+      JniClient        (theJNIEnv),
+      myArrayListJObj_ (theArrayListJObj)
+d110 1
+d115 1
+a115 1
+WitJ::ArrayListJOR::~ArrayListJOR ()
+d117 3
+d124 1
+a124 1
+void WitJ::ArrayListJOR::addJObject (_jobject * theJObject)
+d126 7
+a132 1
+   getJNIEnv ()->CallBooleanMethod (myArrayListJObj_, addJMeth_, theJObject);
+d135 2
+d157 1
+a157 1
+void WitJ::IntALJOR::add (int theInt)
+d159 1
+d162 86
+a247 1
+   theIntegerJObj = anIntegerJObjFor (theInt);
+d249 1
+a249 1
+   addJObject     (theIntegerJObj);
+d251 10
+a260 1
+   deleteLocalRef (theIntegerJObj);
+d264 1
+a264 1
+// Implementation of class template CompALJOR <C>.
+d267 1
+a267 2
+template <typename C>
+      WitJ::CompALJOR <C>::CompALJOR (
+d269 1
+a269 1
+         _jobject * theCompArrayListJObj):
+d271 1
+a271 1
+      ArrayListJOR (theJNIEnv, theCompArrayListJObj)
+d277 1
+a277 2
+template <typename C>
+      WitJ::CompALJOR <C>::~CompALJOR ()
+d283 4
+a286 2
+template <typename C>
+      void WitJ::CompALJOR <C>::add (C * theC)
+d288 2
+d292 5
+a296 1
+   theCompJObj = CORJOR::getComponentJObj (theC);
+d298 7
+a304 1
+   addJObject     (theCompJObj);
+d306 10
+a315 1
+   deleteLocalRef (theCompJObj);
+d319 5
+a323 1
+// Explicit instantiation of class template CompALJOR <C>.
+d326 29
+a354 1
+template class WitJ::CompALJOR <WitJ::Part>;
+@
+

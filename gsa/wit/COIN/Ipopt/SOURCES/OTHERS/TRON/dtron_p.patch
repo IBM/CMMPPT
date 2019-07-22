@@ -1,0 +1,213 @@
+--- dtron.f	Thu Apr 24 23:22:59 2003
++++ dtron_p.f	Thu Apr 24 23:27:01 2003
+@@ -3,7 +3,41 @@
+      +                 b,bdiag,bcol_ptr,brow_ind,
+      +                 l,ldiag,lcol_ptr,lrow_ind,
+      +                 xc,s,indfree,
+-     +                 isave,dsave,wa,iwa)
++     +                 isave,dsave,wa,iwa,TRflag,
++     1     IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE, IVAR,
++     1     NFIX, IFIX, SOFLAG, C,
++     1     NLB, ILB, NUB, IUB, S_L, S_U,
++     1     KCONSTR, LRS, RS, LIS, IS, LRW, RW, LIW, IW, IERR)
++      IMPLICIT NONE
++      integer IPITER
++      integer IPN
++      integer NIND
++      integer M
++      integer NORIG
++      double precision XORIG(NORIG)
++      double precision CSCALE(*)
++      integer IVAR(IPN)
++      integer NFIX
++      integer IFIX(NFIX)
++      logical SOFLAG
++      double precision C(M)
++      integer NLB
++      integer ILB(NLB)
++      integer NUB
++      integer IUB(NUB)
++      double precision S_L(NLB)
++      double precision S_U(NUB)
++      integer KCONSTR(6)
++      integer LRS
++      double precision RS(LRS)
++      integer LIS
++      integer IS(LIS)
++      integer LRW
++      double precision RW(LRW)
++      integer LIW
++      integer IW(LIW)
++      integer IERR
++
+       character*60 task
+       integer n, itermax
+       integer acol_ptr(n+1), arow_ind(*)
+@@ -17,6 +51,8 @@
+       double precision x(n), xl(n), xu(n), g(n), xc(n), s(n)
+       double precision dsave(3) 
+       double precision wa(7*n)
++CAWAE
++      character*1 TRflag
+ c     *********
+ c
+ c     Subroutine dtron
+@@ -243,12 +279,29 @@
+ 
+       logical search
+       character*60 work
+-      integer iter, iters, iterscg
++      integer iter, iters, iterscg, info
+       double precision alphac, fc, prered, actred, snorm, g0, alpha
+ 
+-      double precision ddot, dnrm2
++      double precision ddot, dnrm2, d1mach
+       external dcauchy, dspcg, dssyax
+-      external dcopy, ddot, dnrm2
++      external dcopy, ddot, dnrm2, d1mach
++
++      double precision macheps, precfact
++      parameter( precfact = 1.d1 )
++
++      integer FFINITE
++
++      include 'IPOPT.INC'
++      include 'TIMER.INC'
++CTRY
++      integer infotr_store
++      common /wnrm_max/ infotr_store
++      logical rejected
++      save    rejected
++
++      IERR = 0
++
++      macheps = d1mach(4)
+ 
+ c     Initialization section.
+ 
+@@ -260,6 +313,8 @@
+          iterscg = 0
+          alphac = one
+          work = 'COMPUTE'
++CTRY
++         rejected = .false.
+ 
+       else
+ 
+@@ -296,7 +351,12 @@
+ c           Compute the Cauchy step and store in s.
+          
+             call dcauchy(n,x,xl,xu,a,adiag,acol_ptr,arow_ind,g,delta,
+-     +                   alphac,s,wa)
++     +                   alphac,s,wa,
++     1           IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE, IVAR,
++     1           NFIX, IFIX, SOFLAG, C,
++     1           NLB, ILB, NUB, IUB, S_L, S_U,
++     1           KCONSTR, LRS, RS, LIS, IS, LRW, RW, LIW, IW, IERR)
++            if( IERR.ne.0 ) return
+          
+ c           Compute the projected Newton step.
+ 
+@@ -305,17 +365,38 @@
+      +                 b,bdiag,bcol_ptr,brow_ind,
+      +                 l,ldiag,lcol_ptr,lrow_ind,
+      +                 indfree,wa(1),
+-     +                 wa(n+1),wa(2*n+1),iwa)
++     +                 wa(n+1),wa(2*n+1),iwa,
++     1           IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE, IVAR,
++     1           NFIX, IFIX, SOFLAG, C,
++     1           NLB, ILB, NUB, IUB, S_L, S_U,
++     1           KCONSTR, LRS, RS, LIS, IS, LRW, RW, LIW, IW, IERR)
++            COUNT_TRON_CG = COUNT_TRON_CG + iters
++            if( IERR.ne.0 ) return
++
+ 
+ c           Compute the predicted reduction.
+             
+-            call dssyax(n,a,adiag,acol_ptr,arow_ind,s,wa)
++CAWAE
++            if( QTRONHESS.eq.0 ) then
++               call RES_HV(IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE,
++     1              IVAR, NFIX, IFIX, SOFLAG, C, s, wa,
++     1              NLB, ILB, NUB, IUB, S_L, S_U,
++     1              KCONSTR, LRS, RS, LIS, IS, LRW, RW, LIW, IW, IERR)
++               if( IERR.ne.0 ) return
++            else
++               call dssyax(n,a,adiag,acol_ptr,arow_ind,s,wa)
++            endif
++
+             prered = -(ddot(n,s,1,g,1) + p5*ddot(n,s,1,wa,1))
+-            iterscg = iterscg + iters
++            if( FFINITE(prered).eq.0 ) then
++               task = 'NAN of INF in predicted reduction'
++            else
++               iterscg = iterscg + iters
+ 
+ c           Set task to compute the function.
+ 
+-            task = 'F'
++               task = 'F'
++            endif
+ 
+          end if
+ 
+@@ -326,11 +407,13 @@
+ c           Compute the actual reduction. 
+          
+             actred =  fc - f
++     1           - precfact*macheps*abs(fc) ! for roundoff error
+ 
+ c           On the first iteration, adjust the initial step bound.
+ 
++CTODO
+             snorm = dnrm2(n,s,1)
+-            if (iter .eq. 1)  delta = min(delta,snorm)
++C            if (iter .eq. 1)  delta = min(delta,snorm)
+          
+ c           Update the trust region bound.
+          
+@@ -343,15 +426,41 @@
+ 
+ c           Update the trust region bound according to the ratio
+ c           of actual to predicted reduction.
+-         
+-            if (actred .lt. eta0*prered) then
++
++            if( FFINITE(actred).eq.0 ) then
++               delta = min(max(alpha,sigma1)*snorm,sigma2*delta)
++               TRflag = 'i'
++               rejected = .true.
++            else if (actred .lt. eta0*prered) then
+                delta = min(max(alpha,sigma1)*snorm,sigma2*delta)
++CAWAE
++               TRflag = 'r'
++               rejected = .true.
+             else if (actred .lt. eta1*prered) then
+                delta = max(sigma1*delta,min(alpha*snorm,sigma2*delta))
++CAWAE
++               TRflag = '-'
++               rejected = .false.
+             else if (actred .lt. eta2*prered) then
+                delta = max(sigma1*delta,min(alpha*snorm,sigma3*delta))
++CAWAE
++               TRflag = '='
++               rejected = .false.
+             else
+-               delta = max(delta,min(alpha*snorm,sigma3*delta))
++CORIG               delta = max(delta,min(alpha*snorm,sigma3*delta))
++CTRY
++               if( infotr_store.ne.4 .or. rejected ) then
++CORIG               if( infotr_store.ne.4 ) then
++                  delta = max(delta,min(alpha*snorm,sigma3*delta))
++CAWAE
++                  TRflag = '+'
++               else
++                  delta = sigma3*delta
++CAWAE
++                  TRflag = 'j'
++               endif
++               rejected = .false.
++CTRYENDE
+             end if
+ 
+ c           Update the iterate. 

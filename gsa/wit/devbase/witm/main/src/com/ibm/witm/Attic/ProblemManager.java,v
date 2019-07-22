@@ -1,0 +1,403 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.5
+date	2011.09.14.15.31.34;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2011.09.14.15.06.25;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.07.20.22.51.02;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.07.20.22.13.44;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.07.20.20.18.27;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@ProblemManager ==> WitJHandler
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File ProblemManager.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import com.ibm.witj.Demand;
+import com.ibm.witj.Operation;
+import com.ibm.witj.Part;
+import com.ibm.witj.Problem;
+
+/*******************************************************************************
+ * "Problem Manager"<br>
+ * A ProblemManager is associated with a WIT-J Problem and is responsible for
+ * maintaining WIT-M state information that's specific to the Problem.<br>
+ * 
+ * The factory method for creating instances of this class is
+ * ProblemManager.newProblemManager ().
+ *******************************************************************************
+ */
+public final class ProblemManager
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The current ProblemManager: The ProblemManager for the current Problem that
+ * is to be used by various WIT-M methods, if any; otherwise null.
+ *******************************************************************************
+ */
+   private static ProblemManager current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The Problem for this ProblemManager.
+ *******************************************************************************
+ */
+   private final Problem myProblem;
+   
+/*******************************************************************************
+ * True, iff short names are to be used for Parts, Operations, and Demands.
+ *******************************************************************************
+ */
+   private boolean useShortNames = false;
+   
+/*******************************************************************************
+ * # of Parts created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nPartsCreated = 0;
+   
+/*******************************************************************************
+ * # of Operations created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nOpnsCreated = 0;
+   
+/*******************************************************************************
+ * # of Demands created by WIT-M in myProblem.
+ *******************************************************************************
+ */
+   private int nDemandsCreated = 0;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   private ProblemManager () 
+      {
+      myProblem = Problem.newInstance ();
+      
+      current   = this;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Computes and returns the name to be used used for a new Part, Operation, or
+ * Demand.
+ *******************************************************************************
+ */
+   private String makeName (
+         Item         theItem,
+         Property <?> theProp,
+         int          theCount)
+      {
+      String theName;
+      
+      theName = Integer.toString (theCount);
+      
+      if (! useShortNames)
+         theName =
+            concatenation (
+               theProp.getName (),
+               ":",
+               theItem.getID (),
+               "#",
+               theName);
+      
+      return theName;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Creates and returns new Part
+ *******************************************************************************
+ */
+   Part newPart (
+         Item            theItem,
+         Property <Part> theProp,
+         Part.Category   thePartCat)
+      {
+      String thePartName;
+      Part   thePart;
+      
+      thePartName = makeName (theItem, theProp, nPartsCreated);
+      
+      thePart     = Part.newInstance (myProblem, thePartName, thePartCat);
+
+      nPartsCreated ++;
+      
+      theItem.setValue (theProp, thePart);
+      
+      return thePart;
+      }
+
+/*******************************************************************************
+ * Creates and returns new Operation
+ *******************************************************************************
+ */
+   Operation newOperation (Item theItem, Property <Operation> theProp)
+      {
+      String    theOpnName;
+      Operation theOpn;
+      
+      theOpnName = makeName (theItem, theProp, nOpnsCreated);
+      
+      theOpn     = Operation.newInstance (myProblem, theOpnName);
+
+      nOpnsCreated ++;
+      
+      theItem.setValue (theProp, theOpn);
+      
+      return theOpn;
+      }
+
+/*******************************************************************************
+ * Creates and returns new Demand
+ *******************************************************************************
+ */
+   Demand newDemand (Item theItem, Property <Demand> theProp, Part thePart)
+      {
+      String theDemandName;
+      Demand theDemand;
+      
+      theDemandName = makeName (theItem, theProp, nDemandsCreated);
+      
+      theDemand     = Demand.newInstance (thePart, theDemandName);
+
+      nDemandsCreated ++;
+      
+      theItem.setValue (theProp, theDemand);
+      
+      return theDemand;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Factory method: Constructs a new ProblemManager.<br>
+ * Constructs a new WIT-J Problem that will be associated with this
+ * ProblemManager.<br>
+ * The current ProblemManager is set to the new ProbleMgr.
+ *
+ * @@return The new ProblemManager
+ *******************************************************************************
+ */
+   public static ProblemManager newProblemManager ()
+      {
+      return new ProblemManager ();
+      }
+  
+/*******************************************************************************
+ * Sets the current ProblemManager.<br>
+ * Note: The current ProblemManager should eventually be set to null, in order
+ * to allow the ProblemManager and its Problem to be garbage collected.
+ * 
+ * @@param theProbMgr The ProblemManager which is to become current.
+ *        (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentProblemManager (ProblemManager theProbMgr)
+      {
+      current = theProbMgr;
+      }
+
+/*******************************************************************************
+ * @@return The current ProblemManager, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static ProblemManager getCurrentProblemManager ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * @@return The current Problem, i.e., theProblem associated with the current
+ *         ProblemManager, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static Problem getCurrentProblem ()
+      {
+      return
+         (current != null)?
+            current.myProblem:
+            null;
+      }
+
+/*******************************************************************************
+ * Sets the value of the useShortNames variable for the current ProblemManager
+ * to a specified value; a ProblemManager will use short names for Parts,
+ * Operations, and Demands, iff its useShortNames variable is true.
+ * 
+ * @@param theValue The value to which the useShortNames variable will be set.
+ * 
+ * @@throws IllegalStateException If the current ProblemManager is null
+ *******************************************************************************
+ */
+   public static void setUseShortNames (boolean theValue)
+      {
+      reqCurProbMgr ();
+      
+      current.useShortNames = theValue;
+      }
+
+/*******************************************************************************
+ * @@return True, iff the current ProblemManager uses short names.
+ * 
+ * @@throws IllegalStateException If the current ProblemManager is null
+ *******************************************************************************
+ */
+   public static boolean getUseShortNames ()
+      {
+      reqCurProbMgr ();
+      
+      return current.useShortNames;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.4
+log
+@Name change
+@
+text
+@@
+
+
+1.3
+log
+@longNames ==> shortNames
+@
+text
+@d51 1
+a51 1
+   private boolean shortNames = false;
+d100 1
+a100 1
+      if (! shortNames)
+d234 3
+a236 3
+ * Sets the value of the shortNames variable for the current ProblemManager to a
+ * specified value; a ProblemManager will use short names for Parts, Operations,
+ * and Demands, iff its shortNames variable is true.
+d238 1
+a238 1
+ * @@param theValue The value to which the shortNames variable will be set.
+d243 1
+a243 1
+   public static void setShortNames (boolean theValue)
+d247 1
+a247 1
+      current.shortNames = theValue;
+d256 1
+a256 1
+   public static boolean getShortNames ()
+d260 1
+a260 1
+      return current.shortNames;
+@
+
+
+1.2
+log
+@newDemand
+@
+text
+@d48 1
+a48 1
+ * True, iff long names are to be used for Parts, Operations, and Demands.
+d51 1
+a51 1
+   private boolean longNames = false;
+d68 1
+a68 1
+ */           @@SuppressWarnings("unused")
+d100 1
+a100 1
+      if (longNames)
+d234 3
+a236 3
+ * Sets the value of the longNames variable for the current ProblemManager to a
+ * specified value; a ProblemManager will use long names for Parts, Operations,
+ * and Demands, iff its longNames variable is true.
+d238 1
+a238 1
+ * @@param theValue The value to which the longNames variable will be set.
+d243 1
+a243 1
+   public static void setLongNames (boolean theValue)
+d247 1
+a247 1
+      current.longNames = theValue;
+d251 1
+a251 1
+ * @@return True, iff the current ProblemManager uses long names.
+d256 1
+a256 1
+   public static boolean getLongNames ()
+d260 1
+a260 1
+      return current.longNames;
+@
+
+
+1.1
+log
+@ProblemMgr ==> ProblemManager
+@
+text
+@d10 1
+d159 20
+@
+

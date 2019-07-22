@@ -1,0 +1,2957 @@
+head	1.28;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.28
+date	2004.11.16.15.54.58;	author grzes;	state Exp;
+branches;
+next	1.27;
+
+1.27
+date	2004.11.15.22.48.18;	author grzes;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2004.11.15.22.07.56;	author grzes;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2004.11.15.19.53.02;	author grzes;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2004.11.12.18.33.24;	author grzes;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2004.11.12.13.57.37;	author grzes;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2004.11.11.19.20.36;	author fasano;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2004.11.10.22.40.10;	author grzes;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2004.11.10.14.50.14;	author fasano;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2004.11.10.04.11.31;	author fasano;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2004.11.09.21.40.05;	author grzes;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2004.11.09.20.00.48;	author grzes;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2004.11.09.18.29.44;	author fasano;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2004.11.09.05.12.13;	author fasano;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2004.11.08.23.23.20;	author fasano;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2004.11.08.21.10.36;	author fasano;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.11.06.23.51.19;	author fasano;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.11.06.17.29.17;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.11.06.15.46.52;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.11.06.14.05.57;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.11.06.13.22.40;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.10.31.00.00.51;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.10.30.23.08.23;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.10.30.12.16.17;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.10.29.02.59.35;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.10.29.01.42.17;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.10.28.17.56.54;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.15.51.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.28
+log
+@Minor improvements & bugfixes.
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+  #pragma warning(disable:4290)
+#endif
+
+
+#include <iostream>
+#include <sstream>
+#include <cassert>
+
+#include "parameterFile.h"
+#include "materialFile.h"
+#include "materialAttributesFile.h"
+#include "capacityFile.h"
+#include "operationFile.h"
+#include "operationAttributesFile.h"
+#include "consumptionArcFile.h"
+#include "productionArcFile.h"
+#include "demandFile.h"
+#include "substituteMaterialFile.h"
+#include "CoinFloatEqual.h"
+#include "ovptProblem.h"
+#include "populateOvpt.h"
+
+
+void ECCpopulateProblem::writeMessage(const std::string & msg) const
+{
+    FILE * fp = fopen(logFileName_.c_str(),"a");
+    fprintf(fp,"%s",msg.c_str());
+    fclose(fp);
+    std::cout <<msg <<std::endl;
+}
+
+// Check that period is valid. If it isn't throw an exception
+void ECCpopulateProblem::checkPeriodValidity(
+                         int period, 
+                         int nPeriods, 
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const std::string severity,
+                         const std::string action) 
+{
+  // Test that period is in range
+  if ( period <1 || period > nPeriods ) {
+    std::ostringstream msgStream;
+    msgStream 
+      <<"-------------------------------------------------------"   <<std::endl
+      <<severity <<": period is out of range."                      <<std::endl
+      <<"   filename: " <<file.filename().c_str()                   <<std::endl
+      <<"   file line number: " <<fileIter.recNum()                 <<std::endl 
+      <<"   period: " <<period                                      <<std::endl
+      <<"   Valid range: 1 <= period <= " <<nPeriods                <<std::endl 
+      <<action                                                      <<std::endl   
+      <<"-------------------------------------------------------"   <<std::endl;
+    writeMessage(msgStream.str());
+    throw ( SCOexception(msgStream.str()) );
+  }
+}
+
+// Check that parameter is >=0. If it isn't throw an exception
+void ECCpopulateProblem::checkNonNegativeParmValidity(
+                         float parmValue, 
+                         const std::string & parmName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const std::string severity,
+                         const std::string action) 
+{
+  // Test that parm is in range
+  if ( parmValue <0.f ) {
+    std::ostringstream msgStream;
+    msgStream 
+      <<"-------------------------------------------------------"   <<std::endl
+      <<severity <<": " <<parmName <<" is out of range."            <<std::endl
+      <<"   filename: " <<file.filename().c_str()                   <<std::endl
+      <<"   file line number: " <<fileIter.recNum()                 <<std::endl 
+      <<"   " <<parmName  <<": " <<parmValue                        <<std::endl
+      <<"   Valid range: 0 <= " <<parmValue                         <<std::endl 
+      <<action                                                      <<std::endl   
+      <<"-------------------------------------------------------"   <<std::endl;
+    writeMessage(msgStream.str());
+    throw ( SCOexception(msgStream.str()) );
+  }
+}
+
+// Check that material exists. If it doesn't throw an exception
+void ECCpopulateProblem::checkMaterialExits(
+                         const std::string & materialName,
+                         const std::string & shortFileName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const SCOcsvFormatFile & materialFile,
+                         const std::string severity,
+                         const std::string action) 
+{
+      if (!prob_.materialExists(materialName) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"          <<std::endl
+          <<severity<< ": Undefined material specified in " <<shortFileName <<" file."  <<std::endl
+          <<"   " <<shortFileName <<" file name: " <<file.filename()                     <<std::endl
+          <<"   " <<shortFileName <<" line number: " <<fileIter.recNum()       <<std::endl
+          <<"   Undefined material: " <<materialName                           <<std::endl
+          <<"   material file name: " <<materialFile.filename()                <<std::endl
+          <<action                                                             <<std::endl
+          <<"-------------------------------------------------------"          <<std::endl;
+         writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+
+
+// Check that capacity exists. If it doesn't throw an exception
+void ECCpopulateProblem::checkCapacityExits(
+                         const std::string & capacityName,
+                         const std::string & shortFileName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const SCOcsvFormatFile & capacityFile,
+                         const std::string severity,
+                         const std::string action) 
+{
+      if (!prob_.capacityExists(capacityName) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"          <<std::endl
+          <<"Warning: Undefined capacity specified in " <<shortFileName <<" file."  <<std::endl
+          <<"   " <<shortFileName <<" file name: " <<file.filename()                     <<std::endl
+          <<"   " <<shortFileName <<" line number: " <<fileIter.recNum()       <<std::endl
+          <<"   Undefined capacity: " <<capacityName                           <<std::endl
+          <<"   capacity file name: " <<capacityFile.filename()                <<std::endl
+          <<action                                                             <<std::endl
+          <<"-------------------------------------------------------"          <<std::endl;
+        writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+
+
+// Check that resource exists. If it doesn't throw an exception
+void ECCpopulateProblem::checkResourceExits(
+                         const std::string & resourceName,
+                         const std::string & shortFileName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const SCOcsvFormatFile & materialFile,
+                         const SCOcsvFormatFile & capacityFile,
+                         const std::string severity,
+                         const std::string action) 
+{
+      if (!prob_.materialExists(resourceName) && !prob_.capacityExists(resourceName) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"          <<std::endl
+          <<severity<< ": Undefined resource specified in " <<shortFileName <<" file."  <<std::endl
+          <<"   " <<shortFileName <<" file name: " <<file.filename()                     <<std::endl
+          <<"   " <<shortFileName <<" line number: " <<fileIter.recNum()       <<std::endl
+          <<"   Undefined resource: " <<resourceName                           <<std::endl
+          <<"   material file name: " <<materialFile.filename()                <<std::endl
+          <<"   capacity file name: " <<capacityFile.filename()                <<std::endl
+          <<"   The resource must be defined in the material or capacity file."<<std::endl
+          <<action                                                             <<std::endl
+          <<"-------------------------------------------------------"          <<std::endl;
+        writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+
+// Check that operation exists. If it doesn't throw an exception
+void ECCpopulateProblem::checkOperationExits(
+                         const std::string & operationName,
+                         const std::string & shortFileName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const SCOcsvFormatFile & operationFile,
+                         const std::string severity,
+                         const std::string action) 
+{
+      if (!prob_.operationExists(operationName) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"          <<std::endl
+          <<severity<< ": Undefined operation specified in " <<shortFileName <<" file."  <<std::endl
+          <<"   " <<shortFileName <<" file name: " <<file.filename()                     <<std::endl
+          <<"   " <<shortFileName <<" line number: " <<fileIter.recNum()       <<std::endl
+          <<"   Undefined operation: " <<operationName                           <<std::endl
+          <<"   operation file name: " <<operationFile.filename()                <<std::endl
+          <<action                                                             <<std::endl
+          <<"-------------------------------------------------------"          <<std::endl;
+        writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+// Check that consumptionArc exists. If it doesn't throw an exception
+void ECCpopulateProblem::checkConsumptionArcExits(
+						 const std::string & operationName,
+						 const std::string & consumedResourceName,
+                         const std::string & shortFileName,
+                         const SCOfileIterator & fileIter, 
+                         const SCOcsvFormatFile & file,
+                         const SCOcsvFormatFile & consumptionArcFile,
+                         const std::string severity,
+                         const std::string action) 
+{
+      if (!prob_.consumptionArcExists(operationName, consumedResourceName) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"          <<std::endl
+		  <<severity<< ": Undefined consumptionArc specified in " <<shortFileName <<" file."  <<std::endl
+          <<"   " <<shortFileName <<" file name: " <<file.filename()                     <<std::endl
+          <<"   " <<shortFileName <<" line number: " <<fileIter.recNum()       <<std::endl
+		  <<"   consuming operation name: " << operationName << std::endl
+		  <<"   consumed material name: " << consumedResourceName << std::endl
+	      <<"   consumptionArc file name: " <<consumptionArcFile.filename()                <<std::endl
+		  <<"   The consumption arc between operation " << operationName << " and material " <<
+		  consumedResourceName << " is not defined in the consumptionArc file." <<std::endl
+          <<action                                                             <<std::endl
+          <<"-------------------------------------------------------"          <<std::endl;
+        writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+
+// 3 methods for checking if orphans exist
+
+// Check if orphan materials exist. If they do, throw an exception
+void ECCpopulateProblem::checkOrphanMaterialExists(const SCOcsvFormatFile & materialFile,
+												   const std::string severity,
+												   const std::string action) 
+{
+	std::vector<std::string> orphanMaterialNames;
+	prob_.getMaterialOrphanNames(orphanMaterialNames);
+	if (orphanMaterialNames.size() !=0 ) {
+        std::ostringstream msgStream;
+		int i;
+	    msgStream 
+          <<"-------------------------------------------------------"          <<std::endl;
+		if (orphanMaterialNames.size() ==1 ) msgStream  <<severity<< ": The following material: "<<std::endl;
+		else msgStream  <<"Warning: The following materials: "<<std::endl;
+	    for (i=0; i<orphanMaterialNames.size(); i++ )
+			msgStream << "           " << orphanMaterialNames[i]   <<std::endl;
+		msgStream  <<"   specified in the file: "  <<materialFile.filename()   <<std::endl;
+		if (orphanMaterialNames.size() ==1 ) msgStream  <<"   is";
+		  else msgStream  <<"   are";
+		msgStream<<" being niether produced nor consumed by any operation."    <<std::endl<<std::endl
+        <<action                                                               <<std::endl
+        <<"-------------------------------------------------------"            <<std::endl;
+         writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+// Check if orphan capacities exist. If they do, throw an exception
+void ECCpopulateProblem::checkOrphanCapacityExists(const SCOcsvFormatFile & capacityFile,
+												   const std::string severity,
+												   const std::string action)
+{
+	std::vector<std::string> orphanCapacityNames;
+	prob_.getCapacityOrphanNames(orphanCapacityNames);
+	if (orphanCapacityNames.size() !=0 ) {
+        std::ostringstream msgStream;
+		int i;
+	    msgStream 
+          <<"-------------------------------------------------------"          <<std::endl;
+		if (orphanCapacityNames.size() ==1 ) msgStream  <<severity<< ": The following capacity: "<<std::endl;
+		else msgStream  <<"Warning: The following capacities: "<<std::endl;
+	    for (i=0; i<orphanCapacityNames.size(); i++ )
+			msgStream << "           " << orphanCapacityNames[i]   <<std::endl;
+		msgStream  <<"   specified in the file: "  <<capacityFile.filename()   <<std::endl;
+		if (orphanCapacityNames.size() ==1 ) msgStream  <<"   is";
+		  else msgStream  <<"   are";
+		msgStream<<" not being consumed by any operation."    <<std::endl<<std::endl
+        <<action                                                               <<std::endl
+        <<"-------------------------------------------------------"            <<std::endl;
+         writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+      }
+}
+
+// Check if orphan operations exist. If they do, throw an exception
+void ECCpopulateProblem::checkOrphanOperationExists(const SCOcsvFormatFile & operationFile,
+												    const std::string severity,
+												    const std::string action)
+{
+	std::vector<std::string> orphanOperationNames;
+	prob_.getOperationOrphanNames(orphanOperationNames);
+	if (orphanOperationNames.size() !=0 ) {
+        std::ostringstream msgStream;
+		int i;
+	    msgStream 
+          <<"-------------------------------------------------------"          <<std::endl;
+		if (orphanOperationNames.size() ==1 ) msgStream  <<severity<< ": The following operation: "<<std::endl;
+		else msgStream  <<"Warning: The following operations: "<<std::endl;
+	    for (i=0; i<orphanOperationNames.size(); i++ )
+			msgStream << "           " << orphanOperationNames[i]   <<std::endl;
+		msgStream  <<"   specified in the file: "  <<operationFile.filename()   <<std::endl;
+		if (orphanOperationNames.size() ==1 ) msgStream  <<"   is";
+		  else msgStream  <<"   are";
+		msgStream<<" are either not consuming any material or capacity or not producing any material."    <<std::endl<<std::endl
+        <<action                                                               <<std::endl
+        <<"-------------------------------------------------------"            <<std::endl;
+         writeMessage(msgStream.str());
+        throw ( SCOexception(msgStream.str()) );
+    }
+}
+
+//--------------------------------------------------------------------------
+// Populate the problem from a directory of files
+//--------------------------------------------------------------------------
+void ECCpopulateProblem::readDirectoryFiles(bool throwExceptionOnWarning)
+{
+  
+  // Read parameter file
+  int nPeriods;
+  {
+    std::string parameterFileName = inputDirectory_ + "/parameter.csv";
+    ECCparameterFile parameterFile(parameterFileName);
+    nPeriods=parameterFile.fieldAsInt("numPeriods","parameterValue");
+    if (nPeriods < 1) {
+      std::ostringstream msgStream;
+      msgStream 
+          <<"-------------------------------------------------------" <<std::endl
+          <<"Error: numPeriods is out of range."                      <<std::endl
+          <<"   parameterFile filename: " <<parameterFile.filename()  <<std::endl
+          <<"   numPeriods: " <<nPeriods                              <<std::endl
+          <<"   valid range: 1<=numPeriods"                           <<std::endl
+          <<"-------------------------------------------------------" <<std::endl;
+      writeMessage(msgStream.str());
+      throw ( SCOexception(msgStream.str()) );
+    }
+    prob_.setNPeriods(nPeriods);
+  }
+
+  //---------------------------------------------------------------
+  // Read the material file
+  //---------------------------------------------------------------
+  std::string materialFileName = inputDirectory_ + "/material.csv";
+  ECCmaterialFile materialFile(materialFileName);
+  {
+    ECCmaterialFileIterator fileIter(materialFile);
+    for ( ; fileIter()!=NULL; ) {
+      std::string material=fileIter.material();
+      prob_.addMaterial(material);
+    }
+  }
+  
+  //---------------------------------------------------------------
+  // Read material attribute file
+  //---------------------------------------------------------------
+  std::string materialAttributesFileName = inputDirectory_ + "/materialAttributes.csv";
+  ECCmaterialAttributesFile materialAttributesFile(materialAttributesFileName);
+  {
+    ECCmaterialAttributesFileIterator fileIter(materialAttributesFile);
+    for ( ; fileIter()!=NULL; ) {
+      std::string material=fileIter.material();
+      int period=fileIter.periodAsInt();
+      float supply=fileIter.supplyAsFloat();
+      
+   
+      // Check that material exists
+      try {
+        checkMaterialExits(material,"materialAttribute",fileIter,materialAttributesFile,materialFile, "Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,materialAttributesFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that supply >= 0.
+      try {
+        checkNonNegativeParmValidity(supply,"supply",fileIter,materialAttributesFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      prob_.setMaterialSupply(material,period-1,supply);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading material attribute file
+
+
+  //---------------------------------------------------------------
+  // Read capacity file
+  //---------------------------------------------------------------
+  std::string capacityFileName = inputDirectory_ + "/capacity.csv";
+  ECCcapacityFile capacityFile(capacityFileName);
+  {
+    ECCcapacityFileIterator fileIter(capacityFile);
+    for ( ; fileIter()!=NULL; ) {
+      std::string capacity=fileIter.capacity();
+      int period=fileIter.periodAsInt();
+      float supply=fileIter.supplyAsFloat();
+      
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,capacityFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that supply >= 0.
+      try {
+        checkNonNegativeParmValidity(supply,"supply",fileIter,capacityFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+      // Does capacity already exist?
+      // If no, then add it
+      if ( !prob_.capacityExists(capacity) ){
+        prob_.addCapacity(capacity);
+      }
+      
+      // Set supply of capacity
+      prob_.setCapacitySupply(capacity,period-1,supply);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading capacity attribute file
+
+  //---------------------------------------------------------------
+  // Read the operation file
+  //---------------------------------------------------------------
+  std::string operationFileName = inputDirectory_ + "/operation.csv";
+  ECCoperationFile operationFile(operationFileName);
+  {
+    ECCoperationFileIterator fileIter(operationFile);
+    for ( ; fileIter()!=NULL; ) {
+      std::string operation=fileIter.operation();
+      prob_.addOperation(operation);
+    }
+  }
+  
+  //---------------------------------------------------------------
+  // Read operation attribute file
+  //---------------------------------------------------------------
+  std::string operationAttributesFileName = inputDirectory_ + "/operationAttributes.csv";
+  ECCoperationAttributesFile operationAttributesFile(operationAttributesFileName);
+  {
+    ECCoperationAttributesFileIterator fileIter(operationAttributesFile);
+    for ( ; fileIter()!=NULL; ) {
+      std::string operation=fileIter.operation();
+      int period=fileIter.periodAsInt();
+      float contribution=fileIter.contributionAsFloat();
+      float minimumProduction=fileIter.minimumProductionAsFloat();
+      
+   
+      // Check that operation exists
+      try {
+        checkOperationExits(operation,"operationAttribute",fileIter,operationAttributesFile,operationFile, "Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,operationAttributesFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that contribution >= 0.
+      try {
+        checkNonNegativeParmValidity(contribution,"contribution",fileIter,operationAttributesFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that minimumProduction >= 0.
+      try {
+        checkNonNegativeParmValidity(minimumProduction,"minimumProduction",fileIter,operationAttributesFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      prob_.setOperationContribution(operation,period-1,contribution);
+      prob_.setOperationMinimumProduction(operation,period-1,minimumProduction);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading operation attribute file
+
+  
+  
+  //---------------------------------------------------------------
+  // Read consumptionArc  file
+  //---------------------------------------------------------------
+  std::string consumptionArcFileName = inputDirectory_ + "/consumptionArc.csv";
+  ECCconsumptionArcFile consumptionArcFile(consumptionArcFileName);
+  {
+    ECCconsumptionArcFileIterator fileIter(consumptionArcFile);
+    for ( ; fileIter()!=NULL; ) {
+
+      std::string operation=fileIter.operation();
+      std::string consumedResource=fileIter.consumedResource();
+      int period=fileIter.periodAsInt();
+      float consumptionRate=fileIter.consumptionRateAsFloat();
+      
+      // Check that operation exists
+      try {
+        checkOperationExits(operation,"consumptionArc",fileIter,consumptionArcFile,operationFile, "Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check that resource exists
+      try {
+        checkResourceExits(consumedResource,"consumptionArc",fileIter,consumptionArcFile,materialFile,capacityFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,consumptionArcFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that consumptionRate >= 0.
+      try {
+        checkNonNegativeParmValidity(consumptionRate,"consumptionRate",fileIter,consumptionArcFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // If the arc does not exist, then add it
+      if ( !prob_.consumptionArcExists(operation,consumedResource) ) {
+        prob_.addConsumptionArc(operation,consumedResource);
+      }
+
+      // set consumption rate on arc
+      prob_.setConsumptionArcConsumptionRate(operation,consumedResource,period-1,consumptionRate);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading consumption arc file
+
+    
+  //---------------------------------------------------------------
+  // Read productionArc file
+  //---------------------------------------------------------------
+  std::string productionArcFileName = inputDirectory_ + "/productionArc.csv";
+  ECCproductionArcFile productionArcFile(productionArcFileName);
+  {
+    ECCproductionArcFileIterator fileIter(productionArcFile);
+    for ( ; fileIter()!=NULL; ) {
+
+      std::string operation=fileIter.operation();
+      std::string producedMaterial=fileIter.producedMaterial();
+      int period=fileIter.periodAsInt();
+      float productionRate=fileIter.productionRateAsFloat();
+      
+      // Check that operation exists
+      try {
+        checkOperationExits(operation,"productionArc",fileIter,productionArcFile,operationFile, "Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check that producedMaterial exists
+      try {
+        checkMaterialExits(producedMaterial,"productionArc",fileIter,productionArcFile,materialFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,productionArcFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that productionRate >= 0.
+      try {
+        checkNonNegativeParmValidity(productionRate,"productionRate",fileIter,productionArcFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // If the arc does not exist, then add it
+      if ( !prob_.productionArcExists(operation,producedMaterial) ) {
+        prob_.addProductionArc(operation,producedMaterial);
+      }
+
+      // set production rate on arc
+      prob_.setProductionArcProductionRate(operation,producedMaterial,period-1,productionRate);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading production arc file
+
+  
+  //---------------------------------------------------------------
+  // Read demand file
+  //---------------------------------------------------------------
+  std::string demandFileName = inputDirectory_ + "/demand.csv";
+  ECCdemandFile demandFile(demandFileName);
+  {
+    ECCdemandFileIterator fileIter(demandFile);
+    for ( ; fileIter()!=NULL; ) {
+      
+
+      std::string demand=fileIter.demand();
+      std::string material=fileIter.material();
+      int period=fileIter.periodAsInt();
+      float demandVol=fileIter.demVolAsFloat();
+      float contribution=fileIter.contributionAsFloat();
+      float minShipVol=fileIter.minShipVolAsFloat();
+      
+      // Check that resource exists
+      try {
+        checkMaterialExits(material,"demand",fileIter,demandFile,materialFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+      // Check for valid period
+      try {
+        checkPeriodValidity(period,nPeriods,fileIter,demandFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that demandVol >= 0.
+      try {
+        checkNonNegativeParmValidity(demandVol,"demandVol",fileIter,demandFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that contribution >= 0.
+      try {
+        checkNonNegativeParmValidity(contribution,"contribution",fileIter,demandFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // check that minShipVol >= 0.
+      try {
+        checkNonNegativeParmValidity(minShipVol,"minShipVol",fileIter,demandFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // If the demand does not exist, then add it
+      if ( !prob_.demandExists(material,demand) ) {
+        prob_.addDemand(material,demand);
+      }
+
+      // set demand attribute values
+      prob_.setDemandDemandVol(material,demand,period-1,demandVol);
+      prob_.setDemandContribution(material,demand,period-1,contribution);
+      prob_.setDemandMinShipVol(material,demand,period-1,minShipVol);
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading demand arc file
+  
+    
+  //---------------------------------------------------------------
+  // Read substituteMaterial file
+  //---------------------------------------------------------------
+  std::string substituteMaterialFileName = inputDirectory_ + "/substituteMaterial.csv";
+  ECCsubstituteMaterialFile substituteMaterialFile(substituteMaterialFileName);
+  {
+    ECCsubstituteMaterialFileIterator fileIter(substituteMaterialFile);
+    for ( ; fileIter()!=NULL; ) {
+
+      std::string operation=fileIter.operation();
+      std::string material=fileIter.material();
+      std::string substituteMaterial=fileIter.substituteMaterial();
+      
+      // Check that operation exists
+      try {
+        checkOperationExits(operation,"substituteMaterial",fileIter,substituteMaterialFile,operationFile, "Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check that material exists
+      try {
+        checkMaterialExits(material,"substituteMaterial",fileIter,substituteMaterialFile,materialFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+      
+      // Check that substituteMaterial exists
+      try {
+        checkMaterialExits(substituteMaterial,"substituteMaterial",fileIter,substituteMaterialFile,materialFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+      // Check that consumptionArc from material to operation exits
+	  try {
+        checkConsumptionArcExits(operation,material,"substituteMaterial",fileIter,substituteMaterialFile,consumptionArcFile,"Warning","Record will be ignored.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+        else continue;
+      }
+
+
+      prob_.addSubstitutionArc(operation,material,substituteMaterial);
+
+      
+    } // end of "for ( ; fileIter()!=NULL; )" loop 
+  } // finished reading substituteMaterial file
+
+  //---------------------------------------------------------
+  //check for orphans
+  //---------------------------------------------------------
+  //check for orphan materials
+  {
+	  std::string materialFileName = inputDirectory_ + "/material.csv";
+      ECCmaterialFile materialFile(materialFileName);
+	  try {
+        checkOrphanMaterialExists(materialFile,"Warning","Materials will not take part in the production process.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+      }
+  }
+  //check for orphan capacities
+  {
+	  std::string capacityFileName = inputDirectory_ + "/capacity.csv";
+      ECCcapacityFile capacityFile(capacityFileName);
+	  try {
+        checkOrphanCapacityExists(capacityFile,"Warning","Capacities will not take part in the production process.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+      }
+  }
+
+  //check for orphan operations
+  {
+	  std::string operationFileName = inputDirectory_ + "/operation.csv";
+      ECCoperationFile operationFile(operationFileName);
+	  try {
+        checkOrphanOperationExists(operationFile,"Warning","Operations will not take part in the production process.");
+      }
+      catch (SCOexception e) {
+        if ( throwExceptionOnWarning ) throw e; 
+      }
+  }
+
+  //finished checking for orphans
+}
+
+
+// default constructor
+ECCpopulateProblem::ECCpopulateProblem(
+    ECCovptProblem & prob_,
+    const std::string & inputDirectory,
+    const std::string &  logFileName)
+:
+prob_(prob_),
+inputDirectory_(inputDirectory),
+logFileName_(logFileName)
+{
+  // nothing to do here
+}
+
+// destructor
+ECCpopulateProblem::~ECCpopulateProblem()
+{
+  // nothing to do here
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+//------------------------------------------------------------------------------
+// Test function
+//------------------------------------------------------------------------------
+void
+ECCpopulateProblem::test()
+{
+  CoinRelFltEq eq;
+
+  // Test reading example1 
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/example1";
+    std::string logFileName = "../data/example1/ovptLog.txt";
+    ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles();
+    
+    assert(prob.getNPeriods() == 5);
+
+    // Test that materials were read
+    assert(prob.materialExists("Tow"));
+    assert(prob.materialExists("DullYarn"));
+    assert( eq( prob.getMaterialSupply("CG_AC20")[3-1], 549.f  ) );
+    assert( eq( prob.getMaterialSupply("CG_Acid")[2-1], 1293.f ) );
+
+    // Test that capacities were read
+    assert(prob.capacityExists("EctonaTowCapacity"));
+    assert(prob.capacityExists("B81FlakesCapacity"));
+    assert(prob.capacityExists("KingsportTowCapacity"));
+    assert(prob.capacityExists("PrimesterFlakesCapacity"));
+    assert(prob.capacityExists("AcetateYarnCapacity"));
+    assert( prob.getCapacitySupply("EctonaTowCapacity").size() == 5 );
+    assert( eq( prob.getCapacitySupply("EctonaTowCapacity")[1-1], 14100.f  ) );
+    assert( eq( prob.getCapacitySupply("B81FlakesCapacity")[2-1], 196859.f  ) );
+    assert( eq( prob.getCapacitySupply("KingsportTowCapacity")[3-1], 158000.f  ) );
+    assert( eq( prob.getCapacitySupply("PrimesterFlakesCapacity")[4-1], 79242.f  ) );
+    assert( eq( prob.getCapacitySupply("AcetateYarnCapacity")[5-1], 22000.f  ) );
+
+    // Test that operations were read
+    assert(prob.operationExists("MakeKingsportTow"));
+    assert(prob.operationExists("CombineFlakes"));
+    assert(prob.operationExists("MakePrimesterFlakes"));
+    assert( prob.getOperationContribution("CombineFlakes").size() == 5 );
+    assert( eq( prob.getOperationContribution("CombineFlakes")[3-1], 0.0f  ) );
+    assert( prob.getOperationContribution("MakePrimesterFlakes").size() == 5 );
+    assert( eq( prob.getOperationContribution("MakePrimesterFlakes")[4-1], 1234.5f  ) );
+    assert( prob.getOperationMinimumProduction("CombineFlakes").size() == 5 );
+    assert( eq( prob.getOperationMinimumProduction("CombineFlakes")[3-1], 0.0f  ) );
+    assert( prob.getOperationMinimumProduction("MakePrimesterFlakes").size() == 5 );
+    assert( eq( prob.getOperationMinimumProduction("MakePrimesterFlakes")[4-1], 0.0f  ) );
+
+    // Test that consumption arcs were read
+    assert(prob.consumptionArcExists("MakeEctonaTow","EctonaTowCapacity") );
+    assert(prob.consumptionArcExists("MakeB81Flakes","CG_Acid") );
+    assert(prob.getConsumptionArcConsumptionRate("MakePrimesterFlakes","CG_Acid").size() == 5 );
+    assert(eq(prob.getConsumptionArcConsumptionRate("MakePrimesterFlakes","CG_Acid")[2],4.6788f) );
+
+    // Test that production arcs were read
+    assert(prob.productionArcExists("MakePrimesterFlakes","CG_Acid") );
+    assert(prob.productionArcExists("MakeB81Flakes","RecoveredAceticAcid") );
+    assert(prob.getProductionArcProductionRate("MakePrimesterFlakes","CG_Acid").size() == 5 );
+    assert(eq(prob.getProductionArcProductionRate("MakePrimesterFlakes","CG_Acid")[2],3.7f) );
+
+    // Test that demands were read
+    assert(prob.demandExists("BrightYarn","US Bright Yarn") );
+    assert(prob.demandExists("Flake","AP Ester") );
+    assert(prob.getDemandDemandVol("BrightYarn","US Bright Yarn").size() == 5 );
+    assert(eq(prob.getDemandDemandVol("BrightYarn","US Bright Yarn")[2],150.f) );
+    assert(eq(prob.getDemandContribution("BrightYarn","US Bright Yarn")[2],26.f) );
+    assert(eq(prob.getDemandMinShipVol("BrightYarn","US Bright Yarn")[2],0.0f) );
+    
+    // Test that substitutes were read
+    assert(prob.substitutionArcExists("CombineFlakes","B81Flake","PrimesterFlake"));
+      
+  }
+  
+  // Test that an undefined operation error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorUndefinedOperation";
+    std::string logFileName = "../data/errorUndefinedOperation/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined operation") != -1);
+	  assert ( messageString.find("XMakeB81FlakesX") != -1);
+	  assert ( messageString.find("line number: 28") != -1);
+	  assert ( messageString.find("Undefined material") == -1);
+	  assert ( messageString.find("Undefined resource") == -1);
+    }
+    assert( caughtException );
+  }
+  
+  // Test error where file has a duplicate key
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorDuplicateName";
+    std::string logFileName = "../data/ovptLog.txt";
+    bool caughtException = false;
+    try {
+      ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles();
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+    }
+    assert( caughtException );
+  }
+
+    // Test error where we provide negative value for an attribute that cannot be negative
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorInvalidNegativeAttributeValue";
+	std::string logFileName = "../data/errorInvalidNegativeAttributeValue/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+      ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("contribution is out of range") != -1);
+	  assert ( messageString.find("-7.77") != -1);
+	  assert ( messageString.find("line number: 7") != -1);
+	  assert ( messageString.find("supply is out of range") == -1);
+	  assert ( messageString.find("Undefined resource") == -1);
+    }
+    assert( caughtException );
+  }
+
+
+    // Test that an undefined material error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorUndefinedMaterial";
+	std::string logFileName = "../data/errorUndefinedMaterial/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined material") != -1);
+	  assert ( messageString.find("XCG_AcidX") != -1);
+	  assert ( messageString.find("line number: 9") != -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined resource") == -1);
+    }
+    assert( caughtException );
+  }
+
+#if 0
+    // Test that an undefined capacity error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorUndefinedCapacity";
+	std::string logFileName = "../data/errorUndefinedCapacity/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined capacity") != -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+#endif
+
+      // Test that an undefined resource error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorUndefinedResource";
+	std::string logFileName = "../data/errorUndefinedResource/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined resource") != -1);
+	  assert ( messageString.find("XB81FlakesCapacityX") != -1);
+	  assert ( messageString.find("line number: 28") != -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+
+        // Test that an nonexistent consumptionArc error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorUndefinedConsumptionArc";
+	std::string logFileName = "../data/errorUndefinedConsumptionArc/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined consumptionArc") != -1);
+	  assert ( messageString.find("CombineFlakes") != -1);
+	  assert ( messageString.find("B81Flake") != -1);
+	  assert ( messageString.find("line number: 2") != -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+   
+  // Test that an orphan material error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorOrphanMaterial";
+	std::string logFileName = "../data/errorOrphanMaterial/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined consumptionArc") == -1);
+	  assert ( messageString.find("OrphanMaterial_1") != -1);
+	  assert ( messageString.find("B81Flake") == -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+  // Test that an orphan capacity error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorOrphanCapacity";
+	std::string logFileName = "../data/errorOrphanCapacity/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined consumptionArc") == -1);
+	  assert ( messageString.find("OrphanCapacity") != -1);
+	  assert ( messageString.find("B81Flake") == -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+  // Test that an orphan operation error is properly handled
+  {
+    ECCovptProblem prob;
+    std::string inputDirectory = "../data/errorOrphanOperation";
+	std::string logFileName = "../data/errorOrphanOperation/ovtpLog.txt";
+    bool caughtException = false;
+    try {
+       ECCpopulateProblem(prob, inputDirectory,logFileName).readDirectoryFiles(true);
+    }
+    catch (SCOexception e) {
+      caughtException = true;
+	  std::string messageString = e.what();
+	  assert ( messageString.find("Undefined consumptionArc") == -1);
+	  assert ( messageString.find("OperationThatProducesNoMaterials") != -1);
+	  assert ( messageString.find("OperationThatConsumesNoMaterials") != -1);
+	  assert ( messageString.find("B81Flake") == -1);
+	  assert ( messageString.find("Undefined operation") == -1);
+	  assert ( messageString.find("Undefined material") == -1);
+    }
+    assert( caughtException );
+  }
+}
+
+
+
+@
+
+
+1.27
+log
+@Added tests for orphan operation
+and minor bugfixes
+@
+text
+@d101 1
+a101 1
+          <<"Warning: Undefined material specified in " <<shortFileName <<" file."  <<std::endl
+d156 1
+a156 1
+          <<"Warning: Undefined resource specified in " <<shortFileName <<" file."  <<std::endl
+d184 1
+a184 1
+          <<"Warning: Undefined operation specified in " <<shortFileName <<" file."  <<std::endl
+d210 1
+a210 1
+		  <<"Warning: Undefined consumptionArc specified in " <<shortFileName <<" file."  <<std::endl
+d239 1
+a239 1
+		if (orphanMaterialNames.size() ==1 ) msgStream  <<"Warning: The following material: "<<std::endl;
+d265 1
+a265 1
+		if (orphanCapacityNames.size() ==1 ) msgStream  <<"Warning: The following capacity: "<<std::endl;
+d292 1
+a292 1
+		if (orphanOperationNames.size() ==1 ) msgStream  <<"Warning: The following operation: "<<std::endl;
+d299 1
+a299 1
+		msgStream<<" are either not consuming any materail or capacity or not producing any material."    <<std::endl<<std::endl
+d770 1
+a770 1
+        checkOrphanMaterialExists(materialFile,"Warning","Material will not take part in the production process.");
+d781 1
+a781 1
+        checkOrphanCapacityExists(capacityFile,"Warning","Capacity will not take part in the production process.");
+d793 1
+a793 1
+        checkOrphanOperationExists(operationFile,"Warning","Operation will not take part in the production process.");
+@
+
+
+1.26
+log
+@Added tests for orphan materials and orphan capacities
+with test cases.
+@
+text
+@d281 3
+a283 1
+void ECCpopulateProblem::checkOrphanOperationExists()
+d285 20
+a773 1
+        //else continue;
+a784 1
+        //else continue;
+d788 11
+d1084 21
+@
+
+
+1.25
+log
+@Minor changes
+@
+text
+@d87 1
+a87 1
+// Check that material exits. If it doesn't throw an exception
+d114 1
+a114 1
+// Check that capacity exits. If it doesn't throw an exception
+d141 1
+a141 1
+// Check that resource exits. If it doesn't throw an exception
+d170 1
+a170 1
+// Check that operation exits. If it doesn't throw an exception
+d195 1
+a195 1
+// Check that consumptionArc exits. If it doesn't throw an exception
+d225 60
+d740 1
+d742 28
+a769 1
+  
+d1012 41
+a1052 1
+
+@
+
+
+1.24
+log
+@Error message text for nonxisting consumptionArc updated.
+Declarations with empty definitions of 3 methods added.
+@
+text
+@d680 1
+a680 1
+  
+@
+
+
+1.23
+log
+@Added test for the existence of consumptionArc when
+creatin substitutionArc.
+@
+text
+@d213 5
+a217 2
+          <<"   Undefined consumptionArc: " <<operationName << " consumes " << consumedResourceName <<std::endl
+          <<"   consumptionArc file name: " <<consumptionArcFile.filename()                <<std::endl
+d916 2
+a917 1
+	  assert ( messageString.find("CombineFlakes consumes B81Flake") != -1);
+@
+
+
+1.22
+log
+@added assert and comment
+@
+text
+@d195 26
+d662 8
+d900 21
+@
+
+
+1.21
+log
+@Updated test cases, now also the line at which there is data causing
+error is subject to a test case.
+@
+text
+@d635 2
+@
+
+
+1.20
+log
+@added methods to get objective value when there is not scrap cost
+@
+text
+@d757 1
+d793 1
+d815 1
+d857 1
+@
+
+
+1.19
+log
+@added code to write output files.
+added code to set scrapVol
+@
+text
+@a777 1
+#if 0
+a858 1
+#endif
+@
+
+
+1.18
+log
+@Improved test cases
+@
+text
+@d777 2
+d860 1
+@
+
+
+1.17
+log
+@Added 4 new error directories:
+errorUndefinedCapacity
+errorUndefinedMaterial
+errorUndefinedResource
+errorInvalidNegativeAttributeValue.
+Added test cases for all four cases, but as the test case for
+checkCapacityExists it has been #if-ed out.
+Resolved some merging conflicts from the previous attempt to commit.
+@
+text
+@d754 5
+d790 1
+d811 1
+d852 1
+@
+
+
+1.16
+log
+@modified to have 3 logfiles: osl, wit, ovpt
+@
+text
+@d772 78
+@
+
+
+1.15
+log
+@Changes to have a witLog and oslLog file written to output directory.
+@
+text
+@d29 4
+a32 3
+  std::cerr <<msg;
+  fprintf(msgFilePtr_,"%s",msg.c_str());
+  fflush(msgFilePtr_);
+d650 1
+a650 1
+    FILE * msgFilePtr=stdout)
+d654 1
+a654 1
+msgFilePtr_(msgFilePtr)
+d681 2
+a682 1
+    ECCpopulateProblem(prob, inputDirectory,prob.getWitMesgFilePtr()).readDirectoryFiles();
+d747 1
+d750 1
+a750 1
+       ECCpopulateProblem(prob, inputDirectory,prob.getWitMesgFilePtr()).readDirectoryFiles(true);
+d762 1
+d765 1
+a765 1
+      ECCpopulateProblem(prob, inputDirectory,prob.getWitMesgFilePtr()).readDirectoryFiles();
+@
+
+
+1.14
+log
+@Fixed up to recognize and test for records with duplicate keys.
+@
+text
+@d27 7
+d55 1
+a55 1
+    std::cout <<msgStream.str();
+d81 1
+a81 1
+    std::cout <<msgStream.str();
+d107 1
+a107 1
+         std::cout <<msgStream.str();
+d134 1
+a134 1
+        std::cout <<msgStream.str();
+d164 1
+a164 1
+        std::cout <<msgStream.str();
+d190 1
+a190 1
+        std::cout <<msgStream.str();
+d216 1
+d648 2
+a649 1
+    const std::string & inputDirectory)
+d652 2
+a653 1
+inputDirectory_(inputDirectory)
+d680 1
+a680 1
+    ECCpopulateProblem(prob, inputDirectory).readDirectoryFiles();
+d747 1
+a747 1
+       ECCpopulateProblem(prob, inputDirectory).readDirectoryFiles(true);
+d761 1
+a761 1
+      ECCpopulateProblem(prob, inputDirectory).readDirectoryFiles();
+@
+
+
+1.13
+log
+@Added error checking for an undefined operation
+@
+text
+@d749 8
+a756 2
+    ECCpopulateProblem(prob, inputDirectory).readDirectoryFiles(true);
+    int x=0;
+@
+
+
+1.12
+log
+@Modified so populate method is now a class
+@
+text
+@d191 1
+a191 1
+void ECCpopulateProblem::readDirectoryFiles()
+d245 2
+a246 1
+        continue;
+d254 2
+a255 1
+        continue;
+d263 2
+a264 1
+        continue;
+d290 2
+a291 1
+        continue;
+d299 2
+a300 1
+        continue;
+d347 2
+a348 1
+        continue;
+d356 2
+a357 1
+        continue;
+d365 2
+a366 1
+        continue;
+d374 2
+a375 1
+        continue;
+d405 2
+a406 1
+        continue;
+d414 2
+a415 1
+        continue;
+d423 2
+a424 1
+        continue;
+d432 2
+a433 1
+        continue;
+d467 2
+a468 1
+        continue;
+d476 2
+a477 1
+        continue;
+d485 2
+a486 1
+        continue;
+d494 2
+a495 1
+        continue;
+d532 2
+a533 1
+        continue;
+d541 2
+a542 1
+        continue;
+d550 2
+a551 1
+        continue;
+d559 2
+a560 1
+        continue;
+d568 2
+a569 1
+        continue;
+d604 2
+a605 1
+        continue;
+d613 2
+a614 1
+        continue;
+d622 2
+a623 1
+        continue;
+d730 22
+@
+
+
+1.11
+log
+@populate updated to read substitutionMaterials
+@
+text
+@d10 1
+a11 2
+#include "populateOvpt.h"
+#include "ovptProblem.h"
+d22 3
+d28 1
+a28 1
+void checkPeriodValidity(
+d54 1
+a54 1
+void checkNonNegativeParmValidity(
+d80 1
+a80 1
+void checkMaterialExits(
+a81 1
+                         const ECCovptProblem & prob,
+d89 1
+a89 1
+      if (!prob.materialExists(materialName) ) {
+d107 1
+a107 1
+void checkCapacityExits(
+a108 1
+                         const ECCovptProblem & prob,
+d116 1
+a116 1
+      if (!prob.capacityExists(capacityName) ) {
+d134 1
+a134 1
+void checkResourceExits(
+a135 1
+                         const ECCovptProblem & prob,
+d144 1
+a144 1
+      if (!prob.materialExists(resourceName) && !prob.capacityExists(resourceName) ) {
+d163 1
+a163 1
+void checkOperationExits(
+a164 1
+                         const ECCovptProblem & prob,
+d172 1
+a172 1
+      if (!prob.operationExists(operationName) ) {
+d187 1
+d191 1
+a191 3
+void populate(
+              ECCovptProblem & prob, 
+              const std::string & inputDir) 
+d197 1
+a197 1
+    std::string parameterFileName = inputDir + "/parameter.csv";
+d211 1
+a211 1
+    prob.setNPeriods(nPeriods);
+d217 1
+a217 1
+  std::string materialFileName = inputDir + "/material.csv";
+d223 1
+a223 1
+      prob.addMaterial(material);
+d230 1
+a230 1
+  std::string materialAttributesFileName = inputDir + "/materialAttributes.csv";
+d242 1
+a242 1
+        checkMaterialExits(material,prob,"materialAttribute",fileIter,materialAttributesFile,materialFile, "Warning","Record will be ignored.");
+d264 1
+a264 1
+      prob.setMaterialSupply(material,period-1,supply);
+d273 1
+a273 1
+  std::string capacityFileName = inputDir + "/capacity.csv";
+d300 2
+a301 2
+      if ( !prob.capacityExists(capacity) ){
+        prob.addCapacity(capacity);
+d305 1
+a305 1
+      prob.setCapacitySupply(capacity,period-1,supply);
+d313 1
+a313 1
+  std::string operationFileName = inputDir + "/operation.csv";
+d319 1
+a319 1
+      prob.addOperation(operation);
+d326 1
+a326 1
+  std::string operationAttributesFileName = inputDir + "/operationAttributes.csv";
+d339 1
+a339 1
+        checkOperationExits(operation,prob,"operationAttribute",fileIter,operationAttributesFile,operationFile, "Warning","Record will be ignored.");
+d369 2
+a370 2
+      prob.setOperationContribution(operation,period-1,contribution);
+      prob.setOperationMinimumProduction(operation,period-1,minimumProduction);
+d380 1
+a380 1
+  std::string consumptionArcFileName = inputDir + "/consumptionArc.csv";
+d393 1
+a393 1
+        checkOperationExits(operation,prob,"consumptionArc",fileIter,consumptionArcFile,operationFile, "Warning","Record will be ignored.");
+d401 1
+a401 1
+        checkResourceExits(consumedResource,prob,"consumptionArc",fileIter,consumptionArcFile,materialFile,capacityFile,"Warning","Record will be ignored.");
+d424 2
+a425 2
+      if ( !prob.consumptionArcExists(operation,consumedResource) ) {
+        prob.addConsumptionArc(operation,consumedResource);
+d429 1
+a429 1
+      prob.setConsumptionArcConsumptionRate(operation,consumedResource,period-1,consumptionRate);
+d438 1
+a438 1
+  std::string productionArcFileName = inputDir + "/productionArc.csv";
+d451 1
+a451 1
+        checkOperationExits(operation,prob,"productionArc",fileIter,productionArcFile,operationFile, "Warning","Record will be ignored.");
+d459 1
+a459 1
+        checkMaterialExits(producedMaterial,prob,"productionArc",fileIter,productionArcFile,materialFile,"Warning","Record will be ignored.");
+d482 2
+a483 2
+      if ( !prob.productionArcExists(operation,producedMaterial) ) {
+        prob.addProductionArc(operation,producedMaterial);
+d487 1
+a487 1
+      prob.setProductionArcProductionRate(operation,producedMaterial,period-1,productionRate);
+d496 1
+a496 1
+  std::string demandFileName = inputDir + "/demand.csv";
+d512 1
+a512 1
+        checkMaterialExits(material,prob,"demand",fileIter,demandFile,materialFile,"Warning","Record will be ignored.");
+d551 2
+a552 2
+      if ( !prob.demandExists(material,demand) ) {
+        prob.addDemand(material,demand);
+d556 3
+a558 3
+      prob.setDemandDemandVol(material,demand,period-1,demandVol);
+      prob.setDemandContribution(material,demand,period-1,contribution);
+      prob.setDemandMinShipVol(material,demand,period-1,minShipVol);
+d567 1
+a567 1
+  std::string substituteMaterialFileName = inputDir + "/substituteMaterial.csv";
+d579 1
+a579 1
+        checkOperationExits(operation,prob,"substituteMaterial",fileIter,substituteMaterialFile,operationFile, "Warning","Record will be ignored.");
+d587 1
+a587 1
+        checkMaterialExits(material,prob,"substituteMaterial",fileIter,substituteMaterialFile,materialFile,"Warning","Record will be ignored.");
+d595 1
+a595 1
+        checkMaterialExits(substituteMaterial,prob,"substituteMaterial",fileIter,substituteMaterialFile,materialFile,"Warning","Record will be ignored.");
+d601 1
+a601 1
+      prob.addSubstitutionArc(operation,material,substituteMaterial);
+d611 99
+@
+
+
+1.10
+log
+@populate updated to read demands
+@
+text
+@d22 1
+d460 1
+a460 1
+      // Check that resource exists
+d462 1
+a462 1
+        checkResourceExits(producedMaterial,prob,"productionArc",fileIter,productionArcFile,materialFile,capacityFile,"Warning","Record will be ignored.");
+d566 45
+@
+
+
+1.9
+log
+@populate updated to read production arcs
+@
+text
+@d21 1
+d493 71
+@
+
+
+1.8
+log
+@Added code to populate consumption arcs
+@
+text
+@d20 1
+d379 1
+a379 1
+  // Read consuptionArc  file
+d394 1
+a394 1
+        checkOperationExits(operation,prob,"operationAttribute",fileIter,consumptionArcFile,operationFile, "Warning","Record will be ignored.");
+d402 1
+a402 1
+        checkResourceExits(consumedResource,prob,"consumedResource",fileIter,consumptionArcFile,materialFile,capacityFile,"Warning","Record will be ignored.");
+d434 58
+@
+
+
+1.7
+log
+@populate function updated to add read operation file
+@
+text
+@d19 1
+d43 1
+d69 1
+d89 2
+a90 2
+          <<"Warning: Undefined material specified.in " <<shortFileName <<"."  <<std::endl
+          <<"   " <<shortFileName <<": " <<file.filename()                     <<std::endl
+d96 2
+d117 2
+a118 2
+          <<"Warning: Undefined capacity specified.in " <<shortFileName <<"."  <<std::endl
+          <<"   " <<shortFileName <<": " <<file.filename()                     <<std::endl
+d124 33
+d175 2
+a176 2
+          <<"Warning: Undefined operation specified.in " <<shortFileName <<"."  <<std::endl
+          <<"   " <<shortFileName <<": " <<file.filename()                     <<std::endl
+d182 2
+d374 59
+@
+
+
+1.6
+log
+@populate function updated to add read capacity file
+@
+text
+@d17 2
+d122 24
+d174 1
+d176 1
+d186 2
+a187 1
+
+d189 1
+d230 1
+d232 1
+d269 65
+@
+
+
+1.5
+log
+@Modified how some error conditions are recognized
+@
+text
+@d16 1
+d94 26
+d199 38
+@
+
+
+1.4
+log
+@updated ovptProblem to implement operation methods
+@
+text
+@d68 25
+d110 6
+a115 3
+        <<"-------------------------------------------------------"              <<std::endl
+        <<"Error:  nPeriods in "  <<parameterFile.filename() <<" is less than 1" <<std::endl
+        <<"-------------------------------------------------------"              <<std::endl;
+d142 6
+a147 12
+      // Test that material exists
+      if (!materialFile.keyExists(material) ) {
+        std::ostringstream msgStream;
+        msgStream 
+          <<"-------------------------------------------------------"                    <<std::endl
+          <<"Warning: Undefined material specified in materialAttributes file."          <<std::endl
+          <<"   materialAttributes filename: " <<materialAttributesFile.filename()      <<std::endl
+          <<"   materialAttributes file line number: " <<fileIter.recNum()               <<std::endl
+          <<"   specifed material: " <<material                                          <<std::endl
+          <<"   material file name: " <<materialFile.filename()                          <<std::endl
+          <<"Record will be ignored."                                                    <<std::endl
+          <<"-------------------------------------------------------"                    <<std::endl;
+@
+
+
+1.3
+log
+@Updated so populate uses ovptProblem.
+@
+text
+@d115 1
+a115 1
+      if (materialFile.keyExists(material) ) {
+d145 1
+a145 1
+      prob.setMaterialSupply(material,period,supply);
+@
+
+
+1.2
+log
+@added code to test non-negative parm are valid
+@
+text
+@d12 1
+d68 3
+d72 1
+a72 1
+              //ECCivptProblem & prob, 
+d90 1
+d97 5
+a101 2
+    // not much to right now.
+    // with will call ovptProblem.addMaterial();
+d113 1
+a113 1
+
+d128 1
+a128 2
+
+
+d136 2
+a137 2
+
+      // need to check that supply >= 0.
+d144 3
+a146 1
+
+a153 960
+#if 0
+#include "rcpOptException.h"
+#include "engagementFile.h"
+#include "globalAttrFile.h"
+#include "prioritySubsFile.h"
+#include "toFromSubsFile.h"
+#include "resourceIdPriorityFile.h"
+#include "gnrlResourceFile.h"
+#include "gnrlBomFile.h"
+#include "gnrlMatchFile.h"
+#include "gnrlResourceActionFile.h"
+#include <cstdio>
+#include <iostream>
+#include <sstream>
+
+void readResourceFile(
+                      RCPproblem & prob, 
+                      const std::string & resourceFileName,
+                      bool readFixedCost, // read fixedCosted from file
+                      float fixedCost,    // value to set fixed cost (ignored if readFixedCost=true).
+
+                      bool setAcquireCost,  // if true, then acquireCost is set to value of next parameter
+                      float acquireCost,   // value to set acquire cost
+                      bool setAcquireTime, // if true, then acquireTime is set to value of next paramente
+                      float acquireTime, // value to set acquire time
+                      bool setReleaseCost, //if true, then releaseCost is set to value of next parameter
+                      float releaseCost, // value to set release cost
+                      bool setReleaseTime, //if true, then releaseTime is set to valueof next parameter
+                      float releaseTime,
+                      
+                      std::vector<int> matchFlags, //needed to stick in "unmatched" if appropriate
+                      RcpOptCalendar & rcpCal
+                      )
+{
+  int nPeriods = prob.getNPeriods();  
+  int numAttributes = prob.getResourceIdentifierNames().size();  
+  RCPgnrlResourceFile resourceFile(resourceFileName,numAttributes,readFixedCost,rcpCal.getCalendarType());
+  RCPgnrlResourceFileIterator resourceFileIter(resourceFile);
+  
+  // loop once for each record in resource file
+  
+  
+  std::vector<std::string> resourceAttributeValues(numAttributes);
+  for ( ; resourceFileIter()!=NULL; ) {
+    for (int j=0; j<numAttributes; j++) {
+      std::string attributeName = prob.getResourceIdentifierNames()[j];
+      std::string attributeValue = resourceFileIter.fieldOnRecord(attributeName);
+      if (matchFlags.size()!=0 && matchFlags[j]==0)
+          attributeValue = "unmatched";
+      resourceAttributeValues[j]=attributeValue;
+    }
+    int period;
+    if (rcpCal.getCalendarType()==RcpOptCalendar::PERIOD)
+       period = resourceFileIter.periodAsInt();
+    else {
+       period = rcpCal.computePeriodFromMonthAndYear(resourceFileIter.monthAsInt(), resourceFileIter.yearAsInt());
+    }
+    float supplyQuantity =  resourceFileIter.supplyQuantityAsFloat();
+    // test to ensure quantity is non-negative
+    if ( supplyQuantity < 0) {
+      std::ostringstream msgStream;
+      msgStream <<"-------------------------------------------------------"         <<std::endl
+        <<"   Error: supplyQuantity is negative"                                    <<std::endl
+        <<"   resource filename: " <<resourceFile.filename().c_str()                <<std::endl
+        <<"   resource file line number: " <<resourceFileIter.recNum()              <<std::endl            
+        <<"   period: " <<period                                                    <<std::endl                          <<std::endl
+        <<"-------------------------------------------------------"                 <<std::endl;
+      throw ( RcpOptException(msgStream.str()) );
+    }
+
+    if (readFixedCost)
+      fixedCost = resourceFileIter.fieldOnRecordAsFloat("fixedCost");  //DLG check for negative
+    
+    // test to ensure period is within the planning horizon
+    if ( period <0 || period >= nPeriods ) {
+      std::ostringstream msgStream;
+      msgStream <<"-------------------------------------------------------"         <<std::endl
+        <<"Error: period is beyond planning horizion"                               <<std::endl
+        <<"   filename: " <<resourceFile.filename().c_str()                         <<std::endl
+        <<"   file line number: " <<resourceFileIter.recNum()                       <<std::endl            
+        <<"-------------------------------------------------------"                 <<std::endl;
+      throw ( RcpOptException(msgStream.str()) );
+    }
+    
+    
+    if ( !prob.resourceExists(resourceAttributeValues) )
+      prob.addResource(resourceAttributeValues);
+    std::vector<float> priorQuantity = prob.getResourceSupplyQuantity(resourceAttributeValues);
+    supplyQuantity=supplyQuantity+priorQuantity[period];
+    prob.setResourceSupplyQuantity(resourceAttributeValues,period,supplyQuantity);
+    if (period == 0){
+      prob.setBenchResourceSupplyQuantity(resourceAttributeValues,0,supplyQuantity);
+    }
+
+    prob.setResourceFixedCost(resourceAttributeValues,period,fixedCost);
+    if ( setAcquireTime )
+      prob.setResourceAcquireTime(resourceAttributeValues, acquireTime);
+    if ( setAcquireCost )
+      prob.setResourceAcquireCost(resourceAttributeValues,acquireCost);
+    if (setReleaseTime)
+      prob.setResourceReleaseTime(resourceAttributeValues,releaseTime);
+    if (setReleaseCost)
+      prob.setResourceReleaseCost(resourceAttributeValues,releaseCost);
+    
+    
+  }
+}
+
+
+
+ //learn about which fields are going to allow priority substitution,
+//and what the allowed field names are
+//without cost and leadtime, for backward compatibility with format 04feb
+void readPrioritySubsDescriptionFile(
+                      RCPproblem & prob, 
+                      const std::string & substitutionFileName
+                      )
+{
+    RCPprioritySubsFile file(substitutionFileName);
+    RCPprioritySubsFileIterator fileIter(file);
+    
+    std::string fromResourceIdValue, toResourceIdValue;
+    std::string resourceIdName;
+    fromResourceIdValue = "PRIORITY";
+    int priority;
+
+    // loop over the records
+    //int recNo=0;
+    for ( ; fileIter()!=NULL; ) {     
+      resourceIdName = fileIter.resourceIdName();
+      if ( !prob.resourceIdentifierNameExists(resourceIdName) ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+	     <<"Error: "+resourceIdName+" is not a defined resourceId in globalAttr.csv"   <<std::endl
+	     <<"   filename: " << substitutionFileName                                     <<std::endl
+         <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+      toResourceIdValue = fileIter.resourceIdValue();
+      priority = fileIter.priorityAsInt();
+
+     
+      // test to ensure that substitute does not already exist
+      if ( prob.subsExists(resourceIdName,fromResourceIdValue,toResourceIdValue) ) {
+      //  Write warning message
+      std::cout 
+        <<"-------------------------------------------------------"        <<std::endl
+        <<"Warning: "+resourceIdName+" substitute already exists"                <<std::endl
+        <<"   filename: " << substitutionFileName                        <<std::endl
+        <<"   from: " <<fromResourceIdValue.c_str()                                  <<std::endl
+        <<"   to: " <<toResourceIdValue.c_str()                                      <<std::endl
+        <<"   record will be ignored. "                                    <<std::endl
+        <<"-------------------------------------------------------"        <<std::endl;
+      continue;
+    }
+    
+    prob.addSubs(resourceIdName,fromResourceIdValue,toResourceIdValue);
+    prob.setSubsAversion(resourceIdName,fromResourceIdValue,toResourceIdValue,priority);
+    prob.setSubsCost(resourceIdName,fromResourceIdValue,toResourceIdValue,(float)priority);
+    prob.setSubsLeadTime(resourceIdName,fromResourceIdValue,toResourceIdValue,0.0);
+  }
+ }
+//learn about which fields are going to allow to from substitution,
+void readToFromSubsDescriptionFile(
+                      RCPproblem & prob, 
+                      const std::string & substitutionFileName
+                      )
+{
+    RCPtoFromSubsFile file(substitutionFileName);
+    RCPtoFromSubsFileIterator fileIter(file);
+    
+    std::string fromResourceIdValue, toResourceIdValue;
+    std::string resourceIdName;
+    int priority;
+    float cost;
+    float leadTime;
+    // loop over the records
+    //int recNo=0;
+    for ( ; fileIter()!=NULL; ) {     
+      resourceIdName = fileIter.resourceIdName();
+      if ( !prob.resourceIdentifierNameExists(resourceIdName) ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+	     <<"Error: "+resourceIdName+" is not a defined resourceId in globalAttr.csv"   <<std::endl
+	     <<"   filename: " << substitutionFileName                                     <<std::endl
+         <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+      toResourceIdValue = fileIter.resourceIdToValue();
+      fromResourceIdValue = fileIter.resourceIdFromValue();
+      priority = fileIter.priorityAsInt();  //DLG check these values
+      cost = fileIter.costAsFloat();
+      leadTime = fileIter.leadTimeAsFloat();
+     
+      // test to ensure that substitute does not already exist
+      if ( prob.subsExists(resourceIdName,fromResourceIdValue,toResourceIdValue) ) {
+      //  Write warning message
+      std::cout 
+        <<"-------------------------------------------------------"        <<std::endl
+        <<"Warning: "+resourceIdName+" substitute already exists"                <<std::endl
+        <<"   filename: " << substitutionFileName                        <<std::endl
+        <<"   from: " <<fromResourceIdValue.c_str()                                  <<std::endl
+        <<"   to: " <<toResourceIdValue.c_str()                                      <<std::endl
+        <<"   record will be ignored. "                                    <<std::endl
+        <<"-------------------------------------------------------"        <<std::endl;
+      continue;
+    }
+    
+    prob.addSubs(resourceIdName,fromResourceIdValue,toResourceIdValue);
+    prob.setSubsAversion(resourceIdName,fromResourceIdValue,toResourceIdValue,priority);
+    prob.setSubsCost(resourceIdName,fromResourceIdValue,toResourceIdValue,cost);
+    prob.setSubsLeadTime(resourceIdName,fromResourceIdValue,toResourceIdValue,leadTime);
+  }
+ }
+
+// read the resource ID priorities
+void readResourceIdPriorityDescriptionFile(
+                      RCPproblem & prob, 
+                      const std::string & resourceIdPriorityFileName
+                      )
+{
+    RCPresourceIdPriorityFile file(resourceIdPriorityFileName);
+    RCPresourceIdPriorityFileIterator fileIter(file);
+    
+    std::string resourceIdName;
+    int priority;
+    // loop over the records
+    //int recNo=0;
+    for ( ; fileIter()!=NULL; ) {     
+      resourceIdName = fileIter.resourceIdName();
+      priority = fileIter.priorityAsInt();  //DLG check this value
+     
+      // test to ensure that the resource ID name exists
+      if ( !prob.resourceIdentifierNameExists(resourceIdName) ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+	     <<"Error: "+resourceIdName+" is not a defined resourceId in globalAttr.csv"   <<std::endl
+	     <<"   filename: " << resourceIdPriorityFileName                                     <<std::endl
+         <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+
+      // test to ensure that the resource priority is no greater than 1 million
+      if ( priority > 1000000) {
+	    //  Write warning message
+	    std::cout 
+	      <<"-------------------------------------------------------"        <<std::endl
+	      <<"Warning: " +resourceIdName+ "'s priority:"<<priority <<" is too large"                <<std::endl
+	      <<"The priority will be truncated to 1000000"                      <<std::endl
+	      <<"   filename: " << resourceIdPriorityFileName                        <<std::endl
+	      <<"-------------------------------------------------------"        <<std::endl;
+	      priority = 1000000;
+      }
+      prob.setResourceIdentifierPriority(resourceIdName,priority);
+    }
+}
+
+
+
+ 
+void populate03Dec(
+              RCPproblem & prob, 
+              const std::string & idir, 
+              const std::string & odir,
+              const std::string & rFileName,
+              const std::string & bFileName,
+              int   nPeriods,
+              bool  toFromSubs,
+              bool  globalSubstitution,
+	          bool  resourceIdPriority,
+              RcpOptCalendar & rcpCal,
+              int hasResourceCosts) 
+{
+  prob.setNPeriods(nPeriods);  
+  prob.setOslMesgFileName(odir+"/oslMesgFile.txt");
+  int numidentifiers = prob.getResourceIdentifierNames().size();
+
+
+  //---------------------------------------------------------
+  // Read engagement file
+  //---------------------------------------------------------
+  {
+    // Read engagement File and set up structures for using data
+    std::string engagementFileName = idir + "/engagement.csv";
+    RCPengagementFile engagementFile(engagementFileName,rcpCal.getCalendarType());
+    RCPengagementFileIterator engagementFileIter(engagementFile);
+    
+    // loop once for each record in engagement file
+    for ( ; engagementFileIter()!=NULL; ) {
+      std::string engagementName = engagementFileIter.engagementName();
+      float revenue = engagementFileIter.revenueAsFloat(); //DLG check for negative revenue
+      
+      int startPeriod;
+      if (rcpCal.getCalendarType()==RcpOptCalendar::PERIOD)
+         startPeriod = engagementFileIter.startPeriodAsInt();
+      else {
+         startPeriod = rcpCal.computePeriodFromMonthAndYear(engagementFileIter.startMonthAsInt(), engagementFileIter.startYearAsInt());
+      }      
+      
+      
+      //int duration =  engagementFileIter.durationAsInt();
+      int lateAllowance = engagementFileIter.lateAllowanceAsInt();
+      int priority = engagementFileIter.priorityAsInt();  //should we check < 1? DLG
+      float quantity = engagementFileIter.quantityAsFloat();
+      // test to ensure quantity is non-negative
+      if (quantity < 0) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+         <<"Error: quantity is negative"                                               <<std::endl
+         <<"   engagement filename: " <<engagementFile.filename().c_str()              <<std::endl
+         <<"   engagement file line number: " <<engagementFileIter.recNum()            <<std::endl
+         <<"   engagementName: " <<engagementName.c_str()                              <<std::endl                              <<std::endl
+         <<"   quantity will be set to zero. "                                         <<std::endl
+         <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+
+      // test to ensure startPeriod is within the planning horizon
+      if ( startPeriod <0 || startPeriod >= nPeriods ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+          <<"Error: startPeriod is beyond planning horizion"                <<std::endl
+          <<"   engagement filename: " <<engagementFile.filename().c_str()    <<std::endl
+          <<"   engagement file line number: " <<engagementFileIter.recNum()  <<std::endl
+          <<"   engagementName: " <<engagementName.c_str()                    <<std::endl
+          <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+      //test to see that the engagement does not already exist
+      if ( prob.engagementExists(engagementName)) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+          <<"Error: engagement already exists"                                <<std::endl
+          <<"   engagement filename: " <<engagementFile.filename().c_str()    <<std::endl
+          <<"   engagement file line number: " <<engagementFileIter.recNum()  <<std::endl
+          <<"   engagementName: " <<engagementName.c_str()                    <<std::endl
+          <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+
+
+       prob.addEngagement(engagementName);
+       prob.setEngagementRevenue(engagementName,revenue);
+       prob.setEngagementStartPeriod(engagementName,startPeriod);
+       //prob.setEngagementDuration(engagementName,duration);
+       prob.setEngagementLateAllowance(engagementName,lateAllowance);
+       prob.setEngagementPriority(engagementName,priority);
+       prob.setEngagementQuantity(engagementName,quantity);
+
+    }
+  }
+  //---------------------------------------------------------
+  // Read match file
+  //---------------------------------------------------------
+
+  
+  std::vector<int> globalMatchVector(numidentifiers);
+  std::vector<int> subVector(numidentifiers);
+  std::vector<int> localMatchVector(numidentifiers);
+
+  {
+    // Read match File 
+    std::string matchFileName = idir + "/match.csv";
+    RCPgnrlMatchFile matchFile(matchFileName,prob.getResourceIdentifierNames().size());
+    RCPgnrlMatchFileIterator matchFileIter(matchFile);
+    matchFileIter(); 
+    
+
+    for (int i=0; i<numidentifiers; i++) {
+       std::string attributeMatchName = prob.getResourceIdentifierNames()[i]+"Match";
+       int matchValue = matchFileIter.fieldOnRecordAsInt(attributeMatchName);
+       if ((matchValue < 0) || (matchValue > 1)) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  matchValue must be 0 or 1"                                         <<std::endl
+            <<"   filename: match.csv"                                                    <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( RcpOptException(msgStream.str()) );
+        }
+
+       globalMatchVector[i] = matchValue;
+    }
+        
+  }  
+  
+  //---------------------------------------------------------
+  // If it is global substitution, read the substitution file
+  //---------------------------------------------------------
+
+  
+  std::vector<int> globalSubstituteVector(numidentifiers);
+  //std::vector<int> subVector(numidentifiers);
+  //std::vector<int> localMatchVector(numidentifiers);
+
+  if (globalSubstitution)
+  {
+    // Read substitute File; has same structure as match file
+    std::string subsFileName = idir + "/substitute.csv";
+    RCPgnrlMatchFile subsFile(subsFileName,prob.getResourceIdentifierNames().size());
+    RCPgnrlMatchFileIterator subsFileIter(subsFile);
+    subsFileIter(); 
+    
+
+    for (int i=0; i<numidentifiers; i++) {
+       std::string attributeSubsName = prob.getResourceIdentifierNames()[i]+"Subs";
+       int subsValue = subsFileIter.fieldOnRecordAsInt(attributeSubsName);
+       if ((subsValue < 0) || (subsValue > 1)) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  subsValue must be 0 or 1"                                         <<std::endl
+            <<"   filename: substitute.csv"                                                    <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( RcpOptException(msgStream.str()) );
+        }
+
+       globalSubstituteVector[i] = subsValue;
+    }
+        
+  }  
+  
+    
+  
+  //---------------------------------------------------------
+  // Read to-from priority substitution file. 
+  //---------------------------------------------------------
+  if (toFromSubs) {
+    std::string subsfile = idir+"/toFromSubs.csv";
+    readToFromSubsDescriptionFile(prob,subsfile);
+  }
+  
+
+  
+
+
+
+  
+  //---------------------------------------------------------
+  // Read resource ID priority file. This simply defines which
+  // priorities for the resource IDs.
+  //---------------------------------------------------------
+  if (resourceIdPriority) {
+    std::string resourceIdPriorityFile = idir+"/idPriority.csv";
+    readResourceIdPriorityDescriptionFile(prob,resourceIdPriorityFile);
+  }
+  
+  //---------------------------------------------------------
+  // Read resource file
+  //---------------------------------------------------------
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileName = idir + "/"+rFileName.c_str();
+    std::vector<int> matchFlags;
+    if (hasResourceCosts)
+       readResourceFile(prob,resourceFileName,true,0.0f,false, 0, false,0,false, 0, false, 0, matchFlags,rcpCal);
+    else
+       readResourceFile(prob,resourceFileName,false,1.f,true, 100, true,0, true, 1000000, true, 0, globalMatchVector,rcpCal);
+  }
+
+  //---------------------------------------------------------
+  // Read resource action file
+  //---------------------------------------------------------
+  if (hasResourceCosts)
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileName = idir + "/resourceaction.csv";
+    RCPgnrlResourceActionFile resourceActionFile(resourceFileName,numidentifiers);
+    RCPgnrlResourceActionFileIterator resourceActionFileIter(resourceActionFile);
+    
+    // loop once for each record in resource file
+    for ( ; resourceActionFileIter()!=NULL; ) {
+      RCPvectorString resourceIdValues;
+      resourceIdValues.clear();
+      for (int j =0; j<numidentifiers; j++) {
+         std::string attributeName = prob.getResourceIdentifierNames()[j];
+         std::string attributeValue = resourceActionFileIter.fieldOnRecord(attributeName);
+         resourceIdValues.push_back(attributeValue);
+      }
+      float acquireCost =  resourceActionFileIter.acquireCostAsFloat(); //check for negative values DLG
+      float acquireTime =  resourceActionFileIter.acquireTimeAsFloat();
+      float releaseCost =  resourceActionFileIter.releaseCostAsFloat();
+      float releaseTime =  resourceActionFileIter.releaseTimeAsFloat();
+
+      // test to ensure that resource exists
+      if ( !prob.resourceExists(resourceIdValues) ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+          <<"Error: Resource does not exist"                                         <<std::endl
+          <<"   filename: " <<resourceActionFile.filename().c_str()    <<std::endl
+          <<"   file line number: " <<resourceActionFileIter.recNum()  <<std::endl
+          <<"-------------------------------------------------------"                   <<std::endl;
+          throw ( RcpOptException(msgStream.str()) );
+      }
+
+      prob.setResourceAcquireTime(resourceIdValues,acquireTime);
+      prob.setResourceAcquireCost(resourceIdValues,acquireCost);
+      prob.setResourceReleaseTime(resourceIdValues,releaseTime);
+      prob.setResourceReleaseCost(resourceIdValues,releaseCost);
+      // finish building resource model now that all the resource action data is available
+      prob.addReleaseLeadtimeStructure(resourceIdValues);
+    }
+  }
+    
+  //---------------------------------------------------------
+  // Read bom file
+  //---------------------------------------------------------
+  {
+    // Read bom File and set up structures for using data
+    std::string bomFileName = idir + "/"+bFileName.c_str();
+    RCPgnrlBomFile bomFile(bomFileName,numidentifiers,true, !globalSubstitution, rcpCal.getCalendarType());
+    RCPgnrlBomFileIterator bomFileIter(bomFile);
+    
+    std::vector<std::string> resourceAttributeValues(numidentifiers);
+    // loop once for each record in bom file
+    for ( ; bomFileIter()!=NULL; ) {
+      RCPvectorString resourceIdValues;
+      for (int ii=0; ii<numidentifiers; ii++)
+         localMatchVector[ii] = 1;
+      
+      
+      for (int j=0; j<numidentifiers; j++) {
+         std::string attributeName = prob.getResourceIdentifierNames()[j];
+         std::string attributeValue = bomFileIter.fieldOnRecord(attributeName);
+         
+         if (globalMatchVector[j]==0)
+             attributeValue = "unmatched";
+         std::string substitutename = attributeName+"Sub";
+         
+         int value;
+         if (globalSubstitution)
+            value = globalSubstituteVector[j];
+         else {
+            value = bomFileIter.fieldOnRecordAsInt(substitutename);
+            if ((value < 0) || (value > 1)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error:  matchValue must be 0 or 1"                                         <<std::endl
+                <<"   filename: " + bomFileName                                               <<std::endl
+                <<"   file line number: " <<bomFileIter.recNum()                              <<std::endl            
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( RcpOptException(msgStream.str()) );
+            }  
+         }
+            
+         if ((attributeValue=="PRIORITY")) {
+           subVector[j]=1;
+         }
+         else if ((attributeValue=="UNSPECIFIED")) {
+           localMatchVector[j]=0; //overwrite the match value with 0 for this bom entry
+           subVector[j]=0;
+         }
+         else 
+           subVector[j]=value;
+           
+         resourceAttributeValues[j]=attributeValue;
+      }
+      
+      std::string engagementName = bomFileIter.fieldOnRecord("engagementName");
+      int period;
+      if (rcpCal.getCalendarType()==RcpOptCalendar::PERIOD) 
+         period = bomFileIter.periodAsInt();
+      else {
+         period = rcpCal.computePeriodFromMonthAndYear(bomFileIter.monthAsInt(), bomFileIter.yearAsInt());
+      }      
+      
+      // test to ensure period is within the planning horizon
+      if ( period <0 || period >= nPeriods ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+         <<"Error: period is beyond planning horizion"                     <<std::endl
+         <<"   filename: " <<bomFileName                                   <<std::endl
+         <<"   file line number: " <<bomFileIter.recNum()                  <<std::endl            
+         <<"-------------------------------------------------------"                   <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      } 
+  
+      // test to ensure that engagement exist
+      if ( !prob.engagementExists(engagementName) ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+          <<"Error: Engagement does not exist"                                         <<std::endl
+          <<"   filename: " <<bomFile.filename().c_str()                               <<std::endl
+          <<"   file line number: " <<bomFileIter.recNum()                             <<std::endl
+          <<"   engagement: " <<engagementName.c_str()                                 <<std::endl
+          <<"   period: " <<period                                                     <<std::endl
+          <<"-------------------------------------------------------"                  <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+      
+      // test to ensure that resource exist
+      if ( !prob.resourceExists(resourceAttributeValues) ) {
+        // Resource does not exist. add it.
+
+       prob.addResource(resourceAttributeValues);
+       prob.setResourceSupplyQuantity(resourceAttributeValues,period,0.0);
+       if (period == 0){
+         prob.setBenchResourceSupplyQuantity(resourceAttributeValues,0,0.0);
+       }
+       prob.setResourceFixedCost(resourceAttributeValues,period,1.0);
+       prob.setResourceAcquireCost(resourceAttributeValues,100.0);
+       prob.setResourceReleaseCost(resourceAttributeValues,1000000.0);
+       
+      }
+      
+      // test to ensure period is within the planning horizon
+      if ( period < 0 || period >= nPeriods ) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+          <<"Error: period is beyond planning horizion"                                <<std::endl
+          <<"   filename: " <<bomFile.filename().c_str()                               <<std::endl
+          <<"   file line number: " <<bomFileIter.recNum()                             <<std::endl
+          <<"   engagement: " <<engagementName.c_str()                                 <<std::endl
+          <<"-------------------------------------------------------"                  <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+
+      int i;
+
+      
+      // test to ensure that each sub has a valid value
+      int resourceSub;
+      for (i=0; i<numidentifiers; i++) {
+         resourceSub=subVector[i];
+         if ( resourceSub < 0 || resourceSub > 1 ) {
+           std::string subString =  prob.getResourceIdentifierNames()[i]+"Sub";
+           std::ostringstream msgStream;
+           msgStream <<"-------------------------------------------------------"         <<std::endl
+             <<"Error: substitution value out of bounds"                              <<std::endl
+             <<"   filename: " <<bomFile.filename().c_str()                  <<std::endl
+             <<"   file line number: " <<bomFileIter.recNum()                <<std::endl
+             <<"   engagement: " <<engagementName.c_str()                        <<std::endl
+             <<"   subFlag: " <<     subString                                   <<std::endl
+             <<"   valid range: 0 <= subString  <= 1"                            <<std::endl
+             <<"-------------------------------------------------------"                   <<std::endl;
+           throw ( RcpOptException(msgStream.str()) );
+          }
+      }
+ 
+      if ( !prob.bomExists(engagementName,resourceAttributeValues) )
+         prob.addBom(engagementName,resourceAttributeValues);
+      float usageQuantity =  bomFileIter.usageQuantityAsFloat();
+      // test to ensure quantity is non-negative
+      if ( usageQuantity < 0.0) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+         <<"Error: quantity is less than zero"                                         <<std::endl
+          <<"   filename: " <<bomFile.filename().c_str()                               <<std::endl
+          <<"   file line number: " <<bomFileIter.recNum()                             <<std::endl
+          <<"   engagement: " <<engagementName.c_str()                                 <<std::endl
+          <<"   period: " <<period                                                     <<std::endl
+          <<"   quantity will be set to 0. "                                           <<std::endl
+          <<"-------------------------------------------------------"                  <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+
+      //get prior usageQuantity
+      float priorUsageQuantity = prob.getBomUsageQuantity(engagementName, resourceAttributeValues,period);
+      usageQuantity=usageQuantity+priorUsageQuantity;
+      prob.setBomUsageQuantity(engagementName,resourceAttributeValues,period,usageQuantity);
+
+
+      prob.setBomUsageQuantity(engagementName,resourceAttributeValues,period,usageQuantity);
+      for (i=0; i<numidentifiers; i++) {
+         std::string resourceIdName = prob.getResourceIdentifierNames()[i];
+         prob.setBomMatch(engagementName, resourceAttributeValues, period, resourceIdName, localMatchVector[i]);
+         prob.setBomSub(engagementName,resourceAttributeValues,period,resourceIdName,subVector[i]);
+      }
+    }
+  }
+     
+
+   //---------------------------------------------------------
+
+}
+void populate04Feb(
+              RCPproblem & prob, 
+              const std::string & idir, 
+              const std::string & odir,
+              const std::string & rFileName,
+              const std::string & bFileName,
+              int   nPeriods,
+              bool  prioritySubs,
+	          bool  resourceIdPriority,
+              RcpOptCalendar & rcpCal) 
+{
+  prob.setNPeriods(nPeriods);  
+  prob.setOslMesgFileName(odir+"/oslMesgFile.txt");
+  //prob.getTimer().printElapsedTime("begining populate04feb");
+
+  //---------------------------------------------------------
+  // Read match file
+  //---------------------------------------------------------
+  int numidentifiers = prob.getResourceIdentifierNames().size();
+  
+  std::vector<int> globalMatchVector(numidentifiers);
+  std::vector<int> subVector(numidentifiers);
+  std::vector<int> localMatchVector(numidentifiers);
+
+  {
+    // Read match File 
+    std::string matchFileName = idir + "/match.csv";
+    RCPgnrlMatchFile matchFile(matchFileName,prob.getResourceIdentifierNames().size());
+    RCPgnrlMatchFileIterator matchFileIter(matchFile);
+    matchFileIter(); 
+    
+
+    for (int i=0; i<numidentifiers; i++) {
+       std::string attributeMatchName = prob.getResourceIdentifierNames()[i]+"Match";
+       int matchValue = matchFileIter.fieldOnRecordAsInt(attributeMatchName);
+       if ( (matchValue < 0) || (matchValue > 1)) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error: match value must be 0 or 1"                                      <<std::endl
+            <<"   filename: match.csv"                                                <<std::endl
+            <<"-------------------------------------------------------"                  <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+       }
+
+       globalMatchVector[i] = matchValue;
+    }
+        
+  }  
+  
+  //---------------------------------------------------------
+  // Read priority substitution file. This simply defines which
+  // fields implement priority substitition.
+  //---------------------------------------------------------
+  if (prioritySubs) {
+    std::string subsfile = idir+"/priority.csv";
+    readPrioritySubsDescriptionFile(prob,subsfile);
+  }
+  
+
+  
+  //---------------------------------------------------------
+  // Read resource ID priority file. This simply defines which
+  // priorities for the resource IDs.
+  //---------------------------------------------------------
+  if (resourceIdPriority) {
+    std::string resourceIdPriorityFile = idir+"/idPriority.csv";
+    readResourceIdPriorityDescriptionFile(prob,resourceIdPriorityFile);
+  }
+  
+  
+   
+  //---------------------------------------------------------
+  // Read resource file
+  //---------------------------------------------------------
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileName = idir + "/"+rFileName.c_str();
+    readResourceFile(prob,resourceFileName,false,1.f,true, 100, true,0, true, 1000000, true, 0, globalMatchVector,rcpCal);
+  }
+
+  
+
+  //prob.getTimer().printElapsedTime("done reading resource file");
+  //---------------------------------------------------------
+  // Read bom file
+  //---------------------------------------------------------
+  {
+    // Read bom File and set up structures for using data
+    std::string bomFileName = idir + "/"+ bFileName.c_str();
+    int numAttributes=prob.getResourceIdentifierNames().size();
+    RCPgnrlBomFile bomFile(bomFileName,numAttributes,false, 0, rcpCal.getCalendarType());
+    RCPgnrlBomFileIterator bomFileIter(bomFile);
+    
+    // loop once for each record in bom file    
+    //initialize with the global match vector
+ 
+    std::vector<std::string> resourceAttributeValues(numAttributes);
+    for ( ; bomFileIter()!=NULL; ) {
+      for (int ii=0; ii<numAttributes; ii++)
+         localMatchVector[ii] = 1;
+      
+      
+      for (int j=0; j<numAttributes; j++) {
+         std::string attributeName = prob.getResourceIdentifierNames()[j];
+         std::string attributeValue = bomFileIter.fieldOnRecord(attributeName);
+         if (globalMatchVector[j]==0)
+             attributeValue = "unmatched";
+         if ((attributeValue=="PRIORITY")) {
+           subVector[j]=1;
+         }
+         else if ((attributeValue=="UNSPECIFIED")) {
+           localMatchVector[j]=0; //overwrite the match value with 0 for this bom entry
+           subVector[j]=0;
+         }
+         else 
+           subVector[j]=0;
+           
+         resourceAttributeValues[j]=attributeValue;
+      }
+      
+      int period;
+      if (rcpCal.getCalendarType()==RcpOptCalendar::PERIOD) 
+         period = bomFileIter.periodAsInt();
+      else {
+         period = rcpCal.computePeriodFromMonthAndYear(bomFileIter.monthAsInt(), bomFileIter.yearAsInt());
+      }
+      float usageQuantity =  bomFileIter.usageQuantityAsFloat();
+      // test to ensure quantity is non-negative
+      if ( usageQuantity < 0.0) {
+         std::ostringstream msgStream;
+         msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error: quantity is less than zero"                                      <<std::endl
+             <<"   filename: " <<bomFile.filename().c_str()                            <<std::endl
+             <<"   file line number: " <<bomFileIter.recNum()                          <<std::endl                     <<std::endl
+             <<"   period: " <<period                                                  <<std::endl
+             <<"   quantity will be set to 0. "                                        <<std::endl
+          <<"-------------------------------------------------------"                  <<std::endl;
+         throw ( RcpOptException(msgStream.str()) );
+      }
+      // test to ensure period is within the planning horizon
+      if ( period < 0 || period >= nPeriods ) {
+           std::ostringstream msgStream;
+           msgStream <<"-------------------------------------------------------"         <<std::endl
+           <<"Error: period is beyond planning horizion"                     <<std::endl
+           <<"   filename: " <<bomFile.filename().c_str()                  <<std::endl
+           <<"   file line number: " <<bomFileIter.recNum()                <<std::endl
+           <<"-------------------------------------------------------"                   <<std::endl;
+           throw ( RcpOptException(msgStream.str()) );
+      }
+ 
+     
+      // test to ensure that resource exist
+      if ( !prob.resourceExists(resourceAttributeValues) ) {
+        // Resource does not exist. add it.
+
+       prob.addResource(resourceAttributeValues);
+       prob.setResourceSupplyQuantity(resourceAttributeValues,period,0.0);
+       if (period == 0){
+         prob.setBenchResourceSupplyQuantity(resourceAttributeValues,0,0.0);
+       }
+       prob.setResourceFixedCost(resourceAttributeValues,period,1.0);
+       prob.setResourceAcquireCost(resourceAttributeValues,100.0);
+       prob.setResourceReleaseCost(resourceAttributeValues,1000000.0);
+       
+      }
+      
+     
+      //need to create an engagement name
+      std::string engagementName= createEngagementName(resourceAttributeValues);
+      //we do not need to test to see that the engagement does not already exist
+      //because we simply don't add it if it does. We need to allow multiple bom's with
+      //the same resource request
+      if (!prob.engagementExists(engagementName)) {
+         prob.addEngagement(engagementName);
+         prob.setEngagementStartPeriod(engagementName,0);
+         //prob.setEngagementDuration(engagementName,nPeriods);
+         prob.setEngagementLateAllowance(engagementName,0);
+         prob.setEngagementQuantity(engagementName,1.f);
+      }
+
+
+      if ( !prob.bomExists(engagementName,resourceAttributeValues) )
+         prob.addBom(engagementName,resourceAttributeValues);
+         
+      //get prior usageQuantity
+      float priorUsageQuantity = prob.getBomUsageQuantity(engagementName, resourceAttributeValues,period);
+      usageQuantity=usageQuantity+priorUsageQuantity;
+      prob.setBomUsageQuantity(engagementName,resourceAttributeValues,period,usageQuantity);
+
+      unsigned int i;
+      for (i=0; i<prob.getResourceIdentifierNames().size(); i++) {
+         prob.setBomMatch(engagementName, resourceAttributeValues, period, prob.getResourceIdentifierNames()[i], localMatchVector[i]);
+      }
+      for (i=0; i<prob.getResourceIdentifierNames().size(); i++) {
+         std::string resourceName = prob.getResourceIdentifierNames()[i];
+         prob.setBomSub(engagementName,resourceAttributeValues,period,resourceName,subVector[i]);
+      }
+     }
+
+    //prob.getTimer().printElapsedTime("done reading bom file");
+
+   
+    //now that we've read all the boms, create a reasonable engagment
+    //revenue. It ought to be more than nPeriods*(total num required per period)
+    //loop once for each engagment 
+    std::vector<std::string> engagementNames;
+    prob.getEngagementNames(engagementNames);
+    unsigned int e;
+    for ( e=0; e<engagementNames.size(); e++) {
+      
+      // loop once for each resource consumed be engagementNames[e]
+      float engagementRevenue=0.f;
+      std::vector<RCPvectorString> consumedResources = prob.getEngagementConsumedResources(engagementNames[e]);
+      unsigned int r;
+      for (r=0; r<consumedResources.size(); ++ r ) {
+        std::vector<float> uq = prob.getBomUsageQuantity(engagementNames[e],consumedResources[r]);
+        std::vector<float> fc = prob.getResourceFixedCost(consumedResources[r]);
+        unsigned int t;
+        for ( t=0; t<uq.size(); ++t ) {
+          engagementRevenue = engagementRevenue + uq[t]*fc[t];
+        }
+      }
+      engagementRevenue = 1000.0f * engagementRevenue;
+      prob.setEngagementRevenue(engagementNames[e],engagementRevenue);
+    }
+
+
+  }
+     
+ 
+}
+
+//---------------------------------------------------------
+// Read a substitute file.
+//---------------------------------------------------------
+void readSubsFile(
+                  RCPproblem & prob, 
+                  const SCOcsvFormatFile & file,
+                  const std::string & resourceIdName)
+{
+  SCOfileIterator fileIter(file);
+  
+  // loop once for each record in bom file
+  for ( ; fileIter()!=NULL; ) {
+    std::string from = fileIter.fieldOnRecord("from");
+    std::string to = fileIter.fieldOnRecord("to");
+    float cost = fileIter.fieldOnRecordAsFloat("cost");  //DLG check these values
+    float leadTime = fileIter.fieldOnRecordAsFloat("leadTime");
+    
+    // test to ensure that subSkill does not exist
+    if ( prob.subsExists(resourceIdName,from,to) ) {
+      // skillSubs does exist. Write warning message
+      std::cout 
+        <<"-------------------------------------------------------"        <<std::endl
+        <<"Warning: "+resourceIdName+" substitute already exists"          <<std::endl
+        <<"   filename: " <<file.filename().c_str()                        <<std::endl
+        <<"   file line number: " <<fileIter.recNum()                      <<std::endl
+        <<"   from: " <<from.c_str()                                       <<std::endl
+        <<"   to: " <<to.c_str()                                           <<std::endl
+        <<"   cost: " <<cost                                               <<std::endl
+        <<"   leadTime: " <<leadTime                                       <<std::endl
+        <<"   record will be ignored. "                                    <<std::endl
+        <<"-------------------------------------------------------"        <<std::endl;
+      continue;
+    }
+    
+    prob.addSubs(resourceIdName,from,to);
+    prob.setSubsCost(resourceIdName,from,to,cost);
+    prob.setSubsLeadTime(resourceIdName,from,to,leadTime);
+    //set to reasonable value
+    prob.setSubsAversion(resourceIdName,from,to,1);
+  }
+} //end of reading skillSubs file
+//---------------------------------------------------------
+
+
+std::string createEngagementName(std::vector<std::string> resourceAttributeVector) {
+  std::string retVal;
+  int numAttributes = resourceAttributeVector.size();
+  for (int i=0; i<numAttributes; i++) {
+    std::string attributeValue = resourceAttributeVector.at(i);
+    retVal = retVal +  attributeValue + " ";
+  }
+  return retVal;
+}
+
+#endif@
+
+
+1.1
+log
+@Initial effort on popluate and main program
+@
+text
+@d34 1
+d42 25
+d130 8
+@
+

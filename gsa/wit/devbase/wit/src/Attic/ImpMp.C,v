@@ -1,0 +1,902 @@
+head	1.3;
+access;
+symbols
+	EndRw-branch:1.2.0.4
+	Root-of-EndRw:1.2
+	rwToStl:1.2.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.03.03.23.26.48;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2002.08.26.22.49.00;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.08.23.21.00.33;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.2
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@@
+
+
+1.1
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@a0 848
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "ImpMp.C"
+//
+// Implementation of class ImpMp.
+//------------------------------------------------------------------------------
+
+int compiledImpMp = 1;
+   //
+   // WATCOM's strict compatibility mode requires every file to
+   // have at least one external definition.
+
+//------------------------------------------------------------------------------
+// Please note: the following #includes are placed outside the 
+// #ifdef OPT_IMPLODE part of the file, because otherwise, make depend sometimes
+// ignores them in OPT_IMPLODE mode.
+//------------------------------------------------------------------------------
+
+#include <Session.h>
+#include <ImpMp.h>
+#include <OptImp.h>
+#include <OptComp.h>
+#include <Global.h>
+#include <Material.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <BoundSet.h>
+#include <Timing.h>
+#include <ScheduleI.h>
+#include <MsgFac.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// Definitions of static data members.
+//------------------------------------------------------------------------------
+
+const double WitImpMp::solnEpsilon = 0.0005;
+
+WitImpMp::WitImpMp (WitOptImploder * theOptImploder):
+
+      WitMpModel     (theOptImploder),
+
+      myBoundsObj_   (NULL),
+      myPrimaryObj_  (NULL),
+      myObj1Obj_     (NULL),
+      myRevObj_      (NULL),
+      myInvObj_      (NULL),
+      myServObj_     (NULL),
+      mySubObj_      (NULL),
+      myObj2Obj_     (NULL),
+
+      nSlbvVars_     (0),
+      solnFile_      (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitImpMp::~WitImpMp ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitImpMp::needDual ()
+   {
+   if (myCompMgr ()->myOptComp ()->compPrices ())
+      return witTRUE;
+
+   if (myCompMgr ()->myGlobalComp ()->computeCriticalList ())
+      return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::reportInfeasible ()
+   {
+   if (positiveHardLBsExist ())
+      myMsgFac () ("infeasBoundsSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::reportUnbounded ()
+   {
+   if (myCompMgr ()->myOptComp ()->objChoice ()->negativeObj1CostsExist ())
+      myMsgFac () ("unboundedSmsg");
+   }
+
+//------------------------------------------------------------------------------
+// Macro implementStoreDerived.
+//
+// Implements a storeDerived function for class ModelElClass, whose Schedule
+// is theSchedule, and whose source item is returned by
+// ModelElClass::itemFunc ().
+//------------------------------------------------------------------------------
+
+#define implementStoreDerived(ModelElClass, theSchedule, itemFunc)             \
+                                                                               \
+   void WitImpMp::storeDerived (ModelElClass * theModelEl)                     \
+      {                                                                        \
+      theSchedule.insert (                                                     \
+         theModelEl,                                                           \
+         theModelEl->itemFunc (),                                              \
+         theModelEl->myPeriod ());                                             \
+      }                                                                        \
+
+//------------------------------------------------------------------------------
+// storeDerived functions.
+//------------------------------------------------------------------------------
+
+implementStoreDerived (WitScrapVar,    myScrapVar_,    myPart)
+implementStoreDerived (WitNonSubVar,   myNonSubVar_,   myBomEnt)
+implementStoreDerived (WitSubVar,      mySubVar_,      mySub)
+implementStoreDerived (WitShipVar,     myShipVar_,     myDemand)
+implementStoreDerived (WitSlbvVar,     mySlbvVar_,     myBoundSet)
+implementStoreDerived (WitExecVar,     myExecVar_,     myOperation)
+implementStoreDerived (WitStockVar,    myStockVar_,    myMaterial)
+implementStoreDerived (WitCumShipVar,  myCumShipVar_,  myDemand)
+
+implementStoreDerived (WitResourceCon, myResourceCon_, myPart)
+implementStoreDerived (WitSubCon,      mySubCon_,      myBomEnt)
+implementStoreDerived (WitShipCon,     myShipCon_,     myDemand)
+implementStoreDerived (WitSlbCon,      mySlbCon_,      myBoundSet)
+
+//------------------------------------------------------------------------------
+// Macro implementLookUp.
+//
+// Implements a look-up function for the ModelEls of class ModelElClass that
+// belong to this ImpMp. The function name is given by func and the
+// instances of class ModelElClass correspond to instances of implosion object
+// class ImpClass.
+//------------------------------------------------------------------------------
+
+#define implementLookUp(ModelElClass, func, ImpClass)                          \
+                                                                               \
+   ModelElClass * WitImpMp::func (ImpClass * theObject, WitPeriod t)           \
+      {                                                                        \
+      return func ## _.ifAny (theObject, t);                                   \
+      }                                                                        \
+
+//------------------------------------------------------------------------------
+// ModelEl look-up functions.
+//------------------------------------------------------------------------------
+
+implementLookUp (WitScrapVar,    myScrapVar,    WitPart)
+implementLookUp (WitNonSubVar,   myNonSubVar,   WitBomEntry)
+implementLookUp (WitSubVar,      mySubVar,      WitSubEntry)
+implementLookUp (WitShipVar,     myShipVar,     WitDemand)
+implementLookUp (WitExecVar,     myExecVar,     WitOperation)
+implementLookUp (WitStockVar,    myStockVar,    WitMaterial)
+implementLookUp (WitCumShipVar,  myCumShipVar,  WitDemand)
+
+implementLookUp (WitResourceCon, myResourceCon, WitPart)
+implementLookUp (WitSubCon,      mySubCon,      WitBomEntry)
+implementLookUp (WitShipCon,     myShipCon,     WitDemand)
+
+//------------------------------------------------------------------------------
+
+WitSlbvVar * WitImpMp::mySlbvVar (const WitBoundedVar * theBoundedVar)
+   {
+   return
+      (WitSlbvVar *) mySlbvVar_.ifAny (
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbCon * WitImpMp::mySlbCon (const WitBoundedVar * theBoundedVar)
+   {
+   return
+      (WitSlbCon *) mySlbCon_.ifAny (
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printItem (WitNode * theNode)
+   {
+   fprintf (
+      modelFile (),
+      itemFormat (),
+      theNode->nodeName ().myCstring (),
+      "",
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printItem (WitBomEntry * theBomEnt)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theBomEnt->myOperationName ().myCstring (),
+      theBomEnt->myPartName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printItem (WitSubEntry * theSub)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theSub->myOperationName ().myCstring (),
+      theSub->myBomEnt ()->myPartName ().myCstring (),
+      theSub->myPartName ().myCstring ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printItem (WitDemand * theDemand)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theDemand->demandedPartName ().myCstring (),
+      theDemand->demandName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printItem (const WitBoundedVar * theBoundedVar)
+   {
+   fprintf (WitMpModel::modelFile (),
+      " Var #%-7d BS #%-8d %-12s",
+      theBoundedVar->index (),
+      theBoundedVar->myBoundSet ()->mappingIndex (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::storeBoundedVar (WitBoundedVar * theBoundedVar)
+   {
+   myBoundedVars_.append (theBoundedVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::screenModel ()
+   {
+   if (myOptImploder ()->printMpModel ())
+      saveBounds ();
+
+   screenImpCons ();
+
+   fixScrapVars ();
+
+   relaxCumShipNonNeg ();
+
+   screenSlbModelEls ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitImpMp::slbvVarsExist ()
+   {
+   return (nSlbvVars_ > 0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printPeriod (WitPeriod t)
+   {
+   fprintf (modelFile (), periodDFormat (), t);
+   }
+
+//------------------------------------------------------------------------------
+// writeSoln prints out the primal MP solution from wit data structures.
+// Optionally prints the dual solution for material balance constraints.
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeSoln (const WitString & fName)
+   {
+   WitTimingEvent theEvent ("extra");
+
+   myMsgFac () ("writeMpSolnMsg");
+
+   solnFile_ = openFile (fName, "w");
+
+   myProblem ()->mySession ()->writeHeading (solnFile ());
+
+   writePartSoln       ();
+   writeOperationSoln    ();
+   writeSubEntrySoln   ();
+   writeDemandSoln     ();
+   writeBoundedVarSoln ();
+
+   fclose (solnFile ());
+
+   solnFile_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::generateVariables ()
+   {
+   WitPart *       thePart;
+   WitMaterial *   theMat;
+   WitOperation *  theOpn;
+   WitBomEntry *   theBomEnt;
+   WitSubEntry *   theSub;
+   WitDemand *     theDemand;
+   WitBoundedVar * theBoundedVar;
+   WitPeriod       t;
+
+   forEachMaterial (theMat, myProblem ())
+      forEachPeriod (t, myProblem ())
+         if (theMat->canStock (t))
+            new WitStockVar (theMat, t, this);
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         new WitScrapVar (thePart, t, this);
+
+   forEachOperation (theOpn, myProblem ())
+      forEachPeriod (t, myProblem ())
+         if (theOpn->executable ()[t])
+            new WitExecVar (theOpn, t, this);
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (t, myProblem ())
+         if (theBomEnt->hasSubsInEffect ()[t])
+            new WitNonSubVar (theBomEnt, t, this);
+
+   forEachSubEntry (theSub, myProblem ())
+      forEachPeriod (t, myProblem ())
+         if (theSub->inEffect (t))
+            new WitSubVar (theSub, t, this);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         new WitShipVar (theDemand, t, this);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         new WitCumShipVar (theDemand, t, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (theBoundedVar->needsAnSlbvVar ())
+         {
+         new WitSlbvVar (theBoundedVar, this);
+
+         ++ nSlbvVars_;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::generateConstraints ()
+   {
+   WitPart * thePart;
+   WitBomEntry * theBomEnt;
+   WitDemand * theDemand;
+   WitPeriod t;
+   WitBoundedVar * theBoundedVar;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         new WitResourceCon (thePart, t, this);
+
+   if (myCompMgr ()->hasSubEntries ())
+      forEachBomEntry (theBomEnt, myProblem ())
+         forEachPeriod (t, myProblem ())
+            if (theBomEnt->hasSubsInEffect ()[t])
+               new WitSubCon (theBomEnt, t, this);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         new WitShipCon (theDemand, t, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (mySlbvVar (theBoundedVar) != NULL)
+         new WitSlbCon (theBoundedVar, this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitMpObj * WitImpMp::generateObjectives ()
+   {
+   if (slbvVarsExist ())
+      myBoundsObj_ = new WitBoundsObj (this);
+
+   if (myCompMgr ()->myOptComp ()->myObjFunc1 ()->isChosen ())
+      {
+      myPrimaryObj_ = new WitPrimaryObj (this);
+         myObj1Obj_ = new    WitObj1Obj (this);
+
+      return myObj1Obj ();
+      }
+
+   if (myCompMgr ()->myOptComp ()->myObjFunc2 ()->isChosen ())
+      {
+       myRevObj_ = new  WitRevObj (this);
+       myInvObj_ = new  WitInvObj (this);
+      myServObj_ = new WitServObj (this);
+       mySubObj_ = new  WitSubObj (this);
+      myObj2Obj_ = new WitObj2Obj (this);
+
+      return myObj2Obj ();
+      }
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printModelElHeading ()
+   {
+   fprintf (modelFile (), "Index    Class       ");
+
+   fprintf (modelFile (), itemFormat (),   "Item", "Item", "Item");
+   fprintf (modelFile (), periodSFormat (), "Per");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::displayDerived ()
+   {
+   int nBSSpec;
+
+   nBSSpec = myCompMgr ()->nBoundSetsSpecified ();
+
+   if (nBSSpec > 0)
+      myMsgFac () ("boundCountsMsg",
+         nBSSpec,
+         myBoundedVars_.nElements (),
+         nSlbvVars_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printDerived ()
+   {
+   printBoundedVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::initDepVars ()
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbvVar = mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         theSlbvVar->primalValue () =
+            positivePart (
+               theBoundedVar->softLB () - theBoundedVar->primalValue ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeMeSoln (const WitModelEl * theModelEl)
+   {
+   const double valJ =
+      (theModelEl == NULL)?
+         0.0:
+         theModelEl->solnValue ();
+
+   if (fabs (valJ) > solnEpsilon)
+      fprintf (solnFile (), "%13.3f  ", valJ);
+   else
+      fprintf (solnFile (), "               ");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writePartSoln ()
+   {
+   WitPart *     thePart;
+   WitMaterial * theMat;
+   WitPeriod     t;
+
+   forEachPart (thePart, myProblem ())
+      {
+      fprintf (
+         solnFile (),
+         "\nPart %s:\n",
+         thePart->partName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period      Inventory          Scrap");
+
+      if (needDual ())
+         fprintf (solnFile (), "   Shadow Price");
+
+      fprintf (solnFile (), "\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         thePart->getMaterial (theMat);
+
+         writeMeSoln (
+            (theMat != NULL)?
+               myStockVar (theMat, t):
+               NULL);
+
+         writeMeSoln (myScrapVar (thePart, t));
+
+         if (needDual ())
+            writeMeSoln (myResourceCon (thePart, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeOperationSoln ()
+   {
+   WitOperation * theOpn;
+   WitPeriod t;
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nOperation %s:\n",
+         theOpn->operationName ().myCstring ());
+
+      fprintf (solnFile (), "Period      Execution\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         writeMeSoln (myExecVar (theOpn, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeSubEntrySoln ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitPeriod t;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      if (! theBomEnt->mySubEntries ().isEmpty ())
+         {
+         fprintf (solnFile (),
+            "\n"
+            "Consuming Operation: %s,  Part Replaced: %s,  BOM Entry #%d:\n"
+            "\n",
+            theBomEnt->myOperationName ().myCstring (),
+            theBomEnt->myPartName ().myCstring (),
+            theBomEnt->localIndex ());
+
+         fprintf (solnFile (), "Period        Non-Sub\n");
+
+         forEachPeriod (t, myProblem ())
+            if (theBomEnt->inEffect (t))
+               {
+               fprintf (solnFile (), "   %3d  ", t);
+
+               writeMeSoln (myNonSubVar (theBomEnt, t));
+
+               fprintf (solnFile (), "\n");
+               }
+
+         fprintf (solnFile (),
+            "\n"
+            "Period  Substitute       Sub #   Substitution\n");
+
+         forEachPeriod (t, myProblem ())
+            forEachEl (theSub, theBomEnt->mySubEntries ())
+               if (theSub->inEffect (t))
+                  {
+                  fprintf (solnFile (),
+                     "   %3d  %-12s  %8d  ",
+                     t,
+                     theSub->myPartName ().myCstring (),
+                     theSub->localIndex ());
+
+                  writeMeSoln (mySubVar (theSub, t));
+
+                  fprintf (solnFile (), "\n");
+                  }
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeDemandSoln ()
+   {
+   WitDemand * theDemand;
+   WitPeriod t;
+
+   forEachDemand (theDemand, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nPart %s,  Demand %s:\n",
+         theDemand->demandedPartName ().myCstring (),
+         theDemand->demandName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period       Shipment     Cum. Ship.\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         writeMeSoln (myShipVar    (theDemand, t));
+         writeMeSoln (myCumShipVar (theDemand, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::writeBoundedVarSoln ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (solnFile (),
+      "\n\nVar Index"
+      "   Hard LB"
+      "   Soft LB"
+      " Violation"
+      "     Value"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printSoln ();
+   }
+
+//------------------------------------------------------------------------------
+// scrapVarNeeded
+// Returns TRUE iff a scrap variable is needed for thePart in
+// period thePer. This is true iff there is any way for there to be forced
+// additional availability of thePart in period thePer.
+//------------------------------------------------------------------------------
+
+WitBoolean WitImpMp::scrapVarNeeded (WitPart * thePart, WitPeriod thePer)
+   {
+   WitMaterial * theMat;
+   WitBopEntry * theBopEnt;
+   WitExecPerItr theExecPerItr;
+   float         softLBval;
+
+   if (thePart->supplyVol ()[thePer] > 0.0)
+      return witTRUE;
+
+   thePart->getMaterial (theMat);
+
+   if (theMat != NULL)
+      if (thePer > 0)
+         {
+         const WitFlexVec <float> & stockSoftLB = 
+            theMat->stockBounds ()->softLB ();
+
+         if (stockSoftLB[thePer] < stockSoftLB[thePer - 1])
+            return witTRUE;
+         }
+
+   forEachEl (theBopEnt, thePart->producingBopEntries ())
+      for (theExecPerItr (theBopEnt, thePer); ++ theExecPerItr;)
+         {
+         softLBval = 
+            theBopEnt->
+               myOperation ()->execBounds ()->softLB ()[theExecPerItr ()];
+
+         if (softLBval > 0.0)
+            return witTRUE;
+         }
+
+   if (thePart->isCoproduced ()[thePer])
+      return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::screenImpCons ()
+   {
+   WitPart * thePart;
+   WitDemand * theDemand;
+   WitPeriod t;
+   int nVarsFixed = 0; // # variables fixed.
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myResourceCon (thePart, t));
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myShipCon (theDemand, t));
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nVarsFixedMsg", nVarsFixed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::fixScrapVars ()
+   {
+   WitPart * thePart;
+   WitPeriod t;
+   int nFixed = 0;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         if (! scrapVarNeeded (thePart, t))
+            {
+            myScrapVar_ (thePart)[t]->bounds ().upper () = 0.0;
+
+            ++ nFixed;
+            }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nScrapFixedMsg", nFixed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::relaxCumShipNonNeg ()
+   {
+   WitDemand * theDemand;
+   WitPeriod t;
+   WitCumShipVar * theCumShipVar;
+   int nRelaxed = 0;
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         {
+         theCumShipVar = myCumShipVar_ (theDemand)[t];
+
+         if (theCumShipVar->bounds ().upper () > 0.0)
+            if (theCumShipVar->bounds ().lower () == 0.0)
+               {
+               theCumShipVar->bounds ().lower () = - OSL_INFTY;
+
+               ++ nRelaxed;
+               }
+         }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nCshipRelaxedMsg", nRelaxed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::screenSlbModelEls ()
+   {
+   WitBoundedVar * theBoundedVar;
+   WitSlbCon *     theSlbCon;
+   int             nScreened = 0;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbCon = mySlbCon (theBoundedVar);
+
+      if (theSlbCon != NULL)
+         if (theBoundedVar->softLB () <=
+             theBoundedVar->hardLB () + FLOAT_EPSILON)
+            {
+            theSlbCon->bounds ().lower () = - OSL_INFTY;
+
+            mySlbvVar (theBoundedVar)->bounds ().upper () = 0.0;
+
+            ++ nScreened;
+            }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nSlbScreenedMsg", nScreened);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitImpMp::positiveHardLBsExist ()
+   {
+   WitMaterial *  theMat;
+   WitDemand *    theDemand;
+   WitOperation * theOpn;
+
+   forEachMaterial (theMat, myProblem ())
+      if (theMat->stockBounds ()->hasPositiveHardLB ())
+         return witTRUE;
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->cumShipBounds ()->hasPositiveHardLB ())
+         return witTRUE;
+
+   forEachOperation (theOpn, myProblem ())
+      if (theOpn->execBounds ()->hasPositiveHardLB ())
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpMp::printBoundedVars ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (modelFile (),
+      "\n\n"
+      "Bound Data\n"
+      "===== ====\n\n\n");
+
+   fprintf (modelFile (),
+      "# Bounded Variables: %8d\n",   myBoundedVars_.nElements ());
+
+   fprintf (modelFile (), "# Slbv Variables:    %8d\n\n", nSlbvVars_);
+
+   fprintf (modelFile (),
+        "Variable"
+      "   Hard LB"
+      "   Soft LB"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printBoundInfo ();
+   }
+
+#endif
+@
+

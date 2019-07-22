@@ -1,0 +1,112 @@
+
+# The first order of business is to attempt to figure out what programming
+# environment we're using, and what the appropriate command names are.
+
+pathsearch = $(firstword $(wildcard $(addsuffix /$(1), \
+	       $(subst :, ,$(PATH)))))
+
+# If the user hasn't specified the programming environment up front, try to
+# figure it out. First up, check for Sun/Forte Workshop. If it's present, use
+# it (after all, someone paid real money to acquire it). For Workshop, cc is
+# correct for C compilation. We need CC for C++ compilation.
+
+# If Workshop isn't present, assume the GCC is available (after all, we're
+# running Gnu make).  Do we want cc or gcc as the C compilation command? If gcc
+# exists, use it.
+
+# Yes, FF is correct --- see Makefile.rules.
+
+SunOS_PROGENV = GCC
+
+ifeq ($(origin SunOS_PROGENV),undefined)
+  testcmd := $(call pathsearch,workshop)
+  ifneq ($(testcmd),)
+    testout := $(shell $(testcmd) -V)
+    ifneq ($(findstring WorkShop,$(testout)),)
+      SunOS_PROGENV := SUNWspro
+      CXX := CC
+      FF := f90
+      DEPCXX := $(CXX) -xM1
+      DEPCC := $(CC) -xM1
+    endif
+  endif
+endif
+
+SunOS_PROGENV ?= GCC
+ifeq ($(SunOS_PROGENV),GCC)
+  testcmd := $(call pathsearch,gcc)
+  ifneq ($(testcmd),)
+    CC := gcc
+  endif
+  CXX := g++
+  FF := g77
+  DEPCXX := $(CXX) -MM
+  DEPCC := $(CC) -MM
+  STDCPP_DIR = $(subst /bin/$(CXX),/lib,$(shell which $(CXX)))
+  #SYSLD += -L$(STDCPP_DIR) -Wl,-R,$(STDCPP_DIR) -lstdc++
+  SYSLD += -Wl,-R,$(STDCPP_DIR) -lstdc++
+endif
+
+CP := /usr/bin/cp -p
+LN := ln -s
+
+###############################################################################
+
+ifeq ($(SunOS_PROGENV),SUNWspro)
+  ifeq ($(OptLevel),-O)
+      OPTFLAG := -xO4
+  else
+      OPTFLAG := $(OptLevel)
+  endif
+  compilerOptFlags := -O -xO1 -xO2 -xO3 -xO4 -xO5
+else
+  ifeq ($(OptLevel),-O)
+      OPTFLAG := -O6
+  else
+      OPTFLAG := $(OptLevel)
+  endif
+  compilerOptFlags := -O -O1 -O2 -O3 -O4 -O5 -O6
+endif
+
+###############################################################################
+# It's OK to specify this even if static executable is created.
+# Used in Osi/Test/Makefile.Test to link unitTest; perhaps elsewhere.
+
+
+ifeq ($(SunOS_PROGENV),SUNWspro)
+
+    SHLINKPREFIX := -R
+    SYSLD += 
+    STATICSYSLD += 
+    ifeq (${LibType},SHARED)
+        LD  := $(CXX) -o
+        LIBLDFLAGS := -G
+        LIBEXT := .so
+        CXXFLAGS += -KPIC
+    else
+        LD  := $(CXX) -o
+        LIBLDFLAGS := -xar 
+        LIBEXT := .a
+        CXXFLAGS +=
+    endif
+
+else
+
+    SHLINKPREFIX := -Wl,-R,
+    SYSLD += 
+    STATICSYSLD += -static
+    ifeq (${LibType},SHARED)
+        LD  := g++ -o
+        LIBLDFLAGS := -shared
+        LIBEXT := .so
+        CXXFLAGS += -fPIC
+    else
+        LD  := ar -q
+        LIBLDFLAGS :=
+        LIBEXT := .a
+        CXXFLAGS +=
+    endif
+
+endif
+
+EFENCE := -lefence

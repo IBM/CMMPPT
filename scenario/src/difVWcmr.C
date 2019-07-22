@@ -1,0 +1,1747 @@
+#include <math.h>
+#include <iostream.h>
+
+#include <rw/rstream.h>
+#include <rw/cstring.h>
+
+#include <scenario/src/dif.h>
+#include <scenario/src/difImpl.h>
+#include <scenario/src/difVWcmr.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/difEssSc.h>
+#include <scenario/src/timeVecs.h>
+#include <scenario/src/idnumber.h>
+
+// added for vacpp - vra
+implement (RWGVector, int)
+
+//-------------------------------------------------------------------
+//  
+//   Create a LgFrDataInterfaceImplementation object
+//
+//-------------------------------------------------------------------
+
+LgFrDataInterfaceImplementation * createVWcmrDifImp()
+{
+   return new LgFrDataInterfaceImplementation;
+} 
+
+// -----------------------------------------------------------------------
+//
+//  Register all functions
+//
+// -----------------------------------------------------------------------
+
+void
+registerVWcmrDifImpFunctions(
+    LgFrDataInterfaceImplementation * dImp) 
+{
+    // Register all raw material attribute functions
+    dImp->registerFunction("rawUnitCost", material, part,
+			   vectorFloat, difVWcmrGetRawUnitCost);
+    dImp->registerFunction("rawProcCost", material, part,
+			   vectorFloat, difVWcmrGetRawProcCost);
+    dImp->registerFunction("rawConstrained", material, part,
+			   vectorInt, difVWcmrGetRawConstrained);
+    dImp->registerFunction("rawProcLeadTime", material, part,
+			   timeVecFloat, difVWcmrGetRawProcLeadTime);
+    dImp->registerFunction("rawObj1ScrapCost", material, part,
+			   timeVecFloat, difVWcmrGetRawObj1ScrapCost);
+    dImp->registerFunction("rawObj1StockCost", material, part,
+			   timeVecFloat, difVWcmrGetRawObj1StockCost);
+    dImp->registerFunction("rawSupplyVol", material, part,
+			   timeVecFloat, difVWcmrGetRawSupplyVol);
+
+    // Register all product attribute functions
+    dImp->registerFunction("productUnitCost", material, part,
+			   vectorFloat, difVWcmrGetProductUnitCost);
+    dImp->registerFunction("productProcCost", material, part,
+			   vectorFloat, difVWcmrGetProductProcCost);
+    dImp->registerFunction("productConstrained", material, part,
+			   vectorInt, difVWcmrGetProductConstrained);
+    dImp->registerFunction("productProcLeadTime", material, part,
+			   timeVecFloat, difVWcmrGetProductProcLeadTime);
+    dImp->registerFunction("productYield", material, part,
+			   vectorInt, difVWcmrGetProductYield);
+    dImp->registerFunction("productCycleTime", material, part,
+			   timeVecFloat, difVWcmrGetProductCycleTime);
+    dImp->registerFunction("obj1ProdCost", material, part,
+			   timeVecFloat, difVWcmrGetObj1ProdCost);
+    dImp->registerFunction("productObj1ScrapCost", material, part,
+			   timeVecFloat, difVWcmrGetProductObj1ScrapCost);
+    dImp->registerFunction("productObj1StockCost", material, part,
+			   timeVecFloat, difVWcmrGetProductObj1StockCost);
+    dImp->registerFunction("productSupplyVol", material, part,
+			   timeVecFloat, difVWcmrGetProductSupplyVol);
+    dImp->registerFunction("productMinLotSize", material, part,
+			   timeVecFloat, difVWcmrGetProductMinLotSize);
+
+    // Register all capacity attribute functions
+    dImp->registerFunction("capacityUnitCost", material, part,
+			   vectorFloat, difVWcmrGetCapacityUnitCost);
+    dImp->registerFunction("capacityConstrained", material, part,
+			   vectorInt, difVWcmrGetCapacityConstrained);
+    dImp->registerFunction("capacityObj1ScrapCost", material, part,
+			   timeVecFloat, difVWcmrGetCapacityObj1ScrapCost);
+    dImp->registerFunction("capacitySupplyVol", material, part,
+			   timeVecFloat, difVWcmrGetCapacitySupplyVol);
+
+    //  need to have demandTable (similar to attrTable)
+    // Register all functions to obtain demands
+    dImp->registerFunction("committedDemands", demandType, demand,
+		   orderedVecDemand, difVWcmrGetCommittedDemands);
+    dImp->registerFunction("newOpportunityDemands", demandType, demand,
+		   orderedVecDemand, difVWcmrGetNewOpportunityDemands);
+    dImp->registerFunction("firmForecastDemands", demandType, demand,
+			   orderedVecDemand, difVWcmrGetFirmForecastDemands);
+    dImp->registerFunction("riskForecastDemands", demandType, demand,
+			   orderedVecDemand, difVWcmrGetRiskForecastDemands);
+
+    //  need to have demandtable (similar to attrTable)
+    // Register all demand attribute functions
+
+    dImp->registerFunction("demandGrossRev", demandType, demand,
+			   vectorFloat, difVWcmrGetDemandGrossRev);
+    dImp->registerFunction("demandVol", demandType, demand,
+			   timeVecFloat, difVWcmrGetDemandVol);
+    dImp->registerFunction("demandObj1CumShipReward", demandType, demand,
+			   timeVecFloat, difVWcmrGetDemandObj1CumShipReward);
+    dImp->registerFunction("demandObj1ShipReward", demandType, demand,
+			   timeVecFloat, difVWcmrGetDemandObj1ShipReward);
+
+    //  need to have partTable (similar to attrTable)
+    // Register all functions to obtain parts
+
+    dImp->registerFunction("rawParts", material, part,
+			   orderedVecPart, difVWcmrGetRawParts);
+    dImp->registerFunction("productParts", material, part,
+			   orderedVecPart, difVWcmrGetProductParts);
+    dImp->registerFunction("capacityParts", material, part,
+			   orderedVecPart, difVWcmrGetCapacityParts);
+    // Register define bom globle function
+    dImp->registerFunction("defineBom", material, part,
+			   timeVecFloat, difVWcmrDefineBom);
+
+}
+
+//-------------------------------------------------------------------
+//  
+//   Global functions to obtain the defined parts and capacities.
+//
+//-------------------------------------------------------------------
+
+// Return vector of raw materials.
+// difVWcmrGetRawParts global function (registering in the attribute table).
+// Get raw parts for the perfect world ATP and insert them into set_of_part
+// Return: a LgFrOrderedVectorPart object (vector of raw parts).
+
+void *
+difVWcmrGetRawParts(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    ) 
+{
+  LgFrOrderedVectorPart& retVal = *(new LgFrOrderedVectorPart);
+  LgFrPart part = difEssenPtr->createAndInsertPart("Transaxle_Housing");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Sportseat");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Engine_Block");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Valves");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Fuel_Injector");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Copper_Sheets");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Air_Condition");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Air_Bag");
+  retVal.insert(part);
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetProdcutParts global function (registering in the attribute table).
+// Get product parts for the perfect world ATP and insert it into set_of_part
+// Return: a LgFrOrderedVectorPart object (vector of producible parts)
+void*
+difVWcmrGetProductParts(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorPart& retVal = *(new LgFrOrderedVectorPart);
+
+  // Subassemblies:
+  LgFrPart part = difEssenPtr->createAndInsertPart("Transaxle");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Engine_1.6");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Engine_1.8");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Engine_2.0");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Platform");
+  retVal.insert(part);
+  // Final Products
+  part = difEssenPtr->createAndInsertPart("GOL_GLI18IGS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_CLI18IAS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_CLI16IGS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_CLI16IAS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_GTI20IGS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_GTI20IAS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_CLI16EGS");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("GOL_CLI18EGS");
+  retVal.insert(part);
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetCapacityParts global function (registering in the attribute table).
+// Get capacity parts for the perfect world ATP and insert it into set_of_part
+// Return: a LgFrOrderedVectorPart object (vector of capacity parts)
+void*
+difVWcmrGetCapacityParts(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    ) 
+{
+  LgFrOrderedVectorPart& retVal = *(new LgFrOrderedVectorPart);
+
+  LgFrPart part = difEssenPtr->createAndInsertPart("Engine_Assembly");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Final_Assembly");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Final_Test");
+  retVal.insert(part);
+  part = difEssenPtr->createAndInsertPart("Stamping");
+  retVal.insert(part);
+  status = 0;
+  return &retVal;
+}
+
+//-------------------------------------------------------------------
+//  
+//   Global functions to obtain raw material attributes
+//
+//-------------------------------------------------------------------
+
+// difVWcmrGetRawUnitCost global function (registered in the attribute table)
+// it returns a LgFrVectorFloat object.
+void *
+difVWcmrGetRawUnitCost(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat ( pv.entries() ));
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+//    assert( setOfParts().contains( pv[i] ) );
+    if ( pv[i]->name() == "Valves" )
+       retVal[i] = 1.0 ;
+    else if ( pv[i]->name() == "Transaxle_Housing" )
+       retVal[i] = 90.0 ;
+    else if ( pv[i]->name() == "Fuel_Injector" )
+       retVal[i] = 50.0 ;
+    else if ( pv[i]->name() == "Engine_Block" ) 
+       retVal[i] = 30.0 ;
+    else if ( pv[i]->name() == "Copper_Sheets" ) 
+       retVal[i] = 2.0 ;    
+    else if ( pv[i]->name() == "Sportseat" ) 
+       retVal[i] = 220.0 ;    
+    else if ( pv[i]->name() == "Air_Bag" ) 
+       retVal[i] = 100.0 ;
+    else if ( pv[i]->name() == "Platform" ) 
+       retVal[i] = 15.0 ;
+    else if ( pv[i]->name() == "Air_Condition" ) 
+       retVal[i] = 450.0 ;
+    else
+       retVal[i] = 0.0 ;
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// difVWcmrGetRawProcCost global function (registered in the attribute table).
+// It returns a LgFrVectorFloat object.
+void *
+difVWcmrGetRawProcCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat ( pv.entries() ));
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    retVal[i] = 1.23f;
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetRawConstrained global function (registered in the attribute table).
+// It returns a LgFrVectorInt object
+void *
+difVWcmrGetRawConstrained(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorInt& retVal = *(new LgFrVectorInt ( pv.entries() ));
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    if ( pv[i]->name() == "Valves" )
+       retVal[i] =  TRUE;
+    else if ( pv[i]->name() == "Air_Bag" )
+       retVal[i] =  TRUE;
+    else
+       retVal[i] = FALSE;
+  }
+  status = 0;
+  return &retVal;
+} 
+
+
+// difVWcmrGetRawProcLeadTime global function (registered in the attribute table).
+// It returns a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetRawProcLeadTime(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) { 
+    if ( pv[i]->name() == "Transaxle_Housing" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 2.0f );
+    else if ( pv[i]->name() == "Engine_Block" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0f );
+    else if ( pv[i]->name() == "Valves" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , (float)nperiods );
+    else if ( pv[i]->name() == "Fuel_Injector" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 2.0f );
+    else if ( pv[i]->name() == "Copper_Sheets" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0f );
+    else if ( pv[i]->name() == "Sportseat" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0f );
+    else if ( pv[i]->name() == "Air_Condition" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 3.0f );
+    else if ( pv[i]->name() == "Air_Bag" )
+       retVal[i] =  LgFrTimeVecFloat( nperiods , (float)nperiods );
+    else
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0f );      
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetRawObj1ScrapCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetRawObj1ScrapCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  LgFrTimeVecFloat( nperiods, 0.12f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetRawObj1StockCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetRawObj1StockCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  LgFrTimeVecFloat( nperiods, 0.10f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetRawSupplyVol global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetRawSupplyVol(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int np = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i=0; i<pv.entries(); i++ ) { 
+
+    if ( pv[i]->name() == "Transaxle_Housing" )
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "3000. 3000. 3000. 3000. 2000. 2000. 2000. 2000." );
+
+    else if ( pv[i]->name() == "Engine_Block" )
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "3025. 3025. 3025. 3025. 3025. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Valves" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "5400. 5300. 5200. 5100. 5400. 3400. 3400. 3400." );
+
+    else if ( pv[i]->name() == "Fuel_Injector" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "5400. 3000. 3000. 3000. 2000. 2000. 2000. 2000." );
+
+    else if ( pv[i]->name() == "Copper_Sheets" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "2400. 2400. 2400. 2400. 2400. 2400. 2400. 2400." );
+
+    else if ( pv[i]->name() == "Sportseat" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "4025. 1500. 1500. 1500. 1500. 1500. 1500. 1500." );
+
+    else if ( pv[i]->name() == "Air_Condition" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "150. 0. 50. 0. 50. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Air_Bag" )
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "525. 525. 525. 525. 525. 525. 525. 525." );
+
+    else
+//       assert( 1==0 && "Unrecognized raw part name" );
+       retVal[i] =  LgFrTimeVecFloat( np , 0.0f );
+
+  } 
+  status = 0; 
+  return &retVal;
+}
+
+//--------------------------------------------------------------------
+//  
+//   Global functions to obtain producible part attributes
+//
+//-------------------------------------------------------------------
+
+
+// difVWcmrGetProductProcCost global function (registered in the attribute table).
+// It returns a LgFrVectorFloat object.
+void *
+difVWcmrGetProductProcCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat ( pv.entries() ));
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] = 1.43f;
+  }
+  status = 0;
+  return &retVal;
+}
+
+void *
+difVWcmrGetProductUnitCost(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat ( pv.entries() ));
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    if ( pv[i]->name() == "GOL_GLI18IGS" )
+       retVal[i] =  15000.f ;
+    else if ( pv[i]->name() == "GOL_CLI18IAS" )
+       retVal[i] = 12000.f ;
+    else if ( pv[i]->name() == "GOL_CLI16IGS" )    
+       retVal[i] = 11000.f ;
+    else if ( pv[i]->name() == "GOL_CLI16IAS")
+       retVal[i] = 10000.f ;
+    else if ( pv[i]->name() == "GOL_GTI20IGS")
+       retVal[i] =  19000.f ;    
+    else if ( pv[i]->name() == "GOL_GTI20IAS")
+       retVal[i] =  18000.f ;
+    else if ( pv[i]->name() == "GOL_CLI16EGS")
+       retVal[i] = 8000.f ;
+    else if ( pv[i]->name() == "GOL_CLI18EGS")
+       retVal[i] = 14000.f ;
+    else if ( pv[i]->name() == "Transaxle")
+       retVal[i] = 180.f ;
+    else if ( pv[i]->name() == "Engine_1.6")
+       retVal[i] = 1600.f ;
+    else if ( pv[i]->name() == "Engine_1.8")
+       retVal[i] = 1800.f ;
+    else if ( pv[i]->name() == "Engine_2.0")
+       retVal[i] = 2000.f ;    
+    else
+       retVal[i] = 0.0f ;
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetProductConstrained global function (registered in the attribute table).
+// It returns a LgFrVectorInt object
+void *
+difVWcmrGetProductConstrained(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorInt& retVal = *(new LgFrVectorInt ( pv.entries() ));
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    retVal[i] =  TRUE;    
+
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetProductYield global function (registered in the attribute table).
+// Return: a LgFrVectorFloat object
+void *
+difVWcmrGetProductYield(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorInt& retVal = *(new LgFrVectorInt ( pv.entries() ));
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    retVal[i] =  100;
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// obj1ProdCost, obj1ScrapCost, obj1StockCost, supplyVol, procLeadTime,
+// cycleTime
+
+// difVWcmrGetProductProcLeadTime global function (registered in the attribute table).
+// It returns a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductProcLeadTime(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    retVal[i] =  LgFrTimeVecFloat( nperiods , -2.0f );
+  } 
+  status = 0; 
+  return &retVal;
+}
+
+// difVWcmrGetProductCycleTime global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductCycleTime(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+    if ( pv[i]->name() == "Transaxle" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 4.f/5.0f );
+    else if ( pv[i]->name() == "Engine_1.6" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 2.f/5.0f);
+    else if (pv[i]->name() == "Engine_1.8")
+        retVal[i] = LgFrTimeVecFloat( nperiods, 2.f/5.0f );
+    else if (pv[i]->name() == "Engine_2.0")
+        retVal[i] = LgFrTimeVecFloat( nperiods, 2.f/5.0f );
+    else if (pv[i]->name() == "Platform")
+        retVal[i] = LgFrTimeVecFloat( nperiods, 1.0f );
+    else
+       retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0 );      
+  }  
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetObj1ProdCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetObj1ProdCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+    retVal[i] =  LgFrTimeVecFloat( nperiods, 3.4f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// difVWcmrGetProductObj1ScrapCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductObj1ScrapCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  LgFrTimeVecFloat( nperiods, 1.0f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// difVWcmrGetProductObj1StockCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductObj1StockCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  LgFrTimeVecFloat( nperiods, 0.83f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetProductSupplyVol global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductSupplyVol(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int np = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    if ( pv[i]->name() == "GOL_GLI18IGS" )
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 0.0f );
+
+    else if ( pv[i]->name() == "GOL_CLI18IAS" )
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,0.0f ); 
+
+    else if ( pv[i]->name() == "GOL_CLI16IGS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np , 
+         "100. 0. 0. 0. 0. 0. 0. 0." );
+    
+    else if ( pv[i]->name() == "GOL_CLI16IAS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "100. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "GOL_GTI20IGS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "100. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "GOL_GTI20IAS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "150. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "GOL_CLI16EGS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "100. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "GOL_CLI18EGS" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "200. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Transaxle" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "350. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Engine_1.6" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "275. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Engine_1.8" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "280. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Engine_2.0" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "50. 0. 0. 0. 0. 0. 0. 0." );
+
+    else if ( pv[i]->name() == "Platform" )    
+       retVal[i] =  
+         LgFrTimeVecFloat( np ,
+         "1900. 0. 0. 0. 0. 0. 0. 0." );
+
+    else retVal[i] =  LgFrTimeVecFloat( np , 0.0 );    
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetProductMinLotSize global function (registered in the attribute 
+// table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetProductMinLotSize(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int np = calendar.nPeriods();  // # periods in scenario calendar
+  for ( size_t i = 0; i < pv.entries(); i++ ) { 
+       retVal[i] =  LgFrTimeVecFloat( np , 0.0f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+//--------------------------------------------------------------------
+//  
+//   Global functions to obtain capacity attributes
+//
+//-------------------------------------------------------------------
+
+// difVWcmrGetCapacityUnitCost global function (registered in the attribute table)
+// it returns a LgFrVectorFloat object.
+void *
+difVWcmrGetCapacityUnitCost(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat ( pv.entries() ));
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] = 1.46f;
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetCapacityConstrained global function (registered in the attribute table).
+// It returns a LgFrVectorInt object
+void *
+difVWcmrGetCapacityConstrained(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr; 
+  LgFrVectorInt& retVal = *(new LgFrVectorInt ( pv.entries() ));
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  TRUE;
+  }
+  status = 0;
+  return &retVal; 
+}
+
+// difVWcmrGetCapacityObj1ScrapCost global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetCapacityObj1ScrapCost(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */, 
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+      retVal[i] =  LgFrTimeVecFloat( nperiods, 0.73f );
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// difVWcmrGetCapacitySupplyVol global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetCapacitySupplyVol(
+    const LgFrDataInterfaceImplementation * /* difImp, not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));   
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i=0; i<pv.entries(); i++ ) {
+    if ( pv[i]->name() == "Engine_Assembly")
+      retVal[i] = LgFrTimeVecFloat( nperiods, "1100. 1100. 1100. 1100. 1100. 1100. 1100. 1100." );
+#if 0
+    else if ( pv[i]->name() == "Engine_Test") 
+      retVal[i] =  LgFrTimeVecFloat( nperiods , "1300. 1300. 1300. 1300. 1300. 1300. 1300. 1300." );
+#endif
+    else if ( pv[i]->name() == "Final_Assembly")    
+      retVal[i] =  LgFrTimeVecFloat( nperiods , "1200. 1200. 1200. 1200. 1200. 1200. 1200. 1200." );
+    else if ( pv[i]->name() == "Final_Test")    
+      retVal[i] =  LgFrTimeVecFloat( nperiods , "1200. 1200. 1200. 1200. 1200. 1200. 1200. 1200." );
+    else if ( pv[i]->name() == "Stamping")    
+      retVal[i] =  LgFrTimeVecFloat( nperiods , "2300. 2300. 2300. 2300. 2300. 2300. 2300. 2300." );
+    else
+      retVal[i] =  LgFrTimeVecFloat( nperiods , 0.0f );
+
+  }
+  status = 0;  
+  return &retVal;
+}
+
+//--------------------------------------------------------------------
+//  
+//   Global functions to obtain demands
+//
+//-------------------------------------------------------------------
+
+// difVWcmrGetCommittedDemands global function (registering in the attribute table).
+// Get committed demands for the perfect world ATP and insert them into set_of_demand
+// Return: a LgFrOrderedVectorDemand object (vector of committed demands).
+void *
+difVWcmrGetCommittedDemands(
+  const LgFrDataInterfaceImplementation * /* dImp,not used */,
+  const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+  LgFrError & status,
+  const LgFrDataInterfaceEssentials * difEssenPtr) 
+{
+  LgFrOrderedVectorDemand& retVal = 
+      *(new LgFrOrderedVectorDemand);
+
+  // All demand names
+  int customers = 5;
+  RWCString dn[] = 
+  {
+      "Brasilwagen",
+      "Mariauto",
+      "Rossi",
+      "Caraiga",
+      "Farias",
+  };
+
+  // All part names
+  int demandedProducts = 8;
+  RWCString pn[] =
+  {
+   "GOL_GLI18IGS",
+   "GOL_CLI18IAS",
+   "GOL_CLI16IGS",
+   "GOL_CLI16IAS",
+   "GOL_GTI20IGS",
+   "GOL_GTI20IAS",
+   "GOL_CLI16EGS",
+   "GOL_CLI18EGS",
+  };
+  
+  for ( int i = 0; i < customers; i++ )
+      {
+	  for (int j = 0; j < demandedProducts; j++) {  
+	  LgFrDemand demand = 
+	      difEssenPtr->createAndInsertDemand(dn[i], pn[j]);
+	  retVal.insert(demand);
+	  }
+      }
+  LgFrDemand demand = 
+	      difEssenPtr->createAndInsertDemand("Brasilwagen","Transaxle");
+	  retVal.insert(demand);
+
+  status = 0;
+  return &retVal;    
+}
+
+// difVWcmrGetNewOpportunityDemands global function (registering in the attribute table).
+// Get new opportunity demands for perfect world ATP and insert them into set_of_demand
+// Return: a LgFrOrderedVectorDemand object (vector of new opportunity demands).
+void *
+difVWcmrGetNewOpportunityDemands(
+    const LgFrDataInterfaceImplementation * /* dImp, not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr) 
+{
+  LgFrOrderedVectorDemand& retVal = 
+      *(new LgFrOrderedVectorDemand);
+
+  // All demand names
+  int nDemands = 3;
+  RWCString dn[] = 
+  {
+      "NewOpportunity",
+      "NewOpportunity",
+      "NewOpportunity"
+  };
+
+  // All part names
+  RWCString pn[] =
+  {
+      "GOL_GLI18IGS",
+      "GOL_CLI18IAS",
+      "GOL_CLI16IGS"
+  };
+  
+  for ( int i = 0; i < nDemands; i++ )
+      {
+	  LgFrDemand demand = 
+	      difEssenPtr->createAndInsertDemand(dn[i], pn[i]);
+	  retVal.insert(demand);
+      }
+  status = 0;
+  return &retVal;    
+} 
+
+
+// difVWcmrGetFirmForecastDemands global function (registering in the attribute table).
+// Get firm forcast demands for perfect world ATP and insert them into set_of_demand
+// Return: a LgFrOrderedVectorDemand object (vector of firm forcast demands).
+void *
+difVWcmrGetFirmForecastDemands(
+    const LgFrDataInterfaceImplementation * /* dImp,not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr) 
+{
+  LgFrOrderedVectorDemand& retVal = 
+      *(new LgFrOrderedVectorDemand);
+
+  // All demand names
+  int nDemands = 9;
+  RWCString dn[] = 
+  {
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+      "FirmForecast",
+	  "FirmForecast",
+  };
+
+  // All part names
+  RWCString pn[] =
+  {
+      "GOL_GLI18IGS",
+      "GOL_CLI18IAS",
+      "GOL_CLI16IGS",
+      "GOL_CLI16IAS",
+      "GOL_GTI20IGS",
+      "GOL_GTI20IAS",
+      "GOL_CLI16EGS",
+      "GOL_CLI18EGS",
+      "Transaxle",
+  };
+  
+  for ( int i = 0; i < nDemands; i++ )
+      {
+	  LgFrDemand demand = 
+	      difEssenPtr->createAndInsertDemand(dn[i], pn[i]);
+	  retVal.insert(demand);
+      }
+  status = 0;
+  return &retVal;    
+}
+
+
+// difVWcmrGetRiskForecastDemands global function (registering in the attribute table).
+// Get risk forcast demands for perfect world ATP and insert them into set_of_demand
+// Return: a LgFrOrderedVectorDemand object (vector of risk forcast demands).
+void *
+difVWcmrGetRiskForecastDemands(
+    const LgFrDataInterfaceImplementation * /* dImp,not used */,
+    const LgFrOrderedVectorItemPtr* /* itemPtrOrdVecPtr, not used */,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr) 
+{
+  LgFrOrderedVectorDemand& retVal = 
+      *(new LgFrOrderedVectorDemand);
+
+  // All demand names
+  int nDemands = 3;
+  RWCString dn[] = 
+  {
+      "RiskForecast",
+      "RiskForecast",
+      "RiskForecast" 
+  };
+
+  // All part names
+  RWCString pn[] =
+  {
+      "GOL_GLI18IGS",
+      "GOL_CLI18IAS",
+      "GOL_CLI16IGS"
+  };
+  
+  for ( int i = 0; i < nDemands; i++ )
+      {
+	  LgFrDemand demand = 
+	      difEssenPtr->createAndInsertDemand(dn[i], pn[i]);
+	  retVal.insert(demand);
+      }
+  status = 0;
+  return &retVal;    
+}
+
+
+//--------------------------------------------------------------------
+//  
+//   Global functions to obtain demand attributes
+//
+//-------------------------------------------------------------------
+
+// difVWcmrGetDemandGrossRev global function (registering in the attribute table).
+// Compute total demand gross revenue
+// Return: a LgFrVectorFloat object (vector of demand gross revenues).
+void *
+difVWcmrGetDemandGrossRev(
+    const LgFrDataInterfaceImplementation * /* difImp,  not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * /* difEssenPtr, not used */
+    )
+{
+  LgFrOrderedVectorItemPtr dv = *itemPtrOrdVecPtr; 
+  LgFrVectorFloat& retVal = *(new LgFrVectorFloat( dv.entries() ));    
+  
+  for ( size_t i = 0; i < dv.entries(); i++ ) {
+    if      ( dv[i]->name() == "Albert_Einstein" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Robert_Oppenheimer" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Issac_Newton" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Mr_Pythagoras" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Joseph_Orlicky" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Michael_Faraday" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Leonhard_Euler" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Turings_Machine_Shop" )  retVal[i] = 111.f;
+    else if ( dv[i]->name() == "Thomas_Edisons_Repair" )  retVal[i] = 111.f;    
+    else if ( dv[i]->name() == "NewOpportunity"  )  retVal[i] = 222.f;
+    else if ( dv[i]->name() == "FirmForecast" )  retVal[i] = 333.f;
+    else if ( dv[i]->name() == "RiskForecast" )  retVal[i] = 444.f;
+    else retVal[i] = (float)i;
+//    else assert( 0 && "illegal ATP type for Gross Revenue" );
+  }
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetDemandVol global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetDemandVol(
+    const LgFrDataInterfaceImplementation * /* difImp,  not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr dv = *itemPtrOrdVecPtr; 
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( dv.entries() ));    
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  // computers 1, 2, 5, 6 bread and butter machines
+  //           3, 4, the older models leaving the market
+  //           7, 8, the hot new machines just being rolled out
+  int customers = 6; 
+  RWCString customerD[]=
+  {
+   "Brasilwagen",
+   "Mariauto",
+   "Rossi",
+   "Caraiga",
+   "Farias",
+   "FirmForecast",
+  };
+
+// all demand products
+  int demandedProducts = 8;
+  RWCString productD[] =
+      {
+   "GOL_GLI18IGS",
+   "GOL_CLI18IAS",
+   "GOL_CLI16IGS",
+   "GOL_CLI16IAS",
+   "GOL_GTI20IGS",
+   "GOL_GTI20IAS",
+   "GOL_CLI16EGS",
+   "GOL_CLI18EGS",
+      };
+
+  // Per period customer demand volumes
+  LgFrTimeVecFloat custVol( customerD->length(), "100. 25. 25. 25. 25. 5350."); 
+
+  // Relative demand for products.
+  LgFrTimeVecFloat demWieghts( productD->length(), 
+			       "6. 22. 12. 12. 1. 1. 12. 22.");
+  LgFrTimeVecFloat demSumWieghtsRec( productD->length(),
+                              100.f / demWieghts.reduce(LgFrAdd) );
+  LgFrTimeVecFloat demRatio = demWieghts * demSumWieghtsRec;
+#if 0
+  cout <<"demWieghts=" <<demWieghts.format() <<endl;
+  cout <<"demWieghtsRec=" <<demSumWieghtsRec.format() <<endl;
+  cout <<"demRatio=" <<demRatio.format() <<endl;
+#endif
+
+  LgFrTimeVecFloat demVol( nperiods );
+
+  for ( int i=0; i<dv.entries(); i++) {
+
+
+    for ( int ic=0; ic<customers; ic++ ) {
+
+      for ( int idp=0; idp<demandedProducts; idp++ ) {
+
+         if ( dv[i]->name() == customerD[ic] ) 
+           if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == productD[idp] ) {
+             demVol = (float)((int)(demRatio[idp]*.01f * custVol[ic] + .5f));
+             retVal[i] = demVol; 
+             break;
+           }
+
+      }
+
+    }
+
+    if ( dv[i]->name() == "Brasilwagen" ){
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "Transaxle" )
+        retVal[i] = LgFrTimeVecFloat( nperiods
+                      , "3. 5. 2. 4. 1. 3. 3. 3." );
+	}
+
+    if ( dv[i]->name() == "FirmForecast" ){
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "Transaxle" )
+        retVal[i] = LgFrTimeVecFloat( nperiods
+                      , "0. 0. 0. 0. 0. 0. 0. 0.");
+	}
+  
+  }
+  status = 0;
+  return &retVal;
+}
+
+
+// difVWcmrGetDemanObj1CumShipReward global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetDemandObj1CumShipReward(
+    const LgFrDataInterfaceImplementation * /* difImp,  not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr dv = *itemPtrOrdVecPtr; 
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( dv.entries() ));    
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < dv.entries(); i++) {
+    if ( dv[i]->name() == "Albert_Einstein" ){
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_GLI18IGS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 100.f );
+    }
+    else if ( dv[i]->name() == "Robert_Oppenheimer" ){    
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_CLI18IAS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 125.f );
+    }
+    else if ( dv[i]->name() == "Issac_Newton" ){        
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_CLI16IGS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 100.f );
+    }
+    else if ( dv[i]->name() == "Mr_Pythagoras" ){     
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_CLI16IAS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 125.f );
+    }
+    else if ( dv[i]->name() == "Joseph_Orlicky" ){    
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_GTI20IAS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 90.f );
+    }
+    else if ( dv[i]->name() == "Michael_Faraday" ){
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_CLI16EGS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 100.f );
+      else if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "Engine_1.8" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 90.f ); 
+    }
+    else if ( dv[i]->name() == "Leonhard_Euler" ){    
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_CLI18EGS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 110.f );
+    }
+    else if ( dv[i]->name() == "Turings_Machine_Shop" ){
+      if ( (((LgFrDemand*)dv[i])->partPtr()->name()) == "GOL_GTI20IGS" )
+        retVal[i] = LgFrTimeVecFloat( nperiods, 80.f );
+    }
+    else if ( dv[i]->name() == "Thomas_Edisons_Repair" )  retVal[i] = LgFrTimeVecFloat(nperiods , 30. );
+    else if ( dv[i]->name() == "FirmForecast" )  retVal[i] = LgFrTimeVecFloat( nperiods, 0. );
+    else if ( dv[i]->name() == "RiskForecast" )  retVal[i] = LgFrTimeVecFloat( nperiods, 0. );
+    else assert( 0 && "illegal VWcmrp type for Cummulative Shipment Reward" );
+  }      
+  status = 0;
+  return &retVal;
+}
+
+// difVWcmrGetDemanObj1ShipReward global function (registered in the attribute table).
+// Return: a LgFrVectorTimeVecFloat object.
+void *
+difVWcmrGetDemandObj1ShipReward(
+    const LgFrDataInterfaceImplementation * /* difImp,  not used */,
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr
+    )
+{
+  LgFrOrderedVectorItemPtr dv = *itemPtrOrdVecPtr; 
+  LgFrVectorTimeVecFloat& retVal = 
+      *(new LgFrVectorTimeVecFloat( dv.entries() ));    
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int nperiods = calendar.nPeriods();  // # periods in scenario calendar
+
+  for ( size_t i = 0; i < dv.entries(); i++) {
+    retVal[i] =  LgFrTimeVecFloat( nperiods, 1. );
+  }      
+  status = 0;
+  return &retVal;
+}
+
+
+//--------------------------------------------------------------------
+//  
+//   Global function to define BOM
+//
+//-------------------------------------------------------------------
+void*
+difVWcmrDefineBom(
+    const LgFrDataInterfaceImplementation * difImp, 
+    const LgFrOrderedVectorItemPtr*, // itemPtrOrdVecPtr,
+    LgFrError &, // status, 
+    const LgFrDataInterfaceEssentials * difEssenPtr)
+{
+   WitRun* eater = 
+     ((LgFrDataInterfaceEssentialsFromScenario*)difEssenPtr)
+     ->mutableWitRun();
+   
+   witAddBomEntry(eater,"Transaxle","Transaxle_Housing");
+   
+   witAddBomEntry(eater,"Engine_1.6","Engine_Block");
+     witSetBomEntryUsageRate(eater,"Engine_1.6", 0, 2); 
+   witAddBomEntry(eater,"Engine_1.6","Valves");
+   witAddBomEntry(eater,"Engine_1.6","Engine_Assembly");
+     witSetBomEntryUsageRate(eater,"Engine_1.6", 2, 0.2f);
+#if 0
+   witAddBomEntry(eater,"Engine_1.6","Engine_Test");
+     witSetBomEntryUsageRate(eater,"Engine_1.6", 3, 0.1f);
+#endif
+
+   
+   witAddBomEntry(eater,"Engine_1.8","Valves");
+   witAddBomEntry(eater,"Engine_1.8","Fuel_Injector");
+   witAddBomEntry(eater,"Engine_1.8","Engine_Assembly");
+     witSetBomEntryUsageRate(eater,"Engine_1.8", 2, 0.2f);
+#if 0
+   witAddBomEntry(eater,"Engine_1.8","Engine_Test");
+     witSetBomEntryUsageRate(eater,"Engine_1.8", 3, 0.2);
+#endif
+
+   
+   witAddBomEntry(eater,"Platform","Copper_Sheets");
+   witAddBomEntry(eater,"Platform","Stamping");
+     witSetBomEntryUsageRate(eater,"Platform", 1, 1.0f);
+   
+
+   witAddBomEntry(eater,"Engine_2.0","Engine_Block");
+   witAddBomEntry(eater,"Engine_2.0","Valves");
+   witAddBomEntry(eater,"Engine_2.0","Fuel_Injector");
+   witAddBomEntry(eater,"Engine_2.0","Engine_Assembly");
+     witSetBomEntryUsageRate(eater,"Engine_2.0", 3, 0.1f);
+#if 0
+   witAddBomEntry(eater,"Engine_2.0","Engine_Test");
+     witSetBomEntryUsageRate(eater,"Engine_2.0", 4, 0.1);
+#endif
+   
+
+
+   witAddBomEntry(eater,"GOL_GLI18IGS","Transaxle");
+   witAddBomEntry(eater,"GOL_GLI18IGS","Engine_1.8");
+   witAddBomEntry(eater,"GOL_GLI18IGS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_GLI18IGS", 2, 0.2f);
+   witAddBomEntry(eater,"GOL_GLI18IGS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_GLI18IGS", 3, 0.3f);
+
+
+   witAddBomEntry(eater,"GOL_CLI18IAS","Transaxle");
+   witAddBomEntry(eater,"GOL_CLI18IAS","Sportseat");
+   witAddBomEntry(eater,"GOL_CLI18IAS","Engine_1.8");
+   witAddBomEntry(eater,"GOL_CLI18IAS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_CLI18IAS", 3, 0.2f);
+   witAddBomEntry(eater,"GOL_CLI18IAS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_CLI18IAS", 4, 0.4f);
+   
+
+   
+   witAddBomEntry(eater,"GOL_CLI16IGS","Engine_1.8");
+   witAddBomEntry(eater,"GOL_CLI16IGS","Platform");
+   witAddBomEntry(eater,"GOL_CLI16IGS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_CLI16IGS", 2, 0.2f);    
+   witAddBomEntry(eater,"GOL_CLI16IGS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_CLI16IGS", 3, 0.2f);    
+
+   
+   
+   witAddBomEntry(eater,"GOL_CLI16IAS","Sportseat");
+   witAddBomEntry(eater,"GOL_CLI16IAS","Engine_1.6");
+   witAddBomEntry(eater,"GOL_CLI16IAS","Platform");
+   witAddBomEntry(eater,"GOL_CLI16IAS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_CLI16IAS", 3, 0.2f);    
+   witAddBomEntry(eater,"GOL_CLI16IAS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_CLI16IAS", 4, 0.1f);       
+   
+
+
+   witAddBomEntry(eater,"GOL_GTI20IGS","Platform");
+   witAddBomEntry(eater,"GOL_GTI20IGS","Engine_2.0");
+   witAddBomEntry(eater,"GOL_GTI20IGS","Air_Bag");
+   witAddBomEntry(eater,"GOL_GTI20IGS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_GTI20IGS", 3, 0.15f);    
+   witAddBomEntry(eater,"GOL_GTI20IGS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_GTI20IGS", 4, 0.15f);       
+      
+   
+
+   
+   witAddBomEntry(eater,"GOL_GTI20IAS","Sportseat");
+   witAddBomEntry(eater,"GOL_GTI20IAS","Platform");
+   witAddBomEntry(eater,"GOL_GTI20IAS","Air_Condition");
+   witAddBomEntry(eater,"GOL_GTI20IAS","Engine_2.0");
+   witAddBomEntry(eater,"GOL_GTI20IAS","Air_Bag");
+   witAddBomEntry(eater,"GOL_GTI20IAS","Final_Assembly");
+   witSetBomEntryUsageRate(eater,"GOL_GTI20IAS", 5, 0.15f);    
+   witAddBomEntry(eater,"GOL_GTI20IAS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_GTI20IAS", 6, 0.1f);     
+   
+
+   
+   witAddBomEntry(eater,"GOL_CLI16EGS","Engine_1.6");
+   witAddBomEntry(eater,"GOL_CLI16EGS","Platform");
+   witAddBomEntry(eater,"GOL_CLI16EGS","Final_Assembly");   
+   witSetBomEntryUsageRate(eater,"GOL_CLI16EGS", 2, 0.1f);    
+   witAddBomEntry(eater,"GOL_CLI16EGS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_CLI16EGS", 3, 0.1f);   
+   
+
+   
+   witAddBomEntry(eater,"GOL_CLI18EGS","Transaxle");
+   witAddBomEntry(eater,"GOL_CLI18EGS","Engine_1.8");
+   witAddBomEntry(eater,"GOL_CLI18EGS","Final_Assembly");   
+   witSetBomEntryUsageRate(eater,"GOL_CLI18EGS", 2, 0.15f);    
+   witAddBomEntry(eater,"GOL_CLI18EGS","Final_Test");
+   witSetBomEntryUsageRate(eater,"GOL_CLI18EGS", 3, 0.1f);
+   return NULL;
+}   
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// Tests this class.  Only returns if all tests passed
+// Tests this class.  Only returns if all tests passed
+void
+difVWcmrContextTest(
+   LgFrDataInterface    	& tdif1,	// testScenario1's
+   LgFrDataInterface    	& ts1dupDif,	// testScenario1dup's
+   const LgFrScenario           * scenPtr)	// testScenario1's
+{
+  const float fltEps = .0001f;
+  LgFrDataInterfaceImplementation* dImp 
+      = tdif1.dataInterfaceImplementation();
+  LgFrDataInterfaceImplementation* dImptsi 
+      = ts1dupDif.dataInterfaceImplementation();
+
+  // Test isA method
+  assert (dImp->isA() == __LGFRDATAINTERFACEIMPLEMENTATION);
+  assert (dImptsi->isA() 
+	  == __LGFRDATAINTERFACEIMPLEMENTATION);
+  // Test title method
+  assert( dImp->title() == "internal data set automobile1" );
+  assert( dImptsi->title()=="internal data set automobile1" );
+  assert( tdif1.title() == "internal data set automobile1");
+  assert( ts1dupDif.title() == "internal data set automobile1");
+
+  // Register all functions
+  registerVWcmrDifImpFunctions(dImp);
+
+
+  // Test Get Part Methods
+  LgFrDataInterfaceEssentialsFromScenario difEssen(scenPtr);
+  LgFrOrderedVectorPart pv;
+  RWCString itemSubTypeStr = "material";  
+  LgFrOrderedVectorPart* rawPartsPtr
+    = (LgFrOrderedVectorPart*) tdif1.partAttribute(
+	pv, itemSubTypeStr, "rawParts", &difEssen);
+  LgFrOrderedVectorPart raw = *rawPartsPtr;
+  assert( raw.entries() == 8 );
+  assert( raw[1].name() == "Sportseat" );
+
+  LgFrOrderedVectorPart* productPartsPtr
+    = (LgFrOrderedVectorPart*) tdif1.partAttribute(
+	pv, itemSubTypeStr, "productParts", &difEssen);
+  LgFrOrderedVectorPart product = *productPartsPtr;
+  assert( product.entries() == 13 );
+  assert( product[11].name() == "GOL_CLI16EGS" );
+
+
+  LgFrOrderedVectorPart* capacityPartsPtr
+    = (LgFrOrderedVectorPart*) tdif1.partAttribute(
+	pv, itemSubTypeStr, "capacityParts", &difEssen);
+  LgFrOrderedVectorPart capacity = *capacityPartsPtr;
+  assert( capacity.entries() == 4 );
+  assert( capacity[1].name() == "Final_Assembly" );
+
+
+  // Test get raw partAttribute methods
+  {
+  LgFrVectorFloat* unitCostPtr
+    = (LgFrVectorFloat*) tdif1.partAttribute(
+	raw, itemSubTypeStr, "rawUnitCost", &difEssen);
+  LgFrVectorFloat unitCost = *unitCostPtr;
+  assert( unitCost.length() == 8 );
+
+  LgFrVectorInt* constrainedPtr
+      = (LgFrVectorInt*) tdif1.partAttribute(
+	  raw, itemSubTypeStr, "rawConstrained", &difEssen);
+  LgFrVectorInt constrained = *constrainedPtr;
+  assert( constrained.length() == 8 );
+  assert( !constrained[0] );
+  assert( constrained[3] );
+  
+  LgFrVectorTimeVecFloat* obj1ScrapCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  raw, itemSubTypeStr, "rawObj1ScrapCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1ScrapCost = *obj1ScrapCostPtr;
+  assert( obj1ScrapCost.length() == 8 );
+
+  LgFrVectorTimeVecFloat* obj1StockCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  raw, itemSubTypeStr, "rawObj1StockCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1StockCost = *obj1StockCostPtr;
+  assert( obj1StockCost.length() == 8 );
+
+  
+  LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  raw, itemSubTypeStr, "rawSupplyVol", &difEssen);
+  LgFrVectorTimeVecFloat supplyVol = *supplyVolPtr;
+  assert( supplyVol.length() == 8 );
+}
+
+  // Test get product partAttribute methods
+  {
+  LgFrVectorTimeVecFloat* cycleTimePtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productCycleTime", &difEssen);
+  LgFrVectorTimeVecFloat cycleTime = *cycleTimePtr;
+  assert( cycleTime.length() == 13 );
+
+ 
+  LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productUnitCost", &difEssen);
+  LgFrVectorFloat unitCost = *unitCostPtr;
+  assert( unitCost.length() == 13 );
+  
+  LgFrVectorInt* constrainedPtr
+      = (LgFrVectorInt*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productConstrained", &difEssen);
+  LgFrVectorInt constrained = *constrainedPtr;
+  assert( constrained.length() == 13 );
+  for (int i=0; i<constrained.length(); i++)
+  assert( constrained[i] );
+
+  LgFrVectorInt* yieldPtr
+      = (LgFrVectorInt*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productYield", &difEssen);
+  LgFrVectorInt yield = *yieldPtr;
+  assert( yield.length() == 13 );
+  
+  LgFrVectorTimeVecFloat* obj1ProdCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "obj1ProdCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1ProdCost = *obj1ProdCostPtr;
+  assert( obj1ProdCost.length() == 13 );
+
+  LgFrVectorTimeVecFloat* obj1ScrapCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productObj1ScrapCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1ScrapCost = *obj1ScrapCostPtr;
+  assert( obj1ScrapCost.length() == 13 );
+  
+  LgFrVectorTimeVecFloat* obj1StockCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productObj1StockCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1StockCost = *obj1StockCostPtr;
+  assert( obj1StockCost.length() == 13 );
+  
+  LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  product, itemSubTypeStr, "productSupplyVol", &difEssen);
+  LgFrVectorTimeVecFloat supplyVol = *supplyVolPtr;
+  assert( supplyVol.length() == 13 );
+  }
+
+
+
+  // Test get capacity partAttribute methods
+  {
+ LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) tdif1.partAttribute(
+	  capacity, itemSubTypeStr, "capacityUnitCost", &difEssen);
+  LgFrVectorFloat unitCost = *unitCostPtr;
+  assert( unitCost.length() == 4 );
+
+  LgFrVectorInt* constrainedPtr
+      = (LgFrVectorInt*) tdif1.partAttribute(
+	  capacity, itemSubTypeStr, "capacityConstrained", &difEssen);
+  LgFrVectorInt constrained = *constrainedPtr;
+  assert( constrained.length() == 4 );
+  assert( constrained[0] );
+  
+
+  LgFrVectorTimeVecFloat* obj1ScrapCostPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  capacity, itemSubTypeStr, "capacityObj1ScrapCost", &difEssen);
+  LgFrVectorTimeVecFloat obj1ScrapCost = *obj1ScrapCostPtr;
+  assert( obj1ScrapCost.length() == 4 );
+
+  LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) tdif1.partAttribute(
+	  capacity, itemSubTypeStr, "capacitySupplyVol", &difEssen);
+  LgFrVectorTimeVecFloat supplyVol = *supplyVolPtr;
+  assert( supplyVol.length() == 4 );
+  
+  }
+
+
+// Test Get Demands Methods
+  LgFrOrderedVectorDemand dv;
+
+  LgFrOrderedVectorDemand* committedDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif1.demandAttribute(
+	dv, "committedDemands", &difEssen );
+  LgFrOrderedVectorDemand committed = * committedDemandPtr;
+  assert( committed.entries() == 41 ); 
+  
+  LgFrOrderedVectorDemand* newOpportunityDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif1.demandAttribute(
+	dv, "newOpportunityDemands", &difEssen );
+  LgFrOrderedVectorDemand newOpportunity = * newOpportunityDemandPtr; 
+  assert( newOpportunity.entries() == 3 );
+  assert( newOpportunity[0].name() == "NewOpportunity" );
+
+  LgFrOrderedVectorDemand* firmForecastDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif1.demandAttribute(
+	dv, "firmForecastDemands", &difEssen );
+  LgFrOrderedVectorDemand firmForecast = * firmForecastDemandPtr;
+  assert( firmForecast.entries() == 9 );
+  assert( firmForecast[1].name() == "FirmForecast" );
+
+
+  LgFrOrderedVectorDemand* riskForecastDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif1.demandAttribute(
+	dv, "riskForecastDemands", &difEssen );
+  LgFrOrderedVectorDemand riskForecast = * riskForecastDemandPtr;
+  assert( riskForecast.entries() == 3 );
+  assert( riskForecast[0].name() == "RiskForecast" );
+  assert( riskForecast[1].name() == "RiskForecast" );
+  assert( riskForecast[2].name() == "RiskForecast" );
+
+
+
+  // Test get demand Attribute methods
+  LgFrVectorFloat* committedGrossRevPtr
+   = (LgFrVectorFloat*) tdif1.demandAttribute(
+       committed,"demandGrossRev", &difEssen);
+  LgFrVectorFloat committedGrossRev = *committedGrossRevPtr;
+  assert( committedGrossRev.length() == 41 );
+
+  LgFrVectorFloat* newOpportunityGrossRevPtr
+      = (LgFrVectorFloat*) tdif1.demandAttribute(
+	  newOpportunity,"demandGrossRev", &difEssen);
+  LgFrVectorFloat newOpportunityGrossRev = *newOpportunityGrossRevPtr;
+  assert( newOpportunityGrossRev.length() == 3 );
+
+  LgFrVectorFloat* firmForecastGrossRevPtr
+   = (LgFrVectorFloat*) tdif1.demandAttribute(
+       firmForecast,"demandGrossRev", &difEssen);
+  LgFrVectorFloat firmForecastGrossRev = *firmForecastGrossRevPtr;
+  assert( firmForecastGrossRev.length() == 9 );
+
+  LgFrVectorFloat* riskForecastGrossRevPtr
+   = (LgFrVectorFloat*) tdif1.demandAttribute(
+       riskForecast,"demandGrossRev", &difEssen);
+  LgFrVectorFloat riskForecastGrossRev = *riskForecastGrossRevPtr;
+  assert( riskForecastGrossRev.length() == 3 );
+}

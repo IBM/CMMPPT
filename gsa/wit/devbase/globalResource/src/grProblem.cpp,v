@@ -1,0 +1,2991 @@
+head	1.11;
+access;
+symbols
+	beforeTiersAdded:1.10
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.11
+date	2002.09.05.13.19.22;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2002.04.12.01.47.28;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.04.10.17.30.31;	author barahon;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.04.09.20.41.35;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.04.09.16.37.18;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2002.04.05.17.03.59;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2002.04.05.01.08.04;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.03.28.15.42.28;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.03.12.17.54.23;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.03.06.21.15.43;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@changes to accomodate tiers
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <numeric>
+#include <set>
+
+#include <assert.h>
+#include <iostream.h>
+#include <float.h>
+
+#include <wit.h>
+
+#define JP_TEST
+
+#include "OsiFloatEqual.h"
+#include "grSortablePortfolio.h"
+#include "grProblem.h"
+#include "grMipProblem.h"
+#include "appData.h"
+
+
+
+
+void GRproblem::setTitle( const std::string & title)
+{
+  setState(UNPREPROCESSED);
+  witSetTitle(witRun(),title.c_str());
+}
+std::string GRproblem::getTitle() const
+{
+  char * t;
+  witGetTitle(mutableWitRun(),&t);
+  std::string retVal(t);
+  witFree(t);
+  return retVal;
+}
+
+
+void GRproblem::setState( State s )
+{ 
+  if (s==UNPREPROCESSED) {
+    if ( state_ != UNPREPROCESSED ) unpreprocess();
+  }
+  else if ( s==PREPROCESSED ) {
+    assert( state_ == UNPREPROCESSED );
+  }
+  else if ( s==SOLVED ) {
+    assert( state_ == PREPROCESSED );
+  }
+  else if ( s==POSTPROCESSED ) {
+    assert( state_ == SOLVED );
+  }
+  state_ = s; 
+};
+void GRproblem::setNPeriods( int nP )
+{
+  setState(UNPREPROCESSED);
+  witSetNPeriods(witRun(),nP);
+}
+
+int GRproblem::getNPeriods() const
+{
+  int retVal;
+  witGetNPeriods(mutableWitRun(),&retVal);
+  return retVal;
+}
+
+float GRproblem::getObjValue() const
+{
+  int np=getNPeriods();
+  float retVal, boundsValue;
+  witEvalObjectives( mutableWitRun() );
+  witGetObjValues ( mutableWitRun(),&retVal,&boundsValue);
+    
+  // loop over each demand and subract off shipment revenue
+  // (application is attempting to minimize cost so does not
+  // really consider revenue)
+  float *shipRev;
+  float *shipVol;  
+  const std::vector<std::string> & ports = getPortfolios();
+  for ( int p=0; p<ports.size(); p++ ) {
+    witGetDemandShipVol(mutableWitRun(),ports[p].c_str(),"Demand",&shipVol);
+    witGetDemandObj1ShipReward(mutableWitRun(),ports[p].c_str(),"Demand",&shipRev);
+    for ( int t=0; t<np; t++ ) {
+      retVal = retVal - shipVol[t]*shipRev[t];
+    }
+    witFree(shipRev);
+    witFree(shipVol);
+  }
+  return retVal;
+}
+
+
+void GRproblem::addPortfolio(const std::string & portName )
+{
+  witAddPart(witRun(),portName.c_str(),WitCAPACITY);
+  witAddDemand(witRun(),portName.c_str(),"Demand");
+
+  // Set demand volume and revenue
+  {
+    int nP=getNPeriods();
+    float * fltTimVec;
+    witGetDemandDemandVol(mutableWitRun(),portName.c_str(),"Demand",&fltTimVec);
+    fltTimVec[0]=1.0f;
+    witSetDemandDemandVol(witRun(),portName.c_str(),"Demand",fltTimVec);
+    fltTimVec[0]=1.0E010f/(100*nP);
+    witSetDemandObj1ShipReward(witRun(),portName.c_str(),"Demand",fltTimVec);
+    witFree(fltTimVec);
+  }
+
+  portNames_.push_back(portName);
+}
+
+void GRproblem::addPortfolioLocationLink( 
+                                         const std::string & portName, 
+                                         const std::string & locName ) 
+{ 
+
+  // Create operation and connect to portfolio
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  witAddOperation(witRun(),opName.c_str());
+  witAddBopEntry(witRun(),opName.c_str(),portName.c_str());
+
+  // Set yield to zero in all periods other than 0
+  int nP = getNPeriods();
+  float * y = (float*)malloc(nP*sizeof(float));
+  y[0]=1.0f;
+  for (int t=1; t<nP; t++) y[t]=0;
+  witSetOperationYieldRate(witRun(),opName.c_str(),y);
+
+  // Set operations incLotSize (to make it a 0-1 variable)
+  witSetOperationIncLotSize(witRun(),opName.c_str(),y);
+  free(y);
+
+  // Add app date
+  GRportLocOpAppData * ad = new GRportLocOpAppData;
+  witSetOperationAppData(mutableWitRun(),opName.c_str(),ad);
+
+}
+
+float GRproblem::getPortfolioLocationExecVol( 
+                                                              const std::string & portName, 
+                                                              const std::string & locName ) const
+{
+   
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  float * ev;
+  witGetOperationExecVol(mutableWitRun(),opName.c_str(),&ev);
+  float retVal = ev[0];
+  witFree(ev);
+  return retVal;
+}
+
+
+void GRproblem::setPortfolioLocationExecVol( 
+    const std::string & portName, 
+    const std::string & locName,
+    float execVol ) 
+{  
+  OsiRelFltEq eq;
+  int np = getNPeriods();
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  float * ev;
+  witGetOperationExecVol(mutableWitRun(),opName.c_str(),&ev);
+  int t;
+  for ( t=0; t<np; ++t ) {
+    assert(ev[t]==0.0f);
+  }
+  ev[0]=execVol;
+
+  witSetOperationExecVol(witRun(),opName.c_str(),ev);
+  witFree(ev);
+
+  // increment shipVol to reflect execVol
+  float * sv;
+  witGetDemandShipVol(witRun(),portName.c_str(),"Demand",&sv);
+  if ( eq(execVol,1.0) ) assert( sv[0]==0.0f );
+  for ( t=1; t<np; ++t ) {
+    assert(sv[t]==0.0f);
+  }
+  sv[0]=sv[0]+execVol;
+  witSetDemandShipVol(witRun(),portName.c_str(),"Demand",sv);
+  witFree(sv);
+
+#if 0
+  // Must propagate exec vol down the bom.
+  
+  // loop over each resource consumed by portfolio at location
+  std::vector<std::string> skills; 
+  std::vector<std::string> resrcLocs;
+  std::vector<std::string> bands;
+  std::vector<std::string> roles;
+  std::vector<bool> homeSites;
+  getPortfolioResourceLinks(portName,locName,skills,resrcLocs,bands,roles,homeSites);
+      
+  for( int prl=0; prl<skills.size(); prl++ ) {
+
+    // get resources consumption rate
+    std::vector<float> consRate=getPortfolioResourceLinkConsRate(
+      portName,locName,
+      skills[prl],resrcLocs[prl],bands[prl],roles[prl],homeSites[prl]); 
+    
+    // compute consVol
+    float * consVol = stlVecToFloatStar(consRate);
+    int t;
+    for ( t=0; t<np; t++ ) {
+      consVol[t] = consRate[t]*execVol;
+    }
+
+    // increment execVol by consVol
+    std::string resNam = resourceName(skills[prl],resrcLocs[prl],bands[prl],roles[prl],homeSites[prl]);
+    witGetOperationExecVol(mutableWitRun(),resNam.c_str(),&ev);
+    for ( t=0; t<np; t++ ) {
+      ev[t] = ev[t]+consVol[t];
+    }
+    witSetOperationExecVol(mutableWitRun(),resNam.c_str(),ev);
+    witFree(ev);
+
+    free(consVol);
+  }
+#endif
+
+}
+
+bool GRproblem::getPortfolioLocationExecutable( 
+                                                const std::string & portName, 
+                                                const std::string & locName ) const
+{
+  
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  witBoolean * vec;
+  witGetOperationExecutable(mutableWitRun(),opName.c_str(),&vec);
+  bool retVal = vec[0]?true:false;
+  witFree(vec);
+  return retVal;
+}
+float GRproblem::getPortfolioLocationCost( 
+                                              const std::string & portName, 
+                                              const std::string & locName ) const
+{
+  
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  
+  // Get the app data associated with this operation    
+  GRportLocOpAppData * appData;
+  witGetOperationAppData(mutableWitRun(),opName.c_str(),(void**)&appData);
+
+  float retVal = appData->unitExecCost();
+  return retVal;
+}
+float GRproblem::getPortfolioLocationUnitConsVol( 
+                                              const std::string & portName, 
+                                              const std::string & locName ) const
+{
+  
+  std::string opName = portfolioSourcingOpName(portName,locName);
+  
+  // Get the app data associated with this operation    
+  GRportLocOpAppData * appData;
+  witGetOperationAppData(mutableWitRun(),opName.c_str(),(void**)&appData);
+
+  float retVal = std::accumulate(
+    appData->unitConsVol().begin(),
+    appData->unitConsVol().end(),
+    0.0f);
+  return retVal;
+}
+
+
+
+// Portfolio to Resource Link Methods
+void GRproblem::addPortfolioResourceLink( 
+                                         const std::string & port, 
+                                         const std::string & portLoc, 
+                                         const std::string & skill, 
+                                         const std::string & resrcLoc,
+                                         const std::string & band,
+                                         const std::string & tier,
+                                         const std::string & role,
+                                         bool homeSite )
+{
+  // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  std::string resName = resourceName(skill,resrcLoc,band,tier,role,homeSite);
+
+  int nP = getNPeriods();
+
+  // Get current number of boms connected to operation
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms);
+
+  // create zero vector of np periods in length
+  int t,t1;
+  float * ur = (float*)malloc(nP*sizeof(float));
+  for (t=0; t<nP; t++) ur[t]=0;
+
+  // create offset vector
+  float * os = (float*)malloc(nP*sizeof(float));
+
+  for (t=0; t<nP; t++) {
+
+    // add bom
+    witAddBomEntry(witRun(),opName.c_str(),resName.c_str());
+
+    // set it's consRate to zero
+    witSetBomEntryConsRate(witRun(),opName.c_str(),nBoms+t,ur);
+
+    // set offset so all of the portfolio (or none of it) must be
+    // completed over entire time horizion.
+    for (t1=0; t1<nP; t1++) os[t1]=-t;
+    witSetBomEntryOffset(witRun(),opName.c_str(),nBoms+t,os);
+
+  }
+  free(os);
+  free(ur);
+}
+
+
+// Get Bom Entry Index
+int GRproblem::getBomEntryIndex( 
+                                const std::string & port, 
+                                const std::string & portLoc, 
+                                const std::string & skill, 
+                                const std::string & resrcLoc,
+                                const std::string & band,
+                                const std::string & tier,
+                                const std::string & role,
+                                bool homeSite ) const
+{
+  int retVal = -1;
+  
+  // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  std::string resName = resourceName(skill,resrcLoc,band,tier,role,homeSite);
+
+  int nP = getNPeriods();
+
+  // Get current number of boms connected to operation
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms);
+
+  int bei;
+  for ( bei=0; bei<nBoms; bei=bei+nP ) {
+    char * consRes;
+    witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),bei,&consRes);
+    if(resName==consRes) retVal=bei;
+    witFree(consRes);
+    if(retVal!=-1) break;
+  }
+
+  return retVal;
+}
+
+
+// Get Bop Entry Index
+int GRproblem::getBopEntryIndex( 
+                                const std::string & port, 
+                                const std::string & portLoc ) const
+{
+  int retVal = -1;
+  
+  // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+
+  int nP = getNPeriods();
+
+  // Get current number of bops connected to operation
+  int nBops;
+  witGetOperationNBopEntries(mutableWitRun(),opName.c_str(),&nBops);
+
+  int bei;
+  for ( bei=0; bei<nBops; bei++ ) {
+    char * prodPart;
+    witGetBopEntryProducedPart(mutableWitRun(),opName.c_str(),bei,&prodPart);
+    if(port==prodPart) retVal=bei;
+    witFree(prodPart);
+    if(retVal!=-1) break;
+  }
+
+  return retVal;
+}
+
+
+
+void GRproblem::setPortfolioResourceLinkConsRate( 
+                                         const std::string & port, 
+                                         const std::string & portLoc, 
+                                         const std::string & skill, 
+                                         const std::string & resrcLoc,
+                                         const std::string & band,
+                                         const std::string & tier,
+                                         const std::string & role,
+                                         bool homeSite,
+                                         const std::vector<float> & consRate )
+{
+  setState(UNPREPROCESSED);
+
+  // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  std::string resName = resourceName(skill,resrcLoc,band,tier,role,homeSite);
+
+  // get bomEntryIndex
+  int bei=getBomEntryIndex(port,portLoc,skill,resrcLoc,band,tier,role,homeSite);
+
+  int nP = getNPeriods();
+
+  // create consRate vector
+  float * cr = (float*)malloc(nP*sizeof(float));
+
+  int t;
+  
+  for (t=1; t<nP; t++) cr[t]=0.0;
+
+#if 0
+  for (t=1; t<nP; t++) {
+    if ( consRate[t]!=consRate[t-1] ) {
+      printf("x\n");
+    }
+  }
+#endif
+  for (t=0; t<nP; t++) {
+
+    //for(t1=0; t1<nP; t1++) cr[t1]=consRate[t];
+    cr[0]=consRate[t];
+
+    witSetBomEntryConsRate(witRun(),opName.c_str(),bei+t,cr);
+
+  }
+  free(cr);
+}
+
+
+std::vector<float> GRproblem::getPortfolioResourceLinkConsRate( 
+    const std::string & port, 
+    const std::string & portLoc, 
+    const std::string & skill, 
+    const std::string & resrcLoc,
+    const std::string & band,
+    const std::string & tier,
+    const std::string & role,
+    bool homeSite ) const
+{
+    // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  std::string resName = resourceName(skill,resrcLoc,band,tier,role,homeSite);
+
+  // get bomEntryIndex
+  int bei=getBomEntryIndex(port,portLoc,skill,resrcLoc,band,tier,role,homeSite);
+
+  int nP = getNPeriods();
+
+  // create return vector
+  std::vector<float> retVal;
+  OsiRelFltEq eq;
+  
+  int t;
+  // Does the portfolio consume the specified resource?
+  if ( bei != -1 ) {
+    for (t=0; t<nP; t++) {
+      
+      // get it's consRate 
+      float *cr;
+      witGetBomEntryConsRate(mutableWitRun(),opName.c_str(),bei+t,&cr);
+      //for ( t1=1; t1<nP; t1++ ) assert( eq(cr[t1],cr[0]) );
+      retVal.push_back(cr[0]);
+      witFree(cr);
+      
+    }
+  }
+  else {
+    for (t=0; t<nP; t++)retVal.push_back(0.0f);
+  }
+  return retVal;
+}
+
+
+ 
+
+
+
+std::vector<std::string> GRproblem::getPortfolioLocs(
+   const std::string & portName) const
+{
+  std::vector<std::string> retVal;
+  int nBops;
+  witGetPartNProducingBopEntries(mutableWitRun(),portName.c_str(),&nBops);
+  for( int i=0; i<nBops; ++i ) {
+    char *opName;
+    int bopEntryIndex;
+    witGetPartProducingBopEntry(mutableWitRun(),portName.c_str(),i,&opName,&bopEntryIndex);
+    std::string loc=locFromPortfolioSourcingOpName(std::string(opName));
+    retVal.push_back(loc);
+    witFree(opName);
+  }
+  return retVal;
+}
+
+
+
+#if 0
+std::vector<float> GRproblem::getPortfolioResourceLinkConsVol( 
+                                         const std::string & port, 
+                                         const std::string & portLoc, 
+                                         const std::string & skill, 
+                                         const std::string & resrcLoc,
+                                         const std::string & band,
+                                         const std::string & role,
+                                         bool homeSite ) const
+{
+  // Get name wit name of operation and part
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  std::string resName = resourceName(skill,resrcLoc,band,role,homeSite);
+
+  int nP = getNPeriods();
+  int bomOfPrimaryResource = -1;
+
+  // set up return vector
+  std::vector<float> retVal;
+  int t1,t;
+  for(t1=0; t1<nP; t1++) retVal.push_back(0.0f);
+
+  // Loop over bom entries
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms);
+  for ( int b=0; b<nBoms; b=b+nP ) {
+
+    
+    // Loop once for each sub bom entry
+    int nSubs;
+    witGetBomEntryNSubsBomEntries(mutableWitRun(),opName.c_str(),b,&nSubs);
+    for ( int s=0; s<nSubs; s++ ) {
+      char * subConsPart;
+      
+      // get name of part consumed by sub bom entry s
+      witGetSubsBomEntryConsumedPart(mutableWitRun(),opName.c_str(),b,s,&subConsPart);
+      
+      // is this consPart the one being queried about?
+      if ( resName==subConsPart ) {
+        
+        // get parts consVol for each period
+        for (t=0; t<nP; t++) {
+          float * cr;
+          witGetSubsBomEntryConsRate(mutableWitRun(),opName.c_str(),b+t,s,&cr);
+          
+          float * sv;
+          witGetSubsBomEntrySubVol(mutableWitRun(),opName.c_str(),b+t,s,&sv);
+          
+          for (t1=1; t1<nP; t1++) assert(cr[t1]==0.0f);
+          for (t1=1; t1<nP; t1++) assert(sv[t1]==0.0f);
+          retVal[t]=retVal[t]+cr[0]*sv[0];
+          
+          // compute execution volume that consumed primary part
+          //ev[0]=ev[0]-sv[0];
+          
+          witFree(sv);
+          witFree(cr);
+        }
+      }
+      witFree(subConsPart);
+    } //for ( int s=0; s<nSubs; s++ ) 
+
+    
+    // get name of part consumed by bom b
+    char * consPart;
+    witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),b,&consPart);
+    
+    // is this consPart the one being queried about?
+    if ( resName==consPart ) {
+      
+      assert(bomOfPrimaryResource==-1);
+      bomOfPrimaryResource = b;
+    }
+    witFree(consPart);
+    
+  } //for ( int b=0; b<nBoms; b=b+nP )
+  
+  // if resource was consumed by bom, then compute consvol
+  if ( bomOfPrimaryResource!=-1 ) {
+    
+    // get parts consVol for each period
+    for (t=0; t<nP; t++) {  
+      
+      float * ev;
+      witGetOperationExecVol(mutableWitRun(),opName.c_str(),&ev);
+      for (t1=1; t1<nP; t1++) assert(ev[t1]==0.0f);
+      
+      // Reduce exectionVol by subVols to get vol of bom
+      // Loop once for each sub bom entry
+      int nSubs;
+      witGetBomEntryNSubsBomEntries(mutableWitRun(),opName.c_str(),bomOfPrimaryResource+t,&nSubs);
+      for ( int s=0; s<nSubs; s++ ) { 
+        float * sv;
+        witGetSubsBomEntrySubVol(mutableWitRun(),opName.c_str(),bomOfPrimaryResource+t,s,&sv);
+        
+        for (t1=1; t1<nP; t1++) assert(sv[t1]==0.0f);
+        
+        // compute execution volume that consumed primary part
+        ev[0]=ev[0]-sv[0];
+        
+        witFree(sv);
+      }
+      
+      float * cr;
+      witGetBomEntryConsRate(mutableWitRun(),opName.c_str(),bomOfPrimaryResource+t,&cr);
+      
+      for (t1=1; t1<nP; t1++) assert(cr[t1]==0.0f);
+      retVal[t]=retVal[t]+cr[0]*ev[0];
+      
+      witFree(cr);
+      witFree(ev);
+    }
+  }
+ 
+  return retVal;
+}
+#endif
+
+void GRproblem::getPortfolioLocConsVols( 
+                                        const std::string & port, 
+                                        const std::string & portLoc, 
+                                        std::vector< std::string > & skills, 
+                                        std::vector< std::string > & resrcLocs,
+                                        std::vector< std::string > & bands,
+                                        std::vector< std::string > & tiers,
+                                        std::vector< std::string > & roles,
+                                        std::vector< bool > & homeSites,
+                                        std::vector< std::vector<float> > & consVols) const
+{  
+  skills.clear();
+  resrcLocs.clear();
+  bands.clear();
+  tiers.clear();
+  roles.clear();
+  homeSites.clear();
+  consVols.clear();
+  
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  GRportLocOpAppData * appData;
+  witGetOperationAppData(mutableWitRun(),opName.c_str(),(void**)&appData);
+  std::vector< std::string > consumedResources;
+  assert( consVols.size()==consumedResources.size() );
+  appData->consVol(consumedResources,consVols);
+  assert( consVols.size()==consumedResources.size() );
+  for (int r=0; r<consumedResources.size(); ++r ) {
+    skills.push_back(skillFromResourceName(consumedResources[r]));
+    resrcLocs.push_back(locFromResourceName(consumedResources[r]));
+    bands.push_back(bandFromResourceName(consumedResources[r]));
+    tiers.push_back(tierFromResourceName(consumedResources[r]));
+    roles.push_back(roleFromResourceName(consumedResources[r]));
+    homeSites.push_back(homeSiteFromResourceName(consumedResources[r]));
+  }
+  assert( consVols.size()==skills.size() );
+}
+
+
+void GRproblem::addCountry(const std::string & countryName )
+{
+  
+  countryNames_.push_back(countryName);
+  witAddPart(witRun(),countryName.c_str(),WitCAPACITY);
+}
+void GRproblem::setCountryMaxFte(const std::string & countryName,
+                              const std::vector<float>& maxFte )
+{
+  
+  setState(UNPREPROCESSED);
+  float * supplyVol = stlVecToFloatStar(maxFte);
+  witSetPartSupplyVol(witRun(),countryName.c_str(),supplyVol);
+  free(supplyVol);
+}
+
+std::vector<float> GRproblem::getCountryMaxFte ( 
+                       const std::string & countryName )
+                       const
+{
+  float * supplyVol;
+  witGetPartSupplyVol(mutableWitRun(),countryName.c_str(),&supplyVol);
+  std::vector<float> retVal = witFloatStarToStlVec(supplyVol);
+  witFree(supplyVol);
+  return retVal;
+}
+
+
+// Resource to Country Link Methods
+void GRproblem::addResourceCountryLink( 
+                                       const std::string & skill,  
+                                       const std::string & loc,
+                                       const std::string & band,
+                                       const std::string & tier,
+                                       const std::string & role,
+                                       const std::string & country )
+{
+  std::string homeRes = homeSiteResourceName(skill,loc,band,tier,role);
+  witAddBomEntry(witRun(),homeRes.c_str(),country.c_str());
+
+  std::string remoteRes = remoteSiteResourceName(skill,loc,band,tier,role);
+  witAddBomEntry(witRun(),remoteRes.c_str(),country.c_str());
+}
+
+
+std::vector<std::string> GRproblem::getResourceCountryLinks( 
+    const std::string & skill,  
+    const std::string & loc,
+    const std::string & band,
+    const std::string & tier,
+    const std::string & role ) const
+{
+  std::vector<std::string> retVal;
+  std::string homeRes = homeSiteResourceName(skill,loc,band,tier,role);
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),homeRes.c_str(),&nBoms);
+
+  // The country resources are now always bomEntry number 1.
+  // There is nothing preventing one from assigning multiple countries
+  // to the same resource, so that is why a vector is returned
+  for( int c=1; c<nBoms; ++c ) {
+    char *country;
+    witGetBomEntryConsumedPart(mutableWitRun(),homeRes.c_str(),c,&country);
+    retVal.push_back(country);
+    witFree(country);
+  }
+  return retVal;
+}
+
+
+void GRproblem::getResources(
+                             std::vector<std::string> & skills,
+                             std::vector<std::string> & locs,
+                             std::vector<std::string> & bands,
+                             std::vector<std::string> & tiers,
+                             std::vector<std::string> & roles)const
+{ 
+  skills.clear();
+  locs.clear();
+  bands.clear();
+  tiers.clear();
+  roles.clear();
+
+  const std::vector<std::string> & rsrcs = resourceNames_;
+  for ( int r=0; r<rsrcs.size(); r++ ) {
+    skills.push_back(skillFromResourceName(rsrcs[r]));
+    locs.push_back(locFromResourceName(rsrcs[r]));
+    bands.push_back(bandFromResourceName(rsrcs[r]));
+    tiers.push_back(tierFromResourceName(rsrcs[r]));
+    roles.push_back(roleFromResourceName(rsrcs[r]));
+  }
+}
+
+
+void GRproblem::getPortfolioResourceLinks( 
+                                          const std::string & port, 
+                                          const std::string & portLoc, 
+                                          std::vector<std::string> & skills,  
+                                          std::vector<std::string> & resrcLocs,
+                                          std::vector<std::string> & bands,
+                                          std::vector<std::string> & tiers,
+                                          std::vector<std::string> & roles,
+                                          std::vector<bool> & homeSites  ) const
+{
+  skills.clear();
+  resrcLocs.clear();
+  bands.clear();
+  tiers.clear();
+  roles.clear();
+  homeSites.clear();
+  
+  int nP = getNPeriods();
+  
+  
+  std::string op = portfolioSourcingOpName(port,portLoc);
+  
+  // loop once for each bom entry (portfolio resource link)
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),op.c_str(),&nBoms);
+  for ( int b=0; b<nBoms; b=b+nP ) {
+    
+    char * consPart;
+    witGetBomEntryConsumedPart(mutableWitRun(),op.c_str(), b, &consPart);
+    
+    skills.push_back( skillFromResourceName(std::string(consPart)) );
+    resrcLocs.push_back( locFromResourceName(std::string(consPart)) );
+    bands.push_back( bandFromResourceName(std::string(consPart)) );
+    tiers.push_back( tierFromResourceName(std::string(consPart)) );
+    roles.push_back( roleFromResourceName(std::string(consPart)) );
+    homeSites.push_back( homeSiteFromResourceName(std::string(consPart)) );
+    
+    witFree(consPart);
+  }
+}
+
+
+#if 0
+void GRproblem::getPortfolioResourceLinks(  
+                                          const std::string & skill,  
+                                          const std::string & resrcLoc,
+                                          const std::string & band,
+                                          const std::string & role,   
+                                          std::vector<std::string> & ports, 
+                                          std::vector<std::string> & portLocs ) const
+{
+  ports.clear();
+  portLocs.clear();
+  
+  int nP = getNPeriods();
+
+  // create set of resources
+  std::set<std::string> portLocSet;
+  std::set<std::string>::iterator it;
+  
+  std::string resName[2];
+  resName[0] = remoteSiteResourceName(skill,resrcLoc,band,"2",role);
+  resName[1] = homeSiteResourceName(skill,resrcLoc,band,"2",role);
+  
+  // loop once for each home and remote resource location
+  for ( int l=0; l<2; ++l ) {
+    // loop once for each bop entry in producing operation
+    int nConsBoms;
+    witGetPartNConsumingBomEntries(mutableWitRun(),resName[l].c_str(),&nConsBoms);
+    for ( int cb=0; cb<nConsBoms; /*cb=cb+nP*/ cb++ ) {
+      
+      char * consOpName;
+      int bomIndex;
+      witGetPartConsumingBomEntry (mutableWitRun(),resName[l].c_str(),cb,
+        &consOpName, &bomIndex );
+      std::string consOp(consOpName);
+      witFree(consOpName);
+      
+      // if portLoc pair has not already been added to return vector then add it
+      it = portLocSet.find(consOp);
+      if ( it==portLocSet.end() ) {
+        ports.push_back( portFromPortfolioSourcingOpName(consOp) );
+        portLocs.push_back( locFromPortfolioSourcingOpName(consOp) );
+        
+        // indicate that portLoc has been newly added to return vectors
+        portLocSet.insert(consOp);    
+      }
+    }
+  }
+}
+#endif
+//----------------------------------------
+#if 0
+void GRproblem::getPortfolioResourceLinksWithSubs( 
+                                                  const std::string & port, 
+                                                  const std::string & portLoc, 
+                                                  std::vector<std::string> & skills,  
+                                                  std::vector<std::string> & resrcLocs,
+                                                  std::vector<std::string> & bands,
+                                                  std::vector<std::string> & roles,
+                                                  std::vector<bool> & homeSites  ) const
+{
+  skills.clear();
+  resrcLocs.clear();
+  bands.clear();
+  roles.clear();
+  homeSites.clear();
+  
+  // create set of resources
+  std::set<std::string> resrcSet;
+  std::set<std::string>::iterator it;
+  
+  int nP = getNPeriods();
+  
+  std::string op = portfolioSourcingOpName(port,portLoc);
+  
+  // loop once for each bom entry (portfolio resource link)
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),op.c_str(),&nBoms);
+  for ( int b=0; b<nBoms; b=b+nP ) {
+    
+    char * consPart;
+    witGetBomEntryConsumedPart(mutableWitRun(),op.c_str(), b, &consPart);
+    
+    // if resource has not already been added to return vector then add it
+    it = resrcSet.find(consPart);
+    if ( it==resrcSet.end() ) {
+      
+      std::string skill = skillFromResourceName(std::string(consPart));;
+      std::string resrcLoc = locFromResourceName(std::string(consPart));
+      std::string band = bandFromResourceName(std::string(consPart));
+      std::string role = roleFromResourceName(std::string(consPart));
+      bool homeSite = homeSiteFromResourceName(std::string(consPart)); 
+
+      skills.push_back( skill );
+      resrcLocs.push_back( resrcLoc );
+      bands.push_back( band );
+      roles.push_back( role );
+      homeSites.push_back( homeSite ); 
+      
+      // indicate that resource has been newly added to return vectors
+      resrcSet.insert(consPart);
+      
+      // Check to see if consPart has any subs  
+      std::string resOp = resourceName(skill,resrcLoc,band,"2",role,homeSite); 
+      // loop once for each substitute bom entry
+      int nSubs;
+      witGetBomEntryNSubsBomEntries(mutableWitRun(),resOp.c_str(),0,&nSubs);
+      for ( int s=0; s<nSubs; s++ ) {
+        
+        char * subConsPart;
+        witGetSubsBomEntryConsumedPart(mutableWitRun(),resOp.c_str(),0,s,&subConsPart);
+        
+        // if resource has not already been added to return vector then add it
+        if ( resrcSet.find(subConsPart)==resrcSet.end() ) {
+          skills.push_back( skillFromResourceName(std::string(subConsPart)) );
+          resrcLocs.push_back( locFromResourceName(std::string(subConsPart)) );
+          bands.push_back( bandFromResourceName(std::string(subConsPart)) );
+          roles.push_back( roleFromResourceName(std::string(subConsPart)) );
+          homeSites.push_back( homeSiteFromResourceName(std::string(subConsPart)) ); 
+          
+          // indicate that resource has been newly added to return vectors
+          resrcSet.insert(subConsPart);
+        }
+        witFree(subConsPart); 
+      }
+      witFree(consPart);  
+    }
+  }
+}
+#endif
+//----------------------------------------
+#if 0
+void GRproblem::getPortfolioResourceLinks( 
+    std::vector<std::string> & ports, 
+    std::vector<std::string> & portLocs, 
+    std::vector<std::string> & skills,  
+    std::vector<std::string> & resrcLocs,
+    std::vector<std::string> & bands,
+    std::vector<std::string> & roles,
+    std::vector<bool> & homeSites  ) const
+{
+  ports.clear();
+  portLocs.clear();
+  skills.clear();
+  resrcLocs.clear();
+  bands.clear();
+  roles.clear();
+  homeSites.clear();
+  
+  int nP = getNPeriods();
+
+  // Loop once for each portfolio
+  std::vector<std::string> allPorts=getPortfolios();
+  for (int p=0; p<allPorts.size(); p++ ) {
+
+    // Loop once for each location where portfolio can be performed
+    std::vector<std::string> locs=getPortfolioLocs(allPorts[p]);
+    for (int l=0; l<locs.size(); l++) {
+      std::string op = portfolioSourcingOpName(allPorts[p],locs[l]);
+
+      // loop once for each bom entry (portfolio resource link)
+      int nBoms;
+      witGetOperationNBomEntries(mutableWitRun(),op.c_str(),&nBoms);
+      for ( int b=0; b<nBoms; b=b+nP ) {
+
+        char * consPart;
+        witGetBomEntryConsumedPart(mutableWitRun(),op.c_str(), b, &consPart);
+
+        ports.push_back(allPorts[p]);
+        portLocs.push_back(locs[l]);
+
+        skills.push_back( skillFromResourceName(std::string(consPart)) );
+        resrcLocs.push_back( locFromResourceName(std::string(consPart)) );
+        bands.push_back( bandFromResourceName(std::string(consPart)) );
+        roles.push_back( roleFromResourceName(std::string(consPart)) );
+        homeSites.push_back( homeSiteFromResourceName(std::string(consPart)) );
+
+        witFree(consPart);
+      }
+    }
+  }
+}
+#endif
+
+//----------------------------------------
+#if 0
+void GRproblem::getPortfolioResourceLinksWithSubs( 
+    std::vector<std::string> & ports, 
+    std::vector<std::string> & portLocs, 
+    std::vector<std::string> & skills,  
+    std::vector<std::string> & resrcLocs,
+    std::vector<std::string> & bands,
+    std::vector<std::string> & roles,
+    std::vector<bool> & homeSites  ) const
+{
+  ports.clear();
+  portLocs.clear();
+  skills.clear();
+  resrcLocs.clear();
+  bands.clear();
+  roles.clear();
+  homeSites.clear();
+  
+  int nP = getNPeriods();
+
+  // Loop once for each portfolio
+  std::vector<std::string> allPorts=getPortfolios();
+  for (int p=0; p<allPorts.size(); p++ ) {
+
+    // Loop once for each location where portfolio can be performed
+    std::vector<std::string> locs=getPortfolioLocs(allPorts[p]);
+    for (int l=0; l<locs.size(); l++) {
+
+      // Get all resource used by port p at location l       
+      std::vector<std::string> skillsUsedByPAtL; 
+      std::vector<std::string> resrcLocsUsedByPAtL;
+      std::vector<std::string> bandsUsedByPAtL;
+      std::vector<std::string> rolesUsedByPAtL;
+      std::vector<bool> homeSitesUsedByPAtL;
+      getPortfolioResourceLinksWithSubs(allPorts[p],locs[l],
+        skillsUsedByPAtL,resrcLocsUsedByPAtL,bandsUsedByPAtL,rolesUsedByPAtL,homeSitesUsedByPAtL);
+
+      // copy these resources to the return vectors
+      for ( int i=0; i<skillsUsedByPAtL.size(); i++ ) {
+        ports.push_back(allPorts[p]);
+        portLocs.push_back(locs[l]);
+        skills.push_back(skillsUsedByPAtL[i]);
+        resrcLocs.push_back(resrcLocsUsedByPAtL[i]);
+        bands.push_back(bandsUsedByPAtL[i]);
+        roles.push_back(rolesUsedByPAtL[i]);
+        homeSites.push_back(homeSitesUsedByPAtL[i]);
+      }
+    }
+  }
+}
+#endif
+//-------------------------------------
+void GRproblem::addResource( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role )
+{
+  std::string remoteRes = remoteSiteResourceName(skill,loc,band,tier,role);
+  std::string   homeRes = homeSiteResourceName(skill,loc,band,tier,role);
+  std::string   baseRes = baseResourceName(skill,loc,band,tier,role);
+
+  resourceNames_.push_back(baseRes);
+
+  witAddPart(witRun(),baseRes.c_str(),WitCAPACITY);
+
+  witAddOperation(witRun(),homeRes.c_str());
+  witAddBomEntry(witRun(),homeRes.c_str(),baseRes.c_str());
+
+  witAddPart(witRun(),homeRes.c_str(),WitCAPACITY);
+  witAddBopEntry(witRun(),homeRes.c_str(),homeRes.c_str());
+
+  witAddOperation(witRun(),remoteRes.c_str());
+  witAddBomEntry(witRun(),remoteRes.c_str(),baseRes.c_str());
+
+  witAddPart(witRun(),remoteRes.c_str(),WitCAPACITY);
+  witAddBopEntry(witRun(),remoteRes.c_str(),remoteRes.c_str());
+  
+}
+
+//-----------------------------------------
+
+
+// add substitute resources
+void GRproblem::addSubstituteResourceLink( 
+                                          const std::string & primSkill,  
+                                          const std::string & primResrcLoc,
+                                          const std::string & primBand,
+                                          const std::string & primTier,
+                                          const std::string & primRole,
+                                          const std::string & subsSkill,  
+                                          const std::string & subsResrcLoc,
+                                          const std::string & subsBand,
+                                          const std::string & subsTier,
+                                          const std::string & subsRole )
+{    
+  int np=getNPeriods();
+  float * delta = new float [np];
+
+  std::string op[2];
+  op[0] = remoteSiteResourceName(primSkill,primResrcLoc,primBand,primTier,primRole);
+  op[1] =   homeSiteResourceName(primSkill,primResrcLoc,primBand,primTier,primRole);
+
+  
+  std::vector<float> primCost[2];
+  primCost[0]= getResourceCostRemoteSite(primSkill,primResrcLoc,primBand,primTier,primRole);
+  primCost[1]=   getResourceCostHomeSite(primSkill,primResrcLoc,primBand,primTier,primRole);
+
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,primTier,primRole);
+
+  std::vector<float> subsCost[2];
+  subsCost[0]= getResourceCostRemoteSite(subsSkill,subsResrcLoc,subsBand,subsTier,subsRole);
+  subsCost[1]=   getResourceCostHomeSite(subsSkill,subsResrcLoc,subsBand,subsTier,subsRole);
+
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,subsTier,subsRole);
+  
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(witRun(),op[0].c_str(),0,&nSubs);
+
+  // Loop once for home and remote usage
+  for ( int l=0; l<2; l++ ) {
+
+    // Add substutite arc
+    witAddSubsBomEntry(witRun(),op[l].c_str(),0,subsResrc.c_str());
+
+    // Set extra cost associated with using substitute
+    for ( int t=0; t<np; ++t ) 
+      delta[t]=subsCost[l][t]-primCost[l][t];
+
+    witSetSubsBomEntryObj1SubCost(witRun(),op[l].c_str(),0,nSubs,delta);
+  }
+  
+  delete delta;
+}
+
+
+#if 0
+void GRproblem::setSubstituteResourceLinkSubsVol(
+    const std::string & primSkill,  
+    const std::string & primResrcLoc,
+    const std::string & primBand,
+    const std::string & primRole,
+    const std::string & subsSkill,  
+    const std::string & subsResrcLoc,
+    const std::string & subsBand,
+    const std::string & subsRole,
+    bool homeSite,
+    const std::vector<float> & subsVol )
+{
+     
+  int np=getNPeriods();
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,"2",primRole);
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,"2",subsRole);
+  std::string opName = resourceName(primSkill,primResrcLoc,primBand,"2",primRole,homeSite);
+
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(mutableWitRun(),opName.c_str(),0,&nSubs);
+
+  // Loop once for each substitute
+  char * subName;
+  int s;
+  for (s=0; s<nSubs; s++ ) {
+    witGetSubsBomEntryConsumedPart(mutableWitRun(),opName.c_str(),0,s,&subName);
+    if ( subsResrc==subName ) {
+      break;
+    }
+    witFree(subName);
+  }
+  // make sure part was found
+  assert(s<nSubs);
+
+  witFree(subName);
+  float * sv = stlVecToFloatStar(subsVol);
+  witSetSubsBomEntrySubVol(witRun(),opName.c_str(),0,s,sv);
+  free(sv);
+}
+#endif
+#if 0
+std::vector<float> GRproblem::getSubstituteResourceLinkSubsVol(
+    const std::string & primSkill,  
+    const std::string & primResrcLoc,
+    const std::string & primBand,
+    const std::string & primRole,
+    const std::string & subsSkill,  
+    const std::string & subsResrcLoc,
+    const std::string & subsBand,
+    const std::string & subsRole,
+    bool homeSite ) const
+{
+     
+  int np=getNPeriods();
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,"2",primRole);
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,"2",subsRole);
+  std::string opName = resourceName(primSkill,primResrcLoc,primBand,"2",primRole,homeSite);
+
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(mutableWitRun(),opName.c_str(),0,&nSubs);
+
+  // Loop once for each substitute
+  char * subName;
+  int s;
+  for (s=0; s<nSubs; s++ ) {
+    witGetSubsBomEntryConsumedPart(mutableWitRun(),opName.c_str(),0,s,&subName);
+    if ( subsResrc==subName ) {
+      break;
+    }
+    witFree(subName);
+  }
+  // make sure part was found
+  assert(s<nSubs);
+
+  witFree(subName);
+  float * sv;
+  witGetSubsBomEntrySubVol(mutableWitRun(),opName.c_str(),0,s,&sv);
+  std::vector<float> retVal = witFloatStarToStlVec(sv);
+  free(sv);
+  return retVal;
+}
+#endif
+
+void GRproblem::getSubstituteResourceLinks(
+    const std::string & primarySkill,  
+    const std::string & primaryResrcLoc,
+    const std::string & primaryBand,
+    const std::string & primaryTier,
+    const std::string & primaryRole,
+    std::vector<std::string> & substituteSkills,  
+    std::vector<std::string> & substituteResrcLocs,
+    std::vector<std::string> & substituteBands,
+    std::vector<std::string> & substituteTiers,
+    std::vector<std::string> & substituteRoles ) const
+{
+  
+  substituteSkills.clear();
+  substituteResrcLocs.clear();
+  substituteBands.clear();
+  substituteTiers.clear();
+  substituteRoles.clear();
+
+  std::string opName = remoteSiteResourceName(
+    primarySkill,primaryResrcLoc,primaryBand,primaryTier,primaryRole);
+  
+  // The consumed resource is bomEntry 0
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(mutableWitRun(),
+    opName.c_str(),0,&nSubs);
+  
+  for ( int s=0; s<nSubs; ++s ) {
+    char * subsName;
+    witGetSubsBomEntryConsumedPart(mutableWitRun(),
+      opName.c_str(),0,s,&subsName); 
+    
+    substituteSkills.push_back(skillFromResourceName(subsName));
+    substituteResrcLocs.push_back(locFromResourceName(subsName));
+    substituteBands.push_back(bandFromResourceName(subsName));
+    substituteTiers.push_back(tierFromResourceName(subsName));
+    substituteRoles.push_back(roleFromResourceName(subsName));
+    
+    witFree(subsName);
+  }
+}
+
+//----------------------
+
+
+
+void GRproblem::setResourceSupply( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role,
+                            const std::vector<float> & supply )
+{  
+  setState(UNPREPROCESSED);
+  std::string baseRes = baseResourceName(skill,loc,band,tier,role); 
+  float * supplyCV = stlVecToFloatStar(supply);
+  witSetPartSupplyVol(witRun(),baseRes.c_str(),supplyCV);
+  free(supplyCV);
+}
+
+std::vector<float> GRproblem::getResourceSupply( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role ) const
+{  
+  std::string baseRes = baseResourceName(skill,loc,band,tier,role); 
+  float * supplyCV;
+  witGetPartSupplyVol(mutableWitRun(),baseRes.c_str(),&supplyCV);
+  std::vector<float> retVal = witFloatStarToStlVec(supplyCV);
+  witFree(supplyCV);
+  return retVal;
+}
+std::vector<float> GRproblem::getResourceConsVol( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role ) const
+{  
+  std::string baseRes = baseResourceName(skill,loc,band,tier,role); 
+  float * resrcConsVol;
+  witGetPartConsVol(mutableWitRun(),baseRes.c_str(),&resrcConsVol);
+  std::vector<float> retVal = witFloatStarToStlVec(resrcConsVol);
+
+#ifdef JP_TEST
+  if ( baseRes==" skill:Project Manager loc:Bank - Detroit band:8 role:Project Manager") {
+    int nPer = getNPeriods();
+    float * hsev;
+    float * rsev;
+    std::string homeRes = homeSiteResourceName(skill,loc,band,tier,role); 
+    std::string remoteRes = remoteSiteResourceName(skill,loc,band,tier,role); 
+    witGetOperationExecVol(mutableWitRun(),homeRes.c_str(),&hsev); 
+    witGetOperationExecVol(mutableWitRun(),remoteRes.c_str(),&rsev);
+    int t;
+    for ( t=0; t<nPer; ++t ) {
+      assert( hsev[t]+rsev[t] == resrcConsVol[t] );
+    }
+    float * hscv;
+    float * rscv;
+    witGetPartConsVol(mutableWitRun(),homeRes.c_str(),&hscv);
+    witGetPartConsVol(mutableWitRun(),remoteRes.c_str(),&rscv);
+    for (t=0; t<nPer; ++t ) {
+      assert( hsev[t] == hscv[t] );
+      assert( rsev[t] == rscv[t] );
+    }
+    witFree(hsev);
+    witFree(rsev);
+    witFree(hscv);
+    witFree(rscv);
+  }
+#endif
+  witFree(resrcConsVol);
+  return retVal;
+}
+
+
+// When a resource is called for substitutes may be consumed.
+// This method returns the actual list of resources that were consumed
+// when the specified resource was called for.
+void GRproblem::getResourceConsVol( 
+                                   const std::string & skill,
+                                   const std::string & loc,
+                                   const std::string & band,
+                                   const std::string & tier,
+                                   const std::string & role,
+                                   bool homeSite,
+                                   std::vector<std::string> & skills,
+                                   std::vector<std::string> & locs,
+                                   std::vector<std::string> & bands,
+                                   std::vector<std::string> & tiers,
+                                   std::vector<std::string> & roles,
+                                   std::vector< std::vector<double> > & consVols
+                                   ) const
+{   
+  // Empty return value vectors
+  skills.clear();
+  locs.clear();
+  bands.clear();
+  tiers.clear();
+  roles.clear();
+  consVols.clear();
+  int np=getNPeriods();
+  int t;
+
+  std::string opName = resourceName(skill,loc,band,tier,role,homeSite); 
+  std::vector<double> execVolD;
+  {
+    float * execVol;
+    witGetOperationExecVol(mutableWitRun(),opName.c_str(),&execVol);
+    
+    for ( t=0; t<np; ++t ){
+      execVolD.push_back(execVol[t]);
+    }
+    witFree(execVol);
+  }
+  
+
+  // Set primary part's consVol initally to zero.
+  // The real value will be computed latter.
+  std::vector<double> consVol;
+  for ( t=0; t<np; ++t ){
+    consVol.push_back(0.0);
+  }
+
+  //Add primary part to returned vectors
+  skills.push_back(skill);
+  locs.push_back(loc);
+  bands.push_back(band);
+  tiers.push_back(tier);
+  roles.push_back(role);
+  consVols.push_back(consVol);
+
+  // For each substitute gets its consumption as substitute and 
+  // push it onto the returned vectors
+  // Loop once for each sub bom entry
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(mutableWitRun(),opName.c_str(),0,&nSubs);
+  for ( int s=0; s<nSubs; s++ ) {
+      
+    // get name of part consumed by sub bom entry s
+    char * subConsPart;
+    witGetSubsBomEntryConsumedPart(mutableWitRun(),opName.c_str(),0,s,&subConsPart);
+     
+    float * subVol;
+    witGetSubsBomEntrySubVol(mutableWitRun(),opName.c_str(),0,s,&subVol);
+    float * subConsRate;
+    witGetSubsBomEntryConsRate(mutableWitRun(),opName.c_str(),0,s,&subConsRate);
+    
+    std::vector<double> subConsVol;
+    bool nonZeroConsVol = false;
+    for (int t=0; t<np; ++t ){
+      OsiAbsFltEq eq;
+      execVolD[t]=execVolD[t]-subVol[t];
+      double subConsVolT=subVol[t]*subConsRate[t];
+      subConsVol.push_back(subConsVolT);
+      if (!eq(subConsVolT,0.0)) 
+        nonZeroConsVol = true;
+    }
+    
+    //Add primary part to returned vectors
+    if ( nonZeroConsVol ) {
+      skills.push_back(skillFromResourceName(subConsPart));
+      locs.push_back(locFromResourceName(subConsPart));
+      bands.push_back(bandFromResourceName(subConsPart));
+      tiers.push_back(tierFromResourceName(subConsPart));
+      roles.push_back(roleFromResourceName(subConsPart));
+      consVols.push_back(subConsVol);
+    }
+    
+    subConsVol.clear();
+    witFree(subVol);
+    witFree(subConsRate);
+    witFree(subConsPart);
+  }
+  
+  // Set primary parts consVol
+  float * consRate;
+  witGetBomEntryConsRate(mutableWitRun(),opName.c_str(),0,&consRate);
+  for ( t=0; t<np; ++t ){
+    consVols[0][t]=execVolD[t]*consRate[t];
+  }
+
+  witFree(consRate);
+}
+
+
+void GRproblem::setResourceCostHomeSite( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role,
+                            const std::vector<float> & costHomeSite )
+{  
+  setState(UNPREPROCESSED);
+  std::string offRes = homeSiteResourceName(skill,loc,band,tier,role); 
+  float * costCV = stlVecToFloatStar(costHomeSite);
+  witSetOperationObj1ExecCost(witRun(),offRes.c_str(),costCV);
+  free(costCV);
+}
+
+std::vector<float> GRproblem::getResourceCostHomeSite( 
+                                                 const std::string & skill,
+                                                 const std::string & loc,
+                                                 const std::string & band,
+                                                 const std::string & tier,
+                                                 const std::string & role) const
+{  
+  std::string offRes = homeSiteResourceName(skill,loc,band,tier,role);
+  float * costCV;
+  witGetOperationObj1ExecCost(mutableWitRun(),offRes.c_str(),&costCV);
+  std::vector<float> retVal = witFloatStarToStlVec(costCV);
+  witFree(costCV);
+  return retVal;
+}
+
+void GRproblem::setResourceCostRemoteSite( 
+                            const std::string & skill,
+                            const std::string & loc,
+                            const std::string & band,
+                            const std::string & tier,
+                            const std::string & role,
+                            const std::vector<float> & costRemoteSite )
+{  
+  setState(UNPREPROCESSED);
+  std::string offRes = remoteSiteResourceName(skill,loc,band,tier,role); 
+  float * costCV = stlVecToFloatStar(costRemoteSite);
+  witSetOperationObj1ExecCost(witRun(),offRes.c_str(),costCV);
+  free(costCV);
+}
+std::vector<float> GRproblem::getResourceCostRemoteSite( 
+                                                 const std::string & skill,
+                                                 const std::string & loc,
+                                                 const std::string & band,
+                                                 const std::string & tier,
+                                                 const std::string & role) const
+{  
+  std::string offRes = remoteSiteResourceName(skill,loc,band,tier,role);
+  float * costCV;
+  witGetOperationObj1ExecCost(mutableWitRun(),offRes.c_str(),&costCV);
+  std::vector<float> retVal = witFloatStarToStlVec(costCV);
+  witFree(costCV);
+  return retVal;
+}
+
+
+
+
+void GRproblem::writeWitData( std::string filename ) const
+{
+  witWriteData(mutableWitRun(), filename.c_str() );
+}
+
+
+void GRproblem::getPortfolioLocationLinks( 
+                                          std::vector< std::string > & portNames, 
+                                          std::vector< std::string > & locNames ) const 
+{
+  portNames.clear();
+  locNames.clear();
+  const std::vector< std::string > ports = getPortfolios();
+  for ( int p=0; p<ports.size(); p++ ) {
+    const std::vector< std::string > locs = getPortfolioLocs(ports[p]);
+    for ( int l=0; l<locs.size(); l++ ) {
+      portNames.push_back(ports[p]);
+      locNames.push_back(locs[l]);
+    }
+  }
+}
+
+
+bool GRproblem::sufficientResources() const
+{
+#if 0
+  bool retVal;
+  witBoolean feas;
+  witGetFeasible(mutableWitRun(),&feas);
+  if ( feas ) retVal=true;
+  else retVal=false;
+  return retVal;
+#else
+  bool retVal=true;
+  const std::vector<std::string> & ports = getPortfolios();
+  int np = getNPeriods();
+  float * sv;
+  float * dv;
+  OsiRelFltEq eq;
+  
+  for ( int p=0; p<ports.size(); p++ ) {
+    witGetDemandShipVol(mutableWitRun(),ports[p].c_str(),"Demand",&sv);
+    witGetDemandDemandVol(mutableWitRun(),ports[p].c_str(),"Demand",&dv);
+    for ( int t=0; t<np; t++ ) {
+      if ( !eq(dv[t],sv[t]) ) {
+        retVal=false;
+        break;
+      }
+    }
+    witFree(sv);
+    witFree(dv);
+    if ( !retVal ) break;
+  }
+  return retVal;
+#endif
+}
+
+
+void GRproblem::getShortages(     
+    std::vector<std::string> & resourceDescriptions,
+    std::vector<int> & periods,
+    std::vector<float> & shortageVols ) const
+{
+  resourceDescriptions.clear();
+  periods.clear();
+  shortageVols.clear();
+
+  // Set Focus
+  const std::vector<std::string> & ports = getPortfolios();
+  int np = getNPeriods();
+  
+  for ( int p=0; p<ports.size(); p++ ) {
+    float *dv;
+    witGetDemandDemandVol(mutableWitRun(),ports[p].c_str(),"Demand",&dv);
+    witSetDemandFssShipVol(mutableWitRun(),ports[p].c_str(),"Demand",dv);
+    witFree(dv);
+  }
+
+  int lenList;
+  char **partList;
+  float ** shortageVolList;  
+  OsiRelFltEq eq;
+  witGetFocusShortageVol ( mutableWitRun(), &lenList, &partList, &shortageVolList );
+  for ( int i=0; i<lenList; i++ ) {
+    for ( int t=0; t<np; t++ ) {
+      if ( eq(shortageVolList[i][t],0.0) ) continue;
+      resourceDescriptions.push_back(partList[i]);
+      periods.push_back(t);
+      shortageVols.push_back(shortageVolList[i][t]);
+    }
+    witFree(partList[i]);
+    witFree(shortageVolList[i]);
+  }
+  witFree(partList);
+  witFree(shortageVolList);
+}
+
+
+std::string GRproblem::portfolioSourcingOpName( 
+                                               const std::string & portName, 
+                                               const std::string & locName ) 
+{
+  return portName+" performed at "+locName;
+}
+std::string GRproblem::portFromPortfolioSourcingOpName( const std::string & opName )
+{
+  int locBegPos = opName.find(" performed at ");
+  assert( locBegPos != std::string::npos );
+  std::string retVal = opName.substr(0,locBegPos);
+  return retVal;
+}
+
+std::string GRproblem::locFromPortfolioSourcingOpName( const std::string & opName )
+{
+  int locBegPos = opName.find(" performed at ");
+  assert( locBegPos != std::string::npos );
+  locBegPos = locBegPos+std::string(" performed at ").size();
+
+  int locEndPos = opName.size();
+
+  int bandLen = locEndPos-locBegPos;
+  std::string retVal = opName.substr(locBegPos,bandLen);
+  return retVal;
+}
+
+//--------------------------------
+
+std::string GRproblem::remoteSiteResourceName( 
+                                           const std::string & skill, 
+                                           const std::string & loc, 
+                                           const std::string & band, 
+                                           const std::string & tier,
+                                           const std::string & role) 
+{
+  return std::string("remoteSite: ") + baseResourceName(skill,loc,band,tier,role);
+}
+std::string GRproblem::homeSiteResourceName( 
+                                           const std::string & skill, 
+                                           const std::string & loc, 
+                                           const std::string & band,
+                                           const std::string & tier,
+                                           const std::string & role) 
+{
+  return std::string("homeSite: ") + baseResourceName(skill,loc,band,tier,role);
+}
+std::string GRproblem::resourceName( 
+                                           const std::string & skill, 
+                                           const std::string & loc, 
+                                           const std::string & band,
+                                           const std::string & tier,
+                                           const std::string & role,
+                                           bool homeSite ) 
+{
+  std::string retVal;
+  if (homeSite) 
+    retVal = homeSiteResourceName(skill,loc,band,tier,role);
+  else
+    retVal = remoteSiteResourceName(skill,loc,band,tier,role);
+  return retVal;
+}
+std::string GRproblem::baseResourceName( 
+                                           const std::string & skill, 
+                                           const std::string & loc, 
+                                           const std::string & band, 
+                                           const std::string & tier,
+                                           const std::string & role) 
+{
+  return 
+    " skill:" + skill +
+    " loc:"+ loc +
+    " band:" + band +
+    " tier:" + tier +
+    " role:" + role;
+}
+
+
+std::string GRproblem::skillFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " skill:";
+  std::string endMark = " loc:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+std::string GRproblem::locFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " loc:";
+  std::string endMark = " band:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+std::string GRproblem::bandFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " band:";
+  std::string endMark = " tier:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+std::string GRproblem::tierFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " tier:";
+  std::string endMark = " role:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+std::string GRproblem::roleFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " role:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.size();
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+bool GRproblem::homeSiteFromResourceName(const std::string & resName )
+{
+  bool retVal=true;
+  std::string target = "homeSite: ";
+  int begPos = resName.find(target);
+  if ( begPos == std::string::npos ) retVal=false;
+  return retVal;
+}
+
+//---------------------------------
+
+
+#ifdef CLEANUP
+std::string GRproblem::appNameFromAppSourcingOpName( std::string portfolioSourcingOpName ) const
+{
+  int perPos = portfolioSourcingOpName.find(" performed at ");
+  assert( perPos != std::string::npos );
+  std::string retVal = portfolioSourcingOpName.substr(0,perPos-1);
+  return retVal;
+}
+
+std::string GRproblem::locNameFromAppSourcingOpName( std::string portfolioSourcingOpName ) const
+{
+  int perPos = portfolioSourcingOpName.find(" performed ");
+  assert( perPos != std::string::npos );
+  perPos = perPos + std::string(" performed ").size();
+  std::string retVal = portfolioSourcingOpName.substr(perPos);
+  return retVal;
+}
+
+bool GRproblem::isAppSourcingOpName( std::string opName ) const
+{
+  return opName.find(" performed ")!=std::string::npos;
+}
+
+
+void GRproblem::getAppSourcingLoc( 
+                               std::vector<std::string> & appName,
+                               std::vector<std::string> & locName,                               
+                               std::vector<float> & quantity )
+                               const
+{
+
+  // Get list of all operations
+  int lenOpList;
+  char ** opList;
+  witGetOperations (mutableWitRun(),&lenOpList,&opList);
+
+  for( int o=0; o<lenOpList; ++o ) {
+
+    // is this a sourcing operation
+    if ( isAppSourcingOpName(opList[o]) ) {
+      float * ev;
+      witGetOperationExecVol(mutableWitRun(),
+        opList[o],
+        &ev);
+      quantity.push_back(ev[0]);
+      std::string an = appNameFromAppSourcingOpName(opList[o]);
+      appName.push_back(an);
+      std::string ln = locNameFromAppSourcingOpName(opList[o]);
+      locName.push_back(ln);
+      witFree(ev);
+    }
+    witFree(opList[o]);
+
+  }
+  witFree(opList);
+
+}
+#endif
+
+void GRproblem::postprocess()
+{
+  OsiAbsFltEq eq(1.e-06);
+
+  assert( getState()==SOLVED );
+  setState(POSTPROCESSED);
+
+  int np=getNPeriods();
+
+  //determine substitute usage for each home and remote resource
+  //loop over each resource
+  std::vector<std::string> skills;
+  std::vector<std::string> locs;
+  std::vector<std::string> bands;
+  std::vector<std::string> tiers;
+  std::vector<std::string> roles;
+  getResources(skills,locs,bands,tiers,roles);
+  for( int r=0; r<skills.size(); ++r ) {
+    bool homeSite[2] = {true,false};
+    for ( int hs=0; hs<2; hs++ ) {
+      
+      std::vector<std::string> ss;
+      std::vector<std::string> ls;
+      std::vector<std::string> bs;
+      std::vector<std::string> ts;
+      std::vector<std::string> rs;
+
+      // consVols[s][t]
+      // s : 0 to number of substitue resources for resource r
+      // t : 0 to np-1
+      std::vector< std::vector<double> >consVols;
+      
+#if 0
+      if ( !(
+              skills[r]=="COBOL" && 
+              locs[r]=="India - IGSI" && 
+              (bands[r]=="7" || bands[r]=="6")   && 
+              roles[r]=="Application Developer" 
+              //&& alg=="SimpleGreedy" 
+              ) ) continue;
+#endif
+
+      getResourceConsVol( 
+        skills[r], locs[r], bands[r],tiers[r], roles[r],homeSite[hs],
+        ss, ls, bs, ts, rs, consVols );
+
+      std::string res = resourceName(skills[r], locs[r], bands[r], tiers[r], roles[r],homeSite[hs]);
+      int nConsumingBomEntries;
+      witGetPartNConsumingBomEntries(mutableWitRun(),res.c_str(),&nConsumingBomEntries);
+      for (int ci=0; ci<nConsumingBomEntries; ci=ci+np ) {
+        char * opName;
+        int bei;
+        witGetPartConsumingBomEntry(mutableWitRun(),res.c_str(),ci,&opName,&bei);
+
+        // opName is the name of a portfolio-location operation.
+        // determine if the portfolio is performed in this location
+        std::string port = portFromPortfolioSourcingOpName(opName);
+        std::string loc  = locFromPortfolioSourcingOpName(opName);
+        float plev = getPortfolioLocationExecVol(port,loc);
+        if ( eq(plev,0.0) ) continue;
+
+        // Get operations App Data where consVol will be stored
+        GRportLocOpAppData * appData;
+        witGetOperationAppData(witRun(),opName,(void**)&appData);
+
+        // rate of consumption
+        std::vector<float> consRate = getPortfolioResourceLinkConsRate(
+          port,loc,skills[r], locs[r], bands[r],tiers[r], roles[r],homeSite[hs]);
+        
+        for ( int t=0; t<np; ++t ) {
+          float remConsVol=plev*consRate[t];
+          if ( eq(remConsVol,0.0) ) continue;
+          // Loop once for each consumed resource
+          for ( int cr=0; cr<consVols.size(); cr++ ) {
+            if ( consVols[cr][t] > 0.0 ) {
+              float decr=remConsVol<consVols[cr][t]?remConsVol:consVols[cr][t];
+              remConsVol-=decr;
+              consVols[cr][t]-=decr;
+              std::string consResource = resourceName( ss[cr], ls[cr], bs[cr], ts[cr], rs[cr], homeSite[hs] );
+              appData->addConsVol(consResource,np,t,decr);
+            }
+            if ( eq(remConsVol,0.0) )  break;
+          }
+        } // for ( int t=0; t<np; ++t )              
+      } //for (int ci=0; ci<nConsumingBomEntries; ci=ci+np ) 
+      for ( int t=0; t<np; ++t ) {
+        for ( int cr=0; cr<consVols.size(); cr++ ) {
+          float unAllocated = consVols[cr][t];
+          OsiAbsFltEq eq(1.e-04);
+          assert( eq(unAllocated,0.0) );
+        }
+      }
+    } //for ( int hs=0; hs<2; hs++ )
+  } //for( int r=0; r<skills.size(); ++r )
+  
+}
+
+void GRproblem::unpreprocess()
+{  
+  // Loop over all portfolios
+  std::vector<std::string> ports=getPortfolios();
+  for ( int p=0; p<ports.size(); p++ ) {
+
+    // loop over portfolio canidate locations
+    std::vector<std::string> portLocs=getPortfolioLocs(ports[p]);
+    for( int l=0; l<portLocs.size(); l++ ) {
+      std::string opName = portfolioSourcingOpName(ports[p],portLocs[l]);
+
+      // Get the app data associated with this operation    
+      GRportLocOpAppData * appData;
+      witGetOperationAppData(witRun(),opName.c_str(),(void**)&appData);
+      appData->clear();
+    }
+  }
+}
+
+void GRproblem::preprocess()
+{
+  //if ( getState()!=UNPREPROCESSED ) return;
+  assert( getState()==UNPREPROCESSED );
+  setState(PREPROCESSED);
+  assert( getState()==PREPROCESSED );  
+
+  int np=getNPeriods();
+  float * zeroVec = (float*)malloc(np*sizeof(np));
+  int t;
+  for ( t=0; t<np; t++ )
+    zeroVec[t]=0.0f;
+
+  // get all operations and set execVol to zero.
+  // get all subBomEntries and set execVol to zero.
+  {
+    int nOps;
+    char ** opList;
+    witGetOperations (mutableWitRun(),&nOps,&opList);
+    for ( int o=0; o<nOps; o++ ) {
+      witSetOperationExecVol(witRun(),opList[o],zeroVec);
+
+      // loop once for each bomEntry
+      int nBoms;
+      witGetOperationNBomEntries(mutableWitRun(),opList[o],&nBoms);
+      for ( int b=0; b<nBoms; ++b ) {
+
+        // Loop once for each SubBomEntry
+        int nSubs;
+        witGetBomEntryNSubsBomEntries(mutableWitRun(),opList[o],b, &nSubs);
+        for ( int s=0; s<nSubs; ++s ) {
+          witSetSubsBomEntrySubVol(witRun(),opList[o],b,s,zeroVec);
+        }
+
+      }
+      witFree(opList[o]);
+    }
+    witFree(opList);
+  }
+
+  // Loop over all portfolios
+  std::vector<std::string> ports=getPortfolios();
+  for ( int p=0; p<ports.size(); p++ ) {
+
+    // Set portfolio's ship vol to zero
+    witSetDemandShipVol(witRun(),ports[p].c_str(),"Demand",zeroVec);
+
+    // loop over portfolio canidate locations
+    std::vector<std::string> portLocs=getPortfolioLocs(ports[p]);
+    for( int l=0; l<portLocs.size(); l++ ) {
+      std::string opName = portfolioSourcingOpName(ports[p],portLocs[l]);
+
+      // Get the app data associated with this operation    
+      GRportLocOpAppData * appData;
+      witGetOperationAppData(witRun(),opName.c_str(),(void**)&appData);
+      
+      // loop over each resource consumed by portfolio at location
+      std::vector<std::string> skills; 
+      std::vector<std::string> resrcLocs;
+      std::vector<std::string> bands;
+      std::vector<std::string> tiers;
+      std::vector<std::string> roles;
+      std::vector<bool> homeSites;
+      getPortfolioResourceLinks(ports[p],portLocs[l],skills,resrcLocs,bands,tiers,roles,homeSites);
+      
+      // If there are no resourse consumed then set cost infinite
+      if ( skills.size()==0 ) 
+        appData->unitExecCost(FLT_MAX);
+      else
+        appData->unitExecCost(0.0);
+
+      appData->unitConsVol(np,0.0f);
+      for( int prl=0; prl<skills.size(); prl++ ) {
+
+        //-------------------------------------------
+        // Compute cost to do portfolio P at location L (unitExecCost)
+        // Compute total number of resources consumed when doing portfolio P at location L (unitConsVol)
+        //-------------------------------------------
+        {
+          // get resources consumption rate and cost
+          std::vector<float> consRate=getPortfolioResourceLinkConsRate(ports[p],portLocs[l],skills[prl],resrcLocs[prl],bands[prl],tiers[prl],roles[prl],homeSites[prl]); 
+          std::vector<float> costRate;
+          if (homeSites[prl]) costRate=getResourceCostHomeSite( skills[prl],resrcLocs[prl],bands[prl],tiers[prl],roles[prl] );
+          else costRate=getResourceCostRemoteSite( skills[prl],resrcLocs[prl],bands[prl],tiers[prl],roles[prl] );
+          
+          // Loop once for each time period
+          float resrcCost=0;
+          for ( int t=0; t<np; t++ ) {
+            // compute cost of consuming this resource
+            resrcCost = resrcCost + consRate[t]*costRate[t];
+          }
+          
+          // Add cost of consuming this resource to the cost of performing 
+          // portfolio p at location l.
+          appData->unitExecCost(resrcCost+appData->unitExecCost());
+          
+          // Add consRate to unitConsVol
+          appData->addToUnitConsVol(consRate);
+        }
+
+      }
+
+      int bopEntryIndex = getBopEntryIndex(ports[p],portLocs[l]);
+      witSetBopEntryExpAversion(witRun(),opName.c_str(),bopEntryIndex,appData->unitExecCost());
+    }
+
+    // Naively set demand priorty to loop index
+    int * priority;
+    witGetDemandPriority(mutableWitRun(),ports[p].c_str(),"Demand",&priority);
+    for ( int t=0; t<np; t++ ) priority[t]=p+1;
+    witSetDemandPriority(witRun(),ports[p].c_str(),"Demand",priority);
+    witFree(priority);
+  }
+  
+  free(zeroVec);
+  assert( getState()==PREPROCESSED );
+}
+
+
+int GRproblem::getNumSubstitutes() const 
+{
+  return numSubs_;
+}
+
+void GRproblem::setAlgorithm( const std::string & alg )
+{
+  setState(UNPREPROCESSED);
+  assert(validAlgorithm(alg));
+  alg_ = alg;
+}
+const std::string & GRproblem::getAlgorithm() const 
+{
+  return alg_;
+}
+bool GRproblem::validAlgorithm(const std::string & alg) 
+{
+  bool retVal=false;
+  std::vector<std::string> algChoices = algorithmChoices();
+  for ( int a=0; a<algChoices.size(); a++ ) {
+    if ( alg==algChoices[a] ) {
+      retVal=true;
+      break;
+    }
+  }
+  return retVal;
+}
+
+WitRun * GRproblem::mutableWitRun() const { return wr_; }
+WitRun * GRproblem::witRun() { return wr_; }
+
+
+void GRproblem::execVolSubVolSettingComplete()
+{
+  witPostprocess(witRun());
+  
+  // Get consVol of each home and remote resource and set its 
+  // producing consVol
+  std::vector<std::string> skills;
+  std::vector<std::string> locs;
+  std::vector<std::string> bands;
+  std::vector<std::string> tiers;
+  std::vector<std::string> roles;
+  getResources(skills,locs,bands,tiers,roles);
+  
+  // Loop once for home and remote location
+  for ( int hrl=0; hrl<2; hrl++ ) {
+    bool homeSite = hrl==0 ? true : false;
+    // loop once for each resource
+    for (int r=0; r<skills.size(); r++ ) {
+      std::string resName = resourceName(skills[r],locs[r],bands[r],tiers[r],roles[r],homeSite); 
+      float * resrcConsVol;
+      witGetPartConsVol(mutableWitRun(),resName.c_str(),&resrcConsVol);
+      witSetOperationExecVol(witRun(),resName.c_str(),resrcConsVol);
+      witFree(resrcConsVol);    
+    }
+  } 
+
+  witPostprocess(witRun());
+}
+
+void GRproblem::solve() 
+{
+  preprocess();
+  assert( getState()==PREPROCESSED );
+  int np=getNPeriods();
+  
+  std::string alg=getAlgorithm(); 
+  assert(validAlgorithm(alg));
+  
+  // Is alg linear programming?
+  if ( alg=="LP" ) 
+  {
+    // LP algortihm  
+    witSetOptWithLotSizes(witRun(),WitFALSE);
+    witOptImplode( witRun() );
+  }
+
+  // Is the algorithm MIP?
+  else if ( alg=="MIP" ) 
+  {
+#if 0
+    witPreprocess(witRun());
+    GRmipProblem grMip;
+    grMip.grProblemPtr(this);
+    grMip.solve();
+    execVolSubVolSettingComplete();
+#else
+    witSetOptWithLotSizes(witRun(),WitTRUE);
+    witWriteData(mutableWitRun(), "mipData.wit" );
+    witOptImplode(witRun());  
+#endif
+  }
+
+  // Is the algorithm Greedy?
+  else if ( alg.find("Greedy")!=std::string::npos  ) 
+  {
+
+    // Get list of portfolios and based on type of Greedy Algorithm
+    std::vector<std::string> ports=getPortfolios();
+    std::vector<GRsortablePortfolio> sortablePorts;
+    int p;
+    for ( p=0; p<ports.size(); p++ ) {
+      sortablePorts.push_back(GRsortablePortfolio(ports[p],*this));
+    }
+
+    // Sort portfolios base on algorithm
+#if defined(_MSC_VER)
+    if ( alg=="SimpleGreedy" ) 
+    //does not compile on aix so don't bother sorting
+      std::sort(sortablePorts.begin(), &sortablePorts[ports.size()], GRalphabeticPortLocName );
+    else if ( alg=="MaxMinPortLocCostGreedy" )
+      std::sort(sortablePorts.begin(), &sortablePorts[ports.size()], GRmaxMinPortLocCost );
+    else if ( alg=="MaxMaxPortLocCostGreedy" )
+      std::sort(sortablePorts.begin(), &sortablePorts[ports.size()], GRmaxMaxPortLocCost );
+    else if ( alg=="MaxMinPortLocResrcConsGreedy" )
+      std::sort(sortablePorts.begin(), &sortablePorts[ports.size()], GRmaxMinPortLocConsVol );
+    else if ( alg=="MaxMaxPortLocResrcConsGreedy" )
+      std::sort(sortablePorts.begin(), &sortablePorts[ports.size()], GRmaxMaxPortLocConsVol );
+    else assert(0==1);
+#endif
+
+    // Set demand priority based on sorted order
+    {
+      int * priority = (int *) malloc(np*sizeof(int));
+      for ( p=0; p<sortablePorts.size(); p++ ) {
+        const char * port = sortablePorts[p].portfolioName().c_str();
+        for ( int t=0; t<np; t++ ) 
+          priority[t]=p+1;
+        witSetDemandPriority(witRun(),port,"Demand",priority);
+      }
+      free(priority);
+    }
+    witHeurImplode( witRun() );
+  }
+  assert( getState()==PREPROCESSED );
+  setState(SOLVED);
+  postprocess();
+}
+
+
+  
+
+// default constructor
+GRproblem::GRproblem()
+:
+wr_(NULL),
+state_(UNPREPROCESSED),
+alg_("LP"),
+numSubs_(0),
+portNames_(),
+locNames_(),
+resourceNames_(),
+countryNames_()
+{
+  witNewRun( &wr_ );
+  witInitialize( witRun() );
+  //witSetOslMesgFileName(witRun(),WitSTDOUT);
+  
+  // Turn off WIT informational messages
+  witSetMesgTimesPrint( witRun(), WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+  // Turn off warning msg about long names.
+  witSetMesgTimesPrint( witRun(), WitTRUE, 338, 0);
+  /* Turn off warning msg:
+  WIT0749W One or more BOP entries have been rejected for possible explosion,
+         because they had positive effective production rates (= yieldRate *
+         productRate) that were below the value of expCutoff. The largest
+         effective production rate that was rejected and the corresponding BOP
+         entry and execution period are given below:
+
+            expCutoff:             0.01
+            Largest Rejected Rate: 0.008
+            Operation:             "disassemble_26353AU"
+            BOP Entry Index:       4
+            Exec. Period:          0
+  */
+  //witSetMesgTimesPrint( witRun(), WitTRUE, 749, 0);
+  
+  
+  //witSetTitle( witRun(), "DaimlerChrysler" );
+  //witSetNPeriods( witRun(), 1 );
+  witSetObjChoice( witRun(), 1 );
+  witSetUseFocusHorizons( witRun(), WitFALSE );
+
+  witSetExecEmptyBom( witRun(), WitFALSE );
+  witSetMultiRoute( witRun(), WitTRUE );
+ 
+}
+
+// destructor
+GRproblem::~GRproblem()
+{
+  gutsOfDestructor();
+}
+
+
+
+// copy constructor
+GRproblem::GRproblem( const GRproblem& source ):
+wr_(NULL)
+{
+  gutsOfCopy(source);
+}
+
+// assignment operator
+GRproblem&
+GRproblem::operator=(const GRproblem& rhs)
+{  
+  if (this != &rhs) { 
+    if ( wr_ != NULL ) gutsOfDestructor();
+    wr_ = NULL;
+    gutsOfCopy(rhs);
+  }
+  return *this;
+}
+
+// copy object
+void GRproblem::gutsOfCopy( const GRproblem& source )
+{
+  // Copy Wit Run
+  assert(wr_==NULL);
+  witNewRun( &wr_ );
+
+  // be conservative and say copy is not preprocessed
+  state_=UNPREPROCESSED;
+  alg_=source.alg_;
+  
+  // Turn off WIT informational messages
+  witSetMesgTimesPrint( wr_, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+  // Turn off warning msg about long names.
+  witSetMesgTimesPrint( wr_, WitTRUE, 338, 0);
+  
+  witCopyData(wr_,source.wr_);
+  
+  portNames_  = source.portNames_;
+  locNames_ = source.locNames_;
+  resourceNames_ = source.resourceNames_;
+  countryNames_ = source.countryNames_;
+
+  // copy app data
+  {
+    std::vector<std::string> ports=source.getPortfolios();
+    for ( int p=0; p<ports.size(); p++ ) {
+      std::vector<std::string> locs=source.getPortfolioLocs(ports[p]);
+      for( int l=0; l<locs.size(); l++ ) {
+        std::string opName = source.portfolioSourcingOpName(ports[p],locs[l]);
+        GRportLocOpAppData * srcAd;
+        witGetOperationAppData(source.wr_,opName.c_str(),(void**)&srcAd);
+        GRportLocOpAppData * ad = new GRportLocOpAppData(*srcAd);
+        witSetOperationAppData(wr_,opName.c_str(),(void**)&srcAd);
+      }
+    }
+  }
+  
+}
+
+// destructor
+void GRproblem::gutsOfDestructor()
+{
+  // delete app data
+  {
+    std::vector<std::string> ports=getPortfolios();
+    for ( int p=0; p<ports.size(); p++ ) {
+      std::vector<std::string> locs=getPortfolioLocs(ports[p]);
+      for( int l=0; l<locs.size(); l++ ) {
+        std::string opName = portfolioSourcingOpName(ports[p],locs[l]);
+        GRportLocOpAppData * ad;
+        witGetOperationAppData(witRun(),opName.c_str(),(void**)&ad);
+        delete ad;
+      }
+    }
+  }
+  
+  // delete the witRun
+  witDeleteRun(witRun());
+  
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+//------------------------------------------------------------------------------
+// Test function
+//------------------------------------------------------------------------------
+void
+GRproblem::test()
+{
+  //OsiRelFltEq eq(1e-05);
+  GRproblem dcp;
+  dcp.solve();
+    
+    
+}
+
+
+@
+
+
+1.10
+log
+@Added method to get substitute usage
+@
+text
+@d132 3
+d280 1
+d286 1
+a286 1
+  std::string resName = resourceName(skill,resrcLoc,band,role,homeSite);
+d328 1
+d336 1
+a336 1
+  std::string resName = resourceName(skill,resrcLoc,band,role,homeSite);
+d393 1
+d402 1
+a402 1
+  std::string resName = resourceName(skill,resrcLoc,band,role,homeSite);
+d405 1
+a405 1
+  int bei=getBomEntryIndex(port,portLoc,skill,resrcLoc,band,role,homeSite);
+a434 1
+ 
+d441 1
+d447 1
+a447 1
+  std::string resName = resourceName(skill,resrcLoc,band,role,homeSite);
+d450 1
+a450 1
+  int bei=getBomEntryIndex(port,portLoc,skill,resrcLoc,band,role,homeSite);
+a478 1
+
+d626 1
+d634 1
+d650 1
+d691 1
+d695 1
+a695 1
+  std::string homeRes = homeSiteResourceName(skill,loc,band,role);
+d698 1
+a698 1
+  std::string remoteRes = remoteSiteResourceName(skill,loc,band,role);
+d707 1
+d711 1
+a711 1
+  std::string homeRes = homeSiteResourceName(skill,loc,band,role);
+d732 1
+d738 1
+d746 1
+d758 1
+d765 1
+d785 1
+d793 2
+d813 2
+a814 2
+  resName[0] = remoteSiteResourceName(skill,resrcLoc,band,role);
+  resName[1] = homeSiteResourceName(skill,resrcLoc,band,role);
+d842 1
+a842 1
+
+d844 1
+d896 1
+a896 1
+      std::string resOp = resourceName(skill,resrcLoc,band,role,homeSite); 
+d922 1
+d924 1
+a924 1
+
+d975 1
+d978 1
+a978 1
+
+d1028 1
+d1034 1
+d1037 3
+a1039 3
+  std::string remoteRes = remoteSiteResourceName(skill,loc,band,role);
+  std::string   homeRes = homeSiteResourceName(skill,loc,band,role);
+  std::string   baseRes = baseResourceName(skill,loc,band,role);
+d1067 1
+d1072 1
+d1079 2
+a1080 2
+  op[0] = remoteSiteResourceName(primSkill,primResrcLoc,primBand,primRole);
+  op[1] =   homeSiteResourceName(primSkill,primResrcLoc,primBand,primRole);
+d1084 2
+a1085 2
+  primCost[0]= getResourceCostRemoteSite(primSkill,primResrcLoc,primBand,primRole);
+  primCost[1]=   getResourceCostHomeSite(primSkill,primResrcLoc,primBand,primRole);
+d1087 1
+a1087 1
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,primRole);
+d1090 2
+a1091 2
+  subsCost[0]= getResourceCostRemoteSite(subsSkill,subsResrcLoc,subsBand,subsRole);
+  subsCost[1]=   getResourceCostHomeSite(subsSkill,subsResrcLoc,subsBand,subsRole);
+d1093 1
+a1093 1
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,subsRole);
+d1115 1
+d1130 3
+a1132 3
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,primRole);
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,subsRole);
+  std::string opName = resourceName(primSkill,primResrcLoc,primBand,primRole,homeSite);
+d1155 2
+d1170 3
+a1172 3
+  std::string primResrc = baseResourceName(primSkill,primResrcLoc,primBand,primRole);
+  std::string subsResrc = baseResourceName(subsSkill,subsResrcLoc,subsBand,subsRole);
+  std::string opName = resourceName(primSkill,primResrcLoc,primBand,primRole,homeSite);
+d1197 1
+d1203 1
+d1208 1
+d1215 1
+d1219 1
+a1219 1
+    primarySkill,primaryResrcLoc,primaryBand,primaryRole);
+d1234 1
+d1249 1
+d1254 1
+a1254 1
+  std::string baseRes = baseResourceName(skill,loc,band,role); 
+d1264 1
+d1267 1
+a1267 1
+  std::string baseRes = baseResourceName(skill,loc,band,role); 
+d1278 1
+d1281 1
+a1281 1
+  std::string baseRes = baseResourceName(skill,loc,band,role); 
+d1291 2
+a1292 2
+    std::string homeRes = homeSiteResourceName(skill,loc,band,role); 
+    std::string remoteRes = remoteSiteResourceName(skill,loc,band,role); 
+d1317 1
+d1325 1
+d1331 1
+d1340 1
+d1346 1
+a1346 1
+  std::string opName = resourceName(skill,loc,band,role,homeSite); 
+d1370 1
+d1406 1
+d1427 1
+d1432 1
+d1437 1
+a1437 1
+  std::string offRes = homeSiteResourceName(skill,loc,band,role); 
+d1447 1
+d1450 1
+a1450 1
+  std::string offRes = homeSiteResourceName(skill,loc,band,role);
+d1462 1
+d1467 1
+a1467 1
+  std::string offRes = remoteSiteResourceName(skill,loc,band,role); 
+d1476 1
+d1479 1
+a1479 1
+  std::string offRes = remoteSiteResourceName(skill,loc,band,role);
+d1517 5
+a1521 1
+  witGetFeasible(mutableWitRun(),&retVal);
+d1620 2
+a1621 1
+                                           const std::string & band,
+d1624 1
+a1624 1
+  return std::string("remoteSite: ") + baseResourceName(skill,loc,band,role);
+d1630 1
+d1633 1
+a1633 1
+  return std::string("homeSite: ") + baseResourceName(skill,loc,band,role);
+d1639 1
+d1645 1
+a1645 1
+    retVal = homeSiteResourceName(skill,loc,band,role);
+d1647 1
+a1647 1
+    retVal = remoteSiteResourceName(skill,loc,band,role);
+d1653 2
+a1654 1
+                                           const std::string & band,
+d1661 1
+d1701 16
+d1829 1
+d1831 1
+a1831 1
+  getResources(skills,locs,bands,roles);
+d1839 1
+d1858 2
+a1859 2
+        skills[r], locs[r], bands[r], roles[r],homeSite[hs],
+        ss, ls, bs, rs, consVols );
+d1861 1
+a1861 1
+      std::string res = resourceName(skills[r], locs[r], bands[r], roles[r],homeSite[hs]);
+d1882 1
+a1882 1
+          port,loc,skills[r], locs[r], bands[r], roles[r],homeSite[hs]);
+d1893 1
+a1893 1
+              std::string consResource = resourceName( ss[cr], ls[cr], bs[cr], rs[cr], homeSite[hs] );
+d1991 1
+d1994 1
+a1994 1
+      getPortfolioResourceLinks(ports[p],portLocs[l],skills,resrcLocs,bands,roles,homeSites);
+d2011 1
+a2011 1
+          std::vector<float> consRate=getPortfolioResourceLinkConsRate(ports[p],portLocs[l],skills[prl],resrcLocs[prl],bands[prl],roles[prl],homeSites[prl]); 
+d2013 2
+a2014 2
+          if (homeSites[prl]) costRate=getResourceCostHomeSite( skills[prl],resrcLocs[prl],bands[prl],roles[prl] );
+          else costRate=getResourceCostRemoteSite( skills[prl],resrcLocs[prl],bands[prl],roles[prl] );
+d2091 1
+d2093 1
+a2093 1
+  getResources(skills,locs,bands,roles);
+d2100 1
+a2100 1
+      std::string resName = resourceName(skills[r],locs[r],bands[r],roles[r],homeSite); 
+d2123 2
+a2124 1
+    // LP algortihm
+d2128 1
+a2128 1
+  // Is the algorithm Greedy?
+d2131 1
+d2137 5
+@
+
+
+1.9
+log
+@setting substitute usage part of the solution
+@
+text
+@d1109 1
+a1109 1
+  witGetBomEntryNSubsBomEntries(witRun(),opName.c_str(),0,&nSubs);
+d1128 40
+@
+
+
+1.8
+log
+@Changed gr.cpp to add substitutes to problem.
+Updated grProblem to have method for setting substitute usage
+@
+text
+@d1113 2
+a1114 1
+  for (int s=0; s<nSubs; s++ ) {
+@
+
+
+1.7
+log
+@Turned on some debugging code.
+Removed code to add substitutes.
+@
+text
+@d1089 40
+@
+
+
+1.6
+log
+@Added code to test the new methods last night.
+Fixed a bug in the code (free changed to witFree).
+Added JP_TEST to conditionally compile testing code.
+@
+text
+@d15 1
+a15 1
+
+d1165 3
+a1167 3
+  float * supplyCV;
+  witGetPartConsVol(mutableWitRun(),baseRes.c_str(),&supplyCV);
+  std::vector<float> retVal = witFloatStarToStlVec(supplyCV);
+d1169 1
+a1169 1
+#if JP_TEST
+d1180 1
+a1180 1
+      assert( hsev[t]+rsev[t] == supplyCV[t] );
+d1196 1
+a1196 1
+  witFree(supplyCV);
+d1944 4
+a1947 4
+      float * supplyCV;
+      witGetPartConsVol(mutableWitRun(),resName.c_str(),&supplyCV);
+      witSetOperationExecVol(witRun(),resName.c_str(),supplyCV);
+      witFree(supplyCV);    
+d1977 1
+a1977 1
+    witPostprocess(witRun());
+@
+
+
+1.5
+log
+@Added some extra get methods for Francisco.
+Modifed postprocess to use technique suggested by Tom
+@
+text
+@d673 1
+a673 1
+  free(supplyVol);
+d1168 2
+d1195 1
+@
+
+
+1.4
+log
+@Changes to add osl mip solver structure to code
+@
+text
+@d159 2
+d164 4
+d169 50
+a218 3
+  int np = getNPeriods();
+  for ( int t=1; t<np; ++t ) {
+    ev[t] = 0.0f;
+a219 3
+#if 0
+  JPF THIS STATEMENT NEEDS TO BE PUT BACK IN WHEN MIP IS GENERATING A VALID SOLUTION
+  witSetOperationExecVol(witRun(),opName.c_str(),ev);
+a220 1
+  witFree(ev);
+d451 1
+a451 1
+
+d453 15
+a467 9
+  for (t=0; t<nP; t++) {
+
+    // get it's consRate 
+    float *cr;
+    witGetBomEntryConsRate(mutableWitRun(),opName.c_str(),bei+t,&cr);
+    //for ( t1=1; t1<nP; t1++ ) assert( eq(cr[t1],cr[0]) );
+    retVal.push_back(cr[0]);
+    witFree(cr);
+
+d652 2
+d666 11
+d694 24
+d722 1
+a722 1
+                             std::vector<std::string> & roles)
+a772 1
+    
+a773 1
+    
+d775 12
+d788 35
+a1039 38
+#if 0
+void GRproblem::addSubstituteResourceLink(
+                                          const std::string & port,
+                                          const std::string & portLoc, 
+                                          const std::string & primSkill,  
+                                          const std::string & primResrcLoc,
+                                          const std::string & primBand,
+                                          const std::string & primRole,
+                                          bool homeSite,
+                                          const std::string & subsSkill,  
+                                          const std::string & subsResrcLoc,
+                                          const std::string & subsBand,
+                                          const std::string & subsRole )
+{    
+  std::string opName = portfolioSourcingOpName(port,portLoc);
+  //std::string primResrc = resourceName(primSkill,primResrcLoc,primBand,primRole,homeSite);
+  std::string subsResrc = resourceName(subsSkill,subsResrcLoc,subsBand,subsRole,homeSite);
+
+  int nP=getNPeriods();
+  int bei=getBomEntryIndex(port,portLoc,primSkill,primResrcLoc,primBand,primRole,homeSite);
+  
+  int nSubs;
+  witGetBomEntryNSubsBomEntries(witRun(),opName.c_str(),bei,&nSubs);
+
+  // Loop once for each period
+  for ( int t=bei; t<bei+nP; t++ ) {
+
+    // Add substutite arc
+    witAddSubsBomEntry(witRun(),opName.c_str(),t,subsResrc.c_str());
+
+    // Set consumpution rate of substitute resource equal to that of primary resource
+    float * consRate;
+    witGetBomEntryConsRate(mutableWitRun(),opName.c_str(),t,&consRate);
+    witSetSubsBomEntryConsRate(witRun(),opName.c_str(),t,nSubs,consRate);
+    witFree(consRate);
+  }
+}
+#else
+a1052 1
+  //std::string opName = portfolioSourcingOpName(port,portLoc);
+d1088 38
+a1125 1
+#endif
+d1168 25
+d1384 4
+d1409 1
+d1778 1
+a1778 2
+  assert( getState()==PREPROCESSED );
+  
+d1781 31
+d1817 3
+a1869 1
+
+d1886 1
+d1922 29
+d1970 1
+d1974 1
+d1990 1
+d1992 1
+a1992 2
+#if 0
+does not compile on aix
+d2035 2
+a2036 1
+resourceNames_()
+d2120 1
+@
+
+
+1.3
+log
+@updated to build on aix
+@
+text
+@d20 1
+d152 23
+d1580 1
+d1639 6
+a1644 1
+      appData->unitExecCost(0.0);
+d1693 5
+d1741 8
+d1803 1
+@
+
+
+1.2
+log
+@Moved substitution back down below home/remote site operations.
+Added code to peg home and remote site usage to a portfolio as a postProcess step.
+@
+text
+@d18 1
+a18 1
+#include "GRsortablePortfolio.h"
+d705 1
+a705 1
+      
+d1712 2
+a1713 1
+    for ( int p=0; p<ports.size(); p++ ) {
+d1719 2
+d1731 1
+d1734 9
+a1742 5
+    int * priority = (int *) malloc(np*sizeof(int));
+    for ( p=0; p<sortablePorts.size(); p++ ) {
+      const char * port = sortablePorts[p].portfolioName().c_str();
+      for ( int t=0; t<np; t++ ) priority[t]=p+1;
+      witSetDemandPriority(witRun(),port,"Demand",priority);
+a1743 1
+    free(priority);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d39 17
+d418 1
+d534 35
+d666 7
+a672 7
+                                          const std::string & port, 
+                                          const std::string & portLoc, 
+                                          std::vector<std::string> & skills,  
+                                          std::vector<std::string> & resrcLocs,
+                                          std::vector<std::string> & bands,
+                                          std::vector<std::string> & roles,
+                                          std::vector<bool> & homeSites  ) const
+d679 1
+a679 1
+
+d700 11
+a710 5
+      skills.push_back( skillFromResourceName(std::string(consPart)) );
+      resrcLocs.push_back( locFromResourceName(std::string(consPart)) );
+      bands.push_back( bandFromResourceName(std::string(consPart)) );
+      roles.push_back( roleFromResourceName(std::string(consPart)) );
+      homeSites.push_back( homeSiteFromResourceName(std::string(consPart)) ); 
+d714 10
+a723 18
+    }
+    
+    witFree(consPart);  
+    
+    // loop once for each substitute bom entry
+    int nSubs;
+    witGetBomEntryNSubsBomEntries(mutableWitRun(),op.c_str(),b,&nSubs);
+    for ( int s=0; s<nSubs; s++ ) {
+
+      witGetSubsBomEntryConsumedPart(mutableWitRun(),op.c_str(),b,s,&consPart);
+
+      // if resource has not already been added to return vector then add it
+      if ( resrcSet.find(consPart)==resrcSet.end() ) {
+        skills.push_back( skillFromResourceName(std::string(consPart)) );
+        resrcLocs.push_back( locFromResourceName(std::string(consPart)) );
+        bands.push_back( bandFromResourceName(std::string(consPart)) );
+        roles.push_back( roleFromResourceName(std::string(consPart)) );
+        homeSites.push_back( homeSiteFromResourceName(std::string(consPart)) ); 
+d725 12
+a736 2
+        // indicate that resource has been newly added to return vectors
+        resrcSet.insert(consPart);
+d738 3
+a740 4
+
+      witFree(consPart);      
+    }    
+  } 
+d879 1
+d916 51
+d1013 104
+d1180 18
+d1270 7
+d1411 1
+a1411 1
+
+d1468 114
+d1585 2
+a1586 1
+  if ( getState()!=UNPREPROCESSED ) return;
+d1588 2
+d1658 2
+d1665 1
+d1692 1
+d1739 3
+@
+
+
+1.1.1.1
+log
+@globalResource import
+@
+text
+@@

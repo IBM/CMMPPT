@@ -1,0 +1,365 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2006.10.12.19.44.19;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2006.10.11.22.42.53;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.10.11.22.37.49;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.10.10.20.59.12;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.10.10.19.11.20;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@External opt implosion.
+@
+text
+@//------------------------------------------------------------------------------
+// Source File: "asstOptTest.C".
+//
+// A WIT application program whose purpose is to test WIT's "assisted optimizing
+// implosion" capability.
+//------------------------------------------------------------------------------
+
+#include <wit.h>
+
+#include <OsiClpSolverInterface.hpp>
+
+#include <stdlib.h>
+#include <stdio.h>
+
+//------------------------------------------------------------------------------
+// Class AsstOptTester
+//------------------------------------------------------------------------------
+
+class AsstOptTester
+   {
+   public:
+
+   //---------------------------------------------------------------------------
+   // Public Member Functions
+   //---------------------------------------------------------------------------
+
+    AsstOptTester ();
+   ~AsstOptTester ();
+
+   void testAsstOpt ();
+
+   private:
+
+   //---------------------------------------------------------------------------
+   // Private Member Functions
+   //---------------------------------------------------------------------------
+
+   void buildWitRun (WitRun * theWitRun);
+
+   void callCoin ();
+
+   void prtRemFile (const char * fileName);
+
+   //---------------------------------------------------------------------------
+   // Private Member Data
+   //---------------------------------------------------------------------------
+
+   int      numcols_;
+   int      numrows_;
+   int *    start_;
+   int *    index_;
+   double * value_;
+   double * collb_;
+   double * colub_;
+   double * obj_;
+   double * rowlb_;
+   double * rowub_;
+   int *    intIndices_;
+   int      numIntCols_;
+   double   objSense_;
+   };
+
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+int main ()
+   {
+   AsstOptTester theTester;
+
+   theTester.testAsstOpt ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AsstOptTester
+//------------------------------------------------------------------------------
+
+AsstOptTester::AsstOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+AsstOptTester::~AsstOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void AsstOptTester::testAsstOpt ()
+   {
+   WitRun * theWitRun;
+
+   witNewRun     (& theWitRun);
+
+   buildWitRun     (theWitRun);
+
+   witStartAsstOpt (theWitRun);
+
+   witGetOptProblemDbl (
+        theWitRun,
+      & numcols_,
+      & numrows_,
+      & start_,
+      & index_,
+      & value_,
+      & collb_,
+      & colub_,
+      & obj_,
+      & rowlb_,
+      & rowub_,
+      & intIndices_,
+      & numIntCols_,
+      & objSense_);
+
+   callCoin ();
+
+   free (start_);
+   free (index_);
+   free (value_);
+   free (collb_);
+   free (colub_);
+   free (obj_);
+   free (rowlb_);
+   free (rowub_);
+   free (intIndices_);
+
+   witFinishAsstOpt (theWitRun);
+
+   witDeleteRun     (theWitRun);
+   }
+
+//------------------------------------------------------------------------------
+
+void AsstOptTester::buildWitRun (WitRun * theWitRun)
+   {
+   float consRateD0 [] =  {2.0};
+
+   float supplyVolA [] = {80.0};
+
+   float demandVolF [] = {30.0};
+   float demandVolG [] = {60.0};
+
+   float shipRewardF[] =  {3.0};
+   float shipRewardG[] =  {2.0};
+
+   witInitialize          (theWitRun);
+
+   witSetNPeriods         (theWitRun, 1);
+
+   witAddPart             (theWitRun, "A",      WitCAPACITY);
+   witAddPart             (theWitRun, "B",      WitCAPACITY);
+   witAddPart             (theWitRun, "C",      WitCAPACITY);
+
+   witAddOperation        (theWitRun, "D");
+   witAddOperation        (theWitRun, "E");
+
+   witAddBomEntry         (theWitRun, "D", "A");
+   witAddBomEntry         (theWitRun, "E", "A");
+
+   witAddBopEntry         (theWitRun, "D", "B");
+   witAddBopEntry         (theWitRun, "E", "C");
+
+   witAddDemand           (theWitRun, "B", "F");
+   witAddDemand           (theWitRun, "C", "G");
+
+   witSetBomEntryConsRate (theWitRun, "D",  0,  consRateD0);
+
+   witSetPartSupplyVol    (theWitRun, "A",      supplyVolA);
+
+   witSetDemandDemandVol  (theWitRun, "B", "F", demandVolF);
+   witSetDemandDemandVol  (theWitRun, "C", "G", demandVolG);
+
+   witSetDemandShipReward (theWitRun, "B", "F", shipRewardF);
+   witSetDemandShipReward (theWitRun, "C", "G", shipRewardG);
+   }
+
+//------------------------------------------------------------------------------
+
+void AsstOptTester::callCoin ()
+   {
+   FILE *                  coinMsgFile;
+   CoinMessageHandler *    theCMH;
+   OsiClpSolverInterface * theSI;
+
+   coinMsgFile = fopen ("coin.log", "w");
+
+   theCMH      = new CoinMessageHandler (coinMsgFile);
+
+   theCMH->setLogLevel (4);
+
+   theSI   = new OsiClpSolverInterface;
+
+   theSI->passInMessageHandler (theCMH);
+
+   theSI->getModelPtr ()->passInMessageHandler (theCMH);
+
+   theSI->
+      loadProblem (
+         numcols_,
+         numrows_,
+         start_,
+         index_,
+         value_,
+         collb_,
+         colub_,
+         obj_,
+         rowlb_,
+         rowub_);
+
+   theSI->setObjSense (objSense_);
+
+   theSI->writeMps ("app-opt");
+
+   prtRemFile ("app-opt.mps");
+
+   theSI->getModelPtr ()->dual ();
+
+   delete theSI;
+
+   delete theCMH;
+
+   fclose (coinMsgFile);
+
+   prtRemFile ("coin.log");
+   }
+
+//------------------------------------------------------------------------------
+
+void AsstOptTester::prtRemFile (const char * fileName)
+   {
+   char command[101] = "";
+
+   printf (
+      "\n"
+      "------------------------------\n"
+      "File \"%s\":\n"
+      "------------------------------\n"
+      "\n",
+      fileName);
+
+   fflush (stdout);
+
+   sprintf (command, "cat %s", fileName);
+
+   system (command);
+
+   printf (
+      "\n"
+      "------------------------------\n"
+      "End of file \"%s\".\n"
+      "------------------------------\n"
+      "\n",
+      fileName);
+
+   remove (fileName);
+   }
+@
+
+
+1.4
+log
+@Assisted opt implosion.
+@
+text
+@@
+
+
+1.3
+log
+@Assisted opt implosion.
+@
+text
+@d211 1
+a211 1
+   theSI->setObjSense (-1.0);
+@
+
+
+1.2
+log
+@Assisted opt implosion.
+@
+text
+@d58 3
+d111 4
+a114 1
+      & rowub_);
+d126 1
+@
+
+
+1.1
+log
+@Assisted opt implosion.
+@
+text
+@d42 2
+d175 1
+d179 3
+a181 1
+   theCMH  = new CoinMessageHandler (stdout);
+d208 19
+d229 5
+a233 2
+      "File \"app-opt.mps\":\n"
+      "\n");
+d237 3
+a239 1
+   system ("cat app-opt.mps");
+d243 5
+a247 4
+      "End of file \"app-opt.mps\":\n"
+      "\n");
+
+   remove ("app-opt.mps");
+d249 1
+a249 3
+   theSI->getModelPtr ()->dual ();
+
+   delete theSI;
+@
+

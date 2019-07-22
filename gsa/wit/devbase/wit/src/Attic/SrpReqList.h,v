@@ -1,0 +1,528 @@
+head	1.15;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.15
+date	2006.01.27.21.14.35;	author rjw;	state dead;
+branches;
+next	1.14;
+
+1.14
+date	2006.01.26.22.10.56;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.01.24.22.03.14;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.01.23.23.04.22;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.01.23.20.54.05;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.01.23.20.18.33;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.01.23.17.25.49;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.01.23.16.43.02;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.01.20.21.41.36;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.01.20.20.58.06;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.01.20.17.00.47;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.01.19.22.20.42;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.01.19.20.43.04;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.01.18.23.20.06;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.01.18.20.02.59;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.15
+log
+@[shared-resource pegging]
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef SrpReqListH
+#define SrpReqListH
+
+//------------------------------------------------------------------------------
+// Header file: "SrpReqList.h"
+//
+// Contains the declaration of class SrpReqList.
+//------------------------------------------------------------------------------
+
+#include <Assoc.h>
+#include <PairStack.h>
+#include <ObjStack.h>
+
+#include <vector>
+
+//------------------------------------------------------------------------------
+// Class SrpReqList
+//
+// "Shared-Resource Pegging Requirement List"
+//
+// Specifies an ordered list of pegged requirements for SRP.
+//
+// Implemented in SRP.C.
+//------------------------------------------------------------------------------
+
+class WitSrpReqList: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitSrpReqList (WitProblem *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitSrpReqList ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      inline bool isEmpty ()
+         {
+         return curReqPairs_.isEmpty ();
+         }
+
+      void load (WitSrpReqPairStack & theReqPairs);
+         //
+         // Transfers the ReqPairs in theReqPairs to this SrpReqList,
+         // then sorts and consolidates the list.
+
+      void getReq (WitSrpReqSrc * & theReqSrc, double & incReqVol);
+         //
+         // When called, this SrpReqList must be non-empty.
+         // Removes the first pair from this SrpReqList sets
+         // (theReqSrc, incReqVol) to the pair.
+
+      void restoreReq (double incReqVol);
+         //
+         // When called, getReq is required to have been called more recently
+         // than load or restoreReq.
+         // Adds (theReqSrc, incReqVol) to the beginning of this SrpReqList,
+         // where theReqSrc was the SrpReqSrc that was retrieved by the most
+         // recent call to getReq.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      void formActiveReqSpecs (WitSrpReqPairStack & theReqPairs);
+         //
+         // Converts the ReqPairs in theReqPairs to SrpReqSpecs and stores them
+         // in activeReqSpecs_.
+
+      void formReqPairs ();
+         //
+         // Converts the SrpReqSpecs in activeReqSpecs_ to ReqPairs,
+         // consolidates them, and stores them in curReqPairs_.
+
+      void popActiveReqSpecs (WitSrpReqSrc * & theReqSrc, double & incReqVol);
+         //
+         // Removes the last SrpReqSpec in activeReqSpecs_ and sets theReqSrc
+         // and incReqVol to its contents.
+         // activeReqSpecs_ must be non-empty.
+
+      void prtReqSpecs (bool afterSort);
+         //
+         // Prints activeReqSpecs_.
+         // afterSort indicates whether or not the vector has been sorted.
+
+      void prtSizes ();
+         //
+         // Prints the maximum size and capacity of activeReqSpecs_.
+
+      noCopyCtorAssign (WitSrpReqList);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      std::vector <WitSrpReqSpec *> activeReqSpecs_;
+         //
+         // The set of active SrpReqSpecs owned by the SrpReqList.
+         // They are stored in this vector, so that they can be sorted.
+
+      WitObjStack <WitSrpReqSpec> inactiveReqSpecs_;
+         //
+         // The set of inactive SrpReqSpecs owned by this SrpReqList.
+
+      WitSrpReqPairStack curReqPairs_;
+         //
+         // The list of pairs, (theReqSrc, incReqVol), indicating that incReqVol
+         // units of requirement for the current Part and Period are pegged to
+         // theReqSrc.
+
+      WitSrpReqSrc * retrievedReqSrc_;
+         //
+         // The SrpReqSrc that was retrieved by the most recent call to getReq.
+         // NULL, if getReq has not been called since load or restoreReq.
+   };
+
+#endif
+@
+
+
+1.14
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.13
+log
+@[shared-resource pegging]
+@
+text
+@d57 1
+a57 1
+         return myReqPairs_.isEmpty ();
+d65 1
+a65 1
+      void getReq (WitSrpSeqEl * & theSeqEl, double & incReqVol);
+d69 1
+a69 1
+         // (theSeqEl, incReqVol) to the pair.
+d75 2
+a76 2
+         // Adds (theSeqEl, incReqVol) to the beginning of this SrpReqList,
+         // where theSeqEl was the SrpSeqEl that was retrieved by the most
+d93 1
+a93 1
+         // consolidates them, and stores them in myReqPairs_.
+d95 1
+a95 1
+      void popActiveReqSpecs (WitSrpSeqEl * & theSeqEl, double & incReqVol);
+d97 2
+a98 2
+         // Removes the last SrpReqSpec in activeReqSpecs_ and sets theSeqEl and
+         // incReqVol to its contents.
+d125 1
+a125 1
+      WitPairStack <WitSrpSeqEl, double> myReqPairs_;
+d127 3
+a129 2
+         // The list of pairs, (theSeqEl, incReqVol), indicating that
+         // incReqVol units of requirement are pegged to theSeqEl.
+d131 1
+a131 1
+      WitSrpSeqEl * retrievedSeqEl_;
+d133 1
+a133 1
+         // The SrpSeqEl that was retrieved by the most recent call to getReq.
+@
+
+
+1.12
+log
+@[shared-resource pegging]
+@
+text
+@d101 5
+@
+
+
+1.11
+log
+@[shared-resource pegging]
+@
+text
+@d65 1
+a65 1
+      void addToFront (WitSrpSeqEl * theSeqEl, double incReqVol);
+d67 11
+a77 8
+         // Adds (theSeqEl, incReqVol) to the front of the list of
+         // requirements.
+
+      bool getFirst (WitSrpSeqEl * & theSeqEl, double & incReqVol);
+         //
+         // If this SrpReqList is non-Empty, its first pair is removed from it
+         // and (theSeqEl, incReqVol) is set to the pair.
+         // Returns true, iff this SrpReqList was non-empty before the removal.
+a100 5
+      bool belongsInFront (WitSrpSeqEl * theSeqEl);
+         //
+         // Returns true, iff it would be valid to add theSeqEl to the front
+         // of this SrpReqList.
+
+a110 5
+      WitPairStack <WitSrpSeqEl, double> myReqPairs_;
+         //
+         // The list of pairs, (theSeqEl, incReqVol), indicating that
+         // incReqVol units of requirement are pegged to theSeqEl.
+
+d119 10
+@
+
+
+1.10
+log
+@[shared-resource pegging]
+@
+text
+@d60 1
+a60 1
+      void load (WitSrpReqSet & theReqSet);
+d62 1
+a62 1
+         // Transfers the ReqPairs in theReqSet to this SrpReqList,
+d82 1
+a82 1
+      void formActiveReqSpecs (WitSrpReqSet & theReqSet);
+d84 2
+a85 2
+         // Converts the ReqPairs in theReqSet to SrpReqSpecs and stores them in
+         // activeReqSpecs_.
+@
+
+
+1.9
+log
+@[shared-resource pegging]
+@
+text
+@d62 1
+a62 1
+         // Transfers the SrpReqSpecs in theReqSet to this SrpReqList,
+d82 1
+a82 1
+      void sort ();
+d84 2
+a85 1
+         // Sorts this SrpReqList.
+d87 1
+a87 1
+      void consolidate ();
+d89 8
+a96 1
+         // Consolidates this SrpReqList.
+@
+
+
+1.8
+log
+@[shared-resource pegging]
+@
+text
+@d21 1
+d97 1
+a97 1
+         // Prints size and capacity of myReqSpecVec_.
+d110 1
+a110 1
+      std::vector <WitSrpReqSpec *> myReqSpecVec_;
+d112 6
+a117 1
+         // Temporarily stores the contents of myReqPairs_ for sorting purposes.
+@
+
+
+1.7
+log
+@[shared-resource pegging]
+@
+text
+@d61 1
+a61 1
+         // Transfers the SrpReqPairs in theReqSet to this SrpReqList,
+d96 1
+a96 1
+         // Prints size and capacity of myReqPairVec_.
+d109 1
+a109 1
+      std::vector <WitSrpReqPair *> myReqPairVec_;
+@
+
+
+1.6
+log
+@[shared-resource pegging]
+@
+text
+@d19 1
+d34 1
+a34 1
+class WitSrpReqList
+d94 4
+@
+
+
+1.5
+log
+@[shared-resource pegging]
+@
+text
+@d21 2
+d103 4
+@
+
+
+1.4
+log
+@[shared-resource pegging]
+@
+text
+@d26 1
+a26 1
+// Specifies a list of pegged requirements for SRP.
+d56 1
+a56 1
+      void addUnsorted (WitSrpSeqEl * theSeqEl, double incReqVol);
+d58 2
+a59 6
+         // Adds (theSeqEl, incReqVol) to the set of requirements.
+         // This SrpReqList must be in an unsorted state.
+
+      void sort ();
+         //
+         // Sorts and consolidates this SrpReqList.
+a64 1
+         // This SrpReqList must be in a sorted state.
+a70 1
+         // This SrpReqList must be in a sorted state.
+d78 4
+a100 4
+
+      bool sorted_;
+         //
+         // True, iff this SrpReqList has been sorted and consolidated.
+@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@d26 1
+a26 1
+// Specifies a list of pegged requirements in SRP.
+d28 1
+a28 1
+// Implemented on SRP.C.
+a83 4
+      static bool compare (WitSrpReqPair *, WitSrpReqPair *);
+         //
+         // Comparison function for sorting the requirement list.
+
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@d56 1
+a56 1
+      void addUnsorted (WitSrpSeqEl * theSrpSeqEl, double incReqVol);
+d58 1
+a58 1
+         // Adds (theSrpSeqEl, incReqVol) to the set of requirements.
+d65 1
+a65 1
+      void addToFront (WitSrpSeqEl * theSrpSeqEl, double incReqVol);
+d67 1
+a67 1
+         // Adds (theSrpSeqEl, incReqVol) to the front of the list of
+d71 1
+a71 1
+      bool getFirst (WitSrpSeqEl * & theSrpSeqEl, double & incReqVol);
+d74 1
+a74 1
+         // and (theSrpSeqEl, incReqVol) is set to the pair.
+d92 1
+a92 1
+      bool belongsInFront (WitSrpSeqEl * theSrpSeqEl);
+d94 1
+a94 1
+         // Returns true, iff it would be valid to add theSrpSeqEl to the front
+d105 2
+a106 2
+         // The list of pairs, (theSrpSeqEl, incReqVol), indicating that
+         // incReqVol units of requirement are pegged to theSrpSeqEl.
+@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d84 4
+d105 2
+a106 2
+         // A set of pairs, (theSrpSeqEl, incReqVol), indicating that incReqVol
+         // units of requirement are pegged to theSrpSeqEl.
+@
+

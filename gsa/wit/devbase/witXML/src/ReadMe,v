@@ -1,0 +1,166 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.2
+date	2001.04.13.17.52.45;	author liusz;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.04.13.17.50.18;	author liusz;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@		witXML Documentation
+
+1. Goal/Purpose
+witXML provides tools for wit to read/write file in XML format. These tools include function witXMLRead, witXMLWrite and witXMLTerminate.
+	Function "witXMLRead" reads an input XML file for a WitRun. It is similar to witReadData(),
+	Function "witXMLWrite" generates an output XML file from a WitRun. It is similar to witWriteData(),
+but can also be used to convert a wit input file from text format into XML format.
+	Function "witXMLTerminate" frees all memory that was being held by the Xerces library.
+Use this function only if the Xerces library is used from DLL. In this case, evoke it before unloading the Xerces library. 
+These tools are developed on the basis of XML tools (developed by the Apache Software Foundation, http://www.apache.org/) and the standard wit public interface wit.h.
+
+2. Format of XML file
+The witXML file format is defined in file "wit.dtd".
+The structure of witXML file includes 2 levels of nodes:
+	root element node	<WIT> </WIT>
+	command-object node 	<setProblem>,
+				<addPart>, <setPart>,
+				<addDemand>, <setDemand>,
+				<addOperation>, <setOperation>,
+				<addBomEntry>, <setBomEntry>,
+				<addSubEntry>, <setSubEntry>,
+				<addBopEntry>, <setBopEntry>,
+There is only one root node <WIT>, which is unempty and has only one attribute: release.
+There are 13 command-object nodes, one for problem and 2 for each wit object. These nodes are empty. Therefore, there is no contents follow the start tag and the end tag is not necessary. Each of these nodes has many attributes. Each of these attributes corresponds to a wit attribute.
+The types of attribute include CDATA and enumerated. For example,
+	partName CDATA #REQUIRED
+	nPeriods CDATA #IMPLIED
+are CDATA type and
+	accAfterOptImp (True | False) #IMPLIED
+	objChoice (0 | 1 | 2) #IMPLIED
+	partCategory (material | capacity) #IMPLIED
+are enumarated.
+The CDATA type can be used to express a text, a number or many numbers (vector).
+An attribute could be REQUIRED or IMPLIED, meaning whether it can be omitted. For instance,
+	<addBomEntry> and <addBopEntry> has required attribute operationName and partName,
+   	<setBomEntry> and <setBopEntry> has required attribute operationName and index,
+	<addSubEntry> has required attribute operationName, bomIndex and partName,
+  	<setSubEntry> has required attribute operationName, bomIndex and index,
+	<addPart> has two required attributes: partName and partCategory,
+	<setPart> has only one required attribute: partName.
+The wit boundSet attributes are expressed in wit.dtd as:
+	for parts (stockBounds): sbHardLowerBound, sbSoftLowerBound, sbHardUpperBound,
+	for demands (cumShipBounds): csbHardLowerBound, csbSoftLowerBound, csbHardUpperBound,
+	for operations (execBounds): ebHardLowerBound, ebSoftLowerBound, ebHardUpperBound.
+To add a new attribute to a wit object, both <setXXX> and <addXXX> node have to be changed. For example,
+if attribute 'XYZ' is going to add into object 'ABC', then add the line
+	XYZ 	CDATA/(value1 | value2 | ..) 	REQUIRED/IMPLIED,
+into the section of both
+	<!ATTLIST setABC
+and
+	<!ATTLIST addABC.
+The syntax of witXML file is:
+	<?xml version="1.0"?>
+	<!DOCTYPE WIT SYSTEM "name_of_dtd_file">
+	<WIT release="value_of_release">
+	<name_of_command_object_node name_of_attribute="value_of_attribute" ... />
+	......
+	</WIT>
+As an example,
+	<WIT release="5.0">
+    	<setProblem title="XML Testing" objChoice="1" nPeriods="4"  independentOffsets="True"/>
+    	<addPart partName="p3" partCategory="material"/>
+    	<setPart partName="p3" buildAheadUB="dense 0 1 2 1" buildAsap="True" obj1ScrapCost="dense 2.1 3.2 4.3 5.4"
+ 	obj1StockCost="sparse 0:2.1 3:5.4" stockBoundsHardUB="single 1.1"/>
+	......
+	</WIT>
+Here, a white space is used to separate 2 attributes.
+For vector attributes, the value is represented by the format (either single, or dense, or sparse) followed by a space, followed by the real value as in the wit text file.
+This XML file format uses XML's predefined entities to escape the characters from element or attribute content. They are:
+	"&lt;" for left angle bracket "<",
+	"&gt;" for right angle bracket ">",
+	"&amp;" for ampersand "&",
+	"&apos;" for single quote "'",
+	"&quot;" for double quote """.
+Therefore, when convert a text file into XML format, the above characters will be replaced by the corresponding predefined entities.
+
+3. C++ code
+The C++ programs of witXML include 4 classes:
+	witXML
+	witXMLText (dealing with wit vectors)
+	witXMLErrorReporter
+	witXMLErrorHandler
+
+witXML.h and witXML.C define class witXML,which has two functions to deal with i/o:
+	witReadXML() and witWriteXML()
+witXMLText.h and witXMLText.C define class witXMLText which converts a string representing the input value of an attribute into the right type.
+witXMLErrorReporter.h and witXMLErrorReporter.C define class witXMLErrorReporter which handles all exceptions during the parsing.
+witXMLErrorHandler.h and witXMLErrorHandler.C defines class witXMLErrorHandler which processes an error message.
+Function witXML.witReadXML() runs through the following steps:
+	evokes XML parser which reads dtd and XML file to verify the XML file,
+	recursively calls ReadANode() to travel though every node (depth-first),
+	if the current node is an element node, runs runwitCommand() to call a corresponding function:
+		ReadProblem(), ReadPart(), ReadDemand(), ...
+	in each of these functions, reads all attributes and
+		if the command is 'set...', set all attributes by evoking the corresponding witSet() function 
+		if the command is 'add...', add an object by evoking the corresponding witAdd() function; then set all its attributes
+Function witXML.witWriteXML()  runs through the following steps
+	creates a default WitRun
+	goes thru all object lists by sequentially evoking
+		WriteProblem(), WritePart(), WriteDemand(), ...
+	gets the current and default value of each attribute from current and default witRun respectively, 
+	if they are different, print the current value
+In order to add/delete an attribute, the corresponding ReadXXX and WriteXXX function have to be modified.
+File witXMLApi.h and witXMLApi.C defines function witXMLRead, witXMLWrite and witXMLTerminate. There is also a CompareWitRuns, which 
+compares 2 WitRuns.
+The following is a sample code to evoke witReadXML and witWriteXML function:
+	WitRun * theWitRun;
+	witNewRun( &theWitRun );
+	witInitialize ( theWitRun );
+	......
+	witXMLReadXML(theWitRun,inputfilename);
+	......
+	witWriteXML(theWitRun,dtdfilename,outputfilename);
+
+4. Library functions
+The witXML needs 3 XML library files:
+	libicu-uc.a
+	libicudata.a
+	libxerces-c1_3.a.
+
+4. How to to generate witXML library and test code, go to
+ 	/u/wit/liusz/witXML/power43
+and type
+	/usr/gnu/bin/make all.
+The library file "libwitXML.a" and the test code "unitTest" will be generated.
+		
+@
+
+
+1.1
+log
+@By Shuzheng Liu: add a new file
+@
+text
+@d13 1
+a13 1
+The witXML file format wit is defined in file "wit.dtd".
+@
+

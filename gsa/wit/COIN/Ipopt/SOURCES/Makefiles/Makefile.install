@@ -1,0 +1,87 @@
+# Copyright (C) 2002, Carnegie Mellon University and others.
+# All Rights Reserved.
+# This code is published under the Common Public License.
+
+#
+#  Installations Makefile
+#
+FIND = find
+LN = ln -s
+ifndef CP
+  CP = cp
+endif
+
+#
+#  Specify directory in which the source files are
+#
+ifndef SRCROOTDIR
+  SRCROOTDIR = $(shell pwd)/../SOURCES
+endif
+MKINSTALLDIRS = $(SRCROOTDIR)/Makefiles/mkinstalldirs
+
+SHELL = /bin/sh
+
+POSSIBLEDIRS = IPOPT DYNOPT OTHERS
+CLEANDIRS = IPOPT DYNOPT
+MAKEFILE = Makefile
+BUILDDIRFLAG = ._BUILDDIR
+
+ADDMKFLS = $(MAKEFILE).defs $(MAKEFILE).trgs
+ADDMKFLSDIR = Makefiles
+
+CPFILES = \
+  set -x; \
+  list="$(filter $@%, $(POSSIBLEMAKEFILES))"; \
+  for dir in $$list ; \
+  do \
+    $(LN) $(SRCROOTDIR)/$${dir}$(MAKEFILE) $${dir}$(MAKEFILE) ;\
+  done
+
+SOLIBDIR = ./lib
+
+POSSIBLEMAKEFILES = $(dir $(foreach dir, $(POSSIBLEDIRS), \
+	$(shell cd $(SRCROOTDIR); $(FIND) $(dir) -name $(BUILDDIRFLAG) )))
+
+all:
+	@echo
+	@echo This Makefile only sets up directories and makefiles.
+	@echo Nothing will be build.
+	@echo
+	@echo To install the directories type \"make install\"
+	@echo
+
+install: $(POSSIBLEDIRS) $(ADDMKFLS) $(SOLIBDIR)
+
+clean:
+	set -x; \
+	for dir in $(POSSIBLEMAKEFILES); \
+	do \
+	  if [ -r $$dir/$(MAKEFILE) ]; \
+	  then \
+	    (cd $$dir; $(MAKE) clean) ;\
+	  fi; \
+	done
+
+veryclean:
+	set -x; \
+	for dir in $(POSSIBLEMAKEFILES); \
+	do \
+	  if [ -r $$dir/$(MAKEFILE) ]; \
+	  then \
+	    (cd $$dir; $(MAKE) veryclean) ;\
+	  fi; \
+	done
+
+$(POSSIBLEDIRS): 
+	$(MKINSTALLDIRS) $(filter $@%, $(dir $(POSSIBLEMAKEFILES)))
+	$(CPFILES)
+
+$(SOLIBDIR):
+	mkdir $@
+
+$(ADDMKFLS):
+	$(CP) $(SRCROOTDIR)/$(ADDMKFLSDIR)/$@ .
+
+distclean:
+	rm -rf $(POSSIBLEDIRS) $(SOLIBDIR)
+	rm -f $(ADDMKFLS)

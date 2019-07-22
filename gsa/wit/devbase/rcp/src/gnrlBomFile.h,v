@@ -1,0 +1,819 @@
+head	1.11;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.11
+date	2005.11.02.16.59.28;	author gresh;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.06.22.19.15.32;	author gresh;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.06.18.17.31.25;	author gresh;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.06.17.14.50.43;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.06.04.17.07.36;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.04.14.16.01.21;	author gresh;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.03.22.13.40.16;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.03.18.14.43.58;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.03.17.19.02.51;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.03.16.20.25.59;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.03.16.18.41.05;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@giving some attribute values nice names (such as appDeveloper instead of r1)
+@
+text
+@#ifndef RCPgnrlBomFile_h
+#define RCPgnrlBomFile_h
+
+#include "scoFile.h"
+#include "rcpOptCal.h"
+
+
+class RCPgnrlBomFile : public SCOcsvFormatFile {
+public:
+
+  bool hasEngagement;
+  // Fields 
+ 
+
+  getIntFieldH(period);
+  getIntFieldH(month);
+  getIntFieldH(year);
+  getFloatFieldH(usageQuantity);
+
+  
+  // preferred constructor
+  RCPgnrlBomFile(
+    std::string filename,
+    int numResourceIdFields,
+    bool hasEngagementName,
+    bool hasSubsFlags,
+    RcpOptCalendar::CalendarType calType )
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    numResourceIdFields_ = numResourceIdFields;
+    int numFields = numResourceIdFields + 1; //for quantity
+    if (calType==RcpOptCalendar::MONTH_YEAR)
+       numFields = numFields+2;
+    else
+       numFields = numFields+1;
+    if (hasEngagementName) {
+      numFields++;
+      hasEngagement=true;
+    }
+    else
+      hasEngagement=false;
+      
+    if (hasSubsFlags)
+      numFields=numFields+numResourceIdFields;
+    
+    hasHeaderRecord(numFields);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+
+  std::string key(std::string &engagementName,
+    const std::vector<std::string> & resourceIdValues,
+    int period) const
+  {
+    //assert( resourceIdValues.size() == numResourceIdFields_);
+    std::string retVal;
+    retVal = retVal + engagementName + "!@@#$%";
+    unsigned int i;
+    for ( i=0; i<resourceIdValues.size(); ++i ) {
+      retVal = retVal + resourceIdValues[i] + "!@@#$%";
+    }
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    retVal = retVal + periodchar ;
+    return retVal;
+  };
+ 
+  std::string key(
+    const std::vector<std::string> & resourceIdValues,
+    int period) const
+  {
+    //assert( resourceIdValues.size() == (unsigned int)numResourceIdFields_);
+    std::string retVal;
+    unsigned int i;
+    for ( i=0; i<resourceIdValues.size(); ++i ) {
+      retVal = retVal + resourceIdValues[i] + "!@@#$%";
+    }
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    retVal = retVal + periodchar ;
+    return retVal;
+  };
+ 
+  
+  // destructor
+  ~RCPgnrlBomFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    // tests from resourceFile.h
+    {
+      RCPgnrlBomFile file("../data/example1/bom.csv",5, true, true, RcpOptCalendar::PERIOD);
+      
+      // Test reading first record
+      assert(file.fieldAsString(0,"engagementName") == "engagement1");
+      assert( file.fieldAsString(0,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(0,"skillSet")=="java" );
+      assert( file.fieldAsString(0,"LOB")=="AMS" );
+      assert( file.fieldAsString(0,"source")=="IBM" );
+      assert( file.fieldAsString(0,"resourceLocName")=="New York" );
+      assert( file.periodAsInt(0) == 1 );
+      assert( file.fieldAsInt(0,"period") == 1 );
+      assert( file.usageQuantityAsFloat(0) == 2.f );
+      assert( file.fieldAsFloat(0,"usageQuantity") == 2.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(1,"skillSet")=="java" );
+      assert( file.fieldAsString(1,"LOB")=="AMS" );
+      assert( file.fieldAsString(1,"source")=="IBM" );
+      assert( file.periodAsInt(1) == 2 );
+      assert( file.fieldAsInt(1,"period") == 2 );
+      assert( file.usageQuantityAsFloat(1) == 3.f );
+      assert( file.fieldAsFloat(1,"usageQuantity") == 3.f );
+      
+      
+      assert( file.fieldAsString(2,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(2,"skillSet")=="java" );
+      assert( file.fieldAsString(2,"LOB")=="AMS" );
+      assert( file.fieldAsString(2,"source")=="IBM" );
+      assert( file.periodAsInt(2) == 3 );
+      assert( file.fieldAsInt(2,"period") == 3 );
+      assert( file.usageQuantityAsFloat(2) == 2.f );
+      assert( file.fieldAsFloat(2,"usageQuantity") == 2.f );
+      
+      
+      // Test reading record by key   
+      std::vector<std::string> vals;
+      vals.push_back("architect");
+      vals.push_back("c++");
+      vals.push_back("eBHS");
+      vals.push_back("SUBCON");
+      vals.push_back("New York");
+      std::string e = "engagement1";
+      std::string key = file.key(e, vals,1);
+      assert( file.usageQuantityAsFloat(key) == 3.0f );
+      
+       // try to read month. This should throw and exception since the
+      // calendar is of type period.
+      bool exceptionCaught = false;
+      try {
+        file.monthAsInt(1);
+      }
+      catch ( SCOexception e ) {
+        exceptionCaught = true;
+      }
+      assert (exceptionCaught);
+      
+      // now try to read the year
+      exceptionCaught = false;
+      try {
+        file.yearAsInt(0);
+      }
+      catch ( SCOexception e ) {
+        exceptionCaught = true;
+      }
+      assert (exceptionCaught);
+    }
+    
+    // tests from resourceFile04Feb.h
+    {
+
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, 0, RcpOptCalendar::PERIOD);
+      
+      // Test reading first record
+      
+      assert( file.fieldAsString(0,"jobRole")=="j1" );
+      assert( file.fieldAsString(0,"skillSet")=="java" );
+      assert( file.fieldAsString(0,"LOB")=="AMS" );
+      assert( file.fieldAsString(0,"source")=="ibm" );
+      assert( file.fieldAsString(0,"region")=="emea" );
+      assert( file.fieldAsString(0,"country")=="gb" );
+      assert( file.fieldAsString(0,"city")=="london" );
+      assert( file.periodAsInt(0) == 0 );
+      assert( file.fieldAsString(0,"band") == "7" );
+      assert( file.usageQuantityAsFloat(0) == 18.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="j1" );
+      assert( file.fieldAsString(1,"skillSet")=="java" );
+      assert( file.fieldAsString(1,"LOB")=="AMS" );
+      assert( file.fieldAsString(1,"source")=="ibm" );
+      assert( file.fieldAsString(1,"region")=="na" );
+      assert( file.fieldAsString(1,"country")=="gb" );
+      assert( file.fieldAsString(1,"city")=="london" );
+      assert( file.periodAsInt(1) == 0 );
+      assert( file.fieldAsString(1,"band") == "7" );
+      assert( file.usageQuantityAsFloat(1) == 8.f );      
+      
+      // Test reading record by key    
+      std::vector<std::string> vals;
+      vals.push_back("j1");
+      vals.push_back("java");
+      vals.push_back("AMS");
+      vals.push_back("ibm");
+      vals.push_back("emea");
+      vals.push_back("gb");
+      vals.push_back("london");
+      vals.push_back("abc");
+      vals.push_back("7");
+      vals.push_back("global");
+      vals.push_back("foo");
+      vals.push_back("transportation");
+      
+
+      std::string key = file.key(vals,0);
+      assert( file.usageQuantityAsFloat(key) == 18.0f );
+      
+    }
+
+    // tests from resourceFileSimple.h
+    {
+    #if 0
+      RCPgnrlBomFile file("../data/example_simple/bom.csv",5,false);
+      
+      // Test reading first record
+      
+      assert( file.fieldAsString(0,"jobRole")=="DetailA" );
+      assert( file.fieldAsString(0,"skillSet")=="java" );
+      assert( file.fieldAsString(0,"LOB")=="AMS" );
+      assert( file.fieldAsString(0,"source")=="IBM" );
+      assert( file.fieldAsString(0,"resourceLocName")=="New York" );
+      assert( file.fieldAsInt(0,"period") == 0 );
+      assert( file.fieldAsFloat(0,"usageQuantity") == 30.f );
+      assert( file.periodAsInt(0) == 0 );
+      assert( file.usageQuantityAsFloat(0) == 30.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="DetailB" );
+      assert( file.fieldAsString(1,"skillSet")=="java" );
+      assert( file.fieldAsString(1,"LOB")=="AMS" );
+      assert( file.fieldAsString(1,"source")=="IBM" );
+      assert( file.fieldAsInt(1,"period") == 0 );
+      assert( file.fieldAsFloat(1,"usageQuantity") == 20.f );
+      assert( file.periodAsInt(1) == 0 );
+      assert( file.usageQuantityAsFloat(1) == 20.f );
+      
+      assert( file.fieldAsString(2,"jobRole")=="DetailC" );
+      assert( file.fieldAsString(2,"skillSet")=="java" );
+      assert( file.fieldAsString(2,"LOB")=="AMS" );
+      assert( file.fieldAsString(2,"source")=="IBM" );
+      assert( file.fieldAsInt(2,"period") == 0 );
+      assert( file.fieldAsFloat(2,"usageQuantity") == 30.f );
+      assert( file.periodAsInt(2) == 0 );
+      assert( file.usageQuantityAsFloat(2) == 30.f );
+      
+      
+      
+      // Test reading record by key      
+      std::vector<std::string> vals;
+      vals.push_back("DetailC");
+      vals.push_back("java");
+      vals.push_back("AMS");
+      vals.push_back("IBM");
+      vals.push_back("New York");
+      std::string key = file.key(vals,1);
+      assert( file.usageQuantityAsFloat(key) == 40.0f );
+      
+      //std::string key = file.key("DetailC","java","AMS","IBM","New York",1);
+      //assert( file.supplyQuantityAsFloat(key) == 40.0f );
+      #endif
+    }
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+
+
+    std::vector<std::string> vals;
+    std::string eName;
+    int f;
+    for ( f=0; f<numResourceIdFields_; ++f ) {
+      if (hasEngagement) eName = fieldAsString(recNum,"engagementName");
+      std::string fv;
+      if (hasEngagement)
+         fv = fieldNAsString(recNum,f+1);
+      else
+         fv = fieldNAsString(recNum,f);
+      vals.push_back(fv);
+    }
+    
+    int p = periodAsInt(recNum);
+    std::string retVal;
+    if (hasEngagement) 
+        retVal = key(eName, vals, p );
+    else 
+        retVal = key(vals, p);
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPgnrlBomFile();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlBomFile( const RCPgnrlBomFile& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlBomFile&
+  operator=(const RCPgnrlBomFile& rhs);
+
+  int numResourceIdFields_;
+};
+
+
+
+class RCPgnrlBomFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+ 
+  getIntFieldFileWithIteratorH(period);
+  getIntFieldFileWithIteratorH(month);
+  getIntFieldFileWithIteratorH(year);
+  getFloatFieldFileWithIteratorH(usageQuantity);
+
+
+  // preferred constructor
+  RCPgnrlBomFileIterator(const RCPgnrlBomFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPgnrlBomFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    
+    {
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true, 0, RcpOptCalendar::PERIOD);
+      RCPgnrlBomFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="appDeveloper" );
+          assert( fileIter.fieldOnRecord("skillSet")=="java" );
+          assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+          assert( fileIter.fieldOnRecord("source")=="IBM" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="New York" );
+          assert( fileIter.periodAsInt() == 1 );
+          assert( fileIter.fieldOnRecordAsInt("period") == 1 );
+          //float foo = fileIter.usageQuantityAsFloat();
+          assert( fileIter.usageQuantityAsFloat() == 2.f );
+          assert( fileIter.fieldOnRecordAsFloat("usageQuantity") == 2.f );
+           // try to read month. This should throw and exception since the
+          // calendar is of type period.
+          bool exceptionCaught = false;
+          try {
+            fileIter.monthAsInt();
+          }
+          catch ( SCOexception e ) {
+            exceptionCaught = true;
+          }
+          assert (exceptionCaught);
+
+          // now try to read the year
+          exceptionCaught = false;
+          try {
+            fileIter.yearAsInt();
+          }
+          catch ( SCOexception e ) {
+            exceptionCaught = true;
+          }
+          assert (exceptionCaught);
+
+         
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+    }
+    
+    // tests from resourceFile04Feb.h
+    {
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, 0, RcpOptCalendar::PERIOD);
+      RCPgnrlBomFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="j1" );
+          assert( fileIter.fieldOnRecord("skillSet")=="java" );
+          assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+          assert( fileIter.fieldOnRecord("source")=="ibm" );
+          assert( fileIter.fieldOnRecord("region")=="emea" );
+          assert( fileIter.periodAsInt() == 0 );
+          assert( fileIter.usageQuantityAsFloat() == 18.f );
+          
+          
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+    }
+    
+    // test from resourceFileSimple.h
+    {
+    #if 0
+      RCPgnrlBomFile file("../data/example_simple/bom.csv",5,false);
+      RCPgnrlBomFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="DetailA" );
+          assert( fileIter.fieldOnRecord("skillSet")=="java" );
+          assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+          assert( fileIter.fieldOnRecord("source")=="IBM" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="New York" );
+          assert( fileIter.periodAsInt() == 0 );
+          assert( fileIter.usageQuantityAsFloat() == 30.f );
+          
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+      #endif
+    }
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPgnrlBomFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlBomFileIterator( const RCPgnrlBomFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlBomFileIterator&
+  operator=(const RCPgnrlBomFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.10
+log
+@folding together original "engagement" oriented files with new ER5 files
+@
+text
+@d99 6
+a104 6
+      assert(file.fieldAsString(0,"engagementName") == "e1");
+      assert( file.fieldAsString(0,"jobRole")=="r1" );
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+      assert( file.fieldAsString(0,"source")=="src1" );
+      assert( file.fieldAsString(0,"resourceLocName")=="l1" );
+d110 4
+a113 4
+      assert( file.fieldAsString(1,"jobRole")=="r1" );
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+      assert( file.fieldAsString(1,"source")=="src1" );
+d120 4
+a123 4
+      assert( file.fieldAsString(2,"jobRole")=="r1" );
+      assert( file.fieldAsString(2,"skillSet")=="s1" );
+      assert( file.fieldAsString(2,"LOB")=="LOB1" );
+      assert( file.fieldAsString(2,"source")=="src1" );
+d132 6
+a137 6
+      vals.push_back("r2");
+      vals.push_back("s2");
+      vals.push_back("LOB2");
+      vals.push_back("src2");
+      vals.push_back("l1");
+      std::string e = "e1";
+d171 2
+a172 2
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+d182 2
+a183 2
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+d195 2
+a196 2
+      vals.push_back("s1");
+      vals.push_back("LOB1");
+d221 4
+a224 4
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+      assert( file.fieldAsString(0,"source")=="src1" );
+      assert( file.fieldAsString(0,"resourceLocName")=="l1" );
+d231 3
+a233 3
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+      assert( file.fieldAsString(1,"source")=="src1" );
+d240 3
+a242 3
+      assert( file.fieldAsString(2,"skillSet")=="s1" );
+      assert( file.fieldAsString(2,"LOB")=="LOB1" );
+      assert( file.fieldAsString(2,"source")=="src1" );
+d253 4
+a256 4
+      vals.push_back("s1");
+      vals.push_back("LOB1");
+      vals.push_back("src1");
+      vals.push_back("l1");
+d260 1
+a260 1
+      //std::string key = file.key("DetailC","s1","LOB1","src1","l1",1);
+d345 5
+a349 5
+          assert( fileIter.fieldOnRecord("jobRole")=="r1" );
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+          assert( fileIter.fieldOnRecord("source")=="src1" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="l1" );
+d396 2
+a397 2
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+d424 4
+a427 4
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+          assert( fileIter.fieldOnRecord("source")=="src1" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="l1" );
+@
+
+
+1.9
+log
+@support for handling demandType and demandTypePriority
+@
+text
+@a18 1
+  getFieldH(demandType);
+d26 1
+a26 2
+    bool hasDemandType,
+    int  numSubstituteColumns,
+d45 2
+a46 4
+    if (hasDemandType) 
+      numFields++;
+     
+    numFields=numFields+numSubstituteColumns;
+d96 1
+a96 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true, false, 0, RcpOptCalendar::PERIOD);
+d166 1
+a166 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, false, 0, RcpOptCalendar::PERIOD);
+a320 1
+  getFieldFileWithIteratorH(demandType);
+d337 1
+a337 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true, false, 0, RcpOptCalendar::PERIOD);
+d387 1
+a387 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, false, 0, RcpOptCalendar::PERIOD);
+@
+
+
+1.8
+log
+@some changes to support ER5; adding columns for demand type, flags for substituion
+@
+text
+@d19 1
+d325 1
+@
+
+
+1.7
+log
+@commented out assorted asserts and did things to make the eclipse compiler happy. Also for cleanliness, added "acquireTime" to readResourceFile.
+@
+text
+@d26 2
+d45 6
+d99 1
+a99 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true, RcpOptCalendar::PERIOD);
+d169 1
+a169 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, RcpOptCalendar::PERIOD);
+d340 1
+a340 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true, RcpOptCalendar::PERIOD);
+d390 1
+a390 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false, RcpOptCalendar::PERIOD);
+@
+
+
+1.6
+log
+@use month/year format
+@
+text
+@d53 1
+a53 1
+    assert( resourceIdValues.size() == numResourceIdFields_);
+d70 1
+a70 1
+    assert( resourceIdValues.size() == numResourceIdFields_);
+d347 1
+a347 1
+          float foo = fileIter.usageQuantityAsFloat();
+@
+
+
+1.5
+log
+@trivial changes from int to unsigned int to make the compiler happier
+@
+text
+@d5 1
+d16 2
+d25 2
+a26 1
+    bool hasEngagementName )
+d32 5
+a36 1
+    int numFields = numResourceIdFields + 2;
+d91 1
+a91 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true);
+d135 21
+d161 1
+a161 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false);
+d314 2
+d332 1
+a332 1
+      RCPgnrlBomFile file("../data/example1/bom.csv",5,true);
+d350 22
+a371 1
+          
+d382 1
+a382 1
+      RCPgnrlBomFile file("../data/example04Feb/bom.csv",12,false);
+@
+
+
+1.4
+log
+@iterator self-tests were using a non-existant directory
+@
+text
+@d48 1
+a48 1
+    int i;
+d64 1
+a64 1
+    int i;
+@
+
+
+1.3
+log
+@fixed "key" stuff in new gnrlBom file
+@
+text
+@d181 1
+d228 1
+a228 1
+      
+d357 1
+d380 1
+@
+
+
+1.2
+log
+@updated match.csv files for consistency in naming. Also added some
+selftests for the new gnrl format files
+@
+text
+@d126 1
+a126 2
+      //assert( file.usageQuantityAsFloat(key) == 3.0f );
+      //DLG THIS NEEDS TO BE FIXED!
+d223 1
+a223 2
+      //assert( file.usageQuantityAsFloat(key) == 30.0f );
+      //DLG THIS NEEDS TO BE FIXED!
+d244 5
+a248 1
+      std::string fv = fieldNAsString(recNum,f);
+@
+
+
+1.1
+log
+@add gnrlBomFile.h, and a few other changes
+@
+text
+@d57 2
+a58 1
+ std::string key(
+d73 1
+a73 1
+
+d125 3
+a127 2
+      std::string key = file.key(e,vals,1);
+      assert( file.usageQuantityAsFloat(key) == 10.0f );
+d173 2
+d224 2
+a225 1
+      assert( file.usageQuantityAsFloat(key) == 30.0f );
+d296 1
+a296 1
+    // tests from resourceFile.h
+d313 3
+a315 2
+          assert( fileIter.usageQuantityAsFloat() == 20.f );
+          assert( fileIter.fieldOnRecordAsFloat("usageQuantity") == 20.f );
+d341 1
+a341 1
+          assert( fileIter.usageQuantityAsFloat() == 20.f );
+d368 1
+a368 1
+          assert( fileIter.usageQuantityAsFloat() == 20.f );
+@
+

@@ -1,0 +1,361 @@
+head	1.2;
+access;
+symbols
+	beforeTiersAdded:1.2;
+locks; strict;
+comment	@// @;
+
+
+1.2
+date	2002.04.05.01.02.12;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.03.28.15.42.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Added methods to support resourceConsumption columns
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+#endif
+
+
+#include <strstream>
+#include <iostream>
+#include <iomanip>
+#include <assert.h>
+//#include "hash.h"
+
+#include "columnIndexManager.h"
+#include "grProblem.h"
+
+
+// Get number of defined columns
+int GRcolumnIndexManager::getNumCols() const
+{
+  int retVal = colNames_.size();
+  return retVal;
+}
+int GRcolumnIndexManager::getNumPortfolioLocationCols() const
+{
+  return portLocHashTab_.dataTableSize();
+}
+
+// Get vector of column names
+const std::vector<std::string> & GRcolumnIndexManager::getColNames() const
+{
+  return colNames_;
+}
+
+// return col number given Column name
+int GRcolumnIndexManager::getColNumber( const std::string & colName ) const throw(MBerror)
+{    
+  int retVal = colNameToColNum_.valueAllowUndefinedKey(colName);
+  
+  // If name was not found, then throw an exception
+  if ( retVal == -1 ) {
+    std::ostrstream errMsg;
+    errMsg <<"There is no column named: " <<colName <<"." <<'\0'; 
+    throw MBerror(errMsg.str(), "getColNumber","GRcolumnIndexManager");
+  }
+
+  return retVal;
+}
+
+
+
+
+//-------------------------------------------------------------------
+// Return column number for StockPlus of part at facility
+//-------------------------------------------------------------------
+int GRcolumnIndexManager::portfolioLocationColNum( const std::string & port, const std::string & loc ) const throw(MBerror)
+{
+  int retVal = -1;
+
+  // create column name
+  std::string hashValue = GRproblem::portfolioSourcingOpName(port,loc);
+  
+  // get column number
+  retVal = colNameToColNum_.value(hashValue);
+  
+  // if column does not exist, then throw exception
+  if ( retVal==-1 ) {
+    std::ostrstream errMsg;
+    errMsg <<"Column " <<hashValue <<" does not exist." <<'\0'; 
+    throw MBerror(errMsg.str(), "portfolioLocationColNum","GRcolumnIndexManager");
+  }
+
+  return retVal;
+}
+
+
+//-------------------------------------------------------------------
+// define column number for Stock of part at facility
+//-------------------------------------------------------------------
+int GRcolumnIndexManager::definePortfolioLocationCol( const std::string & port, const std::string & loc )
+{
+  // create column name
+  std::string hashValue = GRproblem::portfolioSourcingOpName(port,loc);
+  
+  // Column should not yet exist
+#if 0
+  if ( colNameToColNum_.dataTableSize()>0 ) {
+    // does a column with this name alread exist?
+    int cn = colNameToColNum_.value(hashValue);
+    assert( cn == -1 );
+  }
+#endif  
+  
+  //Assign next available column to this variable
+  int colNum = getNumCols();
+  immobileColNames_.push_back(hashValue);
+  colNameToColNum_.insert(immobileColNames_.back(),colNum);
+
+  colNames_.push_back(hashValue); 
+
+  return colNum;
+}
+
+
+//-------------------------------------------------------------------
+// define column number for resource
+//-------------------------------------------------------------------
+int GRcolumnIndexManager::resourceColNum( 
+                                         const std::string & skill, 
+                                         const std::string & loc, 
+                                         const std::string & band, 
+                                         const std::string & role,
+                                         int period) const throw(MBerror)
+{
+  std::string hashValue = resourceHashValue(skill,loc,band,role,period);
+  int retVal = -1;
+  
+  // get column number
+  retVal = colNameToColNum_.value(hashValue);
+  
+  // if column does not exist, then throw exception
+  if ( retVal==-1 ) {
+    std::ostrstream errMsg;
+    errMsg <<"Column " <<hashValue <<" does not exist." <<'\0'; 
+    throw MBerror(errMsg.str(), "resourceColNum","GRcolumnIndexManager");
+  }
+
+  return retVal;
+}
+int GRcolumnIndexManager::defineResourceCol( 
+                                            const std::string & skill, 
+                                            const std::string & loc, 
+                                            const std::string & band, 
+                                            const std::string & role,
+                                            int period)
+{
+  // create column name
+  std::string hashValue = resourceHashValue(skill,loc,band,role,period);
+  
+  //Assign next available column to this variable
+  int colNum = getNumCols();
+  immobileColNames_.push_back(hashValue);
+  colNameToColNum_.insert(immobileColNames_.back(),colNum);
+
+  colNames_.push_back(hashValue); 
+
+  return colNum;
+}
+std::string GRcolumnIndexManager::resourceHashValue(
+                                            const std::string & skill, 
+                                            const std::string & loc, 
+                                            const std::string & band, 
+                                            const std::string & role,
+                                            int period)
+{
+  std::string resourceName = GRproblem::baseResourceName( skill,loc,band,role );
+  std::ostrstream retVal;
+  retVal <<resourceName <<" period: " <<period <<'\0'; 
+  return retVal.str();
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+GRcolumnIndexManager::GRcolumnIndexManager ()
+:
+colNames_(),
+immobileColNames_(),
+colNameToColNum_(),
+portLocHashTab_()
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+GRcolumnIndexManager::GRcolumnIndexManager (
+                  const GRcolumnIndexManager & source)  
+{  
+  colNames_ = source.colNames_;
+  immobileColNames_ = source.immobileColNames_;
+  colNameToColNum_ = source.colNameToColNum_;
+  
+  portLocHashTab_ = source.portLocHashTab_;
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+GRcolumnIndexManager::~GRcolumnIndexManager ()
+{
+  // nothing to do here
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+GRcolumnIndexManager &
+GRcolumnIndexManager::operator=(
+                   const GRcolumnIndexManager& rhs)
+{
+  if (this != &rhs) {
+    colNames_ = rhs.colNames_;
+    immobileColNames_ = rhs.immobileColNames_;
+    colNameToColNum_ = rhs.colNameToColNum_;
+
+    portLocHashTab_ = rhs.portLocHashTab_;
+  }
+  return *this;
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+
+
+//--------------------------------------------------------------------------
+// test  method
+//--------------------------------------------------------------------------
+int
+GRcolumnIndexManager::unitTest()
+{
+  GRcolumnIndexManager baseCim;
+
+#if 0
+  assert( baseCim.getNumCols()==0);
+  baseCim.defineYCol(1,"P1",0);
+  assert( baseCim.getNumCols()==1);
+  baseCim.defineYCol(1,"P2",1);
+  assert( baseCim.getNumCols()==2);
+  baseCim.defineYCol(2,"P1",0);
+  assert( baseCim.getNumCols()==3);
+  baseCim.defineYCol(3,"P3",2);
+  assert( baseCim.getNumCols()==4);
+
+  baseCim.defineLambdaCol(1,1,"P1",0,"SG1",0);
+  assert( baseCim.getNumCols()==5);
+  baseCim.defineLambdaCol(1,2,"P1",0,"SG1",0);
+  assert( baseCim.getNumCols()==6);
+  baseCim.defineLambdaCol(1,1,"P2",1,"SG1",0);
+  assert( baseCim.getNumCols()==7);
+  baseCim.defineLambdaCol(1,1,"P1",0,"SG3",2);
+  assert( baseCim.getNumCols()==8);
+
+#if 0
+  baseCim.defineStockCol(1,"P1",0);
+  assert( baseCim.getNumCols()==9);
+  baseCim.defineStockCol(2,"P1",0);
+  assert( baseCim.getNumCols()==10);
+  baseCim.defineStockCol(1,"P2",1);
+  assert( baseCim.getNumCols()==11);
+#endif
+
+  baseCim.defineStockPlusCol(1,"P1",0);
+  assert( baseCim.getNumCols()==12);
+  baseCim.defineStockPlusCol(2,"P1",0);
+  assert( baseCim.getNumCols()==13);
+  baseCim.defineStockPlusCol(1,"P2",1);
+  assert( baseCim.getNumCols()==14);
+
+  baseCim.defineStockMinusCol(1,"P1",0);
+  assert( baseCim.getNumCols()==15);
+  baseCim.defineStockMinusCol(2,"P1",0);
+  assert( baseCim.getNumCols()==16);
+  baseCim.defineStockMinusCol(1,"P2",1);
+  assert( baseCim.getNumCols()==17);
+
+
+  assert( baseCim.yCol(1,"P1")==0);
+  assert( baseCim.yCol(1,"P2")==1);
+  assert( baseCim.yCol(2,"P1")==2);
+  assert( baseCim.yCol(3,"P3")==3);
+  assert( baseCim.yCol(1,0)==0);
+  assert( baseCim.yCol(1,1)==1);
+  assert( baseCim.yCol(2,0)==2);
+  assert( baseCim.yCol(3,2)==3);
+
+  assert( baseCim.lambdaCol(1,1,"P1","SG1")==4);
+  assert( baseCim.lambdaCol(1,2,"P1","SG1")==5);
+  assert( baseCim.lambdaCol(1,1,"P2","SG1")==6);
+  assert( baseCim.lambdaCol(1,1,"P1","SG3")==7);
+  assert( baseCim.lambdaCol(1,1,0,0)==4);
+  assert( baseCim.lambdaCol(1,2,0,0)==5);
+  assert( baseCim.lambdaCol(1,1,1,0)==6);
+  assert( baseCim.lambdaCol(1,1,0,2)==7);
+
+#if 0
+  assert( baseCim.stockCol(1,"P1")==8);
+  assert( baseCim.stockCol(2,"P1")==9);
+  assert( baseCim.stockCol(1,"P2")==10);
+  assert( baseCim.stockCol(1,0)==8);
+  assert( baseCim.stockCol(2,0)==9);
+  assert( baseCim.stockCol(1,1)==10);
+#endif
+
+  assert( baseCim.stockPlusCol(1,"P1")==11);
+  assert( baseCim.stockPlusCol(2,"P1")==12);
+  assert( baseCim.stockPlusCol(1,"P2")==13);
+  assert( baseCim.stockPlusCol(1,0)==11);
+  assert( baseCim.stockPlusCol(2,0)==12);
+  assert( baseCim.stockPlusCol(1,1)==13);
+
+  assert( baseCim.stockMinusCol(1,"P1")==14);
+  assert( baseCim.stockMinusCol(2,"P1")==15);
+  assert( baseCim.stockMinusCol(1,"P2")==16);
+  assert( baseCim.stockMinusCol(1,0)==14);
+  assert( baseCim.stockMinusCol(2,0)==15);
+  assert( baseCim.stockMinusCol(1,1)==16);
+#endif
+
+  return 0;
+}
+@
+
+
+1.1
+log
+@Changes to add osl mip solver structure to code
+@
+text
+@d69 1
+a69 1
+    throw MBerror(errMsg.str(), "facilityPartCol","GRcolumnIndexManager");
+d102 59
+a160 1
+    
+@
+

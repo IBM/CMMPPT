@@ -1,0 +1,296 @@
+head	1.4;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2005.11.02.16.59.29;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.08.03.14.43.09;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.05.11.16.38.27;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.05.11.15.40.07;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@giving some attribute values nice names (such as appDeveloper instead of r1)
+@
+text
+@#ifndef RCPgnrlResourceActionFile_h
+#define RCPgnrlResourceActionFile_h
+
+#include "scoFile.h"
+
+
+class RCPgnrlResourceActionFile : public SCOcsvFormatFile {
+public:
+
+
+  // Fields 
+
+  getFloatFieldH(acquireTime);
+  getFloatFieldH(acquireCost);
+  getFloatFieldH(releaseTime);
+  getFloatFieldH(releaseCost);
+
+
+
+  
+  // preferred constructor
+  RCPgnrlResourceActionFile(std::string filename,int numResourceIdFields)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    int numfields = numResourceIdFields + 4; //need aquire time/cost, release time/cost
+    hasHeaderRecord(numfields);
+    numResourceIdFields_ = numResourceIdFields;
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key(const std::vector<std::string> & resourceIdValues)
+  {
+    std::string retVal;
+    for (unsigned int i=0; i<resourceIdValues.size(); ++i ) {
+      retVal = retVal + resourceIdValues[i] + "!@@#$%";
+    }
+    return retVal;
+  };
+  
+  // destructor
+  ~RCPgnrlResourceActionFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    RCPgnrlResourceActionFile file("../data/example1/resourceaction.csv",5);
+    
+    // Test reading first record
+
+    assert( file.fieldAsString(0,"jobRole")=="appDeveloper" );
+    assert( file.fieldAsString(0,"skillSet")=="java" );
+    assert( file.fieldAsString(0,"LOB")=="AMS" );
+    assert( file.fieldAsString(0,"source")=="IBM" );
+    assert( file.fieldAsString(0,"resourceLocName")=="New York" );
+    assert( file.acquireTimeAsFloat(0) == 2.f );
+    assert( file.acquireCostAsFloat(0) == 2.f );
+    assert( file.releaseTimeAsFloat(0) == 1.f );
+    assert( file.releaseCostAsFloat(0) == 1.f );
+
+
+    assert( file.fieldAsString(1,"jobRole")=="architect" );
+    assert( file.fieldAsString(1,"skillSet")=="c++" );
+    assert( file.fieldAsString(1,"LOB")=="eBHS" );
+    assert( file.fieldAsString(1,"source")=="SUBCON" );
+    assert( file.fieldAsString(1,"resourceLocName")=="New York" );
+    assert( file.acquireTimeAsFloat(1) == 1.f );
+    assert( file.acquireCostAsFloat(1) == 2.f );
+    assert( file.releaseTimeAsFloat(1) == 2.f );
+    assert( file.releaseCostAsFloat(1) == 1.f );
+
+
+    // Test reading record by key    
+    std::vector<std::string> vals;
+    vals.push_back("architect");
+    vals.push_back("c++");
+    vals.push_back("eBHS");
+    vals.push_back("SUBCON");
+    vals.push_back("New York");
+  
+    std::string key = file.key(vals);
+    assert( file.releaseTimeAsFloat(key) == 2.f );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+   std::vector<std::string> vals;
+    std::string eName;
+    int f;
+    for ( f=0; f<numResourceIdFields_; ++f ) {
+       std::string fv;
+       fv = fieldNAsString(recNum,f);
+       vals.push_back(fv);
+    }
+    
+    std::string retVal;
+    retVal = key(vals);
+    return retVal;    
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPgnrlResourceActionFile();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlResourceActionFile( const RCPgnrlResourceActionFile& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlResourceActionFile&
+  operator=(const RCPgnrlResourceActionFile& rhs);
+
+  int numResourceIdFields_;  
+};
+
+
+
+class RCPgnrlResourceActionFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+
+  getFloatFieldFileWithIteratorH(acquireTime);
+  getFloatFieldFileWithIteratorH(acquireCost);
+  getFloatFieldFileWithIteratorH(releaseTime);
+  getFloatFieldFileWithIteratorH(releaseCost);
+
+
+  // preferred constructor
+  RCPgnrlResourceActionFileIterator(const RCPgnrlResourceActionFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPgnrlResourceActionFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    RCPgnrlResourceActionFile file("../data/example1/resourceaction.csv",5);
+    RCPgnrlResourceActionFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+	assert( fileIter.fieldOnRecord("jobRole")=="appDeveloper" );
+	assert( fileIter.fieldOnRecord("skillSet")=="java" );
+	assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+	assert( fileIter.fieldOnRecord("source")=="IBM" );
+	assert( fileIter.fieldOnRecord("resourceLocName")=="New York" );
+	assert( fileIter.acquireTimeAsFloat() == 2.f );
+	assert( fileIter.acquireCostAsFloat() == 2.f );
+	assert( fileIter.releaseTimeAsFloat() == 1.f );
+	assert( fileIter.releaseCostAsFloat() == 1.f );
+        
+      }
+      recNo++;
+    }
+    
+    // number of records including comments
+    //    assert( fileIter.recNum()==2);
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPgnrlResourceActionFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlResourceActionFileIterator( const RCPgnrlResourceActionFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlResourceActionFileIterator&
+  operator=(const RCPgnrlResourceActionFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.3
+log
+@generalize number of header fields in gnrlResourceActionFile.h and also
+really run different directories in unitTest (as was being reported)
+@
+text
+@d53 5
+a57 5
+    assert( file.fieldAsString(0,"jobRole")=="r1" );
+    assert( file.fieldAsString(0,"skillSet")=="s1" );
+    assert( file.fieldAsString(0,"LOB")=="LOB1" );
+    assert( file.fieldAsString(0,"source")=="src1" );
+    assert( file.fieldAsString(0,"resourceLocName")=="l1" );
+d64 5
+a68 5
+    assert( file.fieldAsString(1,"jobRole")=="r2" );
+    assert( file.fieldAsString(1,"skillSet")=="s2" );
+    assert( file.fieldAsString(1,"LOB")=="LOB2" );
+    assert( file.fieldAsString(1,"source")=="src2" );
+    assert( file.fieldAsString(1,"resourceLocName")=="l1" );
+d77 5
+a81 5
+    vals.push_back("r2");
+    vals.push_back("s2");
+    vals.push_back("LOB2");
+    vals.push_back("src2");
+    vals.push_back("l1");
+d154 5
+a158 5
+	assert( fileIter.fieldOnRecord("jobRole")=="r1" );
+	assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+	assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+	assert( fileIter.fieldOnRecord("source")=="src1" );
+	assert( fileIter.fieldOnRecord("resourceLocName")=="l1" );
+@
+
+
+1.2
+log
+@continuing the process of generalizing 03Dec format
+@
+text
+@d27 2
+a28 1
+    hasHeaderRecord(9);
+@
+
+
+1.1
+log
+@more progress to generalizing the 03Dec format
+@
+text
+@d127 1
+a127 5
+  getFieldFileWithIteratorH(jobRole);
+  getFieldFileWithIteratorH(skillSet);
+  getFieldFileWithIteratorH(LOB);
+  getFieldFileWithIteratorH(source);
+  getFieldFileWithIteratorH(resourceLocName);
+d153 5
+a157 5
+	assert( fileIter.jobRole()=="r1" );
+	assert( fileIter.skillSet()=="s1" );
+	assert( fileIter.LOB()=="LOB1" );
+	assert( fileIter.source()=="src1" );
+	assert( fileIter.resourceLocName()=="l1" );
+@
+

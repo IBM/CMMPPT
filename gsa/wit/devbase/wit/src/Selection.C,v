@@ -1,0 +1,1481 @@
+head	1.16;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.16
+date	2011.09.28.23.50.11;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.09.24.00.28.37;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.08.30.20.18.10;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.09.28.19.25.17;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.07.30.23.39.29;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.07.30.20.20.15;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.07.29.21.03.12;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.07.28.19.27.46;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2010.07.27.23.18.55;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.07.27.20.57.56;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2010.07.26.21.47.12;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2010.07.16.22.37.44;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2010.07.16.22.26.42;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2010.07.02.19.15.50;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2010.07.02.18.53.10;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2010.06.29.19.56.42;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.16
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "Selection.C"
+//
+// Contains the implementation of the following classes and templates:
+//
+//    SelMgr
+//    SelPt
+//    DetSelPt
+//    AltPt
+//    DetAltPt
+//    ReqPtMgr
+//    ReqPt
+//------------------------------------------------------------------------------
+
+#include <SelMgr.h>
+#include <DetSelPt.h>
+#include <DetAltPt.h>
+#include <ReqPtMgr.h>
+#include <ReqPt.h>
+#include <Selector.h>
+#include <SsrMgr.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <BopEntry.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SelMgr.
+//------------------------------------------------------------------------------
+
+WitSelMgr::~WitSelMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitAltPt * WitSelMgr::myAltPtFor (WitPart *, WitPeriod)
+   {
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelMgr::setIndex ()
+   {
+   myIndex_ = mySelector_->mySelMgrs ().nElements ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSelMgr::isLowerThan (WitSelMgr * theSelMgr)
+   {
+   return (myIndex_ > theSelMgr->myIndex_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelMgr::setUpSelSplit ()
+   {
+   stronglyAssert (not selSplit_);
+
+   selSplit_ = true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelMgr::setBoundedSplit (bool theVal)
+   {
+   boundedSplit_ = theVal;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelMgr::postSplitCommit () 
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelMgr::WitSelMgr (WitSelector * theSelector):
+
+      WitProbAssoc  (theSelector),
+      mySelector_   (theSelector),
+      myIndex_      (-1),
+      selSplit_     (false),
+      boundedSplit_ (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SelPt.
+//------------------------------------------------------------------------------
+
+void WitSelPt::attachSplitPt (WitSplitPt * theSplitPt)
+   {
+   stronglyAssert ( mySplitPt_ == NULL);
+   stronglyAssert (theSplitPt  != NULL);
+
+   mySplitPt_ = theSplitPt;
+
+   recSplit ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::detachSplitPt ()
+   {
+   stronglyAssert (mySplitPt_ != NULL);
+
+   mySplitPt_ = NULL;
+
+   recUnsplit ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::recordFlowSS (double incFlowVol)
+   {
+   mySelMgr ()->mySelector ()->recordFlowSS (this, incFlowVol);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSelPt::sglSrcMode ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt::WitSelPt ():
+      mySplitPt_ (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt::~WitSelPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::recSplit ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::recUnsplit ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class DetSelPt.
+//------------------------------------------------------------------------------
+
+WitDetSelPt::WitDetSelPt ():
+
+      WitSelPt    (),
+      myDetAltPt_ (NULL)
+   {
+   myDetAltPt_ = new WitDetAltPt (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitDetSelPt::~WitDetSelPt ()
+   {
+   delete myDetAltPt_;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AltPt.
+//------------------------------------------------------------------------------
+
+WitAltPt::~WitAltPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAltPt::setPending (bool theValue)
+   {
+   pending_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+WitAltPt::WitAltPt ():
+      pending_ (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class DetAltPt.
+//------------------------------------------------------------------------------
+
+WitDetAltPt::WitDetAltPt (WitDetSelPt * theDetSelPt):
+
+      WitAltPt    (),
+      myDetSelPt_ (theDetSelPt)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitDetAltPt::~WitDetAltPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetAltPt::hasResAlt ()
+   {
+   return myDetSelPt_->hasResAlt ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetAltPt::alterSelection ()
+   {
+   myDetSelPt_->alterSelection ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetAltPt::storeRecoveryPt ()
+   {
+   myDetSelPt_->storeRecoveryPt ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetAltPt::tempAlterSel ()
+   {
+   myDetSelPt_->tempAlterSel ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetAltPt::cancelTempAlt ()
+   {
+   myDetSelPt_->cancelTempAlt ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt * WitDetAltPt::mySelPt ()
+   {
+   return myDetSelPt_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetAltPt::printAlteration ()
+   {
+   myDetSelPt_->printAlteration ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ReqPtMgr.
+//------------------------------------------------------------------------------
+
+WitReqPtMgr::WitReqPtMgr (WitProblem * theProblem):
+      WitProbAssoc  (theProblem),
+
+      myReqPts_     (myProblem ()),
+      allocedSlots_ (myProblem ()),
+      unusedPoints_ (myProblem ())
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitReqPtMgr::~WitReqPtMgr ()
+   {
+   reset ();
+
+   deleteContents (unusedPoints_);
+   }
+
+//------------------------------------------------------------------------------
+
+WitReqPt * WitReqPtMgr::myReqPt (WitPart * thePart, WitPeriod thePer)
+   {
+   WitReqPt * & theReqPtRef = myReqPts_.myPtrAt (thePart, thePer);
+
+   if (theReqPtRef == NULL)
+      {
+      if (not unusedPoints_.pop (theReqPtRef))
+         theReqPtRef = new WitReqPt (myProblem ());
+
+      if (DEBUG_MODE)
+         theReqPtRef->set (thePart, thePer);
+
+      allocedSlots_.push (& theReqPtRef);
+      }
+
+   return theReqPtRef;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPtMgr::reset ()
+   {
+   WitReqPt * * theReqPtPtr;
+
+   while (allocedSlots_.pop (theReqPtPtr))
+      {
+      WitReqPt * & theReqPtRef = * theReqPtPtr;
+
+      theReqPtRef->reset ();
+
+      if (DEBUG_MODE)
+         theReqPtRef->set (NULL, -1);
+
+      unusedPoints_.push (theReqPtRef);
+
+      theReqPtRef = NULL;
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ReqPt.
+//------------------------------------------------------------------------------
+
+WitReqPt::WitReqPt (WitProblem * theProblem):
+
+      myPart_     (NULL),
+      myPer_      (-1),
+      directAlts_ (theProblem),
+      source_     (NULL),
+      hasResAlt_  (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitReqPt::~WitReqPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPt::set (WitPart * thePart, WitPeriod thePer)
+   {
+   myPart_ = thePart;
+   myPer_  = thePer;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitReqPt::hasAlt ()
+   {
+   return (source_ != NULL) or (directAlts_.isNonEmpty ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPt::setSource (WitReqPt * theSource)
+   {
+   stronglyAssert (theSource != NULL);
+
+   if (not theSource->hasAlt ())
+      return;
+
+   if (theSource->hasResAlt ())
+      {
+      reset ();
+            
+      hasResAlt_ = true;
+      }        
+
+   source_ = theSource;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPt::putDirectAlt (WitAltPt * theAltPt)
+   {
+   witAssert (theAltPt != NULL);
+
+   if (theAltPt->hasResAlt ())
+      {
+      reset ();
+            
+      hasResAlt_ = true;
+      }        
+
+   directAlts_.push (theAltPt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPt::copyStateOf (WitReqPt * theReqPt)
+   {
+   directAlts_.revCopyFrom (theReqPt->directAlts_);
+
+   directAlts_.reverse ();
+
+   source_    = theReqPt->source ();
+
+   hasResAlt_ = theReqPt->hasResAlt ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqPt::reset ()
+   {
+   directAlts_.clear ();
+
+   source_    = NULL;
+   hasResAlt_ = false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitReqPt::getDirectAlt (WitAltPt * & theAltPt)
+   {
+   return directAlts_.pop (theAltPt);
+   }
+@
+
+
+1.15
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.14
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d40 2
+a41 2
+{
+}
+d46 3
+a48 3
+{
+return NULL;
+}
+d53 3
+a55 3
+{
+myIndex_ = mySelector_->mySelMgrs ().nElements ();
+}
+d60 3
+a62 3
+{
+return (myIndex_ > theSelMgr->myIndex_);
+}
+d67 2
+a68 2
+{
+stronglyAssert (not selSplit_);
+d70 2
+a71 2
+selSplit_ = true;
+}
+d76 3
+a78 3
+{
+boundedSplit_ = theVal;
+}
+d82 3
+a84 3
+void WitSelMgr::postSplitCommit ()
+{
+}
+d90 7
+a96 7
+WitProbAssoc  (theSelector),
+mySelector_   (theSelector),
+myIndex_      (-1),
+selSplit_     (false),
+boundedSplit_ (false)
+{
+}
+d103 3
+a105 3
+{
+stronglyAssert ( mySplitPt_ == NULL);
+stronglyAssert (theSplitPt  != NULL);
+d107 1
+a107 1
+mySplitPt_ = theSplitPt;
+d109 2
+a110 2
+recSplit ();
+}
+d115 2
+a116 2
+{
+stronglyAssert (mySplitPt_ != NULL);
+d118 1
+a118 1
+mySplitPt_ = NULL;
+d120 2
+a121 2
+recUnsplit ();
+}
+d126 3
+a128 3
+{
+mySelMgr ()->mySelector ()->recordFlowSS (this, incFlowVol);
+}
+d133 3
+a135 3
+{
+return false;
+}
+d140 3
+a142 3
+mySplitPt_ (NULL)
+{
+}
+d147 2
+a148 2
+{
+}
+d153 2
+a154 2
+{
+}
+d159 2
+a160 2
+{
+}
+d168 5
+a172 5
+WitSelPt    (),
+myDetAltPt_ (NULL)
+{
+myDetAltPt_ = new WitDetAltPt (this);
+}
+d177 3
+a179 3
+{
+delete myDetAltPt_;
+}
+d186 2
+a187 2
+{
+}
+d192 3
+a194 3
+{
+pending_ = theValue;
+}
+d199 3
+a201 3
+pending_ (false)
+{
+}
+d209 4
+a212 4
+WitAltPt    (),
+myDetSelPt_ (theDetSelPt)
+{
+}
+d217 2
+a218 2
+{
+}
+d223 3
+a225 3
+{
+return myDetSelPt_->hasResAlt ();
+}
+d230 3
+a232 3
+{
+myDetSelPt_->alterSelection ();
+}
+d237 3
+a239 3
+{
+myDetSelPt_->storeRecoveryPt ();
+}
+d244 3
+a246 3
+{
+myDetSelPt_->tempAlterSel ();
+}
+d251 3
+a253 3
+{
+myDetSelPt_->cancelTempAlt ();
+}
+d258 3
+a260 3
+{
+return myDetSelPt_;
+}
+d265 3
+a267 3
+{
+myDetSelPt_->printAlteration ();
+}
+d274 1
+a274 1
+WitProbAssoc  (theProblem),
+d276 5
+a280 5
+myReqPts_     (myProblem ()),
+allocedSlots_ (myProblem ()),
+unusedPoints_ (myProblem ())
+{
+}
+d285 2
+a286 2
+{
+reset ();
+d288 2
+a289 2
+deleteContents (unusedPoints_);
+}
+d294 2
+a295 2
+{
+WitReqPt * & theReqPtRef = myReqPts_.myPtrAt (thePart, thePer);
+d297 4
+a300 4
+if (theReqPtRef == NULL)
+{
+if (not unusedPoints_.pop (theReqPtRef))
+theReqPtRef = new WitReqPt (myProblem ());
+d302 2
+a303 2
+if (DEBUG_MODE)
+theReqPtRef->set (thePart, thePer);
+d305 2
+a306 2
+allocedSlots_.push (& theReqPtRef);
+}
+d308 2
+a309 2
+return theReqPtRef;
+}
+d314 2
+a315 2
+{
+WitReqPt * * theReqPtPtr;
+d317 3
+a319 3
+while (allocedSlots_.pop (theReqPtPtr))
+{
+WitReqPt * & theReqPtRef = * theReqPtPtr;
+d321 1
+a321 1
+theReqPtRef->reset ();
+d323 2
+a324 2
+if (DEBUG_MODE)
+theReqPtRef->set (NULL, -1);
+d326 1
+a326 1
+unusedPoints_.push (theReqPtRef);
+d328 3
+a330 3
+theReqPtRef = NULL;
+}
+}
+d338 7
+a344 7
+myPart_     (NULL),
+myPer_      (-1),
+directAlts_ (theProblem),
+source_     (NULL),
+hasResAlt_  (false)
+{
+}
+d349 2
+a350 2
+{
+}
+d355 4
+a358 4
+{
+myPart_ = thePart;
+myPer_  = thePer;
+}
+d363 3
+a365 3
+{
+return (source_ != NULL) or (directAlts_.isNonEmpty ());
+}
+d370 2
+a371 5
+{
+stronglyAssert (theSource != NULL);
+
+if (not theSource->hasAlt ())
+return;
+d373 2
+a374 3
+if (theSource->hasResAlt ())
+{
+reset ();
+d376 6
+a381 2
+hasResAlt_ = true;
+}
+d383 2
+a384 2
+source_ = theSource;
+}
+d389 2
+a390 6
+{
+witAssert (theAltPt != NULL);
+
+if (theAltPt->hasResAlt ())
+{
+reset ();
+d392 6
+a397 2
+hasResAlt_ = true;
+}
+d399 2
+a400 2
+directAlts_.push (theAltPt);
+}
+d405 2
+a406 2
+{
+directAlts_.revCopyFrom (theReqPt->directAlts_);
+d408 1
+a408 1
+directAlts_.reverse ();
+d410 1
+a410 1
+source_    = theReqPt->source ();
+d412 2
+a413 2
+hasResAlt_ = theReqPt->hasResAlt ();
+}
+d418 2
+a419 2
+{
+directAlts_.clear ();
+d421 3
+a423 3
+source_    = NULL;
+hasResAlt_ = false;
+}
+d428 3
+a430 3
+{
+return directAlts_.pop (theAltPt);
+}
+@
+
+
+1.13
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d40 2
+a41 2
+   {
+   }
+d46 3
+a48 3
+   {
+   return NULL;
+   }
+d53 3
+a55 3
+   {
+   myIndex_ = mySelector_->mySelMgrs ().nElements ();
+   }
+d60 3
+a62 3
+   {
+   return (myIndex_ > theSelMgr->myIndex_);
+   }
+d67 2
+a68 2
+   {
+   stronglyAssert (not selSplit_);
+d70 2
+a71 2
+   selSplit_ = true;
+   }
+d76 3
+a78 3
+   {
+   boundedSplit_ = theVal;
+   }
+d82 3
+a84 3
+void WitSelMgr::postSplitCommit () 
+   {
+   }
+d90 7
+a96 7
+      WitProbAssoc  (theSelector),
+      mySelector_   (theSelector),
+      myIndex_      (-1),
+      selSplit_     (false),
+      boundedSplit_ (false)
+   {
+   }
+d103 3
+a105 3
+   {
+   stronglyAssert ( mySplitPt_ == NULL);
+   stronglyAssert (theSplitPt  != NULL);
+d107 1
+a107 1
+   mySplitPt_ = theSplitPt;
+d109 2
+a110 2
+   recSplit ();
+   }
+d115 2
+a116 2
+   {
+   stronglyAssert (mySplitPt_ != NULL);
+d118 1
+a118 1
+   mySplitPt_ = NULL;
+d120 2
+a121 2
+   recUnsplit ();
+   }
+d126 3
+a128 3
+   {
+   mySelMgr ()->mySelector ()->recordFlowSS (this, incFlowVol);
+   }
+d133 3
+a135 3
+   {
+   return false;
+   }
+d140 3
+a142 3
+      mySplitPt_ (NULL)
+   {
+   }
+d147 2
+a148 2
+   {
+   }
+d153 2
+a154 2
+   {
+   }
+d159 2
+a160 2
+   {
+   }
+d168 5
+a172 5
+      WitSelPt    (),
+      myDetAltPt_ (NULL)
+   {
+   myDetAltPt_ = new WitDetAltPt (this);
+   }
+d177 3
+a179 3
+   {
+   delete myDetAltPt_;
+   }
+d186 2
+a187 2
+   {
+   }
+d192 3
+a194 3
+   {
+   pending_ = theValue;
+   }
+d199 3
+a201 3
+      pending_ (false)
+   {
+   }
+d209 4
+a212 4
+      WitAltPt    (),
+      myDetSelPt_ (theDetSelPt)
+   {
+   }
+d217 2
+a218 2
+   {
+   }
+d223 3
+a225 3
+   {
+   return myDetSelPt_->hasResAlt ();
+   }
+d230 3
+a232 3
+   {
+   myDetSelPt_->alterSelection ();
+   }
+d237 3
+a239 3
+   {
+   myDetSelPt_->storeRecoveryPt ();
+   }
+d244 3
+a246 3
+   {
+   myDetSelPt_->tempAlterSel ();
+   }
+d251 3
+a253 3
+   {
+   myDetSelPt_->cancelTempAlt ();
+   }
+d258 3
+a260 3
+   {
+   return myDetSelPt_;
+   }
+d265 3
+a267 3
+   {
+   myDetSelPt_->printAlteration ();
+   }
+d274 1
+a274 1
+      WitProbAssoc  (theProblem),
+d276 5
+a280 5
+      myReqPts_     (myProblem ()),
+      allocedSlots_ (myProblem ()),
+      unusedPoints_ (myProblem ())
+   {
+   }
+d285 2
+a286 2
+   {
+   reset ();
+d288 2
+a289 2
+   deleteContents (unusedPoints_);
+   }
+d294 2
+a295 2
+   {
+   WitReqPt * & theReqPtRef = myReqPts_.myPtrAt (thePart, thePer);
+d297 4
+a300 4
+   if (theReqPtRef == NULL)
+      {
+      if (not unusedPoints_.pop (theReqPtRef))
+         theReqPtRef = new WitReqPt (myProblem ());
+d302 2
+a303 2
+      if (DEBUG_MODE)
+         theReqPtRef->set (thePart, thePer);
+d305 2
+a306 2
+      allocedSlots_.push (& theReqPtRef);
+      }
+d308 2
+a309 2
+   return theReqPtRef;
+   }
+d314 2
+a315 2
+   {
+   WitReqPt * * theReqPtPtr;
+d317 3
+a319 3
+   while (allocedSlots_.pop (theReqPtPtr))
+      {
+      WitReqPt * & theReqPtRef = * theReqPtPtr;
+d321 1
+a321 1
+      theReqPtRef->reset ();
+d323 2
+a324 2
+      if (DEBUG_MODE)
+         theReqPtRef->set (NULL, -1);
+d326 1
+a326 1
+      unusedPoints_.push (theReqPtRef);
+d328 3
+a330 3
+      theReqPtRef = NULL;
+      }
+   }
+d338 7
+a344 7
+      myPart_     (NULL),
+      myPer_      (-1),
+      directAlts_ (theProblem),
+      source_     (NULL),
+      hasResAlt_  (false)
+   {
+   }
+d349 2
+a350 2
+   {
+   }
+d355 4
+a358 4
+   {
+   myPart_ = thePart;
+   myPer_  = thePer;
+   }
+d363 3
+a365 3
+   {
+   return (source_ != NULL) or (directAlts_.isNonEmpty ());
+   }
+d370 5
+a374 2
+   {
+   stronglyAssert (theSource != NULL);
+d376 3
+a378 2
+   if (not theSource->hasAlt ())
+      return;
+d380 2
+a381 6
+   if (theSource->hasResAlt ())
+      {
+      reset ();
+            
+      hasResAlt_ = true;
+      }        
+d383 2
+a384 2
+   source_ = theSource;
+   }
+d389 6
+a394 2
+   {
+   witAssert (theAltPt != NULL);
+d396 2
+a397 6
+   if (theAltPt->hasResAlt ())
+      {
+      reset ();
+            
+      hasResAlt_ = true;
+      }        
+d399 2
+a400 2
+   directAlts_.push (theAltPt);
+   }
+d405 2
+a406 2
+   {
+   directAlts_.revCopyFrom (theReqPt->directAlts_);
+d408 1
+a408 1
+   directAlts_.reverse ();
+d410 1
+a410 1
+   source_    = theReqPt->source ();
+d412 2
+a413 2
+   hasResAlt_ = theReqPt->hasResAlt ();
+   }
+d418 2
+a419 2
+   {
+   directAlts_.clear ();
+d421 3
+a423 3
+   source_    = NULL;
+   hasResAlt_ = false;
+   }
+d428 3
+a430 3
+   {
+   return directAlts_.pop (theAltPt);
+   }
+@
+
+
+1.12
+log
+@Selection Recovery
+@
+text
+@a15 1
+//    RecoverySet <Owner, Site>, with explicit instantiation
+a24 1
+#include <RecoverySet.h>
+a29 2
+#include <MrCoord.h>
+#include <MeMgr.h>
+a30 1
+#include <PrCoord.h>
+a98 62
+// Implementation of class template RecoverySet <Owner, Site>.
+//------------------------------------------------------------------------------
+
+template <typename Owner, typename Site> 
+      WitRecoverySet <Owner, Site>::WitRecoverySet (Owner * theOwner):
+
+      myOwner_      (theOwner),
+      recoveryPts_  (theOwner->myProblem ()),
+      isRecoveryPt_ (theOwner->myProblem (), false)
+   {
+   witAssert (theOwner->myGlobalComp ()->selectionRecovery ());
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Owner, typename Site> 
+      WitRecoverySet <Owner, Site>::~WitRecoverySet ()
+   {
+   }
+ 
+//------------------------------------------------------------------------------
+
+template <typename Owner, typename Site> 
+      void WitRecoverySet <Owner, Site>::storeRecoveryPt (
+         Site *    theSite,
+         WitPeriod thePer)
+   {
+   if (isRecoveryPt_ (theSite)[thePer])
+      return;
+
+   isRecoveryPt_ (theSite)[thePer] = true;
+
+   recoveryPts_.push (theSite, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Owner, typename Site> 
+      void WitRecoverySet <Owner, Site>::recoverInitState ()
+   {
+   Site *    theSite;
+   WitPeriod thePer;
+
+   while (recoveryPts_.pop (theSite, thePer))
+      {
+      myOwner_->recoverInitState (theSite, thePer);
+
+      isRecoveryPt_ (theSite)[thePer] = false;
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Explicit instantiation of class template RecoverySet <Owner, Site>.
+//------------------------------------------------------------------------------
+
+template class WitRecoverySet <WitMrCoord, WitRtSite>;
+template class WitRecoverySet <WitMrCoord, WitRtCand>;
+template class WitRecoverySet <WitMeMgr,   WitBopEntry>;
+template class WitRecoverySet <WitSsrMgr,  WitMaterial>;
+template class WitRecoverySet <WitPrCoord, WitRtCand>;
+
+//------------------------------------------------------------------------------
+@
+
+
+1.11
+log
+@Selection Recovery
+@
+text
+@d160 1
+@
+
+
+1.10
+log
+@Selection Recovery
+@
+text
+@d16 1
+d26 1
+d32 7
+a38 1
+#include <Part.h>
+d104 61
+d302 1
+a302 1
+void WitDetAltPt::recAltForRecovery ()
+d304 1
+a304 1
+   myDetSelPt_->recAltForRecovery ();
+@
+
+
+1.9
+log
+@Selection Recovery
+@
+text
+@d233 1
+a233 1
+void WitDetAltPt::recordAlteration ()
+d235 1
+a235 1
+   myDetSelPt_->recordAlteration ();
+@
+
+
+1.8
+log
+@Selection Recovery
+@
+text
+@d233 7
+@
+
+
+1.7
+log
+@Selection Recovery
+@
+text
+@a135 14
+void WitSelPt::printRecoverO ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::recoverInitSeO ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+a148 7
+void WitSelPt::recAlteratOld ()
+   {
+   mySelMgr ()->mySelector ()->recAlteredSelPO (this);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.6
+log
+@Selection Recovery
+@
+text
+@d13 1
+a13 1
+// Contains the implementation of the following classes:
+@
+
+
+1.5
+log
+@Selection Recovery
+@
+text
+@a62 6
+void WitSelMgr::specSelRecoverO ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.4
+log
+@Selection Recovery
+@
+text
+@d169 1
+a169 1
+void WitSelPt::recAlteration ()
+d171 1
+a171 1
+   mySelMgr ()->mySelector ()->recAlteredSelPt (this);
+@
+
+
+1.3
+log
+@Selection Recovery.
+@
+text
+@d63 1
+a63 1
+void WitSelMgr::specSelRecovery ()
+d142 14
+@
+
+
+1.2
+log
+@Selection recovery.
+@
+text
+@a141 14
+void WitSelPt::recoverInitSel ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSelPt::prtRecInitSel ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.1
+log
+@Selection Reuse.
+@
+text
+@d63 1
+a63 1
+void WitSelMgr::restoreSpecConfig ()
+d142 1
+a142 1
+void WitSelPt::restoreInitSel ()
+d149 1
+a149 1
+void WitSelPt::prtRestInitSel ()
+@
+

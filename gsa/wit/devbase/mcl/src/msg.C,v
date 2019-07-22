@@ -1,0 +1,1350 @@
+head	1.11;
+access;
+symbols
+	sce_5_01_20080919:1.10
+	latest_sce_4_20_20060523:1.5.0.6
+	sce_4_20_20060523:1.5
+	latest_sce4_20_OSL:1.5.0.4
+	sce_4_20_OSL:1.5
+	sce_4_05_20040511:1.5
+	sce_4_00_20040201:1.5
+	nextGenBranch:1.5.0.2
+	nextGenRoot:1.5
+	sce_3_30_20030627:1.5
+	EndRw-branch:1.1.1.1.0.12
+	Root-of-EndRw:1.1.1.1
+	rwToStl:1.1.1.1.0.10
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.11
+date	2011.09.29.18.27.13;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.07.14.15.36.45;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.07.12.19.41.39;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.07.12.17.41.56;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.07.12.16.18.21;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.07.10.21.53.26;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.04.28.18.00.27;	author dpc;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.01.09.13.19.36;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.09.13.09.12;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.25.15.13.16;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.23.21.35.07;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.23.21.35.07;	author wit;	state Exp;
+branches
+	1.1.1.1.10.1;
+next	;
+
+1.1.1.1.10.1
+date	2002.11.05.22.47.19;	author rwToStl;	state Exp;
+branches;
+next	1.1.1.1.10.2;
+
+1.1.1.1.10.2
+date	2002.11.06.23.25.30;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@Added a proprietary statement to the source code and to the object code.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Message Class Library
+//
+// (C) Copyright IBM Corp. 1997, 2005  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//-----------------------------------------------------------------------------
+// File msg.C
+//
+// Contains the implementation of the following classes:
+//
+// MsgUnit
+//    Msg
+//    MsgFrag
+//-----------------------------------------------------------------------------
+
+#include <mcl/src/msg.h>
+#include <mcl/src/arg.h>
+#include <mcl/src/facility.h>
+#include <mcl/src/level.h>
+
+#include <iostream>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+//-----------------------------------------------------------------------------
+// Implementation of class MsgUnit.
+//-----------------------------------------------------------------------------
+
+MclMsgUnit::~MclMsgUnit ()
+   {
+   if (! myFacility ().deletingMsgUnits ())
+      MclFacility::calledByClientError ("MclMsgUnit::~MclMsgUnit");
+   }
+
+//-----------------------------------------------------------------------------
+
+const char * MclMsgUnit::id () const
+   {
+   return id_.c_str();
+   }
+
+//-----------------------------------------------------------------------------
+
+const char * MclMsgUnit::text () const
+   {
+   return text_.c_str();
+   }
+
+//-----------------------------------------------------------------------------
+
+MclMsgUnit::MclMsgUnit (
+         MclFacility & theFacility,
+         const char *  idVal,
+         const char *  textVal):
+
+      myFacility_  (theFacility),
+      isInserting_ (FALSE)
+   {
+   MclFacility::forbidNullArg (idVal,   "idVal",   "MclMsgUnit::MclMsgUnit");
+   MclFacility::forbidNullArg (textVal, "textVal", "MclMsgUnit::MclMsgUnit");
+
+   id_   = idVal;
+   text_ = textVal;
+
+   forbidBlankId ();
+   forbidDupId   ();
+   }
+
+//-----------------------------------------------------------------------------
+
+MclMsg * MclMsgUnit::asaMsg ()
+   {
+   return NULL;
+   }
+
+//-----------------------------------------------------------------------------
+
+MclMsgFrag * MclMsgUnit::asaMsgFrag ()
+   {
+   return NULL;
+   }
+
+//-----------------------------------------------------------------------------
+
+void MclMsgUnit::clientError (const char * text) const
+   {
+   std::cerr <<
+      "\n\n"
+      "MCL CLIENT ERROR:\n\n"
+      "" << text << "\n\n"
+      "   Message ID: \"" << id () << "\"\n";
+
+   MclFacility::abortMcl ();
+   }
+
+//-----------------------------------------------------------------------------
+
+void MclMsgUnit::insertSelf ()
+   {
+   isInserting_ = TRUE;
+
+   myFacility ().insert (this);
+
+   isInserting_ = FALSE;
+   }
+
+//-----------------------------------------------------------------------------
+
+void MclMsgUnit::forbidBlankId () const
+   {
+   std::string emptyStr (id_.length (), ' ');
+
+   if (id_ == emptyStr)
+      clientError (
+         "   Attempt to create a message unit with message ID all blanks.");
+   }
+
+//-----------------------------------------------------------------------------
+
+void MclMsgUnit::forbidDupId () const
+   {
+   MclMsgUnit * dupIdMsgUnit = myFacility ().findMsgUnit (id ());
+
+   if (dupIdMsgUnit != NULL)
+      clientError (
+         "   Attempt to create a message unit whose message ID duplicates "
+            "an existing message unit.");
+   }
+
+//-----------------------------------------------------------------------------
+// Implementation of class Msg.
+//-----------------------------------------------------------------------------
+
+MclMsg::MclMsg (
+         MclFacility &    theFacility,
+         const char *     msgId,
+         const MclLevel & theLevel,
+         const char *     textVal,
+         int              externalNumber):
+
+      MclMsgUnit             (theFacility, msgId, textVal),
+
+      externalNumber_        (externalNumber),
+      maxTimesIssued_        (-1),
+      timesIssued_           (0),
+      preceedingLineFeeds_   (0),
+      trailingLineFeeds_     (1),
+      vectorIndent_          (0),
+      displayExternalNumber_ (TRUE),
+      allowedToChange_       (TRUE),
+      mark_                  (FALSE),
+      myLevel_               (theLevel)
+   {
+   checkExtNumRange ();
+   forbidDupExtNum ();
+
+   insertSelf ();
+   }
+
+MclMsg::~MclMsg ()
+   {
+   }
+
+void MclMsg::issue (const MclArgList& al)
+   {
+   timesIssued_ ++;
+   mark_ = TRUE;
+   
+   if ((maxTimesIssued_ < 0) || (timesIssued_ <= maxTimesIssued_))
+      {
+      std::string theFinalText;
+   
+      getFinalText (theFinalText, al);
+
+      myFacility ().output(theFinalText.c_str());
+
+      if (myLevel () >= myFacility ().minErrOutLevel ())
+         myFacility ().outputError(theFinalText.c_str());
+      }
+
+   postIssue ();
+   }
+
+MclMsg * MclMsg::maxTimesIssued (int theValue)
+   {
+   return set (maxTimesIssued_, "maxTimesIssued", theValue);
+   }
+  
+MclMsg * MclMsg::preceedingLineFeeds (int theValue)
+   {
+   return setNonNeg (preceedingLineFeeds_, "preceedingLineFeeds", theValue);
+   }
+
+MclMsg * MclMsg::trailingLineFeeds (int theValue)
+   {
+   return setNonNeg (trailingLineFeeds_, "trailingLineFeeds", theValue);
+   }
+
+MclMsg * MclMsg::vectorIndent (int theValue)
+   {
+   return setNonNeg (vectorIndent_, "vectorIndent", theValue);
+   }
+
+MclMsg * MclMsg::displayExternalNumber (MclBoolean theValue)
+   {
+   return set (displayExternalNumber_, "displayExternalNumber", theValue);
+   }
+
+MclMsg * MclMsg::allowedToChange (MclBoolean theValue)
+   {
+   return set (allowedToChange_, "allowedToChange", theValue);
+   }
+
+MclMsg * MclMsg::asaMsg ()
+   {
+   return this;
+   }
+
+void MclMsg::postIssue ()
+   {
+   if (myLevel () < MclLevel::error ())
+      return;
+
+   std::cerr <<
+      "\n\n"
+      "The above message indicates an error.\n"
+      "Program aborted." << std::endl;
+
+   exit (myLevel ().severity ());
+   }
+
+void MclMsg::checkExtNumRange () const
+   {
+   if ((externalNumber_ >= 0) && (externalNumber_ < 10000))
+      return;
+
+   std::cerr <<
+      "\n\n"
+      "MCL CLIENT ERROR:\n\n"
+      "   The externalNumber of a message is out of range.\n\n"
+      "   Message ID:     \"" << id () << "\"\n"
+      "   externalNumber: " << externalNumber_ << "\n"
+      "   Valid range:    0 <= externalNumber < 10000\n";
+
+   MclFacility::abortMcl ();
+   }
+
+MclMsg * MclMsg::set (
+      int &        theAttr,
+      const char * attrName,
+      int          theValue)
+   {
+   if (! allowedToChange_)
+      {
+      std::cerr <<
+         "\n\n"
+         "MCL CLIENT ERROR:\n\n"
+         "   An attempt was made to change an attribute of a message whose\n"
+         "   allowToChange attribute is FALSE.\n\n"
+         "   Message ID:     \"" << id ()           << "\"\n"
+         "   externalNumber: "   << externalNumber_ << "\n"
+         "   Attribute:      "   << attrName        << "\n";
+
+      MclFacility::abortMcl ();
+      }
+
+   theAttr = theValue;
+
+   return this;
+   }
+
+MclMsg * MclMsg::setNonNeg (
+      int &        theAttr,
+      const char * attrName,
+      int          theValue)
+   {
+   if (! (theValue >= 0))
+      {
+      std::cerr <<
+         "\n\n"
+         "MCL CLIENT ERROR:\n\n"
+         "   An attempt was made to assign a negative value to a nonnegative\n"
+         "   message attribute.\n\n"
+         "   Message ID:     \"" << id ()           << "\"\n"
+         "   externalNumber: "   << externalNumber_ << "\n"
+         "   Attribute:      "   << attrName        << "\n"
+         "   Value:          "   << theValue        << "\n";
+
+      MclFacility::abortMcl ();
+      }
+
+   return set (theAttr, attrName, theValue);
+   }
+
+void MclMsg::forbidDupExtNum () const
+   {
+   MclMsg * dupExtNumMsg = myFacility ().findMsg (externalNumber_);
+
+   if (dupExtNumMsg == NULL)
+      return;
+
+   std::cerr <<
+      "\n\n"
+      "MCL CLIENT ERROR:\n\n"
+      "   Attempt to create a message whose external number duplicates\n"
+      "   an existing message.\n\n"
+      "   Current  Message ID: \"" << id ()               << "\"\n"
+      "   Existing Message ID: \"" << dupExtNumMsg->id () << "\"\n"
+      "   External Number:     "   << externalNumber_     << "\n";
+
+   MclFacility::abortMcl ();
+   }
+
+void MclMsg::getFinalText (std::string & finalText, const MclArgList & al) const
+   {
+   int       maxArgNum = 0;
+   std::string formattedArg;
+   size_t idx, start = 0;
+   finalText = text ();
+
+   while ((idx = finalText.find('%', start)) != std::string::npos)
+     {
+      if (finalText[idx+1] == '%')
+        {
+          finalText.erase(idx+1, 1);
+          start = idx + 1;
+          continue;
+        }
+      // The old validateCurArgFmt used to simply validate the format text.
+      // The new validateCurArgFmt does that, but it also sets 
+      // posPercent, number, posv and posDollar.
+      /*validateCurArgFmt(finalText, start);  
+      int argNum = 0;
+
+      size_t posPercent = indexInCurArgFmt("%", finalText, start);
+      size_t posDollar = indexInCurArgFmt("$", finalText, start);
+      
+      sscanf (& finalText[posPercent + 1], "%d", & argNum);*/
+      int argNum = 0;
+      size_t posPercent, posv, posDollar, posFmt;
+      posPercent = posv = posDollar = posFmt = std::string::npos;
+
+      validateCurArgFmt(finalText, start, posPercent, argNum, posv, posDollar, posFmt);
+
+      validateArgNum (argNum, al);
+      if (argNum > maxArgNum)
+         maxArgNum = argNum;
+
+      MclBoolean reqVector = (posv != std::string::npos);
+
+      if (posFmt == std::string::npos)
+         missingFormatFlag (&finalText[ posPercent ]);
+
+	  int fmtLen = posFmt - posDollar;
+
+	  std::string argFmt = finalText.substr(posDollar + 1, fmtLen);
+
+      std::string fmt("%");
+
+      fmt += argFmt;
+
+      al[argNum].format (formattedArg, fmt, reqVector, argNum, this);
+
+      int lenReplaced = posFmt - posPercent + 1;
+
+      finalText.replace(posPercent, lenReplaced, formattedArg);
+
+      start=posPercent + formattedArg.length();
+      }
+
+   validateMaxArgNum (maxArgNum, al);
+   procForAttrs (finalText);
+   procLine(finalText);
+   }
+
+void MclMsg::validateArgNum (
+      size_t             argNum,
+      const MclArgList & theArgList)
+      const
+   {
+   if (argNum < 1)
+     {
+     std::cerr <<
+        "\n\n"
+        "MCL CLIENT ERROR:\n\n"
+        "   A message was issued whose text contains an invalid argument "
+           "number.\n\n"
+        "   Message ID: \"" << id ()  << "\"\n"
+        "   Argument #: "   << argNum << "\n";
+
+     MclFacility::abortMcl ();
+     }
+
+   if (argNum > theArgList.length ())
+      {
+      std::cerr <<
+         "\n\n"
+         "MCL CLIENT ERROR:\n\n"
+         "   A message was issued with too few arguments.\n\n"
+         "   Message ID:         \"" << id ()                << "\"\n"
+         "   Argument # in text: "   << argNum               << "\n"
+         "   # arguments passed: "   << theArgList.length () << "\n";
+
+      MclFacility::abortMcl ();
+      }
+   }
+
+void MclMsg::validateMaxArgNum (
+      int                maxArgNum,
+      const MclArgList & theArgList)
+      const
+   {
+   int nArgs = theArgList.length ();
+
+   if (maxArgNum < nArgs)
+     {
+     std::cerr <<
+        "\n\n"
+        "MCL CLIENT ERROR:\n\n"
+        "   A message was issued with too many arguments.\n\n"
+        "   Message ID:                \"" << id ()     << "\"\n"
+        "   Maximum argument # in text: "  << maxArgNum << "\n"
+        "   # arguments passed:         "  << nArgs     << "\n";
+
+     MclFacility::abortMcl ();
+     }
+   }
+
+void MclMsg::missingFormatFlag (const char * argSpec ) const
+   {
+   std::cerr <<
+      "\n\n"
+      "MCL CLIENT ERROR:\n\n"
+      "   A message was issued whose text includes an argument specification\n"
+      "   without a format flag.\n\n"
+      "   Message ID:             \"" << id ()   << "\"\n"
+      "   Argument specification: \"" << argSpec << "\"\n";
+
+   MclFacility::abortMcl ();
+   }
+
+void MclMsg::procForAttrs (std::string & finalText) const
+{
+  if (displayExternalNumber_)
+    {
+      std::string prefix(myFacility().prefix());
+      char s[] = "0000";
+      int i = 3;
+      int ext = externalNumber_;
+      while (ext)
+        {
+          s[i--] = ext % 10 + '0';
+          ext /= 10;
+        }
+      prefix.append(s);
+      std::string levelFlag;
+	  levelFlag += myLevel().flag();
+      levelFlag += ' ';
+      prefix.append(levelFlag);
+      finalText = prefix + finalText;
+
+      size_t start = 0;
+      size_t idx = finalText.find("\n", start);
+      while(idx != std::string::npos && idx != finalText.length() - 1)
+        {
+          finalText.insert(idx+1, "         ");
+          start = idx + 10;
+          idx = finalText.find("\n", start);
+        }
+    }
+  if (preceedingLineFeeds_)
+    {
+      std::string plf(preceedingLineFeeds_, '\n');
+      finalText = plf + finalText;
+    }
+  if (trailingLineFeeds_)
+    {
+      std::string tlf( trailingLineFeeds_, '\n');
+      finalText = finalText + tlf;
+    }
+}
+// Note that the number argument in real life should be a size_t,
+// but this provides some warning validation in the caller
+void  MclMsg::validateCurArgFmt (const std::string & finalText, size_t start, size_t& posPercent, int& number, size_t& posv, size_t& posDollar, size_t& posFmt ) const
+{
+    posPercent = posDollar = posv = posFmt = std::string::npos;
+
+	size_t i = posPercent = finalText.find('%', start);
+    bool validArgFmt = false;
+	if( i < finalText.length() ) // if % was found
+        if( isdigit( finalText[++i] ) ) // next MUST be a digit
+        {
+	  const char * p = finalText.c_str() + i;
+	    i++;
+            sscanf( p, "%d", &number );
+            while( isdigit( finalText[i] ) ) // more digits OK.
+                i++;
+            if( finalText[i] =='v' ) // v is opt.
+                posv = i++;
+            if( finalText[i] =='$' ) // MUST be a $
+            {
+                posDollar = i;
+                validArgFmt = true;
+            }
+            posFmt = finalText.find_first_of( "abcdefghijklmnopqrstuvwxy", i+1 );
+        }
+
+  if (!validArgFmt)
+    {
+    std::cerr <<
+       "\n\n"
+       "MCL CLIENT ERROR:\n\n"
+       "   A message was issued whose text includes "
+          "an invalid argument specification.\n"
+       "   The argument specification must be a '%', "
+           "followed by a sequence of digits,\n"
+       "   followed by an optional 'v' followed by a '$'.\n\n"
+       "   Message ID:   \"" << id ()   << "\"\n"
+       "   Message Text:\n\n"
+       "\"" << text () << "\"\n";
+ 
+    MclFacility::abortMcl ();
+    }
+}
+
+void MclMsg::procLine (std::string & finalText) const
+{
+  size_t lineLength = myFacility().lineLength();
+  MclBoolean flagBreak = FALSE;
+  size_t start = 0;
+  size_t idx;
+  size_t txtLen = finalText.length();
+  MclBoolean addedLF = FALSE;
+
+  if (txtLen == 0)
+     return;
+
+  if (finalText[txtLen - 1] != '\n')
+     {
+     finalText.append("\n");
+
+     addedLF = TRUE;
+     }
+
+  while ((idx = finalText.find("\n", start)) != std::string::npos )
+    {
+      size_t len = idx - start;
+      size_t blankIdx;
+       
+      if (len > lineLength)
+        {
+          std::string str = finalText.substr(start, lineLength);
+          blankIdx = str.find_last_of(' ');
+
+          std::string lineStart ("\n");
+
+          if (displayExternalNumber_)
+              lineStart += "         ";
+
+          MclBoolean breakWord =
+             blankIdx == std::string::npos ||
+             (displayExternalNumber_ && blankIdx < 9);
+
+          if (breakWord)
+             str.insert (lineLength, lineStart);
+          else
+             {
+             str.erase (blankIdx, 1);
+             str.insert (blankIdx, lineStart);
+             }
+
+          finalText.replace(start, lineLength, str);
+          flagBreak = TRUE;
+        }
+      if (flagBreak)
+        {
+          flagBreak = FALSE;
+          start = start + blankIdx + 2;
+        }
+      else
+        start = idx + 1;
+    }
+
+  if (addedLF)
+     {
+     assert (finalText [finalText.length () - 1] == '\n');
+
+     finalText.erase (finalText.length () - 1);
+     }
+}
+
+//-----------------------------------------------------------------------------
+// Implementation of class MsgFrag.
+//-----------------------------------------------------------------------------
+
+MclMsgFrag::MclMsgFrag (
+         MclFacility & theFacility,
+         const char *  idVal,
+         const char *  textVal):
+
+      MclMsgUnit (theFacility, idVal, textVal)
+   {
+   insertSelf ();
+   }
+
+//-----------------------------------------------------------------------------
+
+MclMsgFrag::~MclMsgFrag ()
+   {
+   }
+
+//-----------------------------------------------------------------------------
+
+MclMsgFrag * MclMsgFrag::asaMsgFrag ()
+   {
+   return this;
+   }
+@
+
+
+1.10
+log
+@Removed some experimental code.
+@
+text
+@d1 14
+@
+
+
+1.9
+log
+@Experiment for Purify on Windows.
+@
+text
+@a610 10
+MclMsgFrag * MclMsgFrag::newMsgFrag (
+      MclFacility & theFacility,
+      const char *  idVal,
+      const char *  textVal)
+   {
+   return new MclMsgFrag (theFacility, idVal, textVal);
+   }
+
+//-----------------------------------------------------------------------------
+
+@
+
+
+1.8
+log
+@Attempt to fix a memory problem detected by Purify on Windows.
+@
+text
+@d95 1
+a95 1
+void MclMsgUnit::insertMe ()
+d154 1
+a154 1
+   insertMe ();
+d600 1
+a600 1
+   insertMe ();
+d616 1
+a616 5
+   MclMsgFrag * theFrag;
+
+   theFrag = new MclMsgFrag (theFacility, idVal, textVal);
+
+   return theFrag;
+a620 20
+#if 0
+
+MclMsgFrag * MclMsgFrag::newMsgFrag (
+      MclFacility & theFacility,
+      const char *  idVal,
+      const char *  textVal)
+   {
+   MclMsgFrag * theFrag;
+
+   theFrag = new MclMsgFrag (idVal, textVal, theFacility);
+
+   theFrag->insertMe ();
+
+   return theFrag;
+   }
+
+#endif
+
+//-----------------------------------------------------------------------------
+
+a624 11
+
+//-----------------------------------------------------------------------------
+
+MclMsgFrag::MclMsgFrag (
+      const char *  idVal,
+      const char *  textVal,
+      MclFacility & theFacility):
+
+      MclMsgUnit (theFacility, idVal, textVal)
+   {
+   }
+@
+
+
+1.7
+log
+@An attempt to fix a memory problem found by purify on Windows.
+@
+text
+@d618 16
+d641 2
+@
+
+
+1.6
+log
+@Replaced data members asaMsg_ and asaMsgFrag_ with virtual functions.
+@
+text
+@d611 16
+d632 10
+@
+
+
+1.5
+log
+@Changes to build on linux
+@
+text
+@d51 1
+a51 2
+         const char *  textVal,
+         MclMsg *      thisMsg):
+d54 1
+a54 3
+      isInserting_ (FALSE),
+      asaMsg_      (thisMsg),
+      asaMsgFrag_  (NULL)
+d56 8
+a63 1
+   setup (idVal, textVal, thisMsg);
+d68 1
+a68 10
+MclMsgUnit::MclMsgUnit (
+         MclFacility & theFacility,
+         const char *  idVal,
+         const char *  textVal,
+         MclMsgFrag *  thisMsgFrag):
+
+      myFacility_  (theFacility),
+      isInserting_ (FALSE),
+      asaMsg_      (NULL),
+      asaMsgFrag_  (thisMsgFrag)
+d70 1
+a70 1
+   setup (idVal, textVal, thisMsgFrag);
+d75 1
+a75 4
+void MclMsgUnit::setup (
+      const char * idVal,
+      const char * textVal,
+      MclMsgUnit * thisMsgUnit)
+d77 1
+a77 11
+   MclFacility::forbidNullArg (idVal,   "idVal",   "MclMsgUnit::MclMsgUnit");
+   MclFacility::forbidNullArg (textVal, "textVal", "MclMsgUnit::MclMsgUnit");
+
+   id_   = idVal;
+   text_ = textVal;
+
+   forbidBlankId ();
+   forbidDupId   ();
+
+   if (thisMsgUnit != this)
+      MclFacility::calledByClientError ("MclMsgUnit::MclMsgUnit");
+d138 1
+a138 1
+      MclMsgUnit             (theFacility, msgId, textVal, this),
+d211 5
+d598 1
+a598 1
+      MclMsgUnit (theFacility, idVal, textVal, this)
+d608 8
+@
+
+
+1.4
+log
+@Modified to always include iostream and not iostream.h
+@
+text
+@d503 3
+a505 1
+            sscanf( &finalText[i++], "%d", &number );
+@
+
+
+1.3
+log
+@Went to std::cout all the way
+@
+text
+@d16 1
+a16 5
+#ifdef STD_CPP_LIB
+#  include <iostream>
+#else
+#  include <iostream.h>
+#endif
+@
+
+
+1.2
+log
+@modications to change rogueWave tools.h++ to STL
+@
+text
+@d106 1
+a106 1
+   cerr <<
+d238 1
+a238 1
+   cerr <<
+d241 1
+a241 1
+      "Program aborted.\n" << flush;
+d251 1
+a251 1
+   cerr <<
+d269 1
+a269 1
+      cerr <<
+d293 1
+a293 1
+      cerr <<
+d316 1
+a316 1
+   cerr <<
+d397 1
+a397 1
+     cerr <<
+d410 1
+a410 1
+      cerr <<
+d431 1
+a431 1
+     cerr <<
+d445 1
+a445 1
+   cerr <<
+d522 1
+a522 1
+    cerr <<
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a15 3
+#include <rw/cstring.h>
+#include <rw/regexp.h>
+
+a33 3
+
+   delete & text_;
+   delete & id_;
+d40 1
+a40 1
+   return id_;
+d47 1
+a47 1
+   return text_;
+a58 1
+      id_          (* new RWCString),
+a59 1
+      text_        (* new RWCString),
+a74 1
+      id_          (* new RWCString),
+a75 1
+      text_        (* new RWCString),
+d130 1
+a130 1
+   RWCString emptyStr (' ', id_.length ());
+d190 1
+a190 1
+      RWCString theFinalText;
+d194 1
+a194 1
+      myFacility ().output(theFinalText);
+d197 1
+a197 1
+         myFacility ().outputError(theFinalText);
+d328 1
+a328 1
+void MclMsg::getFinalText (RWCString & finalText, const MclArgList & al) const
+d331 1
+a331 1
+   RWCString formattedArg;
+d335 1
+a335 1
+   while ((idx = finalText.index("%", start)) != RW_NPOS)
+d337 1
+a337 1
+      if (finalText(idx+1) == '%')
+d339 1
+a339 1
+          finalText.remove(idx+1, 1);
+d343 4
+a346 2
+      
+      validateCurArgFmt(finalText, start);  
+d352 6
+a357 1
+      sscanf (& finalText (posPercent + 1), "%d", & argNum);
+a359 1
+
+d363 1
+a363 1
+      MclBoolean reqVector = (indexInCurArgFmt("v", finalText, start) != RW_NPOS);
+d365 2
+a366 1
+      RWCRegexp re("[a-z]");
+d368 1
+a368 1
+      int posFmt = finalText.index(re, posDollar + 1);
+d370 1
+a370 2
+      if (posFmt == RW_NPOS)
+         missingFormatFlag (finalText.data () + posPercent);
+d372 1
+a372 5
+      int fmtLen = posFmt - posDollar;
+
+      RWCSubString argFmt = finalText(posDollar + 1, fmtLen);
+
+      RWCString fmt('%');
+d456 1
+a456 1
+void MclMsg::procForAttrs (RWCString & finalText) const
+d460 1
+a460 1
+      RWCString prefix(myFacility().prefix());
+d470 2
+a471 1
+      RWCString levelFlag(myLevel().flag());
+d477 2
+a478 2
+      size_t idx = finalText.index("\n", start);
+      while(idx != RW_NPOS && idx != finalText.length() - 1)
+d482 1
+a482 1
+          idx = finalText.index("\n", start);
+d487 1
+a487 1
+      RWCString plf('\n', preceedingLineFeeds_);
+d492 1
+a492 1
+      RWCString tlf('\n', trailingLineFeeds_);
+d496 5
+d502 17
+a518 5
+void  MclMsg::validateCurArgFmt (const RWCString & finalText, size_t start) const
+{
+  size_t  posPercent = finalText.index("%", start);
+  RWCRegexp re("%[0-9]+v*\\$");
+  size_t  idx = finalText.index(re, start);
+d520 1
+a520 1
+  if (idx != posPercent)
+d538 1
+a538 23
+size_t  MclMsg::indexInCurArgFmt(const char* c,
+                                const RWCString & finalText,
+                                size_t start) const
+{
+  RWCRegexp re("%[0-9]+v*\\$");
+  size_t  idxRe = finalText.index(re, start);
+  size_t  idxC = RW_NPOS;
+  if (idxRe != RW_NPOS)
+    {
+      idxC = finalText.index(c, idxRe);
+    }
+  if (idxC != RW_NPOS)
+    {
+      if (RWCString(c) == "v" && (idxC > finalText.index("$", idxRe)))
+        {
+          idxC = RW_NPOS;
+        }
+    }
+    
+  return idxC;
+}
+
+void MclMsg::procLine (RWCString & finalText) const
+d550 1
+a550 1
+  if (finalText(txtLen - 1) != '\n')
+d557 1
+a557 1
+  while ((idx = finalText.index("\n", start)) != RW_NPOS )
+d564 2
+a565 3
+          const RWCSubString subStr = finalText(start, lineLength);
+          RWCString str(subStr);
+          blankIdx = str.last(' ');
+d567 1
+a567 1
+          RWCString lineStart ("\n");
+d573 1
+a573 1
+             blankIdx == RW_NPOS ||
+d580 1
+a580 1
+             str.remove (blankIdx, 1);
+d598 1
+a598 1
+     assert (finalText (finalText.length () - 1) == '\n');
+d600 1
+a600 1
+     finalText.remove (finalText.length () - 1);
+@
+
+
+1.1.1.1
+log
+@MCL Import
+@
+text
+@@
+
+
+1.1.1.1.10.1
+log
+@Removed references to RWCString, RWRegExp, RWSubString
+@
+text
+@d16 1
+d46 1
+a46 1
+   return id_.c_str();
+d53 1
+a53 1
+   return text_.c_str();
+d65 1
+a65 1
+      id_          (* new std::string),
+d67 1
+a67 1
+      text_        (* new std::string),
+d83 1
+a83 1
+      id_          (* new std::string),
+d85 1
+a85 1
+      text_        (* new std::string),
+d140 1
+a140 1
+   std::string emptyStr (id_.length (), ' ');
+d200 1
+a200 1
+      std::string theFinalText;
+d204 1
+a204 1
+      myFacility ().output(theFinalText.c_str());
+d207 1
+a207 1
+         myFacility ().outputError(theFinalText.c_str());
+d338 1
+a338 1
+void MclMsg::getFinalText (std::string & finalText, const MclArgList & al) const
+d341 1
+a341 1
+   std::string formattedArg;
+d345 1
+a345 1
+   while ((idx = finalText.find('%', start)) != std::string::npos)
+d347 1
+a347 1
+      if (finalText[idx+1] == '%')
+d349 1
+a349 1
+          finalText.erase(idx+1, 1);
+d353 2
+a354 4
+      // The old validateCurArgFmt used to simply validate the format text.
+      // The new validateCurArgFmt does that, but it also sets 
+      // posPercent, number, posv and posDollar.
+      /*validateCurArgFmt(finalText, start);  
+d360 1
+a360 4
+      sscanf (& finalText[posPercent + 1], "%d", & argNum);*/
+      int argNum = 0;
+      size_t posPercent, posv, posDollar, posFmt;
+      posPercent = posv = posDollar = posFmt = std::string::npos;
+d362 1
+a362 1
+      validateCurArgFmt(finalText, start, posPercent, argNum, posv, posDollar, posFmt);
+a363 1
+      validateArgNum (argNum, al);
+d367 1
+a367 2
+      MclBoolean reqVector = (posv != std::string::npos);
+/*      MclBoolean reqVector = (indexInCurArgFmt("v", finalText, start) != std::string::npos);
+d371 4
+a374 4
+      int posFmt = finalText.find(re, posDollar + 1);
+*/
+      if (posFmt == std::string::npos)
+         missingFormatFlag (&finalText[ posPercent ]);
+d376 1
+a376 1
+	  int fmtLen = posFmt - posDollar;
+d378 1
+a378 1
+	  std::string argFmt = finalText.substr(posDollar + 1, fmtLen);
+d380 1
+a380 1
+      std::string fmt("%");
+d464 1
+a464 1
+void MclMsg::procForAttrs (std::string & finalText) const
+d468 1
+a468 1
+      std::string prefix(myFacility().prefix());
+d478 1
+a478 2
+      std::string levelFlag;
+	  levelFlag += myLevel().flag();
+d484 2
+a485 2
+      size_t idx = finalText.find("\n", start);
+      while(idx != std::string::npos && idx != finalText.length() - 1)
+d489 1
+a489 1
+          idx = finalText.find("\n", start);
+d494 1
+a494 1
+      std::string plf(preceedingLineFeeds_, '\n');
+d499 1
+a499 1
+      std::string tlf( trailingLineFeeds_, '\n');
+d503 2
+a504 3
+// Note that the number argument in real life should be a size_t,
+// but this provides some warning validation in the caller
+void  MclMsg::validateCurArgFmt (const std::string & finalText, size_t start, size_t& posPercent, int& number, size_t& posv, size_t& posDollar, size_t& posFmt ) const
+d506 3
+a508 24
+    /* old code for ref:
+    this was done with a regexp before, std::string can't do that on its own.
+    size_t  posPercent = finalText.find('%', start);
+    RWCRegexp re("%[0-9]+v*\\$");
+    size_t  idx = finalText.find(re, start); */
+    posPercent = posDollar = posv = posFmt = std::string::npos;
+
+	size_t i = posPercent = finalText.find('%', start);
+    bool validArgFmt = false;
+	if( i < finalText.length() ) // if % was found
+        if( isdigit( finalText[++i] ) ) // next MUST be a digit
+        {
+            sscanf( &finalText[i++], "%d", &number );
+            while( isdigit( finalText[i] ) ) // more digits OK.
+                i++;
+            if( finalText[i] =='v' ) // v is opt.
+                posv = i++;
+            if( finalText[i] =='$' ) // MUST be a $
+            {
+                posDollar = i;
+                validArgFmt = true;
+            }
+            posFmt = finalText.find_first_of( "abcdefghijklmnopqrstuvwxy", i+1 );
+        }
+d510 1
+a510 1
+  if (!validArgFmt)
+d528 23
+a550 1
+void MclMsg::procLine (std::string & finalText) const
+d562 1
+a562 1
+  if (finalText[txtLen - 1] != '\n')
+d569 1
+a569 1
+  while ((idx = finalText.find("\n", start)) != std::string::npos )
+d576 3
+a578 2
+          std::string str = finalText.substr(start, lineLength);
+          blankIdx = str.find_last_of(' ');
+d580 1
+a580 1
+          std::string lineStart ("\n");
+d586 1
+a586 1
+             blankIdx == std::string::npos ||
+d593 1
+a593 1
+             str.erase (blankIdx, 1);
+d611 1
+a611 1
+     assert (finalText [finalText.length () - 1] == '\n');
+d613 1
+a613 1
+     finalText.erase (finalText.length () - 1);
+@
+
+
+1.1.1.1.10.2
+log
+@Removed references to misc RWGOrdered and related classes and some compiler warnings
+@
+text
+@d16 2
+d36 3
+d64 1
+d66 1
+d82 1
+d84 1
+d373 3
+d377 2
+d514 5
+@
+
+

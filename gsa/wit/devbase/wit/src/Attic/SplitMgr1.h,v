@@ -1,0 +1,247 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2002.04.12.21.02.05;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2002.04.11.15.36.31;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef Split1MgrH
+#define Split1MgrH
+
+//------------------------------------------------------------------------------
+// Header file: "SplitMgr1.h"
+//
+// Contains the declaration of class SplitMgr.
+//------------------------------------------------------------------------------
+
+#include <ObjStack.h>
+#include <Assoc.h>
+
+//------------------------------------------------------------------------------
+// Class SplitMgr
+//
+// Performs selection splitting for penalized execution.
+//------------------------------------------------------------------------------
+
+class WitSplitMgr: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitSplitMgr (WitSelector *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitSplitMgr ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void commitMaxQty (double & netQty);
+         //
+         // Commits the heuristically maximum possible quantity of topPart_ 
+         // in topPer_.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      WitBoolean splitCommitNeeded ();
+         //
+         // Returns TRUE, iff a split-commit needs to be performed.
+
+      void splitCommit (WitBoolean & unresFound);
+         //
+         // Does a split-commit for SSPE.
+         // On return:
+         //    unresFound is TRUE, iff an unresolveable shortage was found.
+
+      void buildZeroPts (WitBoolean & unresFound, WitBoolean & splitFound);
+         //
+         // Builds up the zeroPts_ set.
+         // On return:
+         //    unresFound is TRUE, iff an unresolveable shortage was found.
+         //    splitFound is TRUE, iff an opportunity to split selections was
+         //       found.
+
+      void clearSplitItr ();
+         //
+         // Clears data associated with one iteration of the splitCommit loop.
+
+      WitBoolean addChgPtsToZeroPts ();
+         //
+         // Adds the SplitPts corresponding to the current hypothetical
+         // modification and alteration points to zeroPts_.
+         // Returns TRUE, iff at least one SplitPt was added.
+
+      void splitSels ();
+         //
+         // Finds the lowest zero pt at which to split the selections and does
+         // so there.
+
+      WitBoolean resAltOrRest ();
+         //
+         // Returns TRUE, iff the most recent failing temp-commit generated
+         // either a resolving alteration or a restriction shortage.
+
+      WitSplitPt * findLowestZeroPt ();
+         //
+         // Finds and returns the lowest element of zeroPts_.
+
+      WitBoolean firstIsLower (
+            WitSplitPt * theSplitPt1,
+            WitSplitPt * theSplitPt2);
+         //
+         // Returns TRUE, iff theSplitPt1 is considered to be lower than
+         // theSplitPt2.
+
+      double findSplitBound (WitSplitPt * searchPt, double theFlowVol);
+         //
+         // Computes and returns the split bound for searchPt, given
+         // theFlowVol.
+
+      double binarySearch (WitSplitPt * searchPt, double theFlowVol);
+         //
+         // Computes and returns the split bound for searchPt, given
+         // theFlowVol, using a binary search.
+
+      WitBoolean tempCommForSearch (WitSplitPt * searchPt, double searchVol);
+         //
+         // Does a temp-commit if 1 unit of top level vol, discarding all flow
+         // thru the zero points and discarding all flow above searchVol thru
+         // theSplitPt.
+
+      WitBoolean tempCommDiscZeroPts ();
+         //
+         // Does a temp-commit if 1 unit of top level vol, discarding all flow
+         // thru the zero points.
+
+      void splitChgPts (WitSplitPt * searchPt, double splitBound);
+         //
+         // Splits the selections at each current mod point/alt point based on
+         // the flow resulting from doing a temp-commit, applying splitBound at
+         // searchPt.
+
+      void findChgSplitPts (WitObjStack <WitSplitPt> & chgSplitPts);
+         //
+         // Sets chgSplitPts to be the set of SplitPts corresponding to the
+         // modifications that would result if (hypothetically) ps-sup were
+         // updated, creating them, if necessary.
+
+      void findHypoChanges (WitObjStack <WitSelPt> & chgSelPts);
+         //
+         // In pen-exec mode, sets chgSelPts to be the set of modifications and
+         // alterations that would result if (hypothetically) the following
+         // updates performed, based on the most recent failing temp-commit:
+         // * Update ps-sup.
+         // * Discard the current selection at the current resolving alteration
+         //   (if any).
+         //
+         // In non-pen-exec mode, sets chgSelPts to be the current resolving
+         // alteration, if any.
+
+      void findHypoChangesPE (WitObjStack <WitSelPt> & chgSelPts);
+         //
+         // Does the pen-exec case of findHypoChanges.
+
+      void compChgPtFlowVols ();
+         //
+         // Sets totFlowVol_ for each change point.
+
+      //------------------------------------------------------------------------
+      // Safe internal access functions.
+      //------------------------------------------------------------------------
+
+      accessNonNull (WitExpRest *,    myExpRest)
+      accessNonNull (WitRtAnalyzer *, myRtAnalyzer)
+
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitSplitMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitSelector * const mySelector_;
+         //
+         // The Selector associated with this SplitMgr.
+
+      WitSplitter * const mySplitter_;
+         //
+         // The Splitter associated with this SplitMgr.
+
+      WitExpRest * myExpRest_;
+         //
+         // The ExpRest associated with this SplitMgr.
+
+      WitRtAnalyzer * myRtAnalyzer_;
+         //
+         // The RtAnalyzer associated with this SplitMgr.
+
+      WitBoolean penExec_;
+         //
+         // TRUE, iff the penalized execution technique is to be used.
+
+      WitObjStack <WitSplitPt> zeroPts_;
+         //
+         // The set of SplitPts that are to discard all flow.
+
+      int nBSsDone_;
+      int nBSsSkipped_;
+         //
+         // # binary searches done and skipped, respectively.
+
+      int nBatches_;
+         //
+         // # split batches.
+   };
+
+#endif
+@
+
+
+1.1
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@@
+

@@ -1,0 +1,970 @@
+head	1.13;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.13
+date	2006.01.30.15.46.57;	author gresh;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.08.03.15.32.00;	author dpc;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.07.23.18.46.49;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.07.22.23.49.13;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.07.22.00.51.52;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.07.21.17.42.02;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.06.22.19.15.31;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.12.13.04.52.48;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.12.03.19.30.03;	author dpc;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.12.01.16.00.31;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.12.01.14.19.06;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.11.25.18.58.54;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.11.18.21.35.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@changes for nasco multiple skills
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include "rcpProblem.h"
+#include "engagementAppData.h"
+
+void RCPengagementAppData::clearPegging() {
+  peggedFromSupply_.clear();
+  peggedFromAcquisition_.clear();
+  peggedFromSubstitution_.clear();
+}
+
+void RCPengagementAppData::addPeggedQuantityFromSubstitution(
+    int period,
+    const std::vector<std::string> & resource,
+    float quantityFromSubstitution,    
+    const std::vector<std::string> & subResource)
+{
+  RCPquantitySubResourcePair pair(quantityFromSubstitution,subResource);
+  peggedFromSubstitution_[period][resource].insert(pair);
+}
+
+void RCPengagementAppData::getPeggedQuantitiesFromSubstitution(
+                                                               int period,
+                                                               std::vector<RCPvectorString> & resources,
+                                                               std::vector<float> & quantitiesFromSubstitution,
+                                                               std::vector<RCPvectorString> & subResources) const
+{
+  resources.clear();
+  quantitiesFromSubstitution.clear();
+  subResources.clear();
+  std::map<int,RCPmapSetQuantitySubResourcePair>::const_iterator it1;
+  it1=peggedFromSubstitution_.find(period);
+  if( it1==peggedFromSubstitution_.end() )return;
+  
+  const RCPmapSetQuantitySubResourcePair & mapSetQuantitySubResourcePair = it1->second;
+  RCPmapSetQuantitySubResourcePairConstIter it2;
+  
+  for ( 
+    it2= mapSetQuantitySubResourcePair.begin();
+    it2!=mapSetQuantitySubResourcePair.end();
+    ++it2)  {
+    
+    const RCPsetQuantitySubResourcePair & setQuantitySubResourcePair = it2->second;
+    RCPsetQuantitySubResourcePairConstIter it3;
+    
+    for ( 
+      it3= setQuantitySubResourcePair.begin();
+      it3!=setQuantitySubResourcePair.end();
+      ++it3) {
+      
+      
+      resources.push_back(it2->first);
+      quantitiesFromSubstitution.push_back(it3->first); 
+      subResources.push_back(it3->second);
+    }
+  }
+}
+
+
+void RCPengagementAppData::getPeggedQuantitiesFromSubstitution(
+                                                               int period,
+                                                               const std::vector<std::string> & resourceIdValues,
+                                                               std::vector<float> & quantitiesFromSubstitution,
+                                                               std::vector<RCPvectorString> & subResources) const
+{
+  quantitiesFromSubstitution.clear();
+  subResources.clear();
+  std::map<int,RCPmapSetQuantitySubResourcePair>::const_iterator it1;
+  it1=peggedFromSubstitution_.find(period);
+  if( it1==peggedFromSubstitution_.end() )return;
+  
+  const RCPmapSetQuantitySubResourcePair & mapSetQuantitySubResourcePair = it1->second;
+  RCPmapSetQuantitySubResourcePairConstIter it2=mapSetQuantitySubResourcePair.find(resourceIdValues);
+  if( it2==mapSetQuantitySubResourcePair.end() )return;
+  
+  const RCPsetQuantitySubResourcePair & setQuantitySubResourcePair = it2->second;
+  RCPsetQuantitySubResourcePairConstIter it3;
+  
+  for ( 
+    it3= setQuantitySubResourcePair.begin();
+    it3!=setQuantitySubResourcePair.end();
+    ++it3) {
+    
+    quantitiesFromSubstitution.push_back(it3->first); 
+    subResources.push_back(it3->second);
+  }
+}
+
+void RCPengagementAppData::addPeggedQuantity(
+    std::map<int,RCPresourceQuantityMap> & peggedInfo,
+    int period,
+    const std::vector<std::string> & resource,
+    float qtyFromSupply)
+{
+  //RCPresourceQuantityPair pair(resource,qtyFromSupply);
+  peggedInfo[period][resource]=qtyFromSupply;
+}
+void RCPengagementAppData::getPeggedQuantities(
+    const std::map<int,RCPresourceQuantityMap> & peggedInfo,
+    int period,
+    std::vector<RCPvectorString> & resources,
+    std::vector<float> & quantitiesFromSupply) const
+{
+  resources.clear();
+  quantitiesFromSupply.clear();
+  std::map<int,RCPresourceQuantityMap>::const_iterator it1;
+  it1=peggedInfo.find(period);
+  if( it1==peggedInfo.end() )return;
+
+  const RCPresourceQuantityMap & setPeggedResourcesQuantityMap = it1->second;
+  RCPresourceQuantityMapConstIter it2;
+
+  for ( 
+    it2= setPeggedResourcesQuantityMap.begin();
+    it2!=setPeggedResourcesQuantityMap.end();
+    ++it2 ) {
+
+    resources.push_back(it2->first);
+    quantitiesFromSupply.push_back(it2->second);    
+  }
+}
+
+float RCPengagementAppData::getPeggedQuantity(
+    const std::map<int,RCPresourceQuantityMap> & peggedInfo,
+    int period,
+    std::vector<std::string> & resource) const
+{
+  float retVal=0.0f;
+  std::map<int,RCPresourceQuantityMap>::const_iterator it1;
+  it1=peggedInfo.find(period);
+  if( it1==peggedInfo.end() )return retVal;;
+
+  const RCPresourceQuantityMap & setPeggedResourcesQuantityMap = it1->second;
+  RCPresourceQuantityMapConstIter it2=setPeggedResourcesQuantityMap.find(resource);
+  if( it2==setPeggedResourcesQuantityMap.end() )return retVal;
+
+  retVal=it2->second;
+  return retVal;
+}
+
+void RCPengagementAppData::addPeggedQuantityFromSupply(
+    int period,
+    const std::vector<std::string> & resource,
+    float qtyFromSupply)
+{
+  addPeggedQuantity(peggedFromSupply_,period,resource,qtyFromSupply);
+}
+void RCPengagementAppData::getPeggedQuantitiesFromSupply(
+    int period,
+    std::vector<RCPvectorString> & resources,
+    std::vector<float> & quantitiesFromSupply) const
+{
+  getPeggedQuantities(peggedFromSupply_,period,resources,quantitiesFromSupply);
+}
+float RCPengagementAppData::getPeggedQuantityFromSupply(
+    int period,
+    std::vector<std::string> & resourceIdValues) const
+{
+  return getPeggedQuantity(peggedFromSupply_,period,resourceIdValues);
+}
+
+void RCPengagementAppData::addPeggedQuantityFromAcquisition(
+    int period,
+    const std::vector<std::string> & resource,
+    float qtyFromAcquisition)
+{
+  addPeggedQuantity(peggedFromAcquisition_,period,resource,qtyFromAcquisition);
+}
+void RCPengagementAppData::getPeggedQuantitiesFromAcquisition(
+    int period,
+    std::vector<RCPvectorString> & resources,
+    std::vector<float> & quantitiesFromAcquisition) const
+{
+  getPeggedQuantities(peggedFromAcquisition_,period,resources,quantitiesFromAcquisition);
+}
+float RCPengagementAppData::getPeggedQuantityFromAcquisition(
+    int period,
+    std::vector<std::string> & resourceIdValues) const
+{
+  return getPeggedQuantity(peggedFromAcquisition_,period,resourceIdValues);
+}
+
+void RCPengagementAppData::setRevenue( float r )
+{
+  revenue_ = r;
+}
+void RCPengagementAppData::setMustDo( int m )
+{
+  mustDo_ = m;
+}
+void RCPengagementAppData::setRequestedStartPeriod( int p )
+{
+  requestedStartPeriod_ = p;
+}
+//void RCPengagementAppData::setDuration( int d )
+//{
+ // duration_ = d;
+//}
+void RCPengagementAppData::setPriority( int p)
+{
+  priority_ = p;
+}
+void RCPengagementAppData::setQuantity( float q)
+{
+  quantity_ = q;
+}
+void RCPengagementAppData::setLateAllowance( int l )
+{
+  lateAllowance_ = l;
+}
+
+
+float RCPengagementAppData::getRevenue() const
+{
+  return revenue_;
+}
+int RCPengagementAppData::getMustDo() const
+{
+  return mustDo_;
+}
+int RCPengagementAppData::getRequestedStartPeriod() const
+{
+  return requestedStartPeriod_;
+}
+//int RCPengagementAppData::getDuration() const
+//{
+ // return duration_;
+//}
+int RCPengagementAppData::getLateAllowance() const
+{
+  return lateAllowance_;
+}
+int RCPengagementAppData::getPriority() const
+{
+  return priority_;
+}
+float RCPengagementAppData::getQuantity() const
+{
+  return quantity_;
+}
+
+
+
+// default constructor
+RCPengagementAppData::RCPengagementAppData()
+:
+  RCPappData(),revenue_(0.0f),requestedStartPeriod_(0),lateAllowance_(-1),priority_(0),quantity_(0.0),peggedFromSupply_(),peggedFromAcquisition_(),peggedFromSubstitution_()
+{}
+
+
+// destructor
+
+RCPengagementAppData::~RCPengagementAppData()
+{}
+
+// copy constructor
+RCPengagementAppData::RCPengagementAppData( const RCPengagementAppData& source ):
+RCPappData(source),
+revenue_(source.revenue_),
+requestedStartPeriod_(source.requestedStartPeriod_),
+//duration_(source.duration_),
+lateAllowance_(source.lateAllowance_),
+priority_(source.priority_),
+quantity_(source.quantity_),
+peggedFromSupply_(source.peggedFromSupply_),
+peggedFromAcquisition_(source.peggedFromAcquisition_),
+peggedFromSubstitution_(source.peggedFromSubstitution_)
+{};
+
+// assignment operator
+RCPengagementAppData&
+RCPengagementAppData::operator=(const RCPengagementAppData& rhs)
+{  
+  if (this != &rhs) {        
+    RCPappData::operator=(rhs);
+    revenue_ = rhs.revenue_;
+    requestedStartPeriod_ = rhs.requestedStartPeriod_;
+    //duration_ = rhs.duration_;
+    lateAllowance_ = rhs.lateAllowance_;
+    priority_ = rhs.priority_;
+    quantity_ = rhs.quantity_;
+    peggedFromSupply_ = rhs.peggedFromSupply_;
+    peggedFromAcquisition_ = rhs.peggedFromAcquisition_;
+    peggedFromSubstitution_ = rhs.peggedFromSubstitution_;
+  }
+  return *this;
+}
+
+RCPappData * RCPengagementAppData::clone() const
+{ return (new RCPengagementAppData(*this));}
+
+// Self-test
+void RCPengagementAppData::test()
+{
+  
+  RCPengagementAppData ad1;
+  
+  std::vector<RCPvectorString> resources;
+  std::vector<float> quantities;
+  std::vector<RCPvectorString> subResources;
+  
+  // set up some resources
+  std::vector<std::string> rAB,rAC;
+  rAB.push_back("A");
+  rAB.push_back("B");
+  rAC.push_back("A");
+  rAC.push_back("C");
+
+  // set up a few substitute resources
+  std::vector<std::string> srAB,srAC;
+  srAB.push_back("sA");
+  srAB.push_back("sB");
+  srAC.push_back("sA");
+  srAC.push_back("sC");
+  
+  {
+    RCPengagementAppData ad0;
+    assert(ad0.getRevenue()==0.f);
+    assert(ad0.getRequestedStartPeriod()==0);
+    //assert(ad0.getDuration()==0);
+    assert(ad0.getLateAllowance()==-1);
+    assert(ad0.getQuantity()==0.f);
+    
+    ad0.setRevenue(1.0f);
+    ad0.setRequestedStartPeriod(1);
+    //ad0.setDuration(3);
+    ad0.setLateAllowance(2);
+    ad0.setQuantity(3.0);
+    
+    assert(ad0.getRevenue()==1.f);
+    assert(ad0.getRequestedStartPeriod()==1);
+    //assert(ad0.getDuration()==3);
+    assert(ad0.getLateAllowance()==2);
+    assert(ad0.getQuantity()==3.f);
+
+    // Test pegged quantities for supply
+    {
+      // ensure that there is no pegging info for period 1
+      ad0.getPeggedQuantitiesFromSupply( 1,resources, quantities );
+      assert(resources.size()==0);
+      assert(quantities.size()==0);
+      assert(ad0.getPeggedQuantityFromSupply(1,rAB)==0.0f);
+
+      // add a pegged resource quantity
+      ad0.addPeggedQuantityFromSupply(1,rAB,1.0f);
+      ad0.getPeggedQuantitiesFromSupply( 1,resources, quantities );
+      assert(resources.size()==1);
+      assert(quantities.size()==1);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(quantities[0]==1.0f);
+      assert(ad0.getPeggedQuantityFromSupply(0,rAB)==0.0f);
+      assert(ad0.getPeggedQuantityFromSupply(1,rAC)==0.0f);
+      assert(ad0.getPeggedQuantityFromSupply(1,rAB)==1.0f);
+      
+      ad0.addPeggedQuantityFromSupply(1,rAC,2.0f);
+      ad0.getPeggedQuantitiesFromSupply( 1,resources, quantities );
+      assert(resources.size()==2);
+      assert(quantities.size()==2);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(quantities[0]==1.0f);
+      assert(resources[1][0]=="A");
+      assert(resources[1][1]=="C");
+      assert(quantities[1]==2.0f);
+      assert(ad0.getPeggedQuantityFromSupply(0,rAB)==0.0f);
+      assert(ad0.getPeggedQuantityFromSupply(1,rAB)==1.0f);
+      assert(ad0.getPeggedQuantityFromSupply(1,rAC)==2.0f);
+
+    }
+
+    // Test pegged quantities from acquisition
+    {
+      // ensure that there is no pegging info for period 1
+      ad0.getPeggedQuantitiesFromAcquisition( 3,resources, quantities );
+      assert(resources.size()==0);
+      assert(quantities.size()==0);
+      assert(ad0.getPeggedQuantityFromAcquisition(2,rAB)==0.0f);
+
+      // add a pegged resource quantity
+      ad0.addPeggedQuantityFromAcquisition(3,rAB,1.0f);
+      ad0.getPeggedQuantitiesFromAcquisition( 3,resources, quantities );
+      assert(resources.size()==1);
+      assert(quantities.size()==1);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(quantities[0]==1.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(2,rAB)==0.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(3,rAC)==0.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(3,rAB)==1.0f);
+      
+      ad0.addPeggedQuantityFromAcquisition(3,rAC,2.0f);
+      ad0.getPeggedQuantitiesFromAcquisition( 3,resources, quantities );
+      assert(resources.size()==2);
+      assert(quantities.size()==2);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(quantities[0]==1.0f);
+      assert(resources[1][0]=="A");
+      assert(resources[1][1]=="C");
+      assert(quantities[1]==2.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(2,rAB)==0.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(3,rAB)==1.0f);
+      assert(ad0.getPeggedQuantityFromAcquisition(3,rAC)==2.0f);
+
+    }
+
+    // Test pegged quantities from substitution
+    {
+      // ensure that there is no pegging info for period 1
+      ad0.getPeggedQuantitiesFromSubstitution( 2,resources, quantities, subResources );
+      assert(resources.size()==0);
+      assert(quantities.size()==0);
+      assert(subResources.size()==0);
+      ad0.getPeggedQuantitiesFromSubstitution( 2,rAB, quantities, subResources );
+      assert(quantities.size()==0);
+      assert(subResources.size()==0);
+
+      // add a pegged resource quantity
+      ad0.addPeggedQuantityFromSubstitution(2,rAB,1.0f,srAB);
+      ad0.getPeggedQuantitiesFromSubstitution( 2,resources, quantities,subResources );
+      assert(resources.size()==1);
+      assert(quantities.size()==1);
+      assert(subResources.size()==1);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(quantities[0]==1.0f);
+      assert(subResources[0][0]=="sA");
+      assert(subResources[0][1]=="sB");
+      ad0.getPeggedQuantitiesFromSubstitution( 2,rAB, quantities,subResources );
+      assert(quantities.size()==1);
+      assert(subResources.size()==1);
+      assert(quantities[0]==1.0f);
+      assert(subResources[0][0]=="sA");
+      assert(subResources[0][1]=="sB");
+      ad0.getPeggedQuantitiesFromSubstitution( 1,rAB, quantities,subResources );
+      assert(quantities.size()==0);
+      assert(subResources.size()==0);
+      ad0.getPeggedQuantitiesFromSubstitution( 2,rAC, quantities,subResources );
+      assert(quantities.size()==0);
+      assert(subResources.size()==0);
+      
+      ad0.addPeggedQuantityFromSubstitution(2,rAB,2.0f,srAC);
+      ad0.getPeggedQuantitiesFromSubstitution( 2,resources, quantities,subResources );
+      assert(resources.size()==2);
+      assert(quantities.size()==2);
+      assert(subResources.size()==2);
+      assert(resources[0][0]=="A");
+      assert(resources[0][1]=="B");
+      assert(subResources[0][0]=="sA");
+      assert(subResources[0][1]=="sB");
+      assert(quantities[0]==1.0f);
+      assert(resources[1][0]=="A");
+      assert(resources[1][1]=="B");
+      assert(quantities[1]==2.0f);
+      assert(subResources[1][0]=="sA");
+      assert(subResources[1][1]=="sC");
+      ad0.getPeggedQuantitiesFromSubstitution( 2,rAB, quantities,subResources );
+      assert(quantities.size()==2);
+      assert(subResources.size()==2);
+      assert(subResources[0][0]=="sA");
+      assert(subResources[0][1]=="sB");
+      assert(quantities[0]==1.0f);
+      assert(quantities[1]==2.0f);
+      assert(subResources[1][0]=="sA");
+      assert(subResources[1][1]=="sC");
+    }
+
+
+
+
+    ad1 = ad0;
+    
+    ad0.setRevenue(2.0f);
+    ad0.setRequestedStartPeriod(3);
+    //ad0.setDuration(4);
+    ad0.setLateAllowance(3);
+    ad0.setQuantity(4.0f);
+    
+    assert(ad0.getRevenue()==2.f);
+    assert(ad0.getRequestedStartPeriod()==3);
+    //assert(ad0.getDuration()==4);
+    assert(ad0.getLateAllowance()==3);
+    
+  }
+  
+  assert(ad1.getRevenue()==1.f);
+  assert(ad1.getRequestedStartPeriod()==1);
+  //assert(ad1.getDuration()==3);
+  assert(ad1.getLateAllowance()==2);
+  assert(ad1.getQuantity()==3.f);
+  
+  ad1.getPeggedQuantitiesFromSupply( 1,resources, quantities );
+  assert(resources.size()==2);
+  assert(quantities.size()==2);
+  assert(resources[0][0]=="A");
+  assert(resources[0][1]=="B");
+  assert(quantities[0]==1.0f);
+  assert(resources[1][0]=="A");
+  assert(resources[1][1]=="C");
+  assert(quantities[1]==2.0f);
+
+  ad1.getPeggedQuantitiesFromAcquisition( 3,resources, quantities );
+  assert(resources.size()==2);
+  assert(quantities.size()==2);
+  assert(resources[0][0]=="A");
+  assert(resources[0][1]=="B");
+  assert(quantities[0]==1.0f);
+  assert(resources[1][0]=="A");
+  assert(resources[1][1]=="C");
+  assert(quantities[1]==2.0f);
+  
+  ad1.getPeggedQuantitiesFromSubstitution( 2,resources, quantities,subResources );
+  assert(resources.size()==2);
+  assert(quantities.size()==2);
+  assert(subResources.size()==2);
+  assert(resources[0][0]=="A");
+  assert(resources[0][1]=="B");
+  assert(subResources[0][0]=="sA");
+  assert(subResources[0][1]=="sB");
+  assert(quantities[0]==1.0f);
+  assert(resources[1][0]=="A");
+  assert(resources[1][1]=="B");
+  assert(quantities[1]==2.0f);
+  assert(subResources[1][0]=="sA");
+  assert(subResources[1][1]=="sC");
+  
+  ad1.getPeggedQuantitiesFromSubstitution( 2,rAB, quantities,subResources );
+  assert(quantities.size()==2);
+  assert(subResources.size()==2);
+  assert(subResources[0][0]=="sA");
+  assert(subResources[0][1]=="sB");
+  assert(quantities[0]==1.0f);
+  assert(quantities[1]==2.0f);
+  assert(subResources[1][0]=="sA");
+  assert(subResources[1][1]=="sC");
+  
+}
+@
+
+
+1.12
+log
+@Added quantity to the engagement file.  The BOM or demand file is now more like a description of the offering.  Updated the reporting in engagementO.csv.
+@
+text
+@d190 4
+d220 4
+@
+
+
+1.11
+log
+@Added code to clear out the stored pegging info so subsequent calls to solve can be made.
+@
+text
+@d202 4
+d232 4
+d242 1
+a242 1
+  RCPappData(),revenue_(0.0f),requestedStartPeriod_(0),lateAllowance_(-1),priority_(0),peggedFromSupply_(),peggedFromAcquisition_(),peggedFromSubstitution_()
+d259 1
+d276 1
+d317 1
+d323 1
+d329 1
+d473 1
+d486 1
+@
+
+
+1.10
+log
+@added additional methods to get pegging info from engagementAppData
+@
+text
+@d9 5
+@
+
+
+1.9
+log
+@engagementAppData updated to contain pegging info
+@
+text
+@d16 2
+a17 3
+  RCPresourceQuantityPair pair(resource,quantityFromSubstitution);
+  RCPresourceQuantitySubResourceTriple triple(pair,subResource);
+  peggedFromSubstitution_[period].insert(triple);
+d19 1
+d21 4
+a24 4
+    int period,
+    std::vector<RCPvectorString> & resources,
+    std::vector<float> & quantitiesFromSubstitution,
+    std::vector<RCPvectorString> & subResources) const
+d29 1
+a29 1
+  std::map<int,RCPsetResourceQuantitySubResourceTriple>::const_iterator it1;
+d32 24
+a56 2
+  const RCPsetResourceQuantitySubResourceTriple & setPeggedResourcesQuantitySubResTriples = it1->second;
+  RCPsetResourceQuantitySubResourceTripleConstIter it2;
+d58 19
+d78 6
+a83 7
+    it2= setPeggedResourcesQuantitySubResTriples.begin();
+    it2!=setPeggedResourcesQuantitySubResTriples.end();
+    ++it2 ) {
+
+    resources.push_back((it2->first).first);
+    quantitiesFromSubstitution.push_back((it2->first).second); 
+    subResources.push_back(it2->second);
+d88 1
+a88 1
+    std::map<int,RCPsetResourceQuantityPair> & peggedInfo,
+d93 2
+a94 2
+  RCPresourceQuantityPair pair(resource,qtyFromSupply);
+  peggedInfo[period].insert(pair);
+d97 1
+a97 1
+    const std::map<int,RCPsetResourceQuantityPair> & peggedInfo,
+d104 1
+a104 1
+  std::map<int,RCPsetResourceQuantityPair>::const_iterator it1;
+d108 2
+a109 2
+  const RCPsetResourceQuantityPair & setPeggedResourcesQuantityPairs = it1->second;
+  RCPsetResourceQuantityPairConstIter it2;
+d112 2
+a113 2
+    it2= setPeggedResourcesQuantityPairs.begin();
+    it2!=setPeggedResourcesQuantityPairs.end();
+d121 18
+d153 6
+d174 6
+d319 1
+d329 3
+d343 3
+d355 1
+d365 3
+d379 3
+d392 3
+d407 12
+d435 9
+a443 1
+
+d499 10
+@
+
+
+1.8
+log
+@remove "duration" from engagement files, along with "engagement location". Also, implement month/year format for engagement start times.
+@
+text
+@d10 100
+d159 1
+a159 1
+  RCPappData(),revenue_(0.0f),requestedStartPeriod_(0),lateAllowance_(-1)
+d174 5
+a178 1
+lateAllowance_(source.lateAllowance_)
+d191 4
+d208 18
+d243 99
+d360 35
+@
+
+
+1.7
+log
+@folding together original "engagement" oriented files with new ER5 files
+@
+text
+@d19 4
+a22 4
+void RCPengagementAppData::setDuration( int d )
+{
+  duration_ = d;
+}
+a30 4
+void RCPengagementAppData::setLocation( const std::string & l )
+{
+  location_ = l;
+}
+d41 4
+a44 4
+int RCPengagementAppData::getDuration() const
+{
+  return duration_;
+}
+d53 1
+a53 4
+std::string RCPengagementAppData::getLocation() const
+{
+  return location_;
+}
+d59 1
+a59 1
+  RCPappData(),revenue_(0.0f),requestedStartPeriod_(0),duration_(0),lateAllowance_(-1)
+d73 2
+a74 3
+duration_(source.duration_),
+lateAllowance_(source.lateAllowance_),
+location_(source.location_)
+d85 1
+a85 1
+    duration_ = rhs.duration_;
+a86 1
+    location_ = rhs.location_;
+d104 1
+a104 1
+    assert(ad0.getDuration()==0);
+a105 1
+    assert(ad0.getLocation()=="");
+d109 1
+a109 1
+    ad0.setDuration(3);
+a110 1
+    ad0.setLocation("Loc1");
+d114 1
+a114 1
+    assert(ad0.getDuration()==3);
+a115 1
+    assert(ad0.getLocation()=="Loc1");
+d121 1
+a121 1
+    ad0.setDuration(4);
+a122 1
+    ad0.setLocation("Loc2");
+d126 1
+a126 1
+    assert(ad0.getDuration()==4);
+a127 1
+    assert(ad0.getLocation()=="Loc2");
+d133 1
+a133 1
+  assert(ad1.getDuration()==3);
+a134 1
+  assert(ad1.getLocation()=="Loc1");
+@
+
+
+1.6
+log
+@Code modifed so that an engagment is only uniquely identified by enagementName.
+Engagement location is now an attribute of an engagement stored in appData.
+@
+text
+@d23 4
+d52 4
+@
+
+
+1.5
+log
+@Added the concept of lateAllowance to allow us to set the ShipReward for a fixed number of periods following the due date.  The lateAllowance value is stored in the engagementAppData.  The engagementFile was modified to add the new field.  I added a CR/LF to the end of populateRCP.h to avoid the warning message from the Linux compiler.
+@
+text
+@d27 4
+d49 4
+d73 2
+a74 1
+lateAllowance_(source.lateAllowance_)
+d87 1
+d107 1
+d113 1
+d119 1
+d127 1
+d133 1
+d141 1
+@
+
+
+1.4
+log
+@better examples for the unit test
+to test various scenarios (acquire; delay; decline)
+@
+text
+@d23 4
+d41 4
+d50 1
+a50 1
+RCPappData(),revenue_(0.0f),requestedStartPeriod_(0),duration_(0)
+d64 2
+a65 1
+duration_(source.duration_)
+d77 1
+d96 1
+d101 1
+d106 2
+a107 1
+    
+d113 1
+d118 1
+d125 1
+@
+
+
+1.3
+log
+@cleaning up the testing procedures
+@
+text
+@d88 1
+a88 1
+	ad0.setRequestedStartPeriod(1);
+d92 1
+a92 1
+	assert(ad0.getRequestedStartPeriod()==1);
+d98 1
+a98 1
+	ad0.setRequestedStartPeriod(3);
+d102 1
+a102 1
+	assert(ad0.getRequestedStartPeriod()==3);
+@
+
+
+1.2
+log
+@added new examples (very simple) in example3. Also changed various routines
+related to "getEngagementStart" to "getRequestedEngagementStart" so that
+we could have a routine to supply the actual start time.
+@
+text
+@d92 1
+a92 1
+	assert(ad0.getRequestedStartPeriod()==2);
+d108 1
+a108 1
+  assert(ad1.getRequestedStartPeriod()==2);
+@
+
+
+1.1
+log
+@Modified to use witPartAppData for setting/getting rcp engagement revenue, startPeriod, and duration
+@
+text
+@d15 1
+a15 1
+void RCPengagementAppData::setStartPeriod( int p )
+d17 1
+a17 1
+  startPeriod_ = p;
+d29 1
+a29 1
+int RCPengagementAppData::getStartPeriod() const
+d31 1
+a31 1
+  return startPeriod_;
+d42 1
+a42 1
+RCPappData(),revenue_(0.0f),startPeriod_(0),duration_(0)
+d55 1
+a55 1
+startPeriod_(source.startPeriod_),
+d66 1
+a66 1
+    startPeriod_ = rhs.startPeriod_;
+d84 1
+a84 1
+    assert(ad0.getStartPeriod()==0);
+d88 1
+a88 1
+    ad0.setStartPeriod(2);
+d92 1
+a92 1
+    assert(ad0.getStartPeriod()==2);
+d98 1
+a98 1
+    ad0.setStartPeriod(3);
+d102 1
+a102 1
+    assert(ad0.getStartPeriod()==3);
+d108 1
+a108 1
+  assert(ad1.getStartPeriod()==2);
+@
+

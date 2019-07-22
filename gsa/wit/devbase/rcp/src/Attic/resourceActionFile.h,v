@@ -1,0 +1,411 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2004.05.11.15.40.08;	author gresh;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2004.01.21.15.47.32;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.01.09.21.39.50;	author dpc;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.01.08.20.00.04;	author dpc;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.01.07.22.18.35;	author dpc;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.01.07.14.01.53;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.12.09.17.46.05;	author dpc;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.11.21.17.00.30;	author dpc;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@more progress to generalizing the 03Dec format
+@
+text
+@#ifndef RCPresourceActionFile_h
+#define RCPresourceActionFile_h
+
+#include "scoFile.h"
+
+
+class RCPresourceActionFile : public SCOcsvFormatFile {
+public:
+
+
+  // Fields 
+  getFieldH(jobRole);
+  getFieldH(skillSet);
+  getFieldH(LOB);
+  getFieldH(source);
+  getFieldH(resourceLocName);
+  getFloatFieldH(acquireTime);
+  getFloatFieldH(acquireCost);
+  getFloatFieldH(releaseTime);
+  getFloatFieldH(releaseCost);
+
+
+  
+  // preferred constructor
+  RCPresourceActionFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    hasHeaderRecord(9);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( const std::string & jobRole, 
+			  const std::string & skillSet,
+			  const std::string & LOB,
+			  const std::string & source,
+			  const std::string & locName)
+  {
+    std::string retVal = jobRole + "!@@#$%" + skillSet +"!@@#$%" + LOB +"!@@#$%" + source +"!@@#$%" + locName ;
+    return retVal;
+  };
+  
+  // destructor
+  ~RCPresourceActionFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    RCPresourceActionFile file("../data/example1/resourceaction.csv");
+    
+    // Test reading first record
+
+    assert( file.jobRole(0)=="r1" );
+    assert( file.skillSet(0)=="s1" );
+    assert( file.LOB(0)=="LOB1" );
+    assert( file.source(0)=="src1" );
+    assert( file.resourceLocName(0)=="l1" );
+    assert( file.acquireTimeAsFloat(0) == 2.f );
+    assert( file.acquireCostAsFloat(0) == 2.f );
+    assert( file.releaseTimeAsFloat(0) == 1.f );
+    assert( file.releaseCostAsFloat(0) == 1.f );
+
+
+    assert( file.jobRole(1)=="r2" );
+    assert( file.skillSet(1)=="s2" );
+    assert( file.LOB(1)=="LOB2" );
+    assert( file.source(1)=="src2" );
+    assert( file.resourceLocName(1)=="l1" );
+    assert( file.acquireTimeAsFloat(1) == 1.f );
+    assert( file.acquireCostAsFloat(1) == 2.f );
+    assert( file.releaseTimeAsFloat(1) == 2.f );
+    assert( file.releaseCostAsFloat(1) == 1.f );
+
+
+    // Test reading record by key    
+    std::string key = file.key("r2","s2","LOB2","src2","l1");
+    assert( file.releaseTimeAsFloat(key) == 2.f );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key( jobRole(recNum),skillSet(recNum),LOB(recNum),source(recNum),resourceLocName(recNum));
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPresourceActionFile();
+  
+  // copy constructor  -- don't use!
+  RCPresourceActionFile( const RCPresourceActionFile& source );
+  
+  // assignment operator -- don't use!
+  RCPresourceActionFile&
+  operator=(const RCPresourceActionFile& rhs);
+
+  
+};
+
+
+
+class RCPresourceActionFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  getFieldFileWithIteratorH(jobRole);
+  getFieldFileWithIteratorH(skillSet);
+  getFieldFileWithIteratorH(LOB);
+  getFieldFileWithIteratorH(source);
+  getFieldFileWithIteratorH(resourceLocName);
+  getFloatFieldFileWithIteratorH(acquireTime);
+  getFloatFieldFileWithIteratorH(acquireCost);
+  getFloatFieldFileWithIteratorH(releaseTime);
+  getFloatFieldFileWithIteratorH(releaseCost);
+
+
+  // preferred constructor
+  RCPresourceActionFileIterator(const RCPresourceActionFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPresourceActionFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    RCPresourceActionFile file("../data/example1/resourceaction.csv");
+    RCPresourceActionFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+	assert( fileIter.jobRole()=="r1" );
+	assert( fileIter.skillSet()=="s1" );
+	assert( fileIter.LOB()=="LOB1" );
+	assert( fileIter.source()=="src1" );
+	assert( fileIter.resourceLocName()=="l1" );
+	assert( fileIter.acquireTimeAsFloat() == 2.f );
+	assert( fileIter.acquireCostAsFloat() == 2.f );
+	assert( fileIter.releaseTimeAsFloat() == 1.f );
+	assert( fileIter.releaseCostAsFloat() == 1.f );
+        
+      }
+      recNo++;
+    }
+    
+    // number of records including comments
+    //    assert( fileIter.recNum()==2);
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPresourceActionFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPresourceActionFileIterator( const RCPresourceActionFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPresourceActionFileIterator&
+  operator=(const RCPresourceActionFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.7
+log
+@moved the fixedCost from the resourceaction file to the resource file.
+examle data files needed to be modified accordingly.
+@
+text
+@@
+
+
+1.6
+log
+@Changed globally "resourceName" to "jobRole"
+@
+text
+@d21 1
+a21 1
+  getFloatFieldH(fixedCost);
+d30 1
+a30 1
+    hasHeaderRecord(10);
+d64 1
+a64 1
+    assert( file.fixedCostAsFloat(0) == 1.f );
+d75 1
+a75 1
+    assert( file.fixedCostAsFloat(1) == 1.f );
+d122 1
+a122 1
+  getFloatFieldFileWithIteratorH(fixedCost);
+a151 1
+	assert( fileIter.fixedCostAsFloat() == 1.f );
+@
+
+
+1.5
+log
+@Added "source" field to the resource description and all the related code to use "source"
+@
+text
+@d12 1
+a12 1
+  getFieldH(resourceName);
+d35 1
+a35 1
+  static std::string key( const std::string & resourceName, 
+d41 1
+a41 1
+    std::string retVal = resourceName + "!@@#$%" + skillSet +"!@@#$%" + LOB +"!@@#$%" + source +"!@@#$%" + locName ;
+d55 1
+a55 1
+    assert( file.resourceName(0)=="r1" );
+d66 1
+a66 1
+    assert( file.resourceName(1)=="r2" );
+d88 1
+a88 1
+    std::string retVal = key( resourceName(recNum),skillSet(recNum),LOB(recNum),source(recNum),resourceLocName(recNum));
+d113 1
+a113 1
+  getFieldFileWithIteratorH(resourceName);
+d143 1
+a143 1
+	assert( fileIter.resourceName()=="r1" );
+@
+
+
+1.4
+log
+@Added skillSet to rcp code;  added skillSubs* to appl.mk
+@
+text
+@d15 1
+d30 1
+a30 1
+    hasHeaderRecord(9);
+d38 1
+d41 1
+a41 1
+    std::string retVal = resourceName + "!@@#$%" + skillSet +"!@@#$%" + LOB +"!@@#$%" + locName ;
+d58 1
+d69 1
+d78 1
+a78 1
+    std::string key = file.key("r2","s2","LOB2","l1");
+d88 1
+a88 1
+    std::string retVal = key( resourceName(recNum),skillSet(recNum),LOB(recNum),resourceLocName(recNum));
+d116 1
+d146 1
+@
+
+
+1.3
+log
+@Added "skillSet" field to input files and updated the code to use this field.
+@
+text
+@d14 1
+d29 1
+a29 1
+    hasHeaderRecord(8);
+d34 3
+a36 1
+  static std::string key( const std::string & resourceName, const std::string & skillSet,
+d39 1
+a39 1
+    std::string retVal = resourceName + "!@@#$%" + skillSet +"!@@#$%" + locName ;
+d55 1
+d65 1
+d74 1
+a74 1
+    std::string key = file.key("r2","s2","l1");
+d84 1
+a84 1
+    std::string retVal = key( resourceName(recNum),skillSet(recNum),resourceLocName(recNum));
+d111 1
+d140 1
+@
+
+
+1.2
+log
+@Added resource location to resourceActionFile and removed hardcoded resource location from populateRCP.cpp.
+@
+text
+@d13 1
+d28 1
+a28 1
+    hasHeaderRecord(7);
+d33 1
+a33 1
+  static std::string key( const std::string & resourceName,
+d36 1
+a36 1
+    std::string retVal = resourceName + "!@@#$%" + locName ;
+d51 1
+d60 1
+d69 1
+a69 1
+    std::string key = file.key("r2","l1");
+d79 1
+a79 1
+    std::string retVal = key( resourceName(recNum),resourceLocName(recNum));
+d105 1
+d133 1
+@
+
+
+1.1
+log
+@New resourceActionFile added.
+@
+text
+@d13 1
+d27 1
+a27 1
+    hasHeaderRecord(6);
+d32 2
+a33 1
+  static std::string key( const std::string & resourceName)
+d35 1
+a35 1
+    std::string retVal = resourceName;
+d50 1
+d58 1
+d66 1
+a66 1
+    std::string key = file.key("r2");
+d76 1
+a76 1
+    std::string retVal = key( resourceName(recNum) );
+d102 1
+d129 1
+@
+

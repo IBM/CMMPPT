@@ -1,0 +1,2549 @@
+head	1.6;
+access;
+symbols
+	sce_5_01_20080919:1.6
+	latest_sce_4_20_20060523:1.6.0.4
+	sce_4_20_20060523:1.6
+	latest_sce4_20_OSL:1.6.0.2
+	sce_4_20_OSL:1.6
+	sce_4_05_20040511:1.5
+	sce_4_00_20040201:1.5
+	nextGenBranch:1.5.0.2
+	nextGenRoot:1.5
+	sce_3_30_20030627:1.5
+	EndRw-branch:1.4.0.2
+	Root-of-EndRw:1.4
+	EndWitRw-branch:1.2.0.6
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.4
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.2.0.2
+	sce_3_10_20010924:1.2
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2005.09.12.20.01.57;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.01.15.19.36.38;	author rwToStl;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.12.05.00.35.03;	author fasano;	state Exp;
+branches
+	1.4.2.1;
+next	1.3;
+
+1.3
+date	2002.12.02.17.42.24;	author austel;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.08.10.23.02.05;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.44;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.44;	author wit;	state Exp;
+branches;
+next	;
+
+1.4.2.1
+date	2003.01.08.17.42.31;	author rwToStl;	state Exp;
+branches;
+next	1.4.2.2;
+
+1.4.2.2
+date	2003.01.09.13.54.42;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Removed all calls to variable-argument-list WIT API functions,
+except those in source files that still use RogueWave.
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+
+#include <assert.h>
+#include <math.h>
+#include <wit/src/wit.h>
+
+#include <scenario/src/ipCMRP.h>
+#include <scenario/src/demand.h>
+#include <scenario/src/dif.h>
+#include <scenario/src/difCmrpF.h>
+#include <scenario/src/difEssSc.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/sOfParts.h>
+#include <scenario/src/sOfDemds.h>
+#include <scenario/src/generVc.h>
+#include <scenario/src/outInter.h>
+#include <scenario/src/scenCMRP.h>
+#include <scenario/src/schFCMRP.h>
+#include <scenario/src/schdDeSt.h>
+#include <scenario/src/idnumber.h>
+#include <scenario/src/partSchP.h>
+#include <scenario/src/customer.h>
+
+#include <iostream>
+
+const int DEFAULT_PRIORITY = 10;
+const int FORECAST_PRIORITY = 100;
+
+const float DEFAULT_OBJ1SHIPREWARD = 100.f;
+const float FORECAST_OBJ1SHIPREWARD = 10.f;
+
+const float DEFAULT_OBJ1SCRAPCOST = .0001f;
+
+// Returns a description of the problem that is suitable for use as a
+// window heading. This can not be used to set the title; only to query
+// it.
+std::string
+LgFrInitialProblemForCMRP::title( 
+    const LgFrDataInterfaceEssentials* difEssenPtr)
+     const
+{
+  std::string theTitle("Constrained MRP: ");
+  theTitle.append(CMRPscenario()->dataInterface()->title(difEssenPtr));
+  return theTitle;
+}
+
+// get the scenario
+LgFrScenarioForCMRPSmartPointer
+LgFrInitialProblemForCMRP::CMRPscenario()
+     const
+{
+    if (scenario()->GetScenarioType() != __LGFRSCENARIOFORCMRP)  {
+	std::cerr << "the object is not a CMRPscenario and it is supposed to be"
+             << std::endl;
+	abort();
+    }
+
+    return LgFrScenarioForCMRPSmartPointer(scenario());  
+}
+
+
+// Populates the WitRun's data structures 
+void
+LgFrInitialProblemForCMRP::feedInto(
+				     LgFrLastProblemSolved & lps)
+{
+
+  LgFrDataInterface* difPtr
+    = (LgFrDataInterface*)(CMRPscenario()->dataInterface());
+  LgFrCalendar& calendar
+    = CMRPscenario()->calendar();
+  LgFrSetOfParts& universalSOP =
+                 CMRPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+  LgFrSetOfParts& defaultSOP   =
+                 CMRPscenario()->setOfParts(LGFR_DEFAULT_SET);
+  LgFrSetOfParts& constrainedSOP   =
+                 CMRPscenario()->setOfParts(LGFR_CONSTRAINED_SET);
+  LgFrSetOfParts& produceableSOP  =
+                 CMRPscenario()->setOfParts(LGFR_PRODUCEABLE_SET);
+  LgFrSetOfParts& procureableSOP   =
+                 CMRPscenario()->setOfParts(LGFR_PROCUREABLE_SET);
+  LgFrSetOfParts& budgetSOP   =
+                 CMRPscenario()->setOfParts(LGFR_BUDGET_SET);
+  LgFrSetOfParts& mrpPlannedSOP   =
+                 CMRPscenario()->setOfParts(LGFR_MRP_PLANNED_SET);
+  LgFrSetOfParts& rawSOP   =
+                 CMRPscenario()->setOfParts(LGFR_RAW_SET);
+  LgFrSetOfParts& capacitySOP   =
+                 CMRPscenario()->setOfParts(LGFR_CAPACITY_SET);
+  LgFrSetOfDemands& universalSOD =
+                 CMRPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  LgFrSetOfDemands& defaultSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfDemands& committedSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_COMMITTED_DEMAND_SET);
+
+  LgFrDataInterfaceEssentialsFromScenario difEssen(&(*CMRPscenario()));
+
+#ifdef LGFR_ALLOW_BUILD_AHEAD
+  int buildAheadLimit = calendar.nPeriods() - 1;
+#else
+  int buildAheadLimit = 0;
+#endif
+
+
+  // get the witRun pointer from lps
+  WitRun * theWitRun = lps.witRun();
+
+  witBoolean exists;
+  witReturnCode rc;
+  int i;
+  size_t        numberOfPeriods = calendar.nPeriods();
+
+  // Initialize some attribute values
+  LgFrTimeVecFloat obj1ScrapCost(numberOfPeriods,DEFAULT_OBJ1SCRAPCOST);
+
+  // ********************************************************
+  // ****** Set some GLOBAL WIT parameters ******************
+  // ********************************************************
+
+  // shut off the message about a part name being too long
+  rc = witSetMesgTimesPrint( theWitRun, WitTRUE, 338, 0);
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetNPeriods(theWitRun, numberOfPeriods);
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetBuildWhenEmpty(theWitRun, WitTRUE);
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetComputeCriticalList(theWitRun, WitTRUE);
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetObjChoice(theWitRun, 1);
+  assert (rc < WitWARNING_RC);
+
+#ifdef LGFR_USE_FOCUS_HORIZONS
+  rc = witSetUseFocusHorizons( theWitRun, WitTRUE );
+  assert (rc < WitWARNING_RC);
+#else
+  rc = witSetUseFocusHorizons( theWitRun, WitFALSE );
+  assert (rc < WitWARNING_RC);
+#endif
+
+
+  // ********************************************************
+  // ****** Get all the RAW parts from dif and process ******
+  // ********************************************************
+
+  LgFrDataInterface& dif = *difPtr;
+
+
+  // get the raw parts
+  LgFrPartVector pv;
+  std::string itemSubTypeStr = "material";
+  {
+    LgFrPartVector* rawPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+                                                   "rawParts",
+                                                   &difEssen);
+    LgFrPartVector& rawParts = *rawPartsPtr;
+
+    // get supplyVol's
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(rawParts,
+                                                    itemSubTypeStr,
+                                                    "rawSupplyVol",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+
+    // get unitCosts
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+                                             "rawUnitCost",
+                                             &difEssen);
+    LgFrFloatVector& unitCost = *unitCostPtr;
+
+    // determine which are constrained
+    LgFrIntVector* constrainedPtr
+      = (LgFrIntVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+                                           "rawConstrained",
+                                           &difEssen);
+    LgFrIntVector& constrainedRawVec = *constrainedPtr;
+
+    // get procurementLeadTime
+    LgFrTimeVecFloatVector* procLeadTimePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(rawParts,
+                                                    itemSubTypeStr,
+                                                    "rawProcLeadTime",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& procLeadTime = *procLeadTimePtr;
+
+    // get procurement Costs
+    LgFrFloatVector* procCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+                                             "rawProcCost",
+                                             &difEssen);
+    LgFrFloatVector& procCost = *procCostPtr;
+    delete procCostPtr;
+
+    float * negativeCycleTime = new float[numberOfPeriods];
+    for (i=0; i<numberOfPeriods; i++)
+      negativeCycleTime[i] = -1.0;
+
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add raw parts" <<std::endl;
+    for (i=0; i<rawParts.size(); i++) {
+
+      // Check for part "Purchase_$$", and skip it if found.
+      // If the dif data was generated by the CMRP application then
+      // it contains the raw part "Purchase_$$".  This part should
+      // not be added now.  It gets added latter in this method.
+      if ( rawParts[i].name() == "Purchase_$$" ) {
+         std::cerr <<"WARNING: Dif returned raw part Purchase_$$." <<std::endl;
+         std::cerr <<"WARNING:     Purchase_$$ part is being skipped over." <<std::endl;
+         continue;
+      }
+
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, rawParts[i].name().c_str(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+
+      // add the part as a product
+
+      rc =
+         witAddPart (
+            theWitRun,
+            rawParts[i].name ().c_str (),
+            WitPRODUCT);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartSupplyVol (
+            theWitRun,
+            rawParts[i].name ().c_str (),
+            supplyVol[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartUnitCost (
+            theWitRun,
+            rawParts[i].name ().c_str (),
+            unitCost[i]);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartObj1ScrapCost (
+            theWitRun,
+            rawParts[i].name ().c_str (),
+            obj1ScrapCost.data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartCycleTime (
+            theWitRun,
+            rawParts[i].name ().c_str (),
+            constrainedRawVec[i]? 
+               negativeCycleTime:
+               procLeadTime[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      // Set Stock Cost From Unit Cost
+      LgFrTimeVecFloat stockCost =
+        LgFrTimeVecFloat( numberOfPeriods, unitCost[i] ) * .0005f;
+      witSetPartObj1StockCost( theWitRun, rawParts[i].name().c_str(),
+                               stockCost.data() );
+
+      // put the part into the default and raw SOP
+      defaultSOP.insert(rawParts[i]);
+      rawSOP.insert(rawParts[i]);
+
+      // add the part to the constrainedSOP if it's constrained otherwise
+      // add to the procureableSOP
+      if (constrainedRawVec[i])
+        constrainedSOP.insert(rawParts[i]);
+      else  {
+        procureableSOP.insert(rawParts[i]);
+        mrpPlannedSOP.insert(rawParts[i]);
+      }
+    }
+
+    delete procLeadTimePtr;
+    delete rawPartsPtr;
+    delete constrainedPtr;
+    delete unitCostPtr;
+    delete supplyVolPtr; 
+    delete [] negativeCycleTime;
+  }
+
+  // *************************************************************
+  // ****** Get all the CAPACITY parts from dif and process ******
+  // *************************************************************
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get cap parts from dif" <<std::endl;
+
+  {
+
+    // get the capacity parts
+    LgFrPartVector* capacityPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+                                                   "capacityParts",
+                                                   &difEssen);
+    LgFrPartVector& capacityParts = *capacityPartsPtr;
+
+    rc = witGetPartExists(theWitRun, capacityParts[0].name().c_str(), &exists);
+
+    // get capacity supplyVol's
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(capacityParts,
+                                                    itemSubTypeStr,
+                                                    "capacitySupplyVol",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+
+    rc = witGetPartExists(theWitRun, capacityParts[0].name().c_str(), &exists);
+    // get capacity unitCosts
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(capacityParts,
+                                             itemSubTypeStr,
+                                             "capacityUnitCost",
+                                             &difEssen);
+    LgFrFloatVector& unitCost = *unitCostPtr;
+
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add cap parts" <<std::endl;
+    for ( i=0; i<capacityParts.size(); i++) {
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, capacityParts[i].name().c_str(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+      //    std::cerr << "Adding capacity part: " << capacityParts[i].name() << "\n";
+
+      // add the part as a product
+
+      rc =
+         witAddPart (
+            theWitRun,
+            capacityParts[i].name ().c_str (),
+            WitCAPACITY);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartSupplyVol (
+            theWitRun,
+            capacityParts[i].name ().c_str (),
+            supplyVol[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartUnitCost (
+            theWitRun,
+            capacityParts[i].name ().c_str (),
+            unitCost[i]);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartObj1ScrapCost (
+            theWitRun,
+            capacityParts[i].name ().c_str (),
+            obj1ScrapCost.data ());
+
+      assert (rc < WitWARNING_RC);
+
+      // put the part into the default and capacity SOP's
+      defaultSOP.insert(capacityParts[i]);
+      capacitySOP.insert(capacityParts[i]);
+
+
+
+    }
+
+    delete supplyVolPtr;
+    delete unitCostPtr;
+    delete capacityPartsPtr;  
+  }
+
+  // ************************************************************
+  // ****** Get all the PRODUCT parts from dif and process ******
+  // ************************************************************
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get prd parts from dif" <<std::endl;
+  {
+    // get the product parts
+    LgFrPartVector* productPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+                                                   "productParts",
+                                                   &difEssen);
+    LgFrPartVector& productParts = *productPartsPtr;
+
+    // get product supplyVol's
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+                                                    itemSubTypeStr,
+                                                    "productSupplyVol",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+
+    // get product cycleTimes
+    LgFrTimeVecFloatVector* cycleTimePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+                                                    itemSubTypeStr,
+                                                    "productCycleTime",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& cycleTime = *cycleTimePtr;
+
+    // get product unitCosts
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(productParts,
+                                             itemSubTypeStr,
+                                             "productUnitCost",
+                                             &difEssen);
+    LgFrFloatVector& unitCost = *unitCostPtr;
+
+    // get product minLotSize
+    LgFrTimeVecFloatVector* minLotSizePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts, itemSubTypeStr,
+                                                    "productMinLotSize",
+                                                    &difEssen);
+    LgFrTimeVecFloatVector& minLotSize = *minLotSizePtr;
+
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add prd parts" <<std::endl;
+    for (i=0; i<productParts.size(); i++) {
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, productParts[i].name().c_str(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+
+      // add the part as a product
+
+      rc =
+         witAddPart (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            WitPRODUCT);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartSupplyVol (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            supplyVol[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartCycleTime (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            cycleTime[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartObj1ScrapCost (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            obj1ScrapCost.data ());
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartUnitCost (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            unitCost[i]);
+
+      assert (rc < WitWARNING_RC);
+
+      rc =
+         witSetPartMinLotSize (
+            theWitRun,
+            productParts[i].name ().c_str (),
+            minLotSize[i].data ());
+
+      assert (rc < WitWARNING_RC);
+
+      // Set Stock Cost From Unit Cost
+      LgFrTimeVecFloat stockCost =
+        LgFrTimeVecFloat( numberOfPeriods, unitCost[i] ) * .0005f;
+      witSetPartObj1StockCost( theWitRun, productParts[i].name().c_str(),
+                               stockCost.data() );
+      
+      // put the part into the default and mrpPlanned SOP's
+      defaultSOP.insert(productParts[i]);
+      mrpPlannedSOP.insert(productParts[i]);
+
+      // put the part into the produceable set
+      produceableSOP.insert(productParts[i]);
+    }
+    delete supplyVolPtr;
+    delete unitCostPtr;
+    delete cycleTimePtr;
+    delete minLotSizePtr;
+
+    // If incLotSize attribute is defined in DIF, then set it.
+    {
+    bool incLotSizeSupported =  dif.isAttributeFunctionImplemented(
+                                         "productIncLotSize",
+                                         material,
+                                         part );
+    if ( !incLotSizeSupported ) {
+       std::cerr <<"LgFrINFO: Data Interface Attribute productIncLotSize " <<std::endl
+            <<"          is not supported."                           <<std::endl
+            <<"          " << title()
+            <<std::endl;
+    }
+    else {
+      LgFrTimeVecFloatVector* incLotSizePtr
+        = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+                                                      itemSubTypeStr,
+                                                      "productIncLotSize",
+                                                      &difEssen);
+      LgFrTimeVecFloatVector& incLotSize = *incLotSizePtr;
+      const float fltEps = .01f;
+      for (i=0; i<productParts.size(); i++) {
+        if ( fabs( incLotSize[i].max() - 1.0 ) > fltEps ) {
+	  std::cerr << "LgFrINFO: Setting product part: "
+               <<            productParts[i].name()
+               <<            std::endl
+	       << "          incLotSize to "
+               <<            incLotSize[i].format() << std::endl;
+        }
+
+        lps.incLotSize( &(productParts[i]), incLotSize[i] );
+      }
+      delete incLotSizePtr;
+    }
+    }
+
+
+    // If yield attribute is defined in DIF, then set it.
+    {
+    bool yieldSupported =  dif.isAttributeFunctionImplemented(
+                                         "productYieldFloat",
+                                         material,
+                                         part );
+    if ( !yieldSupported ) {
+       std::cerr <<"LgFrINFO: Data Interface Attribute productYieldFloat " <<std::endl
+            <<"          is not supported."                           <<std::endl
+            <<"          " << title()
+            <<std::endl;
+    }
+    else {
+      LgFrTimeVecFloatVector* yieldPtr
+        = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+                                                      itemSubTypeStr,
+                                                      "productYieldFloat",
+                                                      &difEssen);
+      LgFrTimeVecFloatVector yield =  *yieldPtr;
+      for (i=0; i<productParts.size(); i++) {
+        if (yield[i].min() < 100) {
+	  std::cerr << "LgFrINFO: Setting product part: "
+               <<            productParts[i].name()
+               <<            std::endl
+	       << "          yield to "
+               <<            yield[i].format() << std::endl;
+        }
+
+        lps.yield( &(productParts[i]), yield[i] );
+      }
+      delete yieldPtr;
+    }
+    }
+
+    delete productPartsPtr;
+  }       
+
+  LgFrPart budgetPart = universalSOP.newPart("Purchase_$$");
+
+  // ************************************************************
+  // ****** Process DEMANDS *************************************
+  // ************************************************************
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get committed demands from dif"
+       <<std::endl;
+  LgFrDemandVector dv;
+
+
+  // get the COMMITTED CUSTOMER Orders:
+  LgFrDemandVector* committedDemandPtr
+    = (LgFrDemandVector*) dif.demandAttribute(dv, "committedDemands",
+                                                     &difEssen );
+  LgFrDemandVector& committedDemands = * committedDemandPtr; 
+
+  
+  // get demandVol's
+  LgFrTimeVecFloatVector* committedDemandVolPtr
+    = (LgFrTimeVecFloatVector*) dif.demandAttribute(committedDemands,
+                                                    "demandVol", &difEssen);
+  LgFrTimeVecFloatVector& demandVol = *committedDemandVolPtr;
+
+
+  // get demand grossRev's
+  LgFrFloatVector* committedGrossRevPtr
+    = (LgFrFloatVector*) dif.demandAttribute(committedDemands,
+                                             "demandGrossRev", &difEssen);
+  LgFrFloatVector& grossRev = *committedGrossRevPtr;
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add committed demands" <<std::endl;
+  for (i=0; i<committedDemands.size(); i++) {
+    // do a few sanity check's
+    rc = witGetPartExists(theWitRun,
+                          committedDemands[i].partPtr()->name().c_str(), &exists);
+    assert (rc < WitWARNING_RC);
+    assert (exists);
+
+    rc =
+      witAddDemand (
+         theWitRun,
+         committedDemands[i].partPtr ()->name ().c_str (),
+         committedDemands[i].name ().c_str ());
+
+    assert (rc < WitWARNING_RC);
+
+    rc =
+      witSetDemandDemandVol (
+         theWitRun,
+         committedDemands[i].partPtr ()->name ().c_str (),
+         committedDemands[i].name ().c_str (),
+         demandVol[i].data ());
+
+    assert (rc < WitWARNING_RC);
+
+    rc =
+      witSetDemandGrossRev (
+         theWitRun,
+         committedDemands[i].partPtr ()->name ().c_str (),
+         committedDemands[i].name ().c_str (),
+         grossRev[i]);
+
+    assert (rc < WitWARNING_RC);
+
+    rc =
+      witSetDemandBuildAheadLimit (
+         theWitRun,
+         committedDemands[i].partPtr ()->name ().c_str (),
+         committedDemands[i].name ().c_str (),
+         buildAheadLimit);
+
+    assert (rc < WitWARNING_RC);
+
+    // put the demand into the default set
+    defaultSOD.insert(committedDemands[i]);
+    committedSOD.insert(committedDemands[i]);    
+  }
+
+
+  //  delete committedDemandPtr;
+  //  delete committedDemandVolPtr;
+  //  delete committedGrossRevPtr;
+
+
+
+  // get the firmFORECASTED Demands
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get firmForecast demands from dif"
+       <<std::endl;
+
+  LgFrDemandVector* firmForecastDemandsPtr
+    = (LgFrDemandVector*) dif.demandAttribute(dv,"firmForecastDemands",
+                                                     &difEssen);
+  LgFrDemandVector firmForecastDemands = *firmForecastDemandsPtr;
+
+  // nettedForecast -- compute the size of the (potential) netted forecast
+  // vector.  (Need to declare firmForecastDemands and totCommDemand here
+  // so that they don't go out of scope
+  int sizeOfNettedDemandVol;
+  if (dif.title(&difEssen) == "witlib") 
+    sizeOfNettedDemandVol = firmForecastDemands.size();
+  else
+    sizeOfNettedDemandVol = 0;
+  LgFrTimeVecFloatVector nettedDemandVol(sizeOfNettedDemandVol);
+  LgFrSortingPartScheduleFloatSmartPointer totCommDemand;
+
+  // get demandVol's
+  LgFrTimeVecFloatVector* firmForecastDemandVolPtr
+    = (LgFrTimeVecFloatVector*) dif.demandAttribute(firmForecastDemands,
+                                                    "demandVol",
+                                                    &difEssen);
+  demandVol = *firmForecastDemandVolPtr;
+
+  // MUST net-out the committed demand from the forecast
+  // for mapics dif
+
+  if (dif.title(&difEssen) == "witlib")    {
+    // get a schFctry
+    const LgFrScheduleFactory * sfact = CMRPscenario()->scheduleFactory();
+    totCommDemand = sfact->newPartSchedule(LGFRCMRPTotalCommittedDemandVol);
+    const LgFrSortingPartScheduleFloat & constTotCommDemand = *totCommDemand;
+
+    for (i=0; i<firmForecastDemands.size(); i++) {
+      const LgFrPart * partPtr = firmForecastDemands[i].partPtr();
+      const LgFrTimeVecFloat & tcdvTVF
+        = (constTotCommDemand[*partPtr]).timeVecFloat();
+      const LgFrTimeVecFloat & forecastTVF = demandVol[i];
+      LgFrTimeVecFloat nettedForecastTVF = forecastTVF.cumulativeNet(tcdvTVF);
+      nettedDemandVol[i] = nettedForecastTVF;
+    }
+  }
+
+  // get grossRev's
+  LgFrFloatVector* firmForecastGrossRevPtr
+    = (LgFrFloatVector*) dif.demandAttribute(
+                                             firmForecastDemands,
+                                             "demandGrossRev",
+                                             &difEssen);
+  grossRev = *firmForecastGrossRevPtr;
+
+  if (firmForecastDemands.size() > 0)
+      std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add firmForecast demands" 
+       <<std::endl;
+
+  for (i=0; i<firmForecastDemands.size(); i++) {
+    // do a few sanity check's
+    rc = witGetPartExists(theWitRun,
+			  firmForecastDemands[i].partPtr()->name().c_str(),
+			  &exists);
+    assert (rc < WitWARNING_RC);
+    assert (exists);
+
+    // add the demand
+
+    rc =
+       witAddDemand (
+          theWitRun,
+          firmForecastDemands[i].partPtr ()->name ().c_str (),
+          firmForecastDemands[i].name ().c_str ());
+
+    assert (rc < WitWARNING_RC);
+
+    rc =
+       witSetDemandGrossRev (
+          theWitRun,
+          firmForecastDemands[i].partPtr ()->name ().c_str (),
+          firmForecastDemands[i].name ().c_str (),
+          grossRev[i]);
+
+    assert (rc < WitWARNING_RC);
+
+    rc =
+       witSetDemandBuildAheadLimit (
+          theWitRun,
+          firmForecastDemands[i].partPtr ()->name ().c_str (),
+          firmForecastDemands[i].name ().c_str (),
+          buildAheadLimit);
+
+    assert (rc < WitWARNING_RC);
+
+    if (dif.title (& difEssen) == "witlib")
+       rc =
+          witSetDemandDemandVol (
+             theWitRun,
+             firmForecastDemands[i].partPtr ()->name ().c_str (),
+             firmForecastDemands[i].name ().c_str (),
+             nettedDemandVol[i].data ());
+    else
+       rc =
+          witSetDemandDemandVol (
+             theWitRun,
+             firmForecastDemands[i].partPtr ()->name ().c_str (),
+             firmForecastDemands[i].name ().c_str (),
+             demandVol[i].data ());
+
+    assert (rc < WitWARNING_RC);
+
+    // put the demand into the default set
+    defaultSOD.insert(firmForecastDemands[i]);
+
+  }
+
+  //  delete firmForecastDemandsPtr;
+  //  delete firmForecastDemandVolPtr;
+  //  delete firmForecastGrossRevPtr;
+
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand prorities " <<std::endl;
+  // Set demand priorities
+  setDemandPriorities(lps);
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand obj1ShipReward " <<std::endl;
+  // Set demand ship rewards
+  setDemandObj1ShipReward(lps);
+
+
+  // ********************************************************
+  // ****** Set Equitability based on number of demands and periods
+  // ********************************************************
+  lps.equitability (
+#ifdef LGFR_NO_EQUITABILITY
+		    1
+#else
+		      ( numberOfPeriods * 
+			( committedDemands.size() 
+			  + firmForecastDemands.size() 
+			  )
+			> 500 
+			)
+		      ? 10
+		      : 100
+#endif
+		      );
+
+  // ************************************************************
+  // ****** Set build-ahead *************************************
+  // ************************************************************
+  lps.buildAhead (  (buildAheadLimit == 0) ? false : true  );
+
+
+  delete committedDemandVolPtr;
+  delete committedGrossRevPtr;
+  delete firmForecastDemandVolPtr;
+  delete firmForecastGrossRevPtr;
+  delete committedDemandPtr;
+  delete firmForecastDemandsPtr;
+
+
+  // ************************************************************
+  // ****** Process BOM *****************************************
+  // ************************************************************
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set BOM" <<std::endl;
+  dif.partAttribute(
+                    pv, itemSubTypeStr, "defineBom", &difEssen);
+
+
+  // ************************************************************
+  // ****** Process Budget Part and BOM Structure ***************
+  // ************************************************************
+
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() Process budget" <<std::endl;
+  float * budgetSupplyVol = new float[numberOfPeriods];
+  for (i=0; i<numberOfPeriods; i++)
+    budgetSupplyVol[i] = 100.0;
+
+  rc = witGetPartExists(theWitRun, "Purchase_$$", &exists);
+  assert (rc < WitWARNING_RC);
+  assert (! exists);
+
+
+  //  std::cerr << "Adding budget part: Purchase_$$\n";
+
+  rc = witAddPart (theWitRun, "Purchase_$$", WitRAW);
+
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetPartSupplyVol (theWitRun, "Purchase_$$", budgetSupplyVol);
+
+  assert (rc < WitWARNING_RC);
+
+  rc = witSetPartUnitCost (theWitRun, "Purchase_$$", 1.0);
+
+  assert (rc < WitWARNING_RC);
+
+  rc =
+     witSetPartObj1ScrapCost (theWitRun, "Purchase_$$", obj1ScrapCost.data ());
+
+  assert (rc < WitWARNING_RC);
+
+
+  // add the budget part to the universal sop but NOT the default sop
+
+  // LgFrPart budgetPart = universalSOP.newPart("Purchase_$$");
+
+
+  budgetSOP.insert(budgetPart);
+
+  delete [] budgetSupplyVol;
+
+  std::cerr <<"INFO: Leaving LgFrInitialProblemForCMRP::feedInto()" <<std::endl;
+
+}
+
+// Set demand priorities based on the type of demand
+void
+LgFrInitialProblemForCMRP::setDemandPriorities (
+  LgFrLastProblemSolved & lps )
+{
+  witReturnCode rc;
+  WitRun * theWitRun = lps.witRun();
+
+  int numberOfPeriods;
+  rc = witGetNPeriods( theWitRun, &numberOfPeriods );
+  assert (rc < WitWARNING_RC);
+
+  LgFrSetOfDemands& defaultSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfDemands& committedSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_COMMITTED_DEMAND_SET);
+
+  int * defaultPriority = new int[numberOfPeriods];
+  int * forecastPriority = new int[numberOfPeriods];
+  int * priority;
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<numberOfPeriods; i++ ) 
+     defaultPriority[i] = DEFAULT_PRIORITY;
+  for ( i = 0; i<numberOfPeriods; i++ ) 
+     forecastPriority[i] = FORECAST_PRIORITY;
+
+  for ( i = 0; i<defaultSOD.size(); i++ ) {
+
+     if (  committedSOD.contains( defaultSOD[i] )  )
+        priority = defaultPriority;
+     else 
+        priority = forecastPriority;
+
+     rc = witSetDemandPriority(theWitRun, 
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+                               priority );
+     assert (rc < WitWARNING_RC);
+
+  }
+
+  delete [] defaultPriority;
+  delete [] forecastPriority;
+}
+
+
+
+// Set demand obj1ShipReward based on the type of demand
+void
+LgFrInitialProblemForCMRP::setDemandObj1ShipReward (
+  LgFrLastProblemSolved & lps )
+{
+  witReturnCode rc;
+  WitRun * theWitRun = lps.witRun();
+
+  int numberOfPeriods;
+  rc = witGetNPeriods( theWitRun, &numberOfPeriods );
+  assert (rc < WitWARNING_RC);
+
+  LgFrSetOfDemands& defaultSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfDemands& committedSOD   =
+                 CMRPscenario()->setOfDemands(LGFR_COMMITTED_DEMAND_SET);
+
+  LgFrTimeVecFloat defaultObj1ShipReward(
+     numberOfPeriods,DEFAULT_OBJ1SHIPREWARD);
+  LgFrTimeVecFloat forecastObj1ShipReward(
+     numberOfPeriods,FORECAST_OBJ1SHIPREWARD);
+  LgFrTimeVecFloat * obj1ShipReward;
+
+  defaultObj1ShipReward  = DEFAULT_OBJ1SHIPREWARD;
+  forecastObj1ShipReward = FORECAST_OBJ1SHIPREWARD;
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<defaultSOD.size(); i++ ) {
+
+     if (  committedSOD.contains( defaultSOD[i] )  )
+        obj1ShipReward = &defaultObj1ShipReward;
+     else
+        obj1ShipReward = &forecastObj1ShipReward;
+
+     rc = witSetDemandObj1ShipReward(theWitRun,
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+                               obj1ShipReward->data() );
+     assert (rc < WitWARNING_RC);
+
+     rc = witSetDemandObj1CumShipReward(theWitRun,
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+                               (.001f*(*obj1ShipReward)).data() );
+     assert (rc < WitWARNING_RC);
+
+  }
+
+}
+
+
+// Make scenario clone copy of object
+LgFrInitialProblemAndParameters *
+LgFrInitialProblemForCMRP::clone(
+   LgFrScenarioSmartPointer newScenario)
+const
+{
+  return new LgFrInitialProblemForCMRP(newScenario);
+}
+
+
+
+LgFrInitialProblemForCMRP::~LgFrInitialProblemForCMRP()
+{
+  // Nothing to do, so do nothing but return
+}
+
+
+// Default Constructor
+LgFrInitialProblemForCMRP::LgFrInitialProblemForCMRP()
+:
+LgFrInitialProblemAndParameters(
+			LgFrScenarioSmartPointer::nullScenarioSmartPointer)
+{
+  // All the work is done in the initialization part
+}
+
+// the preferred Constructor
+LgFrInitialProblemForCMRP::LgFrInitialProblemForCMRP(
+    LgFrScenarioSmartPointer scenario)
+:
+    LgFrInitialProblemAndParameters(scenario)
+{
+  // All the work is done in the initialization part
+}
+
+
+// *************************************************************************
+//
+// LgFrScenarioForCMRPwithPrioritiesFromDif
+//
+// *************************************************************************
+
+
+// Set demand priorities based on the type of demand
+void
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::setDemandPriorities (
+  LgFrLastProblemSolved & lps )
+{
+
+  LgFrSetOfDemands& defaultSOD = CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+
+  LgFrDataInterface*  difPtr
+      = (LgFrDataInterface*)(CMRPscenario()->dataInterface());
+
+  LgFrDataInterface& difWithPriorities = *difPtr;
+
+  // Make dif supports returning of priorities
+  assert( difWithPriorities.dataInterfaceImplementation()->GetDIIType() 
+	     == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES
+	  || difWithPriorities.dataInterfaceImplementation()->GetDIIType()
+	     == __LGFRDATAINTERFACEIMPLEMENTATIONFROMWITDATAFILE);
+
+  // get demandPriority's
+  LgFrDataInterfaceEssentialsFromScenario difEssen(&(*CMRPscenario()));
+  LgFrTimeVecFloatVector* demandPriorityPtr
+      = (LgFrTimeVecFloatVector*) difWithPriorities.demandAttribute(
+	  defaultSOD, "demandPriority", &difEssen);
+  LgFrTimeVecFloatVector& priorityVec = *demandPriorityPtr;
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<setOfDemands().size(); i++ ) {
+
+     lps.priority( &defaultSOD[i], priorityVec[i] );
+
+  }
+  delete demandPriorityPtr;
+  
+}
+
+
+// Set demand obj1ShipReward based on the type of demand
+void
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::setDemandObj1ShipReward (
+  LgFrLastProblemSolved & lps )
+{
+  LgFrSetOfDemands& defaultSOD = CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+
+  LgFrDataInterface*  difPtr
+      = (LgFrDataInterface*)(CMRPscenario()->dataInterface());
+
+  LgFrDataInterface& difWithPriorities = *difPtr;
+
+  // Make dif supports returning of obj1ShipReward
+  assert( difWithPriorities.dataInterfaceImplementation()->GetDIIType() 
+	     == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES
+	  || difWithPriorities.dataInterfaceImplementation()->GetDIIType()
+	     == __LGFRDATAINTERFACEIMPLEMENTATIONFROMWITDATAFILE);
+
+
+  // Get obj1ShipRewardVect
+  LgFrDataInterfaceEssentialsFromScenario difEssen(&(*CMRPscenario()));
+  LgFrTimeVecFloatVector* obj1ShipRewardVectPtr
+   = (LgFrTimeVecFloatVector*) difWithPriorities.demandAttribute
+      (defaultSOD, "demandObj1ShipReward", &difEssen);
+  LgFrTimeVecFloatVector& obj1ShipRewardVec = *obj1ShipRewardVectPtr;
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<setOfDemands().size(); i++ ) {
+
+     lps.obj1ShipReward( &defaultSOD[i], obj1ShipRewardVec[i] );
+     lps.obj1CumShipReward( &defaultSOD[i], obj1ShipRewardVec[i]*.001f );
+
+  }
+
+  delete obj1ShipRewardVectPtr;
+
+}
+
+
+// Make scenario clone copy of object
+LgFrInitialProblemAndParameters *
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::clone(
+   LgFrScenarioSmartPointer newScenario)
+const
+{
+  LgFrInitialProblemAndParameters* newInst =
+      new LgFrInitialProblemForCMRPwithPrioritiesFromDif(newScenario);
+  return (newInst);
+}
+
+
+
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::~LgFrInitialProblemForCMRPwithPrioritiesFromDif()
+{
+  // Nothing to do, so do nothing but return
+}
+
+// Default Constructor
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::
+   LgFrInitialProblemForCMRPwithPrioritiesFromDif()
+:
+    LgFrInitialProblemForCMRP(
+					LgFrScenarioSmartPointer::nullScenarioSmartPointer)
+{
+  // All the work is done in the initialization part
+}
+
+// the preferred Constructor
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::LgFrInitialProblemForCMRPwithPrioritiesFromDif(LgFrScenarioSmartPointer scenario)
+:
+    LgFrInitialProblemForCMRP(scenario)
+{
+  // All the work is done in the initialization part
+}
+
+
+
+// *************************************************************************
+//
+// Test Methods
+//
+// *************************************************************************
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// Test this class
+void
+LgFrInitialProblemForCMRP::test()
+{
+
+
+}
+
+
+// Context sensitive test called by scenCMRP.test()
+void
+LgFrInitialProblemForCMRP::contextTest(
+    LgFrInitialProblemForCMRP        & ippTest, // ippTest,
+    LgFrInitialProblemForCMRP        & ippPWcmrp)   // ippPWcmrp)
+{
+  std::cerr << "\nEntering IPPforCMRP::contextTest\n";
+
+  LgFrCalendar&     calendar   = ippTest.CMRPscenario()->calendar();
+  LgFrSetOfParts& universalSOP =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+  LgFrSetOfParts& defaultSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_DEFAULT_SET);
+  LgFrSetOfParts& constrainedSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_CONSTRAINED_SET);
+  LgFrSetOfParts& produceableSOP  =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_PRODUCEABLE_SET);
+  LgFrSetOfParts& procureableSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_PROCUREABLE_SET);
+  LgFrSetOfParts& budgetSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_BUDGET_SET);
+  LgFrSetOfParts& mrpPlannedSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_MRP_PLANNED_SET);
+  LgFrSetOfParts& rawSOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_RAW_SET);
+  LgFrSetOfParts& capacitySOP   =
+                 ippTest.CMRPscenario()->setOfParts(LGFR_CAPACITY_SET);
+  LgFrSetOfDemands& universalSOD =
+                 ippTest.CMRPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  LgFrSetOfDemands& defaultSOD   =
+                 ippTest.CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfDemands& committedSOD   =
+                 ippTest.CMRPscenario()->setOfDemands(LGFR_COMMITTED_DEMAND_SET);
+
+
+  assert(universalSOP.size() == 4);
+  assert(defaultSOP.size() == 3);
+  assert(budgetSOP.size() == 1);
+  assert(constrainedSOP.size() == 0);
+  assert(produceableSOP.size() == 1);
+  assert(procureableSOP.size() == 1);
+//  assert(mrpPlannedSOP.size() == 2);
+  assert(rawSOP.size() == 1);
+  assert(capacitySOP.size() == 1);
+  assert(universalSOD.size() == 2);
+  assert(defaultSOD.size() == 2);
+  assert(committedSOD.size() == 1);
+
+
+
+  // Now test the problem fedInto via DIFFromPWcmrp
+  // ===============================================
+  LgFrCalendar&     calendarPWcmrp = ippPWcmrp.CMRPscenario()->calendar();
+  LgFrSetOfParts& universalSOPPWcmrp =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+  LgFrSetOfParts& defaultSOPPWcmrp   =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_DEFAULT_SET);
+  LgFrSetOfParts& constrainedSOPPWcmrp   =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_CONSTRAINED_SET);
+  LgFrSetOfParts& produceableSOPPWcmrp  =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_PRODUCEABLE_SET);
+  LgFrSetOfParts& procureableSOPPWcmrp   =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_PROCUREABLE_SET);
+  LgFrSetOfParts& budgetSOPPWcmrp   =
+                 ippPWcmrp.CMRPscenario()->setOfParts(LGFR_BUDGET_SET);
+  LgFrSetOfDemands& universalSODPWcmrp =
+                 ippPWcmrp.CMRPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  LgFrSetOfDemands& defaultSODPWcmrp   =
+                 ippPWcmrp.CMRPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+
+  WitRun * theWitRun = ippPWcmrp.CMRPscenario()->lastProblemSolved().witRun();
+
+  // raw = 9, product = 12, capacity = 4, budget = 1
+  assert(universalSOPPWcmrp.size() == 26);
+  assert(defaultSOPPWcmrp.size() == 25);
+  assert(budgetSOPPWcmrp.size() == 1);
+  assert(constrainedSOPPWcmrp.size() == 2);
+  assert(produceableSOPPWcmrp.size() == 12);
+  assert(procureableSOPPWcmrp .size() == 7);
+  // committed = 13, firm = 12
+  assert(universalSODPWcmrp.size() == 25);
+  assert(defaultSODPWcmrp.size() == 25);
+
+
+  int nBom;
+  witReturnCode rc;
+
+  rc = witGetPartNBomEntries(theWitRun, "System_Board_1", &nBom);
+  assert (rc < WitWARNING_RC);
+  assert( nBom == 5);
+
+
+#if defined(_MSC_VER)
+  rc = witDisplayData(theWitRun, "./CMRP.display.data");
+#else
+  rc = witDisplayData(theWitRun, "/tmp/CMRP.display.data");
+#endif
+  assert (rc < WitWARNING_RC);
+
+
+  const LgFrSolutionOutputInterface& soi = ippPWcmrp.CMRPscenario()->solutionOutputInterface();
+
+  // implode
+  ippPWcmrp.CMRPscenario()->newImplosionSolution();
+
+
+#if defined(_MSC_VER)
+  // write the wit data file
+  ippPWcmrp.CMRPscenario()->lastProblemSolved().writeWitDataFile(
+                               "./CMRP.wit.data",
+                               ippPWcmrp.CMRPscenario()->workingImplosionProblem());
+  soi.writeWitProductionSchedule("./CMRP.prod.out");
+  soi.writeWitShipmentSchedule("./CMRP.ship.out");
+#else
+  // write the wit data file
+  ippPWcmrp.CMRPscenario()->lastProblemSolved().writeWitDataFile(
+                               "/tmp/CMRP.wit.data",
+                               ippPWcmrp.CMRPscenario()->workingImplosionProblem());
+  soi.writeWitProductionSchedule("/tmp/CMRP.prod.out");
+  soi.writeWitShipmentSchedule("/tmp/CMRP.ship.out");
+#endif
+
+}
+
+
+
+
+// Test this class
+void
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::test()
+{
+
+}
+
+
+// Context sensitive test
+// dif needs to be constructed using string cmrpData/difTest
+// use LgFrDataInterfaceImplementationFromCmrpFiles
+void
+LgFrInitialProblemForCMRPwithPrioritiesFromDif::contextTest(
+          LgFrInitialProblemForCMRPwithPrioritiesFromDif   & ipp,
+          LgFrDataInterface				   & dif )
+{
+  std::cerr << "\nEntering IPPforCMRPwithPrioritiesFromDif::contextTest\n";
+
+  LgFrCalendar&     calendar   = ipp.CMRPscenario()->calendar();
+
+  LgFrSetOfDemands& universalSOD =
+                 ipp.CMRPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  assert(universalSOD.size() == 2);
+
+  LgFrDemandVector demVec;
+  demVec.reserve( universalSOD.size() );
+  size_t d = 0; // Pulled out of the for below by RW2STL
+  for ( d=0; d<universalSOD.size(); d++ ) {
+    demVec.push_back( universalSOD[d] );
+  } 
+
+  // get demandPriority's
+  LgFrDataInterfaceEssentialsFromScenario difEssen(&(*(ipp.CMRPscenario())));
+  LgFrTimeVecFloatVector* demandPriorityPtr
+      = (LgFrTimeVecFloatVector*) dif.demandAttribute(
+	  demVec, "demandPriority", &difEssen);
+  LgFrTimeVecFloatVector & demandPriority = *demandPriorityPtr;
+  assert( demandPriority.size() == 2 );
+  assert( demandPriority[0] == 5. );
+  assert( demandPriority[1] == 4. );
+
+  delete demandPriorityPtr;
+}
+@
+
+
+1.5
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d225 1
+d227 41
+a267 8
+      rc = witAddPartVa(theWitRun, rawParts[i].name().c_str(), WitPRODUCT,
+                        WitNsupplyVol,      supplyVol[i].data(),
+                        WitNunitCost,       unitCost[i],
+                        WitNobj1ScrapCost,  obj1ScrapCost.data(),
+                        WitNcycleTime, 
+                        (constrainedRawVec[i] ? 
+                         negativeCycleTime : procLeadTime[i].data()), 
+                        0);
+d339 1
+d341 31
+a371 5
+      rc = witAddPartVa(theWitRun, capacityParts[i].name().c_str(), WitCAPACITY,
+                        WitNsupplyVol, supplyVol[i].data(),
+                        WitNunitCost,  unitCost[i],
+                        WitNobj1ScrapCost,  obj1ScrapCost.data(),
+                        0);
+d439 47
+a485 7
+      rc = witAddPartVa(theWitRun, productParts[i].name().c_str(), WitPRODUCT,
+                        WitNsupplyVol, supplyVol[i].data(),
+                        WitNcycleTime,  cycleTime[i].data(),
+                        WitNobj1ScrapCost, obj1ScrapCost.data(),
+                        WitNunitCost,   unitCost[i],
+                        WitNminLotSize, minLotSize[i].data(),
+                        0);
+d487 1
+a487 1
+      
+d618 33
+a650 6
+    rc = witAddDemandVa(theWitRun, committedDemands[i].partPtr()->name().c_str(),
+                        committedDemands[i].name().c_str(),
+                        WitNdemandVol,       demandVol[i].data(),
+                        WitNgrossRev,        grossRev[i],
+                        WitNbuildAheadLimit, buildAheadLimit,
+                        0);
+d732 44
+a775 20
+    if (dif.title(&difEssen) == "witlib")    {    
+      rc = witAddDemandVa(theWitRun,
+                          firmForecastDemands[i].partPtr()->name().c_str(),
+                          firmForecastDemands[i].name().c_str(),
+                          WitNdemandVol,       nettedDemandVol[i].data(),
+                          WitNgrossRev,        grossRev[i],
+                          WitNbuildAheadLimit, buildAheadLimit,
+                          0);
+      assert (rc < WitWARNING_RC);
+    }
+    else  {
+      rc = witAddDemandVa(theWitRun,
+                          firmForecastDemands[i].partPtr()->name().c_str(),
+                          firmForecastDemands[i].name().c_str(),
+                          WitNdemandVol,       demandVol[i].data(),
+                          WitNgrossRev,        grossRev[i],
+                          WitNbuildAheadLimit, buildAheadLimit,
+                          0);
+      assert (rc < WitWARNING_RC);
+    }
+d852 15
+a866 5
+  rc = witAddPartVa(theWitRun, "Purchase_$$", WitRAW,
+                    WitNsupplyVol, budgetSupplyVol,
+                    WitNunitCost,  1.0,
+                    WitNobj1ScrapCost,  obj1ScrapCost.data(),
+                    0);
+a876 16
+
+
+  // Commenting out the BOM entries using the budget part in order to
+  // get the explosion down to the correct part level. Need to institute
+  // a fix once the cycle times are settable.
+
+  //  // now add BOM arcs from all procureable parts to the budgetPart
+  //  for (i=0; i<rawParts.size(); i++) {
+  //    // procureable parts are those raw parts which are not constrained
+  //    if (! constrainedRawVec[i]) {
+  //      witAddBomEntryVa(theWitRun, rawParts[i].name().c_str(), "Purchase_$$",
+  //                       WitNusageRate, procCost[i],
+  //                       0);
+  //    }
+  //  }
+
+@
+
+
+1.4
+log
+@Modified to get sce to link on windows.
+Code was changed to conditionally include implement statements
+@
+text
+@d1 4
+a4 1
+#include <rw/rstream.h>
+d27 1
+a27 5
+
+#ifndef WIN32
+// added for vacpp - vra
+implement (RWGVector, int)
+#endif
+d40 1
+a40 1
+RWCString
+d45 1
+a45 1
+  RWCString theTitle("Constrained MRP: ");
+d55 4
+a58 4
+    if (scenario()->isA() != __LGFRSCENARIOFORCMRP)  {
+	cerr << "the object is not a CMRPscenario and it is supposed to be"
+             << endl;
+	abort;
+d157 2
+a158 2
+  LgFrOrderedVectorPart pv;
+  RWCString itemSubTypeStr = "material";
+d160 2
+a161 2
+    LgFrOrderedVectorPart* rawPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(pv, itemSubTypeStr,
+d164 1
+a164 1
+    LgFrOrderedVectorPart& rawParts = *rawPartsPtr;
+d167 2
+a168 2
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(rawParts,
+d172 1
+a172 1
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+d175 2
+a176 2
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(rawParts, itemSubTypeStr,
+d179 1
+a179 1
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+d182 2
+a183 2
+    LgFrVectorInt* constrainedPtr
+      = (LgFrVectorInt*) dif.partAttribute(rawParts, itemSubTypeStr,
+d186 1
+a186 1
+    LgFrVectorInt& constrainedRawVec = *constrainedPtr;
+d189 2
+a190 2
+    LgFrVectorTimeVecFloat* procLeadTimePtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(rawParts,
+d194 1
+a194 1
+    LgFrVectorTimeVecFloat& procLeadTime = *procLeadTimePtr;
+d197 2
+a198 2
+    LgFrVectorFloat* procCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(rawParts, itemSubTypeStr,
+d201 1
+a201 1
+    LgFrVectorFloat& procCost = *procCostPtr;
+d208 2
+a209 2
+    cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() add raw parts" <<endl;
+    for (i=0; i<rawParts.entries(); i++) {
+d216 2
+a217 2
+         cout <<"WARNING: Dif returned raw part Purchase_$$." <<endl;
+         cout <<"WARNING:     Purchase_$$ part is being skipped over." <<endl;
+d222 1
+a222 1
+      rc = witGetPartExists(theWitRun, rawParts[i].name().data(), &exists);
+d226 1
+a226 1
+      rc = witAddPartVa(theWitRun, rawParts[i].name().data(), WitPRODUCT,
+d233 1
+a233 1
+                        NULL);
+d239 1
+a239 1
+      witSetPartObj1StockCost( theWitRun, rawParts[i].name().data(),
+d268 1
+a268 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() get cap parts from dif" <<endl;
+d273 2
+a274 2
+    LgFrOrderedVectorPart* capacityPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(pv, itemSubTypeStr,
+d277 3
+a279 1
+    LgFrOrderedVectorPart& capacityParts = *capacityPartsPtr;
+d282 2
+a283 2
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(capacityParts,
+d287 1
+a287 1
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+d289 1
+d291 2
+a292 2
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(capacityParts,
+d296 1
+a296 1
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+d298 2
+a299 2
+    cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() add cap parts" <<endl;
+    for ( i=0; i<capacityParts.entries(); i++) {
+d301 1
+a301 1
+      rc = witGetPartExists(theWitRun, capacityParts[i].name().data(), &exists);
+d304 1
+a304 1
+      //    cerr << "Adding capacity part: " << capacityParts[i].name() << "\n";
+d306 1
+a306 1
+      rc = witAddPartVa(theWitRun, capacityParts[i].name().data(), WitCAPACITY,
+d310 1
+a310 1
+                        NULL);
+d330 1
+a330 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() get prd parts from dif" <<endl;
+d333 2
+a334 2
+    LgFrOrderedVectorPart* productPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(pv, itemSubTypeStr,
+d337 1
+a337 1
+    LgFrOrderedVectorPart& productParts = *productPartsPtr;
+d340 2
+a341 2
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(productParts,
+d345 1
+a345 1
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+d348 2
+a349 2
+    LgFrVectorTimeVecFloat* cycleTimePtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(productParts,
+d353 1
+a353 1
+    LgFrVectorTimeVecFloat& cycleTime = *cycleTimePtr;
+d356 2
+a357 2
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(productParts,
+d361 1
+a361 1
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+d364 2
+a365 2
+    LgFrVectorTimeVecFloat* minLotSizePtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(productParts, itemSubTypeStr,
+d368 1
+a368 1
+    LgFrVectorTimeVecFloat& minLotSize = *minLotSizePtr;
+d370 2
+a371 2
+    cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() add prd parts" <<endl;
+    for (i=0; i<productParts.entries(); i++) {
+d373 1
+a373 1
+      rc = witGetPartExists(theWitRun, productParts[i].name().data(), &exists);
+d378 1
+a378 1
+      rc = witAddPartVa(theWitRun, productParts[i].name().data(), WitPRODUCT,
+d384 1
+a384 1
+                        NULL);
+d390 1
+a390 1
+      witSetPartObj1StockCost( theWitRun, productParts[i].name().data(),
+d407 1
+a407 1
+    RWBoolean incLotSizeSupported =  dif.isAttributeFunctionImplemented(
+d412 2
+a413 2
+       cout <<"LgFrINFO: Data Interface Attribute productIncLotSize " <<endl
+            <<"          is not supported."                           <<endl
+d415 1
+a415 1
+            <<endl;
+d418 2
+a419 2
+      LgFrVectorTimeVecFloat* incLotSizePtr
+        = (LgFrVectorTimeVecFloat*) dif.partAttribute(productParts,
+d423 1
+a423 1
+      LgFrVectorTimeVecFloat& incLotSize = *incLotSizePtr;
+d425 1
+a425 1
+      for (i=0; i<productParts.entries(); i++) {
+d427 1
+a427 1
+	  cerr << "LgFrINFO: Setting product part: "
+d429 1
+a429 1
+               <<            endl
+d431 1
+a431 1
+               <<            incLotSize[i].format() << endl;
+d443 1
+a443 1
+    RWBoolean yieldSupported =  dif.isAttributeFunctionImplemented(
+d448 2
+a449 2
+       cout <<"LgFrINFO: Data Interface Attribute productYieldFloat " <<endl
+            <<"          is not supported."                           <<endl
+d451 1
+a451 1
+            <<endl;
+d454 2
+a455 2
+      LgFrVectorTimeVecFloat* yieldPtr
+        = (LgFrVectorTimeVecFloat*) dif.partAttribute(productParts,
+d459 2
+a460 2
+      LgFrVectorTimeVecFloat yield =  *yieldPtr;
+      for (i=0; i<productParts.entries(); i++) {
+d462 1
+a462 1
+	  cerr << "LgFrINFO: Setting product part: "
+d464 1
+a464 1
+               <<            endl
+d466 1
+a466 1
+               <<            yield[i].format() << endl;
+d484 3
+a486 3
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() get committed demands from dif"
+       <<endl;
+  LgFrOrderedVectorDemand dv;
+d490 2
+a491 2
+  LgFrOrderedVectorDemand* committedDemandPtr
+    = (LgFrOrderedVectorDemand*) dif.demandAttribute(dv, "committedDemands",
+d493 1
+a493 1
+  LgFrOrderedVectorDemand& committedDemands = * committedDemandPtr; 
+d497 2
+a498 2
+  LgFrVectorTimeVecFloat* committedDemandVolPtr
+    = (LgFrVectorTimeVecFloat*) dif.demandAttribute(committedDemands,
+d500 1
+a500 1
+  LgFrVectorTimeVecFloat& demandVol = *committedDemandVolPtr;
+d504 2
+a505 2
+  LgFrVectorFloat* committedGrossRevPtr
+    = (LgFrVectorFloat*) dif.demandAttribute(committedDemands,
+d507 1
+a507 1
+  LgFrVectorFloat& grossRev = *committedGrossRevPtr;
+d509 2
+a510 2
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() add committed demands" <<endl;
+  for (i=0; i<committedDemands.entries(); i++) {
+d513 1
+a513 1
+                          committedDemands[i].partPtr()->name().data(), &exists);
+d517 2
+a518 2
+    rc = witAddDemandVa(theWitRun, committedDemands[i].partPtr()->name().data(),
+                        committedDemands[i].name().data(),
+d522 1
+a522 1
+                        NULL);
+d538 2
+a539 2
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() get firmForecast demands from dif"
+       <<endl;
+d541 2
+a542 2
+  LgFrOrderedVectorDemand* firmForecastDemandsPtr
+    = (LgFrOrderedVectorDemand*) dif.demandAttribute(dv,"firmForecastDemands",
+d544 1
+a544 1
+  LgFrOrderedVectorDemand firmForecastDemands = *firmForecastDemandsPtr;
+d551 1
+a551 1
+    sizeOfNettedDemandVol = firmForecastDemands.entries();
+d554 1
+a554 1
+  LgFrVectorTimeVecFloat nettedDemandVol(sizeOfNettedDemandVol);
+d558 2
+a559 2
+  LgFrVectorTimeVecFloat* firmForecastDemandVolPtr
+    = (LgFrVectorTimeVecFloat*) dif.demandAttribute(firmForecastDemands,
+d573 1
+a573 1
+    for (i=0; i<firmForecastDemands.entries(); i++) {
+d584 2
+a585 2
+  LgFrVectorFloat* firmForecastGrossRevPtr
+    = (LgFrVectorFloat*) dif.demandAttribute(
+d591 3
+a593 3
+  if (firmForecastDemands.entries() > 0)
+      cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() add firmForecast demands" 
+       <<endl;
+d595 1
+a595 1
+  for (i=0; i<firmForecastDemands.entries(); i++) {
+d598 1
+a598 1
+			  firmForecastDemands[i].partPtr()->name().data(),
+d606 2
+a607 2
+                          firmForecastDemands[i].partPtr()->name().data(),
+                          firmForecastDemands[i].name().data(),
+d611 1
+a611 1
+                          NULL);
+d616 2
+a617 2
+                          firmForecastDemands[i].partPtr()->name().data(),
+                          firmForecastDemands[i].name().data(),
+d621 1
+a621 1
+                          NULL);
+d634 1
+a634 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand prorities " <<endl;
+d638 1
+a638 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand obj1ShipReward " <<endl;
+d651 2
+a652 2
+			( committedDemands.entries() 
+			  + firmForecastDemands.entries() 
+d664 1
+a664 1
+  lps.buildAhead (  (buildAheadLimit == 0) ? FALSE : TRUE  );
+d679 1
+a679 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() set BOM" <<endl;
+d688 1
+a688 1
+  cout <<"INFO: LgFrInitialProblemForCMRP::feedInto() Process budget" <<endl;
+d698 1
+a698 1
+  //  cerr << "Adding budget part: Purchase_$$\n";
+d704 1
+a704 1
+                    NULL);
+d722 1
+a722 1
+  //  for (i=0; i<rawParts.entries(); i++) {
+d725 1
+a725 1
+  //      witAddBomEntryVa(theWitRun, rawParts[i].name().data(), "Purchase_$$",
+d727 1
+a727 1
+  //                       NULL);
+d733 1
+a733 1
+  cout <<"INFO: Leaving LgFrInitialProblemForCMRP::feedInto()" <<endl;
+d758 2
+a759 1
+  for ( size_t i = 0; i<numberOfPeriods; i++ ) 
+d764 1
+a764 1
+  for ( i = 0; i<defaultSOD.entries(); i++ ) {
+d772 2
+a773 2
+                               defaultSOD[i].partPtr()->name().data(),
+                               defaultSOD[i].name().data(),
+d811 2
+a812 1
+  for ( size_t i = 0; i<defaultSOD.entries(); i++ ) {
+d820 2
+a821 2
+                               defaultSOD[i].partPtr()->name().data(),
+                               defaultSOD[i].name().data(),
+d826 2
+a827 2
+                               defaultSOD[i].partPtr()->name().data(),
+                               defaultSOD[i].name().data(),
+d893 1
+a893 2
+  assert( difWithPriorities.isA() == __LGFRDATAINTERFACE );
+  assert( difWithPriorities.dataInterfaceImplementation()->isA() 
+d895 1
+a895 1
+	  || difWithPriorities.dataInterfaceImplementation()->isA()
+d900 2
+a901 2
+  LgFrVectorTimeVecFloat* demandPriorityPtr
+      = (LgFrVectorTimeVecFloat*) difWithPriorities.demandAttribute(
+d903 1
+a903 1
+  LgFrVectorTimeVecFloat& priorityVec = *demandPriorityPtr;
+d905 2
+a906 1
+  for ( size_t i = 0; i<setOfDemands().entries(); i++ ) {
+d929 1
+a929 2
+  assert( difWithPriorities.isA() == __LGFRDATAINTERFACE );
+  assert( difWithPriorities.dataInterfaceImplementation()->isA() 
+d931 1
+a931 1
+	  || difWithPriorities.dataInterfaceImplementation()->isA()
+d937 2
+a938 2
+  LgFrVectorTimeVecFloat* obj1ShipRewardVectPtr
+   = (LgFrVectorTimeVecFloat*) difWithPriorities.demandAttribute
+d940 1
+a940 1
+  LgFrVectorTimeVecFloat& obj1ShipRewardVec = *obj1ShipRewardVectPtr;
+d942 2
+a943 1
+  for ( size_t i = 0; i<setOfDemands().entries(); i++ ) {
+d1017 1
+a1017 1
+  cerr << "\nEntering IPPforCMRP::contextTest\n";
+d1046 12
+a1057 12
+  assert(universalSOP.entries() == 4);
+  assert(defaultSOP.entries() == 3);
+  assert(budgetSOP.entries() == 1);
+  assert(constrainedSOP.entries() == 0);
+  assert(produceableSOP.entries() == 1);
+  assert(procureableSOP.entries() == 1);
+//  assert(mrpPlannedSOP.entries() == 2);
+  assert(rawSOP.entries() == 1);
+  assert(capacitySOP.entries() == 1);
+  assert(universalSOD.entries() == 2);
+  assert(defaultSOD.entries() == 2);
+  assert(committedSOD.entries() == 1);
+d1084 6
+a1089 6
+  assert(universalSOPPWcmrp.entries() == 26);
+  assert(defaultSOPPWcmrp.entries() == 25);
+  assert(budgetSOPPWcmrp.entries() == 1);
+  assert(constrainedSOPPWcmrp.entries() == 2);
+  assert(produceableSOPPWcmrp.entries() == 12);
+  assert(procureableSOPPWcmrp .entries() == 7);
+d1091 2
+a1092 2
+  assert(universalSODPWcmrp.entries() == 25);
+  assert(defaultSODPWcmrp.entries() == 25);
+d1154 1
+a1154 1
+  cerr << "\nEntering IPPforCMRPwithPrioritiesFromDif::contextTest\n";
+d1160 1
+a1160 1
+  assert(universalSOD.entries() == 2);
+d1162 5
+a1166 3
+  LgFrOrderedVectorDemand demVec( universalSOD.entries() );
+  for ( size_t d=0; d<universalSOD.entries(); d++ ) {
+    demVec.insert( universalSOD[d] );
+d1171 2
+a1172 2
+  LgFrVectorTimeVecFloat* demandPriorityPtr
+      = (LgFrVectorTimeVecFloat*) dif.demandAttribute(
+d1174 2
+a1175 2
+  LgFrVectorTimeVecFloat & demandPriority = *demandPriorityPtr;
+  assert( demandPriority.length() == 2 );
+@
+
+
+1.4.2.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+d24 6
+d41 1
+a41 1
+std::string
+d46 1
+a46 1
+  std::string theTitle("Constrained MRP: ");
+d56 1
+a56 1
+    if (scenario()->GetScenarioType() != __LGFRSCENARIOFORCMRP)  {
+d59 1
+a59 1
+	abort();
+d158 2
+a159 2
+  LgFrPartVector pv;
+  std::string itemSubTypeStr = "material";
+d161 2
+a162 2
+    LgFrPartVector* rawPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+d165 1
+a165 1
+    LgFrPartVector& rawParts = *rawPartsPtr;
+d168 2
+a169 2
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(rawParts,
+d173 1
+a173 1
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+d176 2
+a177 2
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+d180 1
+a180 1
+    LgFrFloatVector& unitCost = *unitCostPtr;
+d183 2
+a184 2
+    LgFrIntVector* constrainedPtr
+      = (LgFrIntVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+d187 1
+a187 1
+    LgFrIntVector& constrainedRawVec = *constrainedPtr;
+d190 2
+a191 2
+    LgFrTimeVecFloatVector* procLeadTimePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(rawParts,
+d195 1
+a195 1
+    LgFrTimeVecFloatVector& procLeadTime = *procLeadTimePtr;
+d198 2
+a199 2
+    LgFrFloatVector* procCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(rawParts, itemSubTypeStr,
+d202 1
+a202 1
+    LgFrFloatVector& procCost = *procCostPtr;
+d210 1
+a210 1
+    for (i=0; i<rawParts.size(); i++) {
+d223 1
+a223 1
+      rc = witGetPartExists(theWitRun, rawParts[i].name().c_str(), &exists);
+d227 1
+a227 1
+      rc = witAddPartVa(theWitRun, rawParts[i].name().c_str(), WitPRODUCT,
+d234 1
+a234 1
+                        0);
+d240 1
+a240 1
+      witSetPartObj1StockCost( theWitRun, rawParts[i].name().c_str(),
+d274 2
+a275 2
+    LgFrPartVector* capacityPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+d278 1
+a278 3
+    LgFrPartVector& capacityParts = *capacityPartsPtr;
+
+    rc = witGetPartExists(theWitRun, capacityParts[0].name().c_str(), &exists);
+d281 2
+a282 2
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(capacityParts,
+d286 1
+a286 1
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+a287 1
+    rc = witGetPartExists(theWitRun, capacityParts[0].name().c_str(), &exists);
+d289 2
+a290 2
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(capacityParts,
+d294 1
+a294 1
+    LgFrFloatVector& unitCost = *unitCostPtr;
+d297 1
+a297 1
+    for ( i=0; i<capacityParts.size(); i++) {
+d299 1
+a299 1
+      rc = witGetPartExists(theWitRun, capacityParts[i].name().c_str(), &exists);
+d304 1
+a304 1
+      rc = witAddPartVa(theWitRun, capacityParts[i].name().c_str(), WitCAPACITY,
+d308 1
+a308 1
+                        0);
+d331 2
+a332 2
+    LgFrPartVector* productPartsPtr
+      = (LgFrPartVector*) dif.partAttribute(pv, itemSubTypeStr,
+d335 1
+a335 1
+    LgFrPartVector& productParts = *productPartsPtr;
+d338 2
+a339 2
+    LgFrTimeVecFloatVector* supplyVolPtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+d343 1
+a343 1
+    LgFrTimeVecFloatVector& supplyVol = *supplyVolPtr;
+d346 2
+a347 2
+    LgFrTimeVecFloatVector* cycleTimePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+d351 1
+a351 1
+    LgFrTimeVecFloatVector& cycleTime = *cycleTimePtr;
+d354 2
+a355 2
+    LgFrFloatVector* unitCostPtr
+      = (LgFrFloatVector*) dif.partAttribute(productParts,
+d359 1
+a359 1
+    LgFrFloatVector& unitCost = *unitCostPtr;
+d362 2
+a363 2
+    LgFrTimeVecFloatVector* minLotSizePtr
+      = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts, itemSubTypeStr,
+d366 1
+a366 1
+    LgFrTimeVecFloatVector& minLotSize = *minLotSizePtr;
+d369 1
+a369 1
+    for (i=0; i<productParts.size(); i++) {
+d371 1
+a371 1
+      rc = witGetPartExists(theWitRun, productParts[i].name().c_str(), &exists);
+d376 1
+a376 1
+      rc = witAddPartVa(theWitRun, productParts[i].name().c_str(), WitPRODUCT,
+d382 1
+a382 1
+                        0);
+d388 1
+a388 1
+      witSetPartObj1StockCost( theWitRun, productParts[i].name().c_str(),
+d405 1
+a405 1
+    bool incLotSizeSupported =  dif.isAttributeFunctionImplemented(
+d416 2
+a417 2
+      LgFrTimeVecFloatVector* incLotSizePtr
+        = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+d421 1
+a421 1
+      LgFrTimeVecFloatVector& incLotSize = *incLotSizePtr;
+d423 1
+a423 1
+      for (i=0; i<productParts.size(); i++) {
+d441 1
+a441 1
+    bool yieldSupported =  dif.isAttributeFunctionImplemented(
+d452 2
+a453 2
+      LgFrTimeVecFloatVector* yieldPtr
+        = (LgFrTimeVecFloatVector*) dif.partAttribute(productParts,
+d457 2
+a458 2
+      LgFrTimeVecFloatVector yield =  *yieldPtr;
+      for (i=0; i<productParts.size(); i++) {
+d484 1
+a484 1
+  LgFrDemandVector dv;
+d488 2
+a489 2
+  LgFrDemandVector* committedDemandPtr
+    = (LgFrDemandVector*) dif.demandAttribute(dv, "committedDemands",
+d491 1
+a491 1
+  LgFrDemandVector& committedDemands = * committedDemandPtr; 
+d495 2
+a496 2
+  LgFrTimeVecFloatVector* committedDemandVolPtr
+    = (LgFrTimeVecFloatVector*) dif.demandAttribute(committedDemands,
+d498 1
+a498 1
+  LgFrTimeVecFloatVector& demandVol = *committedDemandVolPtr;
+d502 2
+a503 2
+  LgFrFloatVector* committedGrossRevPtr
+    = (LgFrFloatVector*) dif.demandAttribute(committedDemands,
+d505 1
+a505 1
+  LgFrFloatVector& grossRev = *committedGrossRevPtr;
+d508 1
+a508 1
+  for (i=0; i<committedDemands.size(); i++) {
+d511 1
+a511 1
+                          committedDemands[i].partPtr()->name().c_str(), &exists);
+d515 2
+a516 2
+    rc = witAddDemandVa(theWitRun, committedDemands[i].partPtr()->name().c_str(),
+                        committedDemands[i].name().c_str(),
+d520 1
+a520 1
+                        0);
+d539 2
+a540 2
+  LgFrDemandVector* firmForecastDemandsPtr
+    = (LgFrDemandVector*) dif.demandAttribute(dv,"firmForecastDemands",
+d542 1
+a542 1
+  LgFrDemandVector firmForecastDemands = *firmForecastDemandsPtr;
+d549 1
+a549 1
+    sizeOfNettedDemandVol = firmForecastDemands.size();
+d552 1
+a552 1
+  LgFrTimeVecFloatVector nettedDemandVol(sizeOfNettedDemandVol);
+d556 2
+a557 2
+  LgFrTimeVecFloatVector* firmForecastDemandVolPtr
+    = (LgFrTimeVecFloatVector*) dif.demandAttribute(firmForecastDemands,
+d571 1
+a571 1
+    for (i=0; i<firmForecastDemands.size(); i++) {
+d582 2
+a583 2
+  LgFrFloatVector* firmForecastGrossRevPtr
+    = (LgFrFloatVector*) dif.demandAttribute(
+d589 1
+a589 1
+  if (firmForecastDemands.size() > 0)
+d593 1
+a593 1
+  for (i=0; i<firmForecastDemands.size(); i++) {
+d596 1
+a596 1
+			  firmForecastDemands[i].partPtr()->name().c_str(),
+d604 2
+a605 2
+                          firmForecastDemands[i].partPtr()->name().c_str(),
+                          firmForecastDemands[i].name().c_str(),
+d609 1
+a609 1
+                          0);
+d614 2
+a615 2
+                          firmForecastDemands[i].partPtr()->name().c_str(),
+                          firmForecastDemands[i].name().c_str(),
+d619 1
+a619 1
+                          0);
+d649 2
+a650 2
+			( committedDemands.size() 
+			  + firmForecastDemands.size() 
+d662 1
+a662 1
+  lps.buildAhead (  (buildAheadLimit == 0) ? false : true  );
+d702 1
+a702 1
+                    0);
+d720 1
+a720 1
+  //  for (i=0; i<rawParts.size(); i++) {
+d723 1
+a723 1
+  //      witAddBomEntryVa(theWitRun, rawParts[i].name().c_str(), "Purchase_$$",
+d725 1
+a725 1
+  //                       0);
+d756 1
+a756 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<numberOfPeriods; i++ ) 
+d761 1
+a761 1
+  for ( i = 0; i<defaultSOD.size(); i++ ) {
+d769 2
+a770 2
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+d808 1
+a808 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<defaultSOD.size(); i++ ) {
+d816 2
+a817 2
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+d822 2
+a823 2
+                               defaultSOD[i].partPtr()->name().c_str(),
+                               defaultSOD[i].name().c_str(),
+d889 2
+a890 1
+  assert( difWithPriorities.dataInterfaceImplementation()->GetDIIType() 
+d892 1
+a892 1
+	  || difWithPriorities.dataInterfaceImplementation()->GetDIIType()
+d897 2
+a898 2
+  LgFrTimeVecFloatVector* demandPriorityPtr
+      = (LgFrTimeVecFloatVector*) difWithPriorities.demandAttribute(
+d900 1
+a900 1
+  LgFrTimeVecFloatVector& priorityVec = *demandPriorityPtr;
+d902 1
+a902 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<setOfDemands().size(); i++ ) {
+d925 2
+a926 1
+  assert( difWithPriorities.dataInterfaceImplementation()->GetDIIType() 
+d928 1
+a928 1
+	  || difWithPriorities.dataInterfaceImplementation()->GetDIIType()
+d934 2
+a935 2
+  LgFrTimeVecFloatVector* obj1ShipRewardVectPtr
+   = (LgFrTimeVecFloatVector*) difWithPriorities.demandAttribute
+d937 1
+a937 1
+  LgFrTimeVecFloatVector& obj1ShipRewardVec = *obj1ShipRewardVectPtr;
+d939 1
+a939 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<setOfDemands().size(); i++ ) {
+d1042 12
+a1053 12
+  assert(universalSOP.size() == 4);
+  assert(defaultSOP.size() == 3);
+  assert(budgetSOP.size() == 1);
+  assert(constrainedSOP.size() == 0);
+  assert(produceableSOP.size() == 1);
+  assert(procureableSOP.size() == 1);
+//  assert(mrpPlannedSOP.size() == 2);
+  assert(rawSOP.size() == 1);
+  assert(capacitySOP.size() == 1);
+  assert(universalSOD.size() == 2);
+  assert(defaultSOD.size() == 2);
+  assert(committedSOD.size() == 1);
+d1080 6
+a1085 6
+  assert(universalSOPPWcmrp.size() == 26);
+  assert(defaultSOPPWcmrp.size() == 25);
+  assert(budgetSOPPWcmrp.size() == 1);
+  assert(constrainedSOPPWcmrp.size() == 2);
+  assert(produceableSOPPWcmrp.size() == 12);
+  assert(procureableSOPPWcmrp .size() == 7);
+d1087 2
+a1088 2
+  assert(universalSODPWcmrp.size() == 25);
+  assert(defaultSODPWcmrp.size() == 25);
+d1156 1
+a1156 1
+  assert(universalSOD.size() == 2);
+d1158 3
+a1160 5
+  LgFrDemandVector demVec;
+  demVec.reserve( universalSOD.size() );
+  size_t d = 0; // Pulled out of the for below by RW2STL
+  for ( d=0; d<universalSOD.size(); d++ ) {
+    demVec.push_back( universalSOD[d] );
+d1165 2
+a1166 2
+  LgFrTimeVecFloatVector* demandPriorityPtr
+      = (LgFrTimeVecFloatVector*) dif.demandAttribute(
+d1168 2
+a1169 2
+  LgFrTimeVecFloatVector & demandPriority = *demandPriorityPtr;
+  assert( demandPriority.size() == 2 );
+@
+
+
+1.4.2.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@a26 2
+#include <iostream>
+
+d54 2
+a55 2
+	std::cerr << "the object is not a CMRPscenario and it is supposed to be"
+             << std::endl;
+d206 1
+a206 1
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add raw parts" <<std::endl;
+d214 2
+a215 2
+         std::cerr <<"WARNING: Dif returned raw part Purchase_$$." <<std::endl;
+         std::cerr <<"WARNING:     Purchase_$$ part is being skipped over." <<std::endl;
+d266 1
+a266 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get cap parts from dif" <<std::endl;
+d296 1
+a296 1
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add cap parts" <<std::endl;
+d302 1
+a302 1
+      //    std::cerr << "Adding capacity part: " << capacityParts[i].name() << "\n";
+d328 1
+a328 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get prd parts from dif" <<std::endl;
+d368 1
+a368 1
+    std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add prd parts" <<std::endl;
+d410 2
+a411 2
+       std::cerr <<"LgFrINFO: Data Interface Attribute productIncLotSize " <<std::endl
+            <<"          is not supported."                           <<std::endl
+d413 1
+a413 1
+            <<std::endl;
+d425 1
+a425 1
+	  std::cerr << "LgFrINFO: Setting product part: "
+d427 1
+a427 1
+               <<            std::endl
+d429 1
+a429 1
+               <<            incLotSize[i].format() << std::endl;
+d446 2
+a447 2
+       std::cerr <<"LgFrINFO: Data Interface Attribute productYieldFloat " <<std::endl
+            <<"          is not supported."                           <<std::endl
+d449 1
+a449 1
+            <<std::endl;
+d460 1
+a460 1
+	  std::cerr << "LgFrINFO: Setting product part: "
+d462 1
+a462 1
+               <<            std::endl
+d464 1
+a464 1
+               <<            yield[i].format() << std::endl;
+d482 2
+a483 2
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get committed demands from dif"
+       <<std::endl;
+d507 1
+a507 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add committed demands" <<std::endl;
+d536 2
+a537 2
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() get firmForecast demands from dif"
+       <<std::endl;
+d590 2
+a591 2
+      std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() add firmForecast demands" 
+       <<std::endl;
+d632 1
+a632 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand prorities " <<std::endl;
+d636 1
+a636 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set demand obj1ShipReward " <<std::endl;
+d677 1
+a677 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() set BOM" <<std::endl;
+d686 1
+a686 1
+  std::cerr <<"INFO: LgFrInitialProblemForCMRP::feedInto() Process budget" <<std::endl;
+d696 1
+a696 1
+  //  std::cerr << "Adding budget part: Purchase_$$\n";
+d731 1
+a731 1
+  std::cerr <<"INFO: Leaving LgFrInitialProblemForCMRP::feedInto()" <<std::endl;
+d1015 1
+a1015 1
+  std::cerr << "\nEntering IPPforCMRP::contextTest\n";
+d1152 1
+a1152 1
+  std::cerr << "\nEntering IPPforCMRPwithPrioritiesFromDif::contextTest\n";
+@
+
+
+1.3
+log
+@Added implement (RWGVector, XXX) to satisfy vacpp linker.
+@
+text
+@d24 2
+d28 1
+@
+
+
+1.2
+log
+@Updated so unitTest reads files from
+  /u/wit/wit-data
+instead of
+  /u/implode/data
+With these changes unitTest is running correctly on Windows
+@
+text
+@d24 3
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1093 3
+d1097 1
+d1106 9
+a1118 1
+
+d1121 1
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

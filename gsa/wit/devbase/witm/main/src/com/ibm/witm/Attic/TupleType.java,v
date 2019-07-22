@@ -1,0 +1,909 @@
+head	1.11;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.11
+date	2011.06.06.20.33.35;	author rjw;	state dead;
+branches;
+next	1.10;
+
+1.10
+date	2011.06.06.16.39.08;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.05.31.19.26.21;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.05.27.23.55.12;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.05.27.21.22.43;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.05.27.16.39.27;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.05.26.18.49.09;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.25.19.16.30;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.24.23.44.43;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.24.21.09.39;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.24.18.46.18;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@Type ==> Category
+@
+text
+@
+//==============================================================================
+// WIT-M Source File TupleType.java.
+//==============================================================================
+
+package       com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.List;
+
+/*******************************************************************************
+ * A TupleType is an ItemType for Tuples.
+ *******************************************************************************
+ */
+public final class TupleType extends ItemType
+{
+//==============================================================================
+// Public
+//==============================================================================
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new TupleType.
+ * 
+ * @@param  theName                  The name of the TupleType to be constructed
+ * @@param  theDimens                The ItemTypes that are to be the
+ *                                  dimensions of the TupleType    
+ * @@return                          The new TupleType
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If no ItemTypes are given
+ * @@throws IllegalArgumentException The ItemTypes do all belong to the same
+ *                                  Scheme
+ * @@throws IllegalStateException    If the Scheme of the ItemTypes is frozen
+ *******************************************************************************
+ */
+   public static TupleType newTupleType (
+         String      theName,
+         ItemType... theDimens)
+      {
+      Scheme theScheme;
+      
+      prohibitNull          (theName,   "theName");
+      prohibitNullArray     (theDimens, "theDimens");
+      
+      requireAtLeast1ElType (theName,   theDimens);
+      requireSchemesMatch   (theName,   theDimens);
+   
+      theScheme = theDimens[0].getScheme ();
+      
+      theScheme.prohibitDupTupleTypeName (theName);
+      
+      theScheme.prohibitFrozen ();
+      
+      return new TupleType (theScheme, theName, theDimens);
+      }
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new Tuple of this TupleType
+ *
+ * @@param theCoords                 The Items that are to be the coordinates
+ *                                  of the Tuple
+ * @@return                          The new Tuple
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If the ItemTypes of the Items do not
+ *                                  match the corresponding dimension
+ *                                  ItemTypes of this TupleType
+ * @@throws IllegalArgumentException If the Items do not all belong to the 
+ *                                  same Implementation
+ *******************************************************************************
+ */
+   public Tuple newTuple (Item... theCoords)
+      {
+      Implementation theImp;
+      
+      prohibitNullArray (theCoords, "theCoords");
+      
+      checkItemTypes    (theCoords);
+   
+      requireImpsMatch  (theCoords);
+      
+      theImp = theCoords[0].getImplementation ();
+
+      return new Tuple (this, theImp, theCoords);
+      }
+   
+/*******************************************************************************
+ * Tuple List method
+ * 
+ * @@return An unmodifiable List of all of the Tuples of this TupleType
+ *         in the current Implementation, listed in the order in which they were
+ *         created.
+ * 
+ * @@throws IllegalStateException If the current Implementation is null
+ * @@throws IllegalStateException If the Scheme of this TupleType does not
+ *                               match the Scheme of the current Implementation
+ *******************************************************************************
+ */
+   public List <Tuple> getAll ()
+      {
+      requireCurImplementation   ();
+      requireSchemeMatchesCurImp ();
+      
+      return getTupleMgr ().getTuples ();
+      }
+   
+/* *****************************************************************************
+ * Doc comment inherited.
+ * *****************************************************************************
+ */
+   @@Override public String toString ()
+      {
+      return "TupleType \"" + getName () + "\"";
+      }
+   
+//==============================================================================
+// Package Internal
+//==============================================================================
+
+/*******************************************************************************
+ * Prints this TupleType to theStream.
+ *******************************************************************************
+ */
+   void print (PrintStream theStream)
+      {
+      int theIdx;
+      
+      theStream.printf (
+         "%n"
+      +  "TupleType \"%s\":%n",
+         getName ());
+
+      for (theIdx = 0; theIdx < myDimensionArr.length; theIdx ++)
+         {
+         theStream.printf (
+            "   Coordinate Type #%d:%n"
+          + "      %s%n",
+            theIdx,
+            myDimensionArr[theIdx].getName ());
+         }
+      
+      printProperties (theStream);
+      }
+
+/*******************************************************************************
+ * @@return A unique index for this TupleType.
+ *******************************************************************************
+ */
+   int getIndex ()
+      {
+      return myIndex;
+      }
+
+//==============================================================================
+// Private
+//==============================================================================
+
+/*******************************************************************************
+ * Constructor
+ *******************************************************************************
+ */
+   private TupleType (
+         Scheme     theScheme,
+         String     theName,
+         ItemType[] theDimenArr)
+      {
+      super (theScheme, theName);
+      
+      myDimensionArr = Arrays.copyOf (theDimenArr, theDimenArr.length);
+      
+      myIndex        = theScheme.getTupleTypes ().size ();
+      
+      theScheme.store (this);
+      }
+
+/*******************************************************************************
+ * Verifies that newTupleType (...) was called with at least 1 ItemType.<br>
+ * To be called by newTupleType.
+ *******************************************************************************
+ */
+   private static void requireAtLeast1ElType (
+         String     theName,
+         ItemType[] theDimenArr)
+      {
+      if (theDimenArr.length == 0)
+         {
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to TupleType.newTupleType (...) with no ItemTypes.\n"
+             + "\n"
+             + "      TupleType Name: \"" + theName + "\"\n");
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies that newTupleType (...) was called with ItemTypes whose Schemes
+ * match.
+ *******************************************************************************
+ */
+   private static void requireSchemesMatch (
+         String     theName,
+         ItemType[] theDimenArr)
+      {
+      Scheme theScheme;
+      int    theIdx;
+      
+      theScheme = theDimenArr[0].getScheme ();
+      
+      for (theIdx = 1; theIdx < theDimenArr.length; theIdx ++)
+         {
+         if (theDimenArr[theIdx].getScheme () != theScheme)
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to TupleType.newTupleType (theName, theDimens)\n"
+                + "   with dimension ItemTypes whose Schemes do not match.\n"
+                + "\n"
+                + "      theName:      " + theName + "\n"
+                + "      theDimens[0]: \"" + theDimenArr[0].getName () + "\", "
+                +        "Scheme: \"" + theScheme.getName () + "\"\n"
+                + "      theDimens[" + theIdx + "]: "
+                +        "\"" + theDimenArr[theIdx].getName () + "\", "
+                +        "Scheme: \"" + theDimenArr[theIdx].getName ()
+                +        "\"\n");
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies that the ItemTypes of the Items passed to newTuple match
+ * myDimensionArr.
+ *******************************************************************************
+ */
+   private void checkItemTypes (Item[] theCoordArr)
+      {
+      int theIdx;
+      
+      if (theCoordArr.length != myDimensionArr.length)
+         {
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to theTupleType.newTuple (theCoords) where the number\n"
+             + "   of coordinates does not match the number of dimensions in\n"
+             + "   theTupleType.\n"
+             + "\n"
+             + "      TupleType:     " + getName ()            + "\n"
+             + "      # Coordinates: " + theCoordArr   .length + "\n"
+             + "      # Dimensions:  " + myDimensionArr.length + "\n");         
+         }
+      
+      for (theIdx = 0; theIdx < theCoordArr.length; theIdx ++)
+         {
+         if (theCoordArr[theIdx].getItemType () != myDimensionArr[theIdx])
+            {
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to theTupleType.newTuple (theCoords) where the\n"
+                + "   ItemType of one of the coordinates does not match\n"
+                + "   the corresponding dimension of theTupleType.\n"
+                + "\n"
+                + "      TupleType:           " + getName ()           + "\n"
+                + "      Coordinate Index:    " + theIdx               + "\n"
+                + "      Coordinate ItemType: "
+                +        theCoordArr[theIdx].getItemType ().getName () + "\n"
+                + "      TupleType Dimension: "
+                +        myDimensionArr[theIdx].getName ()                + "\n");
+            }
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies the the Items passed to newTuple all belong to the same
+ * Implementation.
+ *******************************************************************************
+ */
+   private void requireImpsMatch (Item[] theCoordArr)
+      {
+      int theIdx;
+      
+      for (theIdx = 1; theIdx < theCoordArr.length; theIdx ++)
+         {
+         if (   theCoordArr[theIdx].getImplementation ()
+             != theCoordArr[0]     .getImplementation ())
+            {
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to theTupleType.newTuple (theCoords) where the\n"
+                + "   coordinates do not all belong to the same"
+                +	"   Implementation.\n"
+                + "\n"
+                + "      TupleType:                       " + getName ()  + "\n"
+                + "      Implementation of Coordinate #0: \""
+                +        theCoordArr[0].getImplementation ().getName () + "\"\n"
+                + "      Implementation of Coordinate #" + theIdx + ": \""
+                +        theCoordArr[theIdx].getImplementation ().getName ()
+                +        "\"\n");
+            }
+         }
+      }
+   
+/*******************************************************************************
+ * @@return The TupleMgr of the current Implementation for this TupleType.
+ *******************************************************************************
+ */
+   private TupleMgr getTupleMgr ()
+      {
+      return curImplementation ().getTupleMgr (this);
+      }
+   
+/*******************************************************************************
+ * The "dimensions" of this TupleType<br>
+ * For each Tuple in this TupleType, the number of coordinates of the Tuple must
+ * match myDimensionArr.length and
+ * for i = 0, ... myDimensionArr.length - 1, coordinate #i of the Tuple must
+ * belong to myDimensionArr[i].
+ *******************************************************************************
+ */
+   private final ItemType[] myDimensionArr;
+
+/*******************************************************************************
+ * A unique index for this TupleType.<br>
+ * # of TupleTypes in the Scheme that were constructed before this one.
+ *******************************************************************************
+ */
+   private final int myIndex;
+
+//==============================================================================
+}
+@
+
+
+1.10
+log
+@Element     ==> Item
+ElementType ==> ItemTYpe
+@
+text
+@@
+
+
+1.9
+log
+@Embodiment ==> Implementation
+@
+text
+@d15 1
+a15 1
+ * A TupleType is an ElementType for Tuples.
+d18 1
+a18 1
+public final class TupleType extends ElementType
+d29 1
+a29 1
+ * @@param  theDimens                The ElementTypes that are to be the
+d33 2
+a34 2
+ * @@throws IllegalArgumentException If no ElementTypes are given
+ * @@throws IllegalArgumentException The ElementTypes do all belong to the same
+d36 1
+a36 1
+ * @@throws IllegalStateException    If the Scheme of the ElementTypes is frozen
+d40 2
+a41 2
+         String         theName,
+         ElementType... theDimens)
+d64 1
+a64 1
+ * @@param theCoords                  The Elements that are to be the coordinates
+d68 1
+a68 1
+ * @@throws IllegalArgumentException If the ElementTypes of the Elements do not
+d70 2
+a71 2
+ *                                  ElementTypes of this TupleType
+ * @@throws IllegalArgumentException If the Elements do not all belong to the 
+d75 1
+a75 1
+   public Tuple newTuple (Element... theCoords)
+d81 1
+a81 1
+      checkElemTypes    (theCoords);
+d166 3
+a168 3
+         Scheme        theScheme,
+         String        theName,
+         ElementType[] theDimenArr)
+d180 1
+a180 1
+ * Verifies that newTupleType (...) was called with at least 1 ElementType.<br>
+d185 2
+a186 2
+         String        theName,
+         ElementType[] theDimenArr)
+d193 1
+a193 1
+             + "   Call to TupleType.newTupleType (...) with no ElementTypes.\n"
+d200 1
+a200 1
+ * Verifies that newTupleType (...) was called with ElementTypes whose Schemes
+d205 2
+a206 2
+         String        theName,
+         ElementType[] theDimenArr)
+d220 1
+a220 1
+                + "   with dimension ElementTypes whose Schemes do not match.\n"
+d233 1
+a233 1
+ * Verifies that the ElementTypes of the Elements passed to newTuple match
+d237 1
+a237 1
+   private void checkElemTypes (Element[] theCoordArr)
+d257 1
+a257 1
+         if (theCoordArr[theIdx].getElementType () != myDimensionArr[theIdx])
+d263 1
+a263 1
+                + "   ElementType of one of the coordinates does not match\n"
+d266 5
+a270 5
+                + "      TupleType:              " + getName ()           + "\n"
+                + "      Coordinate Index:       " + theIdx               + "\n"
+                + "      Coordinate ElementType: "
+                +        theCoordArr[theIdx].getElementType ().getName () + "\n"
+                + "      TupleType Dimension:    "
+d277 1
+a277 1
+ * Verifies the the Elements passed to newTuple all belong to the same
+d281 1
+a281 1
+   private void requireImpsMatch (Element[] theCoordArr)
+d324 1
+a324 1
+   private final ElementType[] myDimensionArr;
+@
+
+
+1.8
+log
+@theTupleType.getAll
+@
+text
+@d72 1
+a72 1
+ *                                  same Embodiment
+d77 1
+a77 1
+      Embodiment theEmbodiment;
+d83 1
+a83 1
+      requireEmbsMatch  (theCoords);
+d85 1
+a85 1
+      theEmbodiment = theCoords[0].getEmbodiment ();
+d87 1
+a87 1
+      return new Tuple (this, theEmbodiment, theCoords);
+d94 1
+a94 1
+ *         in the current Embodiment, listed in the order in which they were
+d97 1
+a97 1
+ * @@throws IllegalStateException If the current Embodiment is null
+d99 1
+a99 1
+ *                               match the Scheme of the current Embodiment
+d104 2
+a105 2
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+d278 1
+a278 1
+ * Embodiment.
+d281 1
+a281 1
+   private void requireEmbsMatch (Element[] theCoordArr)
+d287 2
+a288 2
+         if (   theCoordArr[theIdx].getEmbodiment ()
+             != theCoordArr[0]     .getEmbodiment ())
+d294 2
+a295 1
+                + "   coordinates do not all belong to the same Embodiment.\n"
+d297 5
+a301 5
+                + "      TupleType:                   " + getName ()  + "\n"
+                + "      Embodiment of Coordinate #0: \""
+                +        theCoordArr[0].getEmbodiment ().getName () + "\"\n"
+                + "      Embodiment of Coordinate #" + theIdx + ": \""
+                +        theCoordArr[theIdx].getEmbodiment ().getName ()
+d308 1
+a308 1
+ * @@return The TupleMgr of the current Embodiment for this TupleType.
+d313 1
+a313 1
+      return curEmbodiment ().getTupleMgr (this);
+@
+
+
+1.7
+log
+@Coordinate List
+@
+text
+@d12 1
+d90 20
+d307 9
+@
+
+
+1.6
+log
+@Improved error messages.
+@
+text
+@d286 1
+a286 1
+ * The coordinate Types of this TupleType<br>
+@
+
+
+1.5
+log
+@Dimensions and Coordinates
+@
+text
+@d44 2
+a45 1
+      prohibitNull (theName, "theName");
+d47 2
+a48 4
+      prohibitNullArray (theDimens, "theDimens");
+      
+      requireAtLeast1ElType (theName, theDimens);
+      requireSchemesMatch   (theName, theDimens);
+d198 2
+a199 2
+                + "   Call to TupleType.newTupleType (...) with\n"
+                + "   ElementTypes whose Schemes do not match.\n"
+d201 1
+d226 1
+a226 1
+             + "   of Elements does not match the number of dimensions in\n"
+d229 3
+a231 2
+             + "   # Elements:   " + theCoordArr   .length + "\n"
+             + "   # Dimensions: " + myDimensionArr.length + "\n");         
+d245 2
+a246 1
+                + "      Coordinate Index:       " + theIdx + "\n"
+d250 1
+a250 1
+                +        myDimensionArr[theIdx].getName () + "\n");
+d275 1
+@
+
+
+1.4
+log
+@Tests of newTuple.
+@
+text
+@d28 2
+a29 2
+ * @@param  theElTypes               The ElementTypes that are to be the
+ *                                  coordinates of the TupleType    
+d40 1
+a40 1
+         ElementType... theElTypes)
+d46 1
+a46 1
+      prohibitNullArray (theElTypes, "theElTypes");
+d48 2
+a49 2
+      requireAtLeast1ElType (theName, theElTypes);
+      requireSchemesMatch   (theName, theElTypes);
+d51 1
+a51 1
+      theScheme = theElTypes[0].getScheme ();
+d57 1
+a57 1
+      return new TupleType (theScheme, theName, theElTypes);
+d64 1
+a64 1
+ * @@param theElems                  The Elements that are to be the coordinates
+d69 1
+a69 1
+ *                                  match the corresponding coordinate
+d75 1
+a75 1
+   public Tuple newTuple (Element... theElems)
+d79 1
+a79 1
+      prohibitNullArray (theElems, "theElems");
+d81 1
+a81 1
+      checkElemTypes    (theElems);
+d83 1
+a83 1
+      requireEmbsMatch  (theElems);
+d85 1
+a85 1
+      theEmbodiment = theElems[0].getEmbodiment ();
+d87 1
+a87 1
+      return new Tuple (this, theEmbodiment, theElems);
+d116 1
+a116 1
+      for (theIdx = 0; theIdx < myCoordinateArr.length; theIdx ++)
+d122 1
+a122 1
+            myCoordinateArr[theIdx].getName ());
+d148 1
+a148 1
+         ElementType[] theElTypeArr)
+d152 1
+a152 1
+      myCoordinateArr = Arrays.copyOf (theElTypeArr, theElTypeArr.length);
+d154 1
+a154 1
+      myIndex         = theScheme.getTupleTypes ().size ();
+d166 1
+a166 1
+         ElementType[] theElTypeArr)
+d168 1
+a168 1
+      if (theElTypeArr.length == 0)
+d186 1
+a186 1
+         ElementType[] theElTypeArr)
+d191 1
+a191 1
+      theScheme = theElTypeArr[0].getScheme ();
+d193 1
+a193 1
+      for (theIdx = 1; theIdx < theElTypeArr.length; theIdx ++)
+d195 1
+a195 1
+         if (theElTypeArr[theIdx].getScheme () != theScheme)
+d202 1
+a202 1
+                + "      theElTypes[0]: \"" + theElTypeArr[0].getName () + "\", "
+d204 3
+a206 3
+                + "      theElTypes[" + theIdx + "]: "
+                +        "\"" + theElTypeArr[theIdx].getName () + "\", "
+                +        "Scheme: \"" + theElTypeArr[theIdx].getName ()
+d213 1
+a213 1
+ * myCoordinateArr.
+d216 1
+a216 1
+   private void checkElemTypes (Element[] theElemArr)
+d220 1
+a220 1
+      if (theElemArr.length != myCoordinateArr.length)
+d225 3
+a227 3
+             + "   Call to theTupleType.newTuple (theElems) where the number\n"
+             + "   of Elements does not match the number of coordinate\n"
+             + "   ElementTypes in theTupleType.\n"
+d229 2
+a230 2
+             + "   # Elements:     " + theElemArr     .length + "\n"
+             + "   # ElementTypes: " + myCoordinateArr.length + "\n");         
+d233 1
+a233 1
+      for (theIdx = 0; theIdx < theElemArr.length; theIdx ++)
+d235 1
+a235 1
+         if (theElemArr[theIdx].getElementType () != myCoordinateArr[theIdx])
+d240 3
+a242 4
+                + "   Call to theTupleType.newTuple (theElems) where the\n"
+                + "   ElementType of one of the coordinate Elements does not\n"
+                + "   match the corresponding coordinate ElementType of\n"
+                + "   theTupleType.\n"
+d244 5
+a248 5
+                + "      Coordinate Index:                 " + theIdx + "\n"
+                + "      Coordinate Element ElementType:   "
+                +        theElemArr[theIdx].getElementType ().getName () + "\n"
+                + "      TupleType Coordinate ElementType: "
+                +        myCoordinateArr[theIdx].getName () + "\n");
+d258 1
+a258 1
+   private void requireEmbsMatch (Element[] theElemArr)
+d262 1
+a262 1
+      for (theIdx = 1; theIdx < theElemArr.length; theIdx ++)
+d264 2
+a265 2
+         if (   theElemArr[theIdx].getEmbodiment ()
+             != theElemArr[0]     .getEmbodiment ())
+d270 2
+a271 2
+                + "   Call to theTupleType.newTuple (theElems) where the\n"
+                + "   the Elements do not all belong to the same Embodiment.\n"
+d273 4
+a276 4
+                + "      Embodiment of Element #0: \""
+                +        theElemArr[0].getEmbodiment ().getName () + "\"\n"
+                + "      Embodiment of Element #" + theIdx + ": \""
+                +        theElemArr[theIdx].getEmbodiment ().getName ()
+d285 3
+a287 3
+ * match myCoordinateArr.length and
+ * for i = 0, ... myCoordinateArr.length - 1, coordinate #i of the Tuple must
+ * belong to myCoordinateArr[i].
+d290 1
+a290 1
+   private final ElementType[] myCoordinateArr;
+@
+
+
+1.3
+log
+@newTuple
+@
+text
+@a61 16
+ * Constructs a new Primitive of this PrimitiveType
+ *   
+ * @@param  theEmbodiment            The Embodiment to which the Primitive will
+ *                                  belong
+ * @@param  theName                  The name for the Primitive 
+ * @@return                          The new Primitive
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If the Scheme of theEmbodiment does not
+ *                                  match the Scheme of this PrimitiveType
+ * @@throws IllegalArgumentException If theName matches the name of an existing
+ *                                  Primitive of this PrimitiveType in
+ *                                  theEmbodiment
+ *******************************************************************************
+ */
+/*******************************************************************************
+ * Factory method:<br>
+d66 1
+a66 1
+ * @@param                           The new Tuple
+d241 3
+a243 2
+                + "   ElementType of one of the Elements does not match the\n"
+                + "   corresponding coordinate ElementType of theTupleType.\n"
+d245 2
+a246 2
+                + "      Element index:          " + theIdx + "\n"
+                + "      Element ElementType:    "
+d248 1
+a248 1
+                + "      Coordinate ElementType: "
+d277 2
+a278 1
+                +        theElemArr[0].getEmbodiment ().getName () + "\"\n");
+@
+
+
+1.2
+log
+@Storing of objects.
+@
+text
+@a41 1
+      int    theIdx;
+d44 1
+a44 2
+      prohibitNull (theName,    "theName");
+      prohibitNull (theElTypes, "theElTypes");
+d46 1
+a46 3
+      for (theIdx = 0; theIdx < theElTypes.length; theIdx++)
+         if (theElTypes[theIdx] == null)
+            prohibitNull (theElTypes[theIdx], "theElTypes[" + theIdx + "]");
+d60 46
+d107 2
+a108 2
+ * The doc comment is inherited
+ *******************************************************************************
+d132 1
+a132 1
+      for (theIdx = 0; theIdx < myCoordinateArr.length; theIdx++)
+d197 1
+a197 2
+ * match.<br>
+ * To be called by newTupleType.
+d209 1
+a209 1
+      for (theIdx = 1; theIdx < theElTypeArr.length; theIdx++)
+d212 26
+d241 3
+a243 2
+             + "   Call to TupleType.newTupleType (...) with\n"
+             + "   ElementTypes whose Schemes do not match.\n"
+d245 49
+a293 5
+             + "      theElTypes[0]: \"" + theElTypeArr[0].getName () + "\", "
+             +        "Scheme: \"" + theScheme.getName () + "\"\n"
+             + "      theElTypes[" + theIdx + "]: "
+             +        "\"" + theElTypeArr[theIdx].getName () + "\", "
+             +        "Scheme: \"" + theElTypeArr[theIdx].getName () + "\"\n");
+@
+
+
+1.1
+log
+@Category ==> Type
+@
+text
+@d61 1
+a61 1
+      return theScheme.newTupleType (theName, theElTypes);
+a77 16
+ * To be called by theScheme.newTupleType (...).
+ *******************************************************************************
+ */
+   TupleType (
+         Scheme        theScheme,
+         String        theName,
+         ElementType[] theElTypeArr)
+      {
+      super (theScheme, theName);
+      
+      myCoordinateArr = Arrays.copyOf (theElTypeArr, theElTypeArr.length);
+      
+      myIndex         = theScheme.getTupleTypes ().size ();
+      }
+
+/*******************************************************************************
+d116 18
+@
+

@@ -1,0 +1,571 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2007.09.17.21.51.16;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2007.09.17.21.46.31;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.09.17.18.31.59;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.09.17.14.37.38;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.09.14.22.38.32;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef ConcScenAttH
+#define ConcScenAttH
+
+//------------------------------------------------------------------------------
+// Header file: "ConcScenAtt.h"
+//------------------------------------------------------------------------------
+
+#endif
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@a14 6
+//
+// Contains the declaration of the following classes and templates:
+//
+//    ScenTmp
+//    ConcScenInputAtt <Owner>
+//    ConcScenSolnAtt  <Owner>
+a16 249
+#include <Assoc.h>
+#include <List.h>
+
+//------------------------------------------------------------------------------
+// Class ScenTmp
+//
+// "Scenario-Specific Attribute"
+// Stores and manages data for the stochastic version of an attribute that
+// exists in deterministic mode, but becomes Scenario-specific in stochastic
+// mode.
+//
+// Class hierarchy:
+//
+//    ProbAssoc
+//       ScenTmp
+//          ConcScenInputAtt <Owner>
+//          ConcScenSolnAtt  <Owner>
+//
+// Implemented in ScenAtt.C
+//------------------------------------------------------------------------------
+
+class WitScenTmp: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitScenTmp ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      virtual void downloadInputToCurScen ();
+         //
+         // If this ScenTmp is for an input attribute, this function downloads
+         // the attribute value from each of the owners into the portion of
+         // this ScenTmp that represents the current Scenario;
+         // otherwise, this function does nothing.
+
+      virtual void uploadInputFromCurScen ();
+         //
+         // If this ScenTmp is for an input attribute, this function uploads
+         // the attribute value to each of the owners from the portion of
+         // this ScenTmp that represents the current Scenario;
+         // otherwise, this function does nothing.
+         // Valid only when the stochastic implosion subsystem is uploading
+         // data.
+
+      virtual void uploadSolnFromCurScen ();
+         //
+         // If this ScenTmp is for a solution attribute, this function uploads
+         // the attribute value to each of the owners from the portion of
+         // this ScenTmp that represents the current Scenario;
+         // otherwise, this function does nothing.
+         // Valid only when the stochastic implosion subsystem is uploading
+         // data.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitScenTmp (WitScenAttMgr *);
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (WitScenMgr *, myScenMgr)
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitScenTmp);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitScenMgr * const myScenMgr_;
+         //
+         // The ScenMgr for this ScenTmp.
+   };
+
+//------------------------------------------------------------------------------
+// Class Template ConcScenInputAtt <Owner>
+//
+// "Concrete Input Scenario-Specific Input Attribute"
+// Stores and manages data for the stochastic version of an input attribute that
+// exists in deterministic mode, but becomes Scenario-specific in stochastic
+// mode.
+//
+// Template argument:
+//    Owner: The class whose instances own the deterinistic version of the
+//           attribute.
+//
+// Class hierarchy:
+//
+//    ProbAssoc
+//       ScenTmp
+//          ConcScenInputAtt <Owner>
+//
+// Implemented in ScenAtt.C
+//------------------------------------------------------------------------------
+
+template <typename Owner>
+      class WitConcScenInputAtt: public WitScenTmp
+   {
+      friend class WitScenario;
+
+      //------------------------------------------------------------------------
+      // Local typedefs.
+      //------------------------------------------------------------------------
+
+      typedef const WitDblFlexVec & (Owner::* AccFunc) () const;
+         //
+         // An AccFunc is an member function of the Owner class that provides
+         // read-only access to the Owner's version of attribute represented by
+         // this ConcScenInputAtt.
+
+      typedef void (Owner::* StoreFunc) (const WitTVec <double> & theValue);
+         //
+         // See ScenAtt <Owner>.
+
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitConcScenInputAtt (WitScenAttMgr *, AccFunc, StoreFunc);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitConcScenInputAtt ();
+
+      //-----------------------------------------------------------------------
+      // Overriding public virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void downloadInputToCurScen ();
+      virtual void uploadInputFromCurScen ();
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      void downloadInputTo (WitScenario * theScenario);
+         //
+         // Downloads the attribute value from each of the owners into this
+         // ScenTmp, associating the value with theScenario.
+
+      noCopyCtorAssign (WitConcScenInputAtt);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitScenAtt <Owner> * myScenAtt_;
+         //
+         // The ScenAtt owned by this ConcScenInputAtt.
+
+      const AccFunc myAccFunc_;
+         //
+         // The access function for the attribute.
+   };
+
+//------------------------------------------------------------------------------
+// Class Template ConcScenSolnAtt <Owner>
+//
+// "Concrete Scenario-Specific Solution Attribute"
+// Stores and manages data for the stochastic version of an input attribute that
+// exists in deterministic mode, but becomes Scenario-specific in stochastic
+// mode.
+//
+// Template argument:
+//    Owner: The class whose instances own the deterinistic version of the
+//           attribute.
+//
+// Class hierarchy:
+//
+//    ProbAssoc
+//       ScenTmp
+//          ConcScenSolnAtt <Owner>
+//
+// Implemented in ScenAtt.C
+//------------------------------------------------------------------------------
+
+template <typename Owner>
+      class WitConcScenSolnAtt: public WitScenTmp
+   {
+      friend class WitScenario;
+
+      //------------------------------------------------------------------------
+      // Local typedefs.
+      //------------------------------------------------------------------------
+
+      typedef void (Owner::* StoreFunc) (const WitTVec <double> & theValue);
+         //
+         // See ScenAtt <Owner>.
+
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitConcScenSolnAtt (WitScenAttMgr *, StoreFunc);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitConcScenSolnAtt ();
+
+      //-----------------------------------------------------------------------
+      // Overriding public virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void uploadSolnFromCurScen ();
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitConcScenSolnAtt);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitScenAtt <Owner> * myScenAtt_;
+         //
+         // The ScenAtt owned by this ConcScenSolnAtt.
+   };
+
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@d16 1
+a16 1
+// Contains the declaration of the following templates:
+d18 3
+a20 3
+//    ConcScenAtt  <Owner>
+//    InputScenAtt <Owner>
+//    SolnScenAtt  <Owner>
+d23 1
+a23 2
+#include <ScenAtt.h>
+#include <RefMap.h>
+d27 1
+a27 1
+// Class Template ConcScenAtt <Owner>
+d29 1
+a29 1
+// "Concrete Scenario-Specific Attribute"
+d31 1
+a31 1
+// exists in deterministic mode, but becomes in Scenario-specific stochastic
+a33 4
+// Template argument:
+//    Owner: The class whose instances own the deterinistic version of the
+//           attribute.
+//
+d37 3
+a39 4
+//       ScenAtt
+//          ConcScenAtt     <Owner>
+//             InputScenAtt <Owner>
+//             SolnScenAtt  <Owner>
+d41 1
+a41 1
+// Implemented in Scenario.C
+d44 1
+a44 2
+template <typename Owner>
+      class WitConcScenAtt: public WitScenAtt
+d46 1
+a46 1
+      friend class WitScenario;
+d49 1
+a49 1
+      // Local typedef.
+d52 1
+a52 9
+      typedef void (Owner::* StoreFunc) (const WitTVec <double> & theValue);
+         //
+         // A StoreFunc is an member function of the Owner class that
+         // sets the value of the Owner's version of the attribute represented
+         // by this ConcScenAtt to the value of the argument.
+         // The function is expected to be valid only when the stochastic
+         // implosion subsystem is uploading data.
+
+   protected:
+d55 1
+a55 1
+      // Constructor functions.
+d58 15
+a72 1
+      WitConcScenAtt (WitScenAttMgr *, StoreFunc);
+d74 8
+a81 3
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+d83 1
+a83 1
+      virtual ~WitConcScenAtt ();
+d86 1
+a86 1
+      // Other protected member functions.
+d89 1
+a89 7
+      void uploadDataFromCurScen ();
+         //
+         // Uploads the value of the represented attribute to each of the
+         // owners from the portion of this ConcScenAtt that represents the
+         // current Scenario.
+         // Valid only when the stochastic implosion subsystem is uploading
+         // data.
+d92 1
+a92 1
+      // Protected access functions.
+d95 1
+a95 8
+      accessFunc (const WitList <Owner> &, allOwners)
+
+      inline WitTVec <double> & myValue (
+            Owner *       theOwner,
+            WitScenario * theScenario)
+         {
+         return myValue_ (theOwner) (theScenario);
+         }
+d103 1
+a103 7
+      static const WitList <Owner> & allOwnersFor (
+            WitScenAttMgr * theScenAttMgr);
+         //
+         // Returns the List of all Owners for theScenAttMgr.
+         // Implemented non-parametrically.
+
+      noCopyCtorAssign (WitConcScenAtt);
+d109 1
+a109 12
+      WitRefMap <Owner, WitSchedule <WitScenario, double> > myValue_;
+         //
+         // myValue_ (theOwner) (theScenario)[thePer] is the value of the
+         // attribute stored by this ConcScenAtt for theOwner in theScenario in
+         // thePer.
+
+      const WitList <Owner> & allOwners_;
+         //
+         // The List of all Owners in the Problem to which this OwnerScenAtt
+         // belongs.
+
+      const StoreFunc myStoreFunc_;
+d111 1
+a111 5
+         // The member function of the Owner class that sets the value of the
+         // Owner's version of the attribute represented by this ConcScenAtt to
+         // the value of the argument.
+         // The function is expected to be valid only when the stochastic
+         // implosion subsystem is uploading data.
+d115 1
+a115 1
+// Class Template InputScenAtt <Owner>
+d117 1
+a117 1
+// "Input Scenario-Specific Attribute"
+d119 1
+a119 1
+// exists in deterministic mode, but becomes in Scenario-specific stochastic
+d129 2
+a130 3
+//       ScenAtt
+//          ConcScenAtt     <Owner>
+//             InputScenAtt <Owner>
+d132 1
+a132 1
+// Implemented in Scenario.C
+d136 1
+a136 1
+      class WitInputScenAtt: public WitConcScenAtt <Owner>
+d138 2
+d148 1
+a148 1
+         // this InputScenAtt.
+d152 1
+a152 1
+         // See ConcScenAtt <Owner>.
+d160 1
+a160 1
+      WitInputScenAtt (WitScenAttMgr *, AccFunc, StoreFunc);
+d166 1
+a166 1
+      virtual ~WitInputScenAtt ();
+d184 1
+a184 1
+         // ScenAtt, associating the value with theScenario.
+d186 1
+a186 1
+      noCopyCtorAssign (WitInputScenAtt);
+d192 4
+d202 1
+a202 1
+// Class Template SolnScenAtt <Owner>
+d204 1
+a204 1
+// "Solution Scenario-Specific Attribute"
+d206 1
+a206 1
+// exists in deterministic mode, but becomes in Scenario-specific stochastic
+d216 2
+a217 3
+//       ScenAtt
+//          ConcScenAtt    <Owner>
+//             SolnScenAtt <Owner>
+d219 1
+a219 1
+// Implemented in Scenario.C
+d223 1
+a223 1
+      class WitSolnScenAtt: public WitConcScenAtt <Owner>
+d225 2
+d233 1
+a233 1
+         // See ConcScenAtt <Owner>.
+d241 1
+a241 1
+      WitSolnScenAtt (WitScenAttMgr *, StoreFunc);
+d247 1
+a247 1
+      virtual ~WitSolnScenAtt ();
+d261 9
+a269 1
+      noCopyCtorAssign (WitSolnScenAtt);
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d53 13
+a65 1
+   friend class WitScenario;
+d73 1
+a73 1
+      WitConcScenAtt (WitScenAttMgr *);
+d82 12
+d134 8
+d170 1
+a170 1
+      // Local typedef.
+d176 6
+a181 1
+         // read-only access to the attribute.
+d189 1
+a189 1
+      WitInputScenAtt (WitScenAttMgr *, AccFunc);
+d202 1
+d251 8
+d265 1
+a265 1
+      WitSolnScenAtt (WitScenAttMgr *);
+d273 6
+@
+

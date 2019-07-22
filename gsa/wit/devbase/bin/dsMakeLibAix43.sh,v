@@ -1,0 +1,346 @@
+head	1.4;
+access;
+symbols
+	latest_sce4_20_OSL:1.4.0.4
+	sce_4_20_OSL:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.4
+	nextGenBranch:1.4.0.2
+	nextGenRoot:1.4
+	sce_3_30_20030627:1.4
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.4
+date	2002.08.02.13.21.56;	author austel;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.08.01.15.43.40;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.08.01.15.15.29;	author austel;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@dsMakeLibAix43.sh and dsMakeLibAix5.sh are almost the same;
+the only difference is the absolute path name used for makeC++SharedLib.
+In older versions of the compiler, this utility is in /usr/ibmcxx/bin;
+in Visual Age C++, it is in /usr/vacpp/bin.  The utility is apparently
+not installed in the standard bin directory, so we can't rely on the
+user's path to find it.
+@
+text
+@#!/bin/ksh -x
+
+# This is a translation of the C-shell script dsMakeLibAix43 into ksh.
+# I did this because the C-shell script was having mysterious
+# problems when I compiled on an AIX v5 system.
+#
+# The lines setting linkerFlags and files caused csh (on crab.yamato.ibm.com)
+# to either hang or segfault; crab is an AIX 5 machine.
+# I tried working around this, but it seems that if there are more
+# than 25 "words" in a value to be assigned to a variable,
+# then csh segfaults.  25 is just the value I got; perhaps it
+# is actually the number of characters, or something else.
+#
+# This is pretty much a word-for-word translation, with one exception:
+# I didn't hard-code the path for makeC++SharedLib.
+# That means that this script should also be useable for 
+# other systems.  However, I've left it as a separate script for now.
+#
+# in the csh script, "set echo" is used to tell csh to start
+# printing commands.
+# I don't know how to do this in ksh, if it can in fact be done.
+# instead, I just have it print all executed commands with the "-x" flag.
+# I've left the set and unset commands in, but commented-out the unset
+# commands, since they return a non-0 status if the variable being unset
+# is not in fact set.
+
+# Make a library
+
+# This command is designed to be used on AIX.  It can be changed to work
+# on other operating systems too, but it doesn't do that right now.
+
+# $Id: dsMakeLibAix43.sh,v 1.3 2002/08/01 15:43:40 fasano Exp $
+
+# double parens for arithmetic expressions in ksh
+if (( $# < 4 )); then
+    echo "Format: dsMakeLib"
+    echo "           shared_flag"
+    echo "           ar_update_flags"
+    echo "           linker_flag1 ... linker_flagN"
+    echo "           library o_file1 ... o_fileN"
+    echo "where shared_flag = -s means make a shared library and any"
+    echo "other value means don't make a shared library"
+    exit 1
+fi
+
+# Let user override $sharedFlag
+if [ $DS_MAKE_NONSHARED_LIBRARIES ]; then
+    sharedFlag='-ns'
+else
+    sharedFlag=$1
+fi
+
+#if OBJECT_MODE is set and not null, set arFlags to the stuff after ":+";
+# otherwise, arFlags remains unset
+if [ $OBJECT_MODE ]; then
+    arFlags="-X${OBJECT_MODE} $2"
+else
+    arFlags=$2
+fi
+
+shift; shift;
+
+# now $* refers to arguments 3 and up
+
+# Get linker flags.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument (\012 is ASCII newline code) and
+# using egrep to find the ones that start with a dash
+linkerFlags=$(echo $* | /bin/tr ' ' '\012' | /bin/egrep -e '^-')
+
+# Get file arguments.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument and
+# using egrep to find the ones that don't start with a dash
+library=$(echo $* | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' | head -1)
+oFiles=$( echo $* | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' | tail +2)
+
+
+# Make the library
+if [[ $sharedFlag = '-s' ]]; then
+	nonSharedLibrary=$(echo $library | sed 's/\.a/ns.a/')
+	expFile=$(echo $nonSharedLibrary | sed 's/\.a/.exp/')
+	sharedOFile=$(echo $nonSharedLibrary | sed 's/\.a/.o/')
+
+	set echo
+
+	if [[ -e $library ]]; then
+		/bin/rm -f $library
+	fi
+
+	# Make non-shared library file
+	/usr/bin/ar $arFlags $nonSharedLibrary $oFiles
+	if (( $? != 0 )); then
+		exit 2
+	fi
+
+	/usr/bin/ranlib $nonSharedLibrary
+	if (( $? != 0 )); then
+		exit 3
+	fi
+
+	# Generate export symbols
+	${DS_DIR}bin/genexlist $nonSharedLibrary > $expFile
+	if (( $? != 0 )); then
+		exit 4
+	fi
+
+	# Make .o file containing entry points for
+	# what is in the non-shared library file
+	/usr/ibmcxx/bin/makeC++SharedLib -o $sharedOFile \
+		-p2100 -E$expFile $linkerFlags $nonSharedLibrary
+	if (( $? != 0 )) then
+		exit 5
+	fi
+
+	# Make a shared library
+	/usr/bin/ar $arFlags $library $sharedOFile
+	if (( $? != 0 )) then
+		exit 6
+	fi
+
+	# Remove the funny .o file and the exports list
+	/bin/rm -f $sharedOFile $expFile
+	if (( $? != 0 )) then
+		exit 7
+	fi
+	#unset echo
+else
+	set echo
+	/usr/bin/ar $arFlags $library $oFiles
+	#unset echo
+fi
+@
+
+
+1.3
+log
+@put full path name in for
+/usr/vacpp/bin/makeC++SharedLib
+because without it the script makeC++SharedLib could not be found
+@
+text
+@d32 1
+a32 1
+# $Id: dsMakeLibAix43.sh,v 1.2 2002/08/01 15:15:29 austel Exp $
+d110 1
+a110 1
+	/usr/vacpp/bin/makeC++SharedLib -o $sharedOFile \
+@
+
+
+1.2
+log
+@Translated dsMakeLibAix43 from C-shell to ksh,
+because the C-shell script failed for mysterious reasons
+on AIX v5.  See the comment in the script.
+Changed the call to makeC++SharedLib from
+	 /usr/ibmcxx/bin/makeC++SharedLib
+to
+	makeC++SharedLib
+@
+text
+@d32 1
+a32 1
+# $Id: dsMakeLibAix43.sh,v 1.1.1.1 2000/02/23 17:02:57 wit Exp $
+d110 1
+a110 2
+	#/usr/vacpp/bin/makeC++SharedLib -o $sharedOFile \
+	makeC++SharedLib -o $sharedOFile \
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 25
+a25 1
+#!/bin/csh
+d32 1
+a32 1
+# $Id: dsMakeLibAix43.sh,v 1.2 1999/06/30 19:39:28 fasano Exp $
+d34 2
+a35 1
+if ($#argv < 4) then
+d44 1
+a44 1
+endif
+d46 18
+a63 10
+unset noclobber		# so that output redirection overwrites existing
+			# files without asking user first
+@@ n = $#argv
+
+set sharedFlag = $argv[1]
+
+set arFlags = $argv[2]
+if ($?OBJECT_MODE) then
+        set arFlags = "-X${OBJECT_MODE} $arFlags"
+endif
+d69 1
+a69 1
+set linkerFlags = ( `echo $argv[3-$n] | /bin/tr ' ' '\012' | /bin/egrep -e '^-' ` )
+d75 2
+a76 5
+set files = ( `echo $argv[3-$n] | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' ` )
+@@ nFiles = $#files
+set library = $files[1]
+set oFiles = ( $files[2-$nFiles] )
+unset files
+a77 4
+# Let user override $sharedFlag
+if ($?DS_MAKE_NONSHARED_LIBRARIES) then
+	set sharedFlag = '-ns'
+endif
+d80 4
+a83 4
+if ($sharedFlag == '-s') then
+	set nonSharedLibrary = `echo $library | sed 's/\.a/ns.a/' `
+	set expFile = `echo $nonSharedLibrary | sed 's/\.a/.exp/' `
+	set sharedOFile = `echo $nonSharedLibrary | sed 's/\.a/.o/' `
+d87 1
+a87 1
+	if (-e $library) then
+d89 1
+a89 1
+	endif
+d93 1
+a93 1
+	if ($status != 0) then
+d95 2
+a96 1
+	endif
+d98 1
+a98 1
+	if ($status != 0) then
+d100 1
+a100 1
+	endif
+d104 1
+a104 1
+	if ($status != 0) then
+d106 1
+a106 1
+	endif
+d110 2
+a111 1
+	/usr/ibmcxx/bin/makeC++SharedLib -o $sharedOFile \
+d113 1
+a113 1
+	if ($status != 0) then
+d115 1
+a115 1
+	endif
+d119 1
+a119 1
+	if ($status != 0) then
+d121 1
+a121 1
+	endif
+d125 1
+a125 1
+	if ($status != 0) then
+d127 2
+a128 2
+	endif
+	unset echo
+d132 2
+a133 2
+	unset echo
+endif
+@
+
+
+1.1.1.1
+log
+@Import bin
+@
+text
+@@

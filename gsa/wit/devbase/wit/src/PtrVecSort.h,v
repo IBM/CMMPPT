@@ -1,0 +1,642 @@
+head	1.6;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.2
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.2.0.2
+	sce_4_20_OSL:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2011.09.28.23.50.02;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.09.24.00.28.25;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.08.30.20.18.03;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.05.02.17.34.10;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.02.17.22.39.17;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.02.17.20.53.14;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+#ifndef PtrVecSortH
+#define PtrVecSortH
+
+//------------------------------------------------------------------------------
+// Header file: "PtrVecSort.h"
+//
+// Contains the declaration of class template AbsPVecCompFtor <Elem>.
+// Contains the declaration of class template PVecCompFtor <Elem, Context>.
+//
+// Contains NonClass function templates for sorting PtrVecs.
+//------------------------------------------------------------------------------
+
+#include <PtrVec.h>
+
+#include <algorithm>
+
+//------------------------------------------------------------------------------
+// Class template AbsPVecCompFtor <Elem>
+//
+// "Abstract Pointer Vector Comparison Functor"
+//
+// Base class for class template PVecCompFtor <Elem, Context>.
+//
+// Class Hierarchy:
+//
+// AbsPVecCompFtor <Elem>
+//    PVecCompFtor <Elem, Context>
+//
+// All implementation is inline.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      class WitAbsPVecCompFtor
+   {
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      inline WitAbsPVecCompFtor ()
+         {
+         }
+
+      inline WitAbsPVecCompFtor (const WitAbsPVecCompFtor &)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      inline ~WitAbsPVecCompFtor ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Other protected member functions.
+      //------------------------------------------------------------------------
+
+      inline WitVector <void *> & theVectorFor (WitPtrVec <Elem> & thePtrVec)
+         {
+         return thePtrVec.myVector_;
+         }
+   };
+
+//------------------------------------------------------------------------------
+// Class template PVecCompFtor <Elem, Context>
+//
+// "Pointer Vector Comparison Functor"
+//
+// A comparison functor to be used for sorting instances of class template
+// PtrVec <Elem>, using a comparison function specified as a member function of
+// class Context.
+//
+// Class Hierarchy:
+//
+// AbsPVecCompFtor <Elem>
+//    PVecCompFtor <Elem, Context>
+//
+// All implementation is inline.
+//------------------------------------------------------------------------------
+
+template <typename Elem, typename Context>
+      class WitPVecCompFtor: public WitAbsPVecCompFtor <Elem>
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Initial constructor function.
+      //------------------------------------------------------------------------
+
+      inline WitPVecCompFtor (
+               bool (Context::* theCompFunc) (Elem *, Elem *),
+               Context *        theContext):
+
+            WitAbsPVecCompFtor <Elem> (),
+
+            myCompFunc_               (theCompFunc),
+            myContext_                (theContext)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Copy constructor function.
+      //------------------------------------------------------------------------
+
+      inline WitPVecCompFtor (WitPVecCompFtor & thePVecCompFtor):
+
+            WitAbsPVecCompFtor <Elem> (),
+
+            myCompFunc_               (thePVecCompFtor.myCompFunc_),
+            myContext_                (thePVecCompFtor.myContext_)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitPVecCompFtor ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort)
+         {
+         std::sort (
+              theVectorFor (thePtrVec).myCVecForUpdate (),
+              theVectorFor (thePtrVec).myCVecForUpdate () + nElemsToSort,
+            * this);
+         }
+
+      inline bool operator () (void * theVoid1, void * theVoid2)
+         {
+         return
+            (myContext_->*myCompFunc_) (
+               reinterpret_cast <Elem *> (theVoid1),
+               reinterpret_cast <Elem *> (theVoid2));
+         }
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      bool (Context::* const myCompFunc_) (Elem *, Elem *);
+         //
+         // The sorting comparsion function for this PVecCompFtor.
+
+      Context * const myContext_;
+         //
+         // The Context in which the sorting comparison function is to be
+         // invoked.
+   };
+
+//------------------------------------------------------------------------------
+// sort function for a PtrVec.
+// Sorts the first nElemsToSort of thePtrVec, using theCompFunc as the
+// comparison function, which is invoked with respect to theContext.
+//------------------------------------------------------------------------------
+
+namespace WitNonClass
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      WitPVecCompFtor <Elem, Context> theCompFtor (theCompFunc, theContext);
+
+      theCompFtor.sort (thePtrVec, nElemsToSort);
+      }
+   };
+
+//------------------------------------------------------------------------------
+// sort function for a PtrVec.
+// Same as above, but sorts the entire PtrVec.
+//------------------------------------------------------------------------------
+
+namespace WitNonClass
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      sort (thePtrVec, thePtrVec.length (), theCompFunc, theContext);
+      }
+   };
+
+#endif
+@
+
+
+1.5
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.4
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d41 34
+a74 34
+template <typename Elem>
+class WitAbsPVecCompFtor
+{
+protected:
+
+//------------------------------------------------------------------------
+// Constructor functions.
+//------------------------------------------------------------------------
+
+inline WitAbsPVecCompFtor ()
+{
+}
+
+inline WitAbsPVecCompFtor (const WitAbsPVecCompFtor &)
+{
+}
+
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+
+inline ~WitAbsPVecCompFtor ()
+{
+}
+
+//------------------------------------------------------------------------
+// Other protected member functions.
+//------------------------------------------------------------------------
+
+inline WitVector <void *> & theVectorFor (WitPtrVec <Elem> & thePtrVec)
+{
+return thePtrVec.myVector_;
+}
+};
+d94 77
+a170 77
+class WitPVecCompFtor: public WitAbsPVecCompFtor <Elem>
+{
+public:
+
+//------------------------------------------------------------------------
+// Initial constructor function.
+//------------------------------------------------------------------------
+
+inline WitPVecCompFtor (
+bool (Context::* theCompFunc) (Elem *, Elem *),
+Context *        theContext):
+
+WitAbsPVecCompFtor <Elem> (),
+
+myCompFunc_               (theCompFunc),
+myContext_                (theContext)
+{
+}
+
+//------------------------------------------------------------------------
+// Copy constructor function.
+//------------------------------------------------------------------------
+
+inline WitPVecCompFtor (WitPVecCompFtor & thePVecCompFtor):
+
+WitAbsPVecCompFtor <Elem> (),
+
+myCompFunc_               (thePVecCompFtor.myCompFunc_),
+myContext_                (thePVecCompFtor.myContext_)
+{
+}
+
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+
+~WitPVecCompFtor ()
+{
+}
+
+//------------------------------------------------------------------------
+// Other public member functions.
+//------------------------------------------------------------------------
+
+inline void sort (
+WitPtrVec <Elem> & thePtrVec,
+int                nElemsToSort)
+{
+std::sort (
+theVectorFor (thePtrVec).myCVecForUpdate (),
+theVectorFor (thePtrVec).myCVecForUpdate () + nElemsToSort,
+* this);
+}
+
+inline bool operator () (void * theVoid1, void * theVoid2)
+{
+return
+(myContext_->*myCompFunc_) (
+reinterpret_cast <Elem *> (theVoid1),
+reinterpret_cast <Elem *> (theVoid2));
+}
+
+private:
+
+//------------------------------------------------------------------------
+// Private member data.
+//------------------------------------------------------------------------
+
+bool (Context::* const myCompFunc_) (Elem *, Elem *);
+//
+// The sorting comparsion function for this PVecCompFtor.
+
+Context * const myContext_;
+//
+// The Context in which the sorting comparison function is to be
+// invoked.
+};
+d179 13
+a191 13
+{
+template <typename Elem, typename Context>
+inline void sort (
+WitPtrVec <Elem> & thePtrVec,
+int                nElemsToSort,
+bool (Context::*   theCompFunc) (Elem *, Elem *),
+Context *          theContext)
+{
+WitPVecCompFtor <Elem, Context> theCompFtor (theCompFunc, theContext);
+
+theCompFtor.sort (thePtrVec, nElemsToSort);
+}
+};
+d199 10
+a208 10
+{
+template <typename Elem, typename Context>
+inline void sort (
+WitPtrVec <Elem> & thePtrVec,
+bool (Context::*   theCompFunc) (Elem *, Elem *),
+Context *          theContext)
+{
+sort (thePtrVec, thePtrVec.length (), theCompFunc, theContext);
+}
+};
+@
+
+
+1.3
+log
+@Updated the copyright date on all source files.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d41 34
+a74 34
+template <typename Elem> 
+      class WitAbsPVecCompFtor
+   {
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      inline WitAbsPVecCompFtor ()
+         {
+         }
+
+      inline WitAbsPVecCompFtor (const WitAbsPVecCompFtor &)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      inline ~WitAbsPVecCompFtor ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Other protected member functions.
+      //------------------------------------------------------------------------
+
+      inline WitVector <void *> & theVectorFor (WitPtrVec <Elem> & thePtrVec)
+         {
+         return thePtrVec.myVector_;
+         }
+   };
+d94 77
+a170 77
+      class WitPVecCompFtor: public WitAbsPVecCompFtor <Elem>
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Initial constructor function.
+      //------------------------------------------------------------------------
+
+      inline WitPVecCompFtor (
+               bool (Context::* theCompFunc) (Elem *, Elem *),
+               Context *        theContext):
+
+            WitAbsPVecCompFtor <Elem> (),
+
+            myCompFunc_               (theCompFunc),
+            myContext_                (theContext)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Copy constructor function.
+      //------------------------------------------------------------------------
+
+      inline WitPVecCompFtor (WitPVecCompFtor & thePVecCompFtor):
+
+            WitAbsPVecCompFtor <Elem> (),
+
+            myCompFunc_               (thePVecCompFtor.myCompFunc_),
+            myContext_                (thePVecCompFtor.myContext_)
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitPVecCompFtor ()
+         {
+         }
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort)
+         {
+         std::sort (
+              theVectorFor (thePtrVec).myCVecForUpdate (),
+              theVectorFor (thePtrVec).myCVecForUpdate () + nElemsToSort,
+            * this);
+         }
+
+      inline bool operator () (void * theVoid1, void * theVoid2)
+         {
+         return
+            (myContext_->*myCompFunc_) (
+               reinterpret_cast <Elem *> (theVoid1),
+               reinterpret_cast <Elem *> (theVoid2));
+         }
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      bool (Context::* const myCompFunc_) (Elem *, Elem *);
+         //
+         // The sorting comparsion function for this PVecCompFtor.
+
+      Context * const myContext_;
+         //
+         // The Context in which the sorting comparison function is to be
+         // invoked.
+   };
+d179 13
+a191 13
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            int                nElemsToSort,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      WitPVecCompFtor <Elem, Context> theCompFtor (theCompFunc, theContext);
+
+      theCompFtor.sort (thePtrVec, nElemsToSort);
+      }
+   };
+d199 10
+a208 10
+   {
+   template <typename Elem, typename Context>
+         inline void sort (
+            WitPtrVec <Elem> & thePtrVec,
+            bool (Context::*   theCompFunc) (Elem *, Elem *),
+            Context *          theContext)
+      {
+      sort (thePtrVec, thePtrVec.length (), theCompFunc, theContext);
+      }
+   };
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d29 1
+a29 1
+// "Abstract Pointer Vector Comparision Functor"
+d79 1
+a79 1
+// "Pointer Vector Comparision Functor"
+d81 2
+a82 2
+// A comparision functor to be used for sorting instances of class template
+// PtrVec <Elem>, using a comparision function specified as a member function of
+d168 1
+a168 1
+         // The Context in which the sorting comparision function is to be
+d175 1
+a175 1
+// comparision function, which is invoked with respect to theContext.
+@
+

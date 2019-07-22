@@ -1,0 +1,261 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2006.05.19.22.39.43;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2006.05.16.21.52.56;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.05.11.20.20.30;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@New PIP pegging order.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef IpipBldrV2H
+#define IpipBldrV2H
+
+//------------------------------------------------------------------------------
+// Header file: "IpipBldrV2.h"
+//
+// Contains the declaration of class IpipBldrV2.
+//------------------------------------------------------------------------------
+
+#include <PipBldr.h>
+#include <Schedule.h>
+
+//------------------------------------------------------------------------------
+// Class IpipBldrV2
+//
+// "Individual Post-Implosion Pegging Builder, Version 2"
+//
+// Responsible for building the individual post-implosion pegging.
+// Temporary experimental version.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    PipBldr
+//       IpipBldrV2
+//------------------------------------------------------------------------------
+
+class WitIpipBldrV2: public WitPipBldr
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitIpipBldrV2 (WitPipPgg *);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitIpipBldrV2 ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      virtual void buildPggSpec ();
+         //
+         // Override from class PipBldr.
+
+      void normalizeShares ();
+         //
+         // Computes the values of normShare_.
+
+      void prtNormShares ();
+         //
+         // Prints the values of normShare_.
+
+      void initUnpeggedScheds ();
+         //
+         // Initializes the unpegged schedules.
+
+      void pegShipment (
+            WitDemand * theDemand,
+            WitPeriod   shipPer,
+            double      incShipVol);
+         //
+         // Pegs incShipVol units of shipVol to theDemand in shipPer;
+
+      void fillReq (WitPart * thePart, WitPeriod reqPer);
+         //
+         // Fills the requirement on thePart in reqPer by pegging.
+
+      void pegToAtt (
+            void (WitIpipBldrV2::* thePegFunc) (WitPart *, WitPeriod, double &),
+            const WitSchedule <WitPart, double> & unpgdVol,
+            WitPart *                           thePart,
+            WitPeriod                           reqPer,
+            double &                            netReqVol);
+         //
+         // Pegs up to netReqVol units of requirement on thePart in reqPer to
+         // one attribute, storing the unmet requirement in netReqVol.
+         // thePegFunc should be one of the following functions:
+         //    pegToSupply
+         //    pegToProd
+         //    pegToSide
+         // unpgdVol should be the Schedule of unpegged volume for the
+         // attribute.
+
+      void pegToSupply (
+            WitPart * thePart,
+            WitPeriod pegPer,
+            double &  netReqVol);
+         //
+         // Pegs up to netReqVol units of supply of thePart in pegPer.
+         // On return, netReqVol is amount that didn't get pegged.
+
+      void pegToProd (WitPart * thePart, WitPeriod expPer, double & netReqVol);
+         //
+         // Does pegging by explosion for netReqVol units on thePart in expPer.
+         // On return, netReqVol is amount that didn't get pegged.
+
+      void pegBopEnt (
+            WitBopEntry * theBopEnt,
+            WitPeriod     execPer,
+            double &      netReqVol);
+         //
+         // Does pegging by explosion for netReqVol units through theBopEnt in
+         // execPer.
+         // On return, netReqVol is amount that didn't get pegged.
+
+      void pegOpn (
+            WitOperation * theOpn,
+            WitPeriod      execPer,
+            double         pgdExecVol);
+         //
+         // Does pegging by explosion of pgdExecVol units of execVol through
+         // theOpn in execPer.
+ 
+      void pegBomEntWithSubs (
+            WitBomEntry * theBomEnt,
+            WitPeriod     execPer,
+            double        pgdExecVol);
+         //
+         // Does pegging by explosion of pgdExecVol units of execVol through
+         // theBomEnt and its substitutes in execPer.
+
+      void pegConsEnt (
+            WitConsEntry * theConsEnt,
+            WitPeriod      execPer,
+            double         pgdExecVol);
+         //
+         // Does pegging by explosion of pgdExecVol units of execVol through
+         // theConsEnt in execPer.
+
+      void pegToStock (WitPart * thePart, WitPeriod pegPer, double & netReqVol);
+         //
+         // Pegs up to netReqVol units of thePart in pegPer to stock.
+         // On return, netReqVol is amount that didn't get pegged.
+
+      void pegToSide (
+            WitPart * thePart,
+            WitPeriod pegPer,
+            double &  netReqVol);
+         //
+         // Pegs up to netReqVol units of side-effect of thePart in pegPer.
+         // On return, netReqVol is amount that didn't get pegged.
+
+      double minAndNet (double & val1, double & val2);
+         //
+         // Returns the min of val1 and val2 after substracting it from both.
+
+      noCopyCtorAssign (WitIpipBldrV2);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitDemand * targDemand_;
+         //
+         // The Demand currently being pegged to, if any; else NULL.
+
+      WitPeriod targShipPer_;
+         //
+         // The shipment period currently being pegged to, if any; else -1.
+
+      WitReqSched * myReqSched_;
+         //
+         // The ReqSched owned by this IpipBldrV2.
+
+      WitSchedule <WitBopEntry, double> normShare_;
+         //
+         // normShare_ (theBopEnt)[execPer] is theBopEnt->pipShare_[execPer],
+         // normalized so that the values for a given Operation and execPer sum
+         // to 1.
+
+      //------------------------------------------------------------------------
+      // Unpegged Volume Schedules
+      // Each of these schedules stores the unpegged portion of the
+      // corresponding Component data (also side-effect volume).
+      //------------------------------------------------------------------------
+
+      WitSchedule <WitBopEntry, double> unpgdCoexVol_;
+      WitSchedule <WitBomEntry, double> unpgdNonSubVol_;
+      WitSchedule <WitSubEntry, double> unpgdSubVol_;
+      WitSchedule <WitMaterial, double> unpgdStockVol_;
+      WitSchedule <WitPart,     double> unpgdSupplyVol_;
+      WitSchedule <WitPart,     double> unpgdProdVol_;
+      WitSchedule <WitPart,     double> unpgdSideVol_;
+   };
+
+#endif
+@
+
+
+1.2
+log
+@New PIP pegging order.
+@
+text
+@@
+
+
+1.1
+log
+@New PIP pegging order.
+@
+text
+@d88 4
+a91 3
+            WitPart *              thePart,
+            WitPeriod              reqPer,
+            double &               netReqVol);
+d99 2
+d200 1
+@
+

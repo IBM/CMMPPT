@@ -1,0 +1,848 @@
+head	1.5;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.5
+date	2002.05.10.12.32.35;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.05.09.20.02.01;	author parija;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.05.09.19.53.19;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.05.09.19.12.10;	author parija;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.05.08.19.39.12;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.05.08.19.39.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Changes to implement the setting/getting of the nDays of a class in appData
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <assert.h>
+#include <iostream.h>
+#include <float.h>
+
+#include "crProblem.h"
+
+#if 0
+#include "grMipProblem.h" 
+#include "globalAttrFile.h"
+#include "portsFile.h"
+#include "portLocLinkFile.h"
+#include "resrcsFile.h"
+#include "resrcsAttrFile.h"
+#include "portResrcLinkFile.h"
+#include "portResrcConsFile.h"
+#include "countryFile.h"
+#include "countryAttrFile.h"
+#include "countryLocLinkFile.h"
+#endif
+
+#include "OsiFloatEqual.h"
+
+//#include "appFile.h"
+//#include "resourcesFile.h"
+//#include "appResourceFile.h"
+
+#define JP_TEST
+
+int
+main (int argc, char * argv[])
+{
+  cout <<"classroom scheduling Build date: " <<__DATE__ <<endl;
+  {
+    
+    // Put Parms into a vector
+    std::vector<std::string> args;
+    for (int i=0; i<argc; i++) 
+      args.push_back(argv[i]);
+    
+    {
+      // Check parm passed to program
+      bool parmError = false;
+      
+      if ( args.size()> 1 ) {
+        if (args[1]=="?" ) {
+          parmError = true; // set flag to provide usage info
+        }
+      }
+      
+      if ( ! parmError ) {
+        if ( args.size()!=2 ) {
+          // Wrong number of parms. Write message
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Wrong number of parmeters specified"                      <<endl
+            <<"  Number parameters specified: " <<args.size()-1          <<endl
+            <<"  Expected number of parameters: 1"                       <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }
+      
+      
+      
+      if ( parmError ) {
+        // Write correct usage
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<argv[0] <<" dataDirectory "                                <<endl
+          <<"  where:"                                                 <<endl
+          <<"    dataDirectory:"                                       <<endl
+          <<"      Directory where input files are located and"        <<endl
+          <<"      output files are written."                          <<endl
+          <<"  example usage:"                                         <<endl
+          <<"    " <<argv[0] <<" ../testData"                          <<endl
+          <<"    " <<argv[0] <<" /u/fasano/grData "                    <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        return 1;
+      }
+    }
+    
+    std::string outputDirectory=args[1];
+    std::string inputDirectory=args[1];
+    CRproblem crp;
+    int nPeriods=0;
+
+	crp.addClassroom("A25","POK");
+	crp.addClassroom("A36","POK");
+	//crp.addClass("NT Basics","POK","1",25,3);
+  crp.addClass("NT Basics","POK","1");
+  crp.setClassNSeats("NT Basics","POK","1",25);
+  crp.setClassNDays("NT Basics","POK","1",3);
+  assert( crp.getClassNDays("NT Basics","POK","1") == 3 );
+  
+
+	crp.addCourse("NT Basics");
+
+
+#if 0
+    const int MINBAND = 4;
+    const int MAXBAND = 10;
+    std::vector<std::string> bandRank;
+    bandRank.push_back("0");
+    bandRank.push_back("1");
+    bandRank.push_back("2");
+    bandRank.push_back("3");
+    bandRank.push_back("4");
+    bandRank.push_back("5");
+    bandRank.push_back("6");
+    bandRank.push_back("7");
+    bandRank.push_back("8");
+    bandRank.push_back("9");
+    bandRank.push_back("10");
+    
+    // Read input files
+    cout <<"Reading input files" <<endl;
+
+    
+    // Read Global Attributes
+    std::string globalAttrFileName = inputDirectory + "/globalAttr.csv";
+    GRglobalAttrFile globalAttrFile(globalAttrFileName);
+    {      
+      std::string title=globalAttrFile.fieldAsString("title","attrValue");
+      grp.setTitle(title);
+      
+      nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+      grp.setNPeriods(nPeriods);
+    }
+
+        
+    // Read Portfolios File
+    {
+      std::string portsFileName = inputDirectory + "/ports.csv";
+      GRportsFile portsFile(portsFileName);
+      GRportsFileIterator portsFileIter(portsFile);
+      
+      // loop once for each record
+      for ( /*portsFileIter()*/ ; portsFileIter()!=NULL; ) {
+        std::string pn = portsFileIter.port();
+
+        // Add Portfolio to Model
+        grp.addPortfolio(pn);
+      }  
+    } 
+    
+    // Read Portfolio Location Linkage File
+    {
+      std::string portLocLinkFileName = inputDirectory + "/portLocLink.csv";
+      GRportLocLinkFile portLocLinkFile(portLocLinkFileName);
+      GRportLocLinkFileIterator portLocLinkFileIter(portLocLinkFile);
+      
+      // loop once for each record
+      for ( /*portLocLinkFileIter()*/ ; portLocLinkFileIter()!=NULL; ) {
+        std::string pn  = portLocLinkFileIter.port();
+        std::string loc = portLocLinkFileIter.loc();
+
+        // Add link from portfolio to location
+        grp.addPortfolioLocationLink(pn,loc);
+      }  
+    } 
+
+    // Read Country File
+    {
+      std::string countryFileName = inputDirectory + "/country.csv";
+      GRcountryFile countryFile(countryFileName);
+      GRcountryFileIterator countryFileIter(countryFile);
+      
+      std::string countryAttrFileName = inputDirectory + "/countryAttr.csv";
+      GRcountryAttrFile countryAttrFile(countryAttrFileName);
+      
+      // loop once for each record
+      for ( /*countryFileIter()*/ ; countryFileIter()!=NULL; ) {
+        std::string cn = countryFileIter.country();
+
+        // Add Country to Model
+        grp.addCountry(cn);
+        
+        // Now set the country attributes: maxFte
+        {
+          std::vector<float> maxFte;
+
+          // Loop once for each period to build attribute vectors
+          for ( int t=1; t<=nPeriods; t++ ) { 
+            if ( !countryAttrFile.keyExists(cn,t) ) {
+              maxFte.push_back( 1.0E30f/(100*nPeriods) );
+              cout 
+                <<"-------------------------------------------------------"        <<endl
+                <<"Warning: country file contains a country that does not"         <<endl
+                <<"   have a maxFte in period " <<t <<" in the countryAttr file."  <<endl
+                <<"   country filename: " <<countryFile.filename().c_str()         <<endl
+                <<"   country file line number: " <<countryFileIter.recNum()       <<endl
+                <<"   country name: " <<countryFileIter.country().c_str()          <<endl
+                <<"   countryAttr filename: " <<countryAttrFile.filename().c_str() <<endl
+                <<"   period: " <<t                                                <<endl
+                <<"   maxFte will be set to a very large number. "                 <<endl
+                <<"-------------------------------------------------------"        <<endl;
+            }
+            else {
+              maxFte.push_back( countryAttrFile.maxFteAsFloat(cn,t) );
+            }
+          }
+
+          // set resource attributes
+          grp.setCountryMaxFte(cn,maxFte);
+        }
+      } 
+#ifdef JP_TEST
+      {
+        // Test that addCountries and getCountries methods are working
+        const std::vector<std::string>& countries = grp.getCountries();
+        assert( countryFile.numRecords()==countries.size() );
+        int c;
+        for ( c=0; c<countries.size(); c++ ) {
+          assert( countryFile.keyExists(countries[c]) );
+        }
+
+        // Test that set/getCountryMaxFte is working correctly
+        for ( c=0; c<countries.size(); c++ ) { 
+          std::vector<float> maxFte = grp.getCountryMaxFte (countries[c]);
+          for ( int t=0; t<nPeriods; t++ ) {
+            if ( !countryAttrFile.keyExists(countries[c],t) ) continue;
+            float maxFteFromFile = countryAttrFile.maxFteAsFloat( countries[c],t);
+            // Test that maxFte in grp is same as that in the date file
+            assert( maxFteFromFile == maxFte[t] );
+          }
+        }
+      }
+#endif
+    } 
+    
+    
+    // Read Resources File, Resource Attribute File and 
+    // File that links a location to a country
+    {
+      std::string resrcsFileName = inputDirectory + "/resrcs.csv";
+      GRresrcsFile resrcsFile(resrcsFileName);
+      GRresrcsFileIterator resrcsFileIter(resrcsFile);
+      GRresrcsFileIterator resrcsFileIter1(resrcsFile);
+      
+      std::string resrcsAttrFileName = inputDirectory + "/resrcAttr.csv";
+      GRresrcsAttrFile resrcsAttrFile(resrcsAttrFileName);
+
+      std::string countryLocLinkFileName = inputDirectory + "/countryLocLink.csv";
+      GRcountryLocLinkFile countryLocLinkFile(countryLocLinkFileName);
+      
+      // loop once for each record
+      for ( /*resrcsFileIter()*/ ; resrcsFileIter()!=NULL; ) {
+        std::string skill  = resrcsFileIter.skill();
+        std::string loc = resrcsFileIter.loc();
+        std::string band = resrcsFileIter.band();
+        std::string role = resrcsFileIter.role();
+
+        // Add resource
+        grp.addResource(skill,loc,band,role);
+
+        // Now set the resources attributes: supplyFte, costHomeSite and costRemoteSite
+        {
+          std::vector<float> supplyFte;
+          std::vector<float> costHomeSite;
+          std::vector<float> costRemoteSite;
+
+          // Loop once for each period to build attribute vectors
+          for ( int t=1; t<=nPeriods; t++ ) {     
+            
+            if ( !resrcsAttrFile.keyExists(skill,loc,band,role,t) ) {
+              supplyFte.push_back(0.0f);
+              costHomeSite.push_back( 1.0E30f/(100*nPeriods) );
+              costRemoteSite.push_back( 1.0E30f/(100*nPeriods) );
+              cout 
+                <<"-------------------------------------------------------"        <<endl
+                <<"Warning: resrcs file contains a resource that does not"         <<endl
+                <<"   appear in resrcsAttr file in period " <<t <<"."              <<endl
+                <<"   resrcs filename: " <<resrcsFile.filename().c_str()           <<endl
+                <<"   resrcs file line number: " <<resrcsFileIter.recNum()         <<endl
+                <<"   Resource skill: " <<skill.c_str()                            <<endl
+                <<"   Resource loc: " <<loc.c_str()                                <<endl
+                <<"   Resource band: " <<band.c_str()                              <<endl
+                <<"   Resource role: " <<role.c_str()                              <<endl
+                <<"   resrcsAttr filename: " <<resrcsAttrFile.filename().c_str()   <<endl
+                <<"   period: " <<t                                                <<endl
+                <<"   supplyFte will be set to zero. "                             <<endl
+                <<"   costHomeSite will be set to a very large number. "           <<endl
+                <<"   costRemoteSite will be set to a very large number. "            <<endl
+                <<"-------------------------------------------------------"        <<endl;
+            }
+            else {
+              supplyFte.push_back( resrcsAttrFile.supplyFteAsFloat(skill,loc,band,role,t));
+              costHomeSite.push_back( resrcsAttrFile.costHomeSiteAsFloat(skill,loc,band,role,t));
+              costRemoteSite.push_back( resrcsAttrFile.costRemoteSiteAsFloat(skill,loc,band,role,t));
+            }
+          }
+          
+          // set resource attributes
+          grp.setResourceSupply(skill,loc,band,role,supplyFte);
+          grp.setResourceCostHomeSite(skill,loc,band,role,costHomeSite);
+          grp.setResourceCostRemoteSite(skill,loc,band,role,costRemoteSite);
+        }
+        
+        // Now link the resource to a country
+        {
+          std::string cn = countryLocLinkFile.country(loc);
+          grp.addResourceCountryLink(skill,loc,band,role,cn);
+          
+#ifdef JP_TEST
+          // test add and gets of ResourceCountryLink
+          {
+            std::vector<std::string> countries=grp.getResourceCountryLinks(skill,loc,band,role); 
+            // It is anticipated that a resource only has 0 or 1 countries
+            assert ( countries.size()==1 );
+            assert( countries[0]==cn );
+          }
+#endif
+        }
+      }
+
+      
+      //--------------------------------------------
+      // Now determine if there are any resources with the
+      // same skill and role at a higher band that could be used as
+      // as substitute           
+      // loop once for each record
+      for ( /*resrcsFileIter()*/ ; resrcsFileIter1()!=NULL; ) {
+        std::string skill  = resrcsFileIter1.skill();
+        std::string loc = resrcsFileIter1.loc();
+        std::string band = resrcsFileIter1.band();
+        std::string role = resrcsFileIter1.role();         
+        int bandI = atoi(band.c_str());
+        assert(bandI>=MINBAND);
+        assert(bandI<=MAXBAND);
+        
+        // loop once for each band greater than bandI
+        for ( int bi=bandI+1; bi<MAXBAND; ++bi ) {
+          
+          // get next band that can substitute for bandI
+          std::string & subsBand = bandRank[bi];
+          
+          // Does a skill, loc, role exist for substitute band
+          if (resrcsFile.keyExists(skill,loc,subsBand,role)) {
+            // it does exist, so indicte that it can substitute for bandI
+#if 1
+            grp.addSubstituteResourceLink(
+              skill,loc,band,role,
+              skill,loc,subsBand,role);
+#ifdef JP_TEST
+            // Test get substitute resources
+            {
+              std::vector<std::string> substituteSkills;
+              std::vector<std::string> substituteResrcLocs;
+              std::vector<std::string> substituteBands;
+              std::vector<std::string> substituteRoles;
+              grp.getSubstituteResourceLinks(skill,loc,band,role,
+                substituteSkills,  
+                substituteResrcLocs,
+                substituteBands,
+                substituteRoles );
+              int numSubs= substituteSkills.size();
+              assert( substituteSkills[numSubs-1] == skill );
+              assert( substituteResrcLocs[numSubs-1] == loc );
+              assert( substituteBands[numSubs-1] == subsBand );
+              assert( substituteRoles[numSubs-1] == role );
+            }
+#endif
+#endif
+          }
+        }
+      }
+      //-------------------------
+    } 
+    
+    // Read file that links portfolios to resources, and file that contains
+    // the consumption rates along these links
+    {
+      std::string portResrcLinkFileName = inputDirectory + "/portResrcLink.csv";
+      GRportResrcLinkFile portResrcLinkFile(portResrcLinkFileName);
+      GRportResrcLinkFileIterator portResrcLinkFileIter(portResrcLinkFile);
+         
+      std::string portResrcConsFileName = inputDirectory + "/portResrcCons.csv";
+      GRportResrcConsFile portResrcConsFile(portResrcConsFileName);
+      
+      std::string resrcsFileName = inputDirectory + "/resrcs.csv";
+      GRresrcsFile resrcsFile(resrcsFileName);
+
+      // loop once for each record
+      for ( /*portResrcLinkFileIter()*/ ; portResrcLinkFileIter()!=NULL; ) {
+        std::string port  = portResrcLinkFileIter.port();
+        std::string portLoc = portResrcLinkFileIter.portLoc();
+        std::string skill = portResrcLinkFileIter.skill();
+        std::string resrcLoc = portResrcLinkFileIter.resrcLoc();
+        std::string band = portResrcLinkFileIter.band();
+        std::string role = portResrcLinkFileIter.role();
+        bool homeSite = portResrcLinkFileIter.homeSite();
+
+        // Add link from portfolio to resource
+        grp.addPortfolioResourceLink(
+          port,portLoc, skill,resrcLoc,band,role,homeSite);
+
+        
+        // Now set the links attributes: consRate
+        {
+          std::vector<float> consRate;
+          
+          // Loop once for each period to build attribute vectors
+          for ( int t=1; t<=nPeriods; t++ ) {          
+            if ( !portResrcConsFile.keyExists(port,portLoc,skill,resrcLoc,band,role,homeSite,t) ) {
+              //consRate.push_back( 1.0E30f/(100*nPeriods) );
+              consRate.push_back( 0.0f );
+              cout 
+                <<"-------------------------------------------------------"        <<endl
+                <<"Warning: portResrcLink file contains a link that does not"      <<endl
+                <<"   appear in portResrcCons file in period " <<t <<"."           <<endl
+                <<"   portResrcLink filename: " <<portResrcLinkFile.filename().c_str()  <<endl
+                <<"   portResrcLink file line number: " <<portResrcLinkFileIter.recNum()<<endl
+                <<"   port: " <<port.c_str()                                       <<endl
+                <<"   portLoc: " <<portLoc.c_str()                                 <<endl
+                <<"   resource skill: " <<skill.c_str()                            <<endl
+                <<"   resrcLoc: " <<resrcLoc.c_str()                               <<endl
+                <<"   band: " <<band.c_str()                                       <<endl
+                <<"   role: " <<role.c_str()                                       <<endl
+                <<"   shore: " <<portResrcLinkFileIter.usageLoc().c_str()          <<endl
+                <<"   portResrcCons filename: " <<portResrcConsFile.filename().c_str() <<endl
+                <<"   period: " <<t                                                <<endl
+                <<"   consRate will be set to a very large number. "               <<endl
+                <<"-------------------------------------------------------"        <<endl;
+            }
+            else {
+              consRate.push_back( portResrcConsFile.consRateAsFloat(port,portLoc,skill,resrcLoc,band,role,homeSite,t));
+            }            
+          }
+          
+          // set resource attributes
+          grp.setPortfolioResourceLinkConsRate(
+            port,portLoc, skill,resrcLoc,band,role,homeSite,consRate);
+#if 0
+          // Now determine if there are any resources with the
+          // same skill and role at a higher band that could be used as
+          // as substitute
+          {
+            
+            int bandI = atoi(band.c_str());
+            assert(bandI>=MINBAND);
+            assert(bandI<=MAXBAND);
+            
+            // loop once for each band greater than bandI
+            for ( int bi=bandI+1; bi<MAXBAND; ++bi ) {
+              
+              // get next band that can substitute for bandI
+              std::string & subsBand = bandRank[bi];
+              
+              // Does a skill, loc, role exist for substitute band
+              if (resrcsFile.keyExists(skill,resrcLoc,subsBand,role)) {
+                // it does exist, so indicte that it can substitute for bandI
+                grp.addSubstituteResourceLink(
+                  port,portLoc,
+                  skill,resrcLoc,band,role,
+                  homeSite,
+                  skill,resrcLoc,subsBand,role);
+              }
+            }
+          }
+#endif
+        }
+      }
+    }
+       
+    // Solve
+    cout <<"Solving." <<endl;
+    grp.writeWitData(outputDirectory+"/data.wit");
+
+    // Open portResrcUsage file and write header.
+    std::string portResrcUsageFileName = outputDirectory+"/portResrcUsageO.csv";
+    FILE * portResrcUsageFilePtr = fopen(portResrcUsageFileName.c_str(),"w");
+    std::string heading;
+    heading="\"algorithm\",\"port\",\"portLoc\",\"skill\",\"resrcLoc\",\"band\",\"role\",\"usageLoc\",\"period\",\"usageVol\",\"consRate\",\"supplyVol\",\"unitCost\""; 
+    fprintf(portResrcUsageFilePtr,"%s\n",heading.c_str());    
+    
+    // Open portLoc file and write header.
+    std::string portLocFileName = outputDirectory+"/portLocO.csv";
+    FILE * portLocFilePtr = fopen(portLocFileName.c_str(),"w");
+    heading="\"algorithm\",\"port\",\"portLoc\",\"execVol\",\"cost\""; 
+    fprintf(portLocFilePtr,"%s\n",heading.c_str());
+
+    // Open resrc file and write header.
+    std::string resrcFileName = outputDirectory+"/resrcO.csv";
+    FILE * resrcFilePtr = fopen(resrcFileName.c_str(),"w");
+    heading="\"algorithm\",\"skill\",\"loc\",\"band\",\"role\",\"period\",\"supplyVol\",\"consVol\""; 
+    fprintf(resrcFilePtr,"%s\n",heading.c_str());
+
+    for ( int runNum=1 ; ; runNum++ ) {
+
+      // Get algorithm to be used on this run.
+      std::string alg;
+      {
+        char attrName[100];
+        sprintf(attrName,"algRun%d",runNum);
+        
+        // If algorithm for this run was not specified then exit
+        if ( !globalAttrFile.keyExists(attrName) ) {
+          if ( runNum==1 ) {
+            cout 
+              <<"-------------------------------------------------------"        <<endl
+              <<"Error: globalAttr file does not contain a record"               <<endl
+              <<"   with the attrName field containing \"algRun1\"."             <<endl
+              <<"   The algorithm to be used on the first run must be specified."<<endl
+              <<"   globalAttr filename: " <<globalAttrFile.filename().c_str()   <<endl
+              <<"-------------------------------------------------------"        <<endl;
+          }
+          break;
+        }  
+        alg=globalAttrFile.fieldAsString(attrName,"attrValue");
+        cout <<"  Solving run number " <<runNum <<" with algorithm " <<alg.c_str() <<endl;
+        if ( GRproblem::validAlgorithm(alg) ) {
+          grp.setAlgorithm(alg);
+        }
+        else {
+          cout 
+            <<"-------------------------------------------------------"            <<endl
+            <<"Error: globalAttr file contains an unrecognized algorithm."         <<endl
+            <<"   globalAttr filename: " <<globalAttrFile.filename().c_str()       <<endl
+            <<"   algorithm specified in attrValue field  contains: " <<alg.c_str()<<endl
+            <<"   attrName field on record contains: " <<attrName                  <<endl
+            <<"-------------------------------------------------------"            <<endl;
+          break;
+        }
+      }
+
+      grp.solve();
+      
+      // Check to see if sufficient resources for all portfolios
+      if ( !grp.sufficientResources() ) {
+        cout <<"Not enough resources to source all portfolios\n";
+        
+        std::vector<std::string> resourceDescriptions;
+        std::vector<int> periods;
+        std::vector<float> shortageVols;
+        grp.getShortages( resourceDescriptions, periods, shortageVols );
+        
+        for ( int i=0; i<periods.size(); i++ ){
+          cout 
+            <<periods[i] <<" "
+            <<shortageVols[i] <<" "
+            <<resourceDescriptions[i].c_str() <<endl;
+        }
+      }
+      else {
+        
+        cout <<"    Writing results file." <<endl;
+        
+        float obj=grp.getObjValue();
+        cout <<"    Objective function value is " <<obj <<endl;
+        
+        // Write first output file
+        {
+          
+          std::vector<std::string> ports; 
+          std::vector<std::string> portLocs; 
+          std::vector<std::string> skills;
+          std::vector<std::string> resrcLocs;
+          std::vector<std::string> bands;
+          std::vector<std::string> roles;
+          std::vector<bool> homeSites;  
+#if 0
+          grp.getPortfolioResourceLinksWithSubs(ports,portLocs,skills,resrcLocs,bands,roles,homeSites);
+          int portsSize = ports.size();
+          for ( int rl=0 ; rl<portsSize; rl++ ) {
+            std::string port  = ports[rl];
+            std::string portLoc = portLocs[rl];
+            std::string skill = skills[rl];
+            std::string resrcLoc = resrcLocs[rl];
+            std::string band = bands[rl];
+            std::string role = roles[rl];
+            bool homeSite = homeSites[rl];
+            
+            // Get resouce usage
+            std::vector<float> usage = grp.getPortfolioResourceLinkConsVol(
+              port,portLoc, skill,resrcLoc,band,role,homeSite);
+#else
+            grp.getPortfolioLocationLinks(ports,portLocs);
+            for( int pl=0; pl<ports.size(); ++pl ) {
+              std::vector< std::vector<float> > consVols;
+              grp.getPortfolioLocConsVols(ports[pl],portLocs[pl],skills,resrcLocs,bands,roles,homeSites,consVols);
+              assert( skills.size() == consVols.size() );
+              for ( int cr=0; cr<skills.size(); cr++ ) {
+                
+                std::string port  = ports[pl];
+                std::string portLoc = portLocs[pl];
+                std::string skill = skills[cr];
+                std::string resrcLoc = resrcLocs[cr];
+                std::string band = bands[cr];
+                std::string role = roles[cr];
+                bool homeSite = homeSites[cr];
+                std::vector<float> usage = consVols[cr];
+
+#endif
+            
+#if 0
+            std::vector<float> usageRate = grp.getPortfolioResourceLinkConsRate(
+              port,portLoc, skill,resrcLoc,band,role,homeSite);
+#endif
+            std::vector<float> supplyVol= grp.getResourceSupply(
+              skill,resrcLoc,band,role);
+            
+            // Get cost of consuming a unit of the resource
+            std::vector<float> usageUnitCost;
+            
+            if ( homeSite ) 
+              usageUnitCost = grp.getResourceCostHomeSite(skill,resrcLoc,band,role);
+            else 
+              usageUnitCost = grp.getResourceCostRemoteSite(skill,resrcLoc,band,role);
+            
+            for (int t=0; t<nPeriods; ++t ) {
+
+              //if ( t!=1 ) continue;
+              
+              // don't write records which have 0 usage of resource
+              OsiRelFltEq eq;
+              //if ( eq(usage[t],0.0) ) continue;
+              
+              std::string shore;
+              if (homeSite) shore="HomeSite";
+              else shore="RemoteSite";
+              
+              fprintf(portResrcUsageFilePtr,
+                "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%f,%f,%f,%f\n",
+                alg.c_str(),port.c_str(),portLoc.c_str(),
+                skill.c_str(),resrcLoc.c_str(),band.c_str(),role.c_str(),
+                shore.c_str(),
+                t+1,usage[t],-1.0/*usageRate[t]*/,supplyVol[t],usageUnitCost[t]);
+            }
+          }
+        }
+          }
+        
+        // write second output file
+        {          
+          // Loop once for each portfolio
+          const std::vector<std::string>& ports=grp.getPortfolios();
+          for (int p=0; p<ports.size(); p++ ) {
+            
+            // Loop once for each location where portfolio can be performed
+            std::vector<std::string> locs=grp.getPortfolioLocs(ports[p]);
+            for (int l=0; l<locs.size(); l++) {
+              
+              // Get cost of portfolio at location
+              float cost=grp.getPortfolioLocationCost(ports[p],locs[l]);
+              
+              // Get portfolio sourcing at this location
+              float execVol=grp.getPortfolioLocationExecVol(ports[p],locs[l]);            
+              
+              fprintf(portLocFilePtr,
+                "\"%s\",\"%s\",\"%s\",%f,%f\n",
+                alg.c_str(),ports[p].c_str(),locs[l].c_str(),
+                execVol,cost);
+            }
+          }
+        }
+        
+        // write third output file
+        {          
+          // Loop once for each resource
+          std::vector<std::string> skills;
+          std::vector<std::string> locs;
+          std::vector<std::string> bands;
+          std::vector<std::string> roles;
+          grp.getResources(skills,locs,bands,roles);
+          for (int r=0; r<skills.size(); r++ ) {
+
+#if 0
+            if ( !(
+              skills[r]=="COBOL" && 
+              locs[r]=="India - IGSI" && 
+              (bands[r]=="7" || bands[r]=="6")   && 
+              roles[r]=="Application Developer" 
+              //&& alg=="SimpleGreedy" 
+              ) ) continue;
+#endif
+            
+            
+            // Get resource supply volume and consVol
+            std::vector<float> sv=grp.getResourceSupply(skills[r],locs[r],bands[r],roles[r]);
+            std::vector<float> cv=grp.getResourceConsVol(skills[r],locs[r],bands[r],roles[r]);
+            
+            for ( int t=0; t<nPeriods; t++ ) {
+              
+              fprintf(resrcFilePtr,
+                "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%f,%f\n",
+                alg.c_str(),
+                skills[r].c_str(),locs[r].c_str(),bands[r].c_str(),roles[r].c_str(),
+                t+1,sv[t],cv[t]);
+            }
+          }
+        }
+      }
+    } //for ( int runNum=1 ; ; runNum++ ) 
+
+#ifdef JP_TEST
+    //---------------------------------------------------------        
+    // Test that the consRate in the data files agrees with
+    // consRate in grProblem
+    {
+      
+      
+      std::string portResrcConsFileName = std::string(inputDirectory) + "/portResrcCons.csv";
+      GRportResrcConsFile portResrcConsFile(portResrcConsFileName);
+      GRportResrcConsFileIterator portResrcConsFileIter(portResrcConsFile);
+      
+      
+      // loop once for each record
+      for ( ; portResrcConsFileIter()!=NULL; ) {
+        std::string port = portResrcConsFileIter.port();
+        std::string portLoc = portResrcConsFileIter.portLoc();
+        std::string skill = portResrcConsFileIter.skill();
+        std::string resrcLoc = portResrcConsFileIter.resrcLoc();
+        std::string band = portResrcConsFileIter.band();
+        std::string role = portResrcConsFileIter.role();
+        bool homeSite = portResrcConsFileIter.homeSite();
+        int period = portResrcConsFileIter.periodAsInt();
+        float consRate = portResrcConsFileIter.consRateAsFloat();
+        
+        std::vector<float> grConsRateV = grp.getPortfolioResourceLinkConsRate(
+          port,portLoc,skill,resrcLoc,band,role,homeSite);
+        float grConsRate=grConsRateV[period-1];
+        assert( consRate == grConsRate );
+      }
+      
+    }
+#endif
+#endif
+  }
+  
+  
+
+  
+  
+  
+  //---------------------------------------------------------
+  cout <<"classroom scheduling application is finished." <<endl;
+  return 0;
+}
+
+
+@
+
+
+1.4
+log
+@Gyana changed name from globalResource to classroom scheduling.
+@
+text
+@d98 1
+@
+
+
+1.3
+log
+@Added set methods for a class nDays and nSeats
+@
+text
+@d740 1
+a740 1
+  cout <<"globalResource application is finished." <<endl;
+@
+
+
+1.2
+log
+@Gyana's latest changes
+@
+text
+@d94 5
+a98 1
+	crp.addClass("NT Basics","POK","1",25,3);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d90 1
+a90 1
+    int nPeriods;
+d94 1
+a94 1
+	crp.addClass("NT Basics","POK","1");
+@
+
+
+1.1.1.1
+log
+@start
+@
+text
+@@

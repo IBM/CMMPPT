@@ -1,0 +1,500 @@
+head	1.1;
+access;
+symbols
+	beforeTiersAdded:1.1;
+locks; strict;
+comment	@// @;
+
+
+1.1
+date	2002.03.28.15.42.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Changes to add osl mip solver structure to code
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+#endif
+
+
+#include <strstream>
+#include <iostream>
+//#include <iomanip>
+#include <assert.h>
+
+#include "MBhashTable.h"
+
+
+
+int MBhashTable::hash_mult[81] = {
+      262139,259459,256889,254291,251701,249133,246709,244247,
+      241667,239179,236609,233983,231289,228859,226357,223829,
+      221281,218849,216319,213721,211093,208673,206263,203773,
+      201233,198637,196159,193603,191161,188701,186149,183761,
+      181303,178873,176389,173897,171469,169049,166471,163871,
+      161387,158941,156437,153949,151531,149159,146749,144299,
+      141709,139369,136889,134591,132169,129641,127343,124853,
+      122477,120163,117757,115361,112979,110567,108179,105727,
+      103387,101021,98639, 96179, 93911, 91583, 89317, 86939, 84521,
+      82183, 79939, 77587, 75307, 72959, 70793, 68447, 66103
+  };
+
+const void * MBhashTable::gutsOfValueAllowUndefinedKeys( const void* keys ) const
+{
+  // If key is undefined return NULL
+  const void * retVal = NULL;
+  if ( hashTableSize()==0 ) {
+    initializeHashTable();
+  }
+  if ( hashTableSize() == 0 ) return retVal;
+  int ipos = hashKey(keys);
+  while (1) {
+    const void * item = hashTable_[ipos].item;
+    if (!item) {
+      return retVal;
+    }
+    if ( found(item,keys) ) {
+      retVal=item;
+      return retVal;
+    } else {
+      int k = hashTable_[ipos].next;
+      if (k != -1)
+        ipos = k;
+      else {
+        return retVal;
+      }
+    }
+  }
+}
+
+const void * MBhashTable::gutsOfValue( const void* keys ) const throw(MBerror)
+{
+  const void * retVal = gutsOfValueAllowUndefinedKeys( keys );    
+  if (retVal==NULL) {
+    std::ostrstream errMsg;
+    errMsg <<"Item not in hash table." <<'\0';
+    throw MBerror(errMsg.str(), "gutsOfValue","MBhashTable");
+  }
+  return retVal;
+}
+
+void MBhashTable::addItemToHashTable( void * dataTableEntryPtr )
+{
+  if(hashTable_==NULL) return;
+  
+  int nitem= dataTableSize();
+
+  // only add a single item if the table isn't too full
+  if ( nitem*3 > hashTableSize() ) {
+    clearHashTable();
+    return;
+  }
+  
+  int iq=0;
+  int ipos;
+  int nfirst=0;
+  dataTableInitNextItemPtr();
+  //const void* dataTableEntryPtr = dataTableGetNextItemPtr();
+  ipos = hashKey( dataTableEntryPtr );
+  if (!hashTable_[ipos].item) {
+    // Found a place to put item
+    hashTable_[ipos].item = dataTableEntryPtr;
+    nfirst++;
+  }
+  else {
+    // Need to put item someplace else since there was a clash
+    int iput=-1;
+    iq=0; 
+    while (1) {
+      int k = hashTable_[ipos].next;
+      if (k == -1) {
+        while (1) {
+          ++iput;
+          assert (iput < nitem);
+          if (!hashTable_[iput].item) {
+            break;
+          }
+        }
+        hashTable_[ipos].next = iput;
+        hashTable_[iput].item=dataTableEntryPtr;
+        break;
+      } else {
+        /* nothing worked - try it again */
+        ipos = k;
+      }
+    }
+  }
+}
+
+
+
+void MBhashTable::initializeHashTable() const
+{
+  //hashTableInitialized_=true;
+  int nitem= dataTableSize();
+  int maxhash=5*nitem;
+  hashTableSize_ = maxhash;
+  hashTable_ = new Link[hashTableSize_];
+  int i;
+  Link nullitem={NULL,-1};
+  for (i=0;i<maxhash;i++) {
+    hashTable_[i] = nullitem;
+  }
+  int iq=0;
+  int ipos;
+  int nfirst=0;
+  dataTableInitNextItemPtr();
+  for (i=0;i<nitem;i++) {
+    const void* dataTableEntryPtr = dataTableGetNextItemPtr();
+    ipos = hashKey( dataTableEntryPtr );
+    if (!hashTable_[ipos].item) {
+      hashTable_[ipos].item = dataTableEntryPtr;
+      nfirst++;
+    }
+  }
+  std::cout <<nfirst<<" in hash first time out of "<<nitem<<std::endl;
+  int iput=-1;
+  iq=0;
+  dataTableInitNextItemPtr();
+  for (i=0;i<nitem;i++) {    
+    const void* dataTableEntryPtr = dataTableGetNextItemPtr();
+    ipos = hashKey( dataTableEntryPtr );
+    while (1) {
+      const void * j1 = hashTable_[ipos].item;
+      if ( j1==dataTableEntryPtr ) {
+        break;
+      } else {
+        int k = hashTable_[ipos].next;
+        if (k == -1) {
+          while (1) {
+            ++iput;
+            assert (iput < nitem);
+            if (!hashTable_[iput].item) {
+              break;
+            }
+          }
+          hashTable_[ipos].next = iput;
+          hashTable_[iput].item=dataTableEntryPtr;
+          break;
+        } else {
+          /* nothing worked - try it again */
+          ipos = k;
+        }
+      }
+    }
+  }
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+MBhashTable::MBhashTable ()
+:hashTable_(NULL),
+hashTableSize_(0)
+//hashTableInitialized_(false)
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+MBhashTable::MBhashTable (const MBhashTable & source)  
+:
+hashTable_(source.hashTable_)
+{  
+  hashTableSize_ = source.hashTableSize_;
+  if ( hashTableSize_ != 0 ) {
+    hashTable_ = new Link[hashTableSize_];
+    int i;
+    for ( i=0; i<hashTableSize_; i++ ) {
+      hashTable_[i] = source.hashTable_[i];
+    }
+  }
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+MBhashTable::~MBhashTable ()
+{
+  delete [] hashTable_;
+}
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+MBhashTable &
+MBhashTable::operator=(
+                   const MBhashTable& rhs)
+{
+  if (this != &rhs) {
+     delete [] hashTable_;
+     hashTable_ = NULL; 
+     hashTableSize_ = rhs.hashTableSize_;
+     if ( hashTableSize_ != 0 ) {
+       hashTable_ = new Link[hashTableSize_];
+       int i;
+       for ( i=0; i<hashTableSize_; i++ ) {
+         hashTable_[i] = rhs.hashTable_[i];
+       }
+     }
+     //hashTable_ = rhs.hashTable_;
+    //hashTableInitialized_ = rhs.hashTableInitialized_;
+  }
+  return *this;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void MBhashTableIntIntToInt::insert( int key0, int key1, int value )
+{
+  //clearHashTable();
+  IntIntIntTriple elem;
+  elem.key0=key0;
+  elem.key1=key1;
+  elem.value=value;
+  dataTable_.push_back(elem);
+  addItemToHashTable( &dataTable_.back() );
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntToInt::MBhashTableIntIntToInt ()
+:dataTable_()
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntToInt::MBhashTableIntIntToInt (const MBhashTableIntIntToInt & source)  
+:
+dataTable_(source.dataTable_)
+{  
+  // nothing to do here
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntToInt::~MBhashTableIntIntToInt ()
+{
+  // nothing to do here
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+MBhashTableIntIntToInt &
+MBhashTableIntIntToInt::operator=(
+                   const MBhashTableIntIntToInt& rhs)
+{
+  if (this != &rhs) {
+    dataTable_ = rhs.dataTable_;
+  }
+  return *this;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void MBhashTableStringToInt::insert( const std::string & key, int value )
+{
+  //clearHashTable();
+  StringIntPair elem;
+  elem.key=&key;
+  elem.value=value;
+  dataTable_.push_back(elem);
+  addItemToHashTable( &dataTable_.back() );
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+MBhashTableStringToInt::MBhashTableStringToInt ()
+:dataTable_()
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+MBhashTableStringToInt::MBhashTableStringToInt (const MBhashTableStringToInt & source)  
+:
+dataTable_(source.dataTable_)
+{  
+  // nothing to do here
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+MBhashTableStringToInt::~MBhashTableStringToInt ()
+{
+  // nothing to do here
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+MBhashTableStringToInt &
+MBhashTableStringToInt::operator=(
+                   const MBhashTableStringToInt& rhs)
+{
+  if (this != &rhs) {
+    dataTable_ = rhs.dataTable_;
+  }
+  return *this;
+}
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void MBhashTableIntIntIntToInt::insert( int key0, int key1, int key2, int value )
+{
+  //clearHashTable();
+  IntIntIntIntQuadruple elem;
+  elem.key0=key0;
+  elem.key1=key1;
+  elem.key2=key2;
+  elem.value=value;
+  dataTable_.push_back(elem);
+  addItemToHashTable( &dataTable_.back() );
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntToInt::MBhashTableIntIntIntToInt ()
+:dataTable_()
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntToInt::MBhashTableIntIntIntToInt (const MBhashTableIntIntIntToInt & source)  
+:
+dataTable_(source.dataTable_)
+{  
+  // nothing to do here
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntToInt::~MBhashTableIntIntIntToInt ()
+{
+  // nothing to do here
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntToInt &
+MBhashTableIntIntIntToInt::operator=(
+                   const MBhashTableIntIntIntToInt& rhs)
+{
+  if (this != &rhs) {
+    dataTable_ = rhs.dataTable_;
+  }
+  return *this;
+}
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void MBhashTableIntIntIntIntToInt::insert( int key0, int key1, int key2, int key3, int value )
+{
+  //clearHashTable();
+  IntIntIntIntIntQuintuple elem;
+  elem.key0=key0;
+  elem.key1=key1;
+  elem.key2=key2;
+  elem.key3=key3;
+  elem.value=value;
+  dataTable_.push_back(elem);
+  addItemToHashTable( &dataTable_.back() );
+}
+
+
+//-------------------------------------------------------------------
+// Default Constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntIntToInt::MBhashTableIntIntIntIntToInt ()
+:dataTable_()
+{
+  // nothing to do here
+}
+
+//-------------------------------------------------------------------
+// Copy constructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntIntToInt::MBhashTableIntIntIntIntToInt (const MBhashTableIntIntIntIntToInt & source)  
+:
+dataTable_(source.dataTable_)
+{  
+  // nothing to do here
+}
+
+
+//-------------------------------------------------------------------
+// Destructor 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntIntToInt::~MBhashTableIntIntIntIntToInt ()
+{
+  // nothing to do here
+}
+
+//----------------------------------------------------------------
+// Assignment operator 
+//-------------------------------------------------------------------
+MBhashTableIntIntIntIntToInt &
+MBhashTableIntIntIntIntToInt::operator=(
+                   const MBhashTableIntIntIntIntToInt& rhs)
+{
+  if (this != &rhs) {
+    dataTable_ = rhs.dataTable_;
+  }
+  return *this;
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+#if 0
+
+//--------------------------------------------------------------------------
+// test  method
+//--------------------------------------------------------------------------
+int
+MBhashTableIntIntToInt::unitTest()
+{
+ 
+
+  return 0;
+}
+#endif
+@

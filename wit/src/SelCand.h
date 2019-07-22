@@ -1,0 +1,97 @@
+//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+#ifndef SelCandH
+#define SelCandH
+
+//------------------------------------------------------------------------------
+// Header file: "SelCand.h"
+//
+// Contains the declaration of class SelCand.
+//------------------------------------------------------------------------------
+
+#include <Assoc.h>
+
+//------------------------------------------------------------------------------
+// Class SelCand
+//
+// "Selection Candidate"
+//
+// Abstract representation of a candidate for selection.
+//
+// Class Hierarchy:
+//
+// SelCand
+//    MrCand
+//    BaCand
+//    MeCand
+//    SsrCand
+//    PrCand
+//
+// Implemented in SelSplit.C.
+//------------------------------------------------------------------------------
+
+class WitSelCand: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitSelCand ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      virtual void prtID () = 0;
+         //
+         // Prints info identifying this SelCand.
+
+      virtual void getMrData  (WitRtCand * &    theRtCand);
+      virtual void getBaData  (WitPeriod &      expPer);
+      virtual void getMeData  (WitPeriod &      execPer);
+      virtual void getSsrData (bool &           srAllowedVal);
+      virtual void getPoData  (bool &           activeVal,
+                               bool &           potActiveVal);
+      virtual void getPrData  (WitRtCandStack & theRtCands);
+         //
+         // Each of these functions sets it arguments to the selection state
+         // data for this SelCand for a particular selection case.
+         // If this SelCand does not belong to the indicated case, a fatal error
+         // is issued.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Protected member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitSelCand (WitProblem *);
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitSelCand);
+   };
+
+#endif

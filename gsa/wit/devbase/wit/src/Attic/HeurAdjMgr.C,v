@@ -1,0 +1,848 @@
+head	1.16;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.16
+date	2010.09.21.21.19.12;	author rjw;	state dead;
+branches;
+next	1.15;
+
+1.15
+date	2010.09.21.19.58.43;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2010.09.20.19.50.27;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.09.17.23.23.20;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.09.17.22.38.53;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.09.17.22.20.53;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.09.16.22.40.26;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.09.10.23.22.43;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2010.09.10.23.17.46;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.09.10.22.10.38;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2010.09.10.21.46.38;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2010.09.10.21.12.28;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2010.09.10.20.12.06;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2010.09.10.16.03.49;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2010.09.07.23.50.33;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2010.09.07.19.52.01;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.16
+log
+@Heuristic Adjustment
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "HeurAdjMgr.C"
+//
+// Contains the implementation of class HeurAdjMgr
+//------------------------------------------------------------------------------
+
+#include <HeurAdjMgr.h>
+#include <HeurAllMgr.h>
+#include <GlobalComp.h>
+#include <Operation.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <BoundSet.h>
+#include <IVRealArg.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class HeurAdjMgr.
+//------------------------------------------------------------------------------
+
+WitHeurAdjMgr::WitHeurAdjMgr (WitProblem * theProblem):
+
+      WitProbAssoc       (theProblem),
+      heurAdjustAllowed_ (false),
+      active_            (false),
+      pairsToSubCheck_   (myProblem ()),
+      toSubCheck_        ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitHeurAdjMgr::~WitHeurAdjMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::setHeurAdjustAllowed (bool theValue)
+   {
+   heurAdjustAllowed_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::start ()
+   {
+   stronglyAssert (heurAdjustAllowed_);
+
+   checkPreconditions ();
+
+   toSubCheck_.allocate (myProblem (), false);
+
+   active_ = true;
+
+   myMsgFac () ("heurAdjActiveMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::finish ()
+   {
+   stronglyAssert (active_);
+
+   checkSubCons ();
+
+   toSubCheck_.clear ();
+
+   active_ = false;
+
+   myMsgFac () ("heurAdjInactiveMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::adjustForExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod     execPer;
+   double        deltaExecVol;
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     impactPer;
+   double        deltaAvailVol;
+
+   stronglyAssert (active_);
+
+   checkExecVol (theOpn, theVec);
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaExecVol =
+           theVec            [execPer]
+         - theOpn->execVol ()[execPer];
+
+      if (fabs (deltaExecVol) < NET_TOL)
+         continue;
+
+      forEachEl (theBomEnt, theOpn->bom ())
+         {
+         if (not theBomEnt->inEffect (execPer))
+            continue;
+
+         thePart       =   theBomEnt->myPart       ();
+         impactPer     =   theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = - theBomEnt->effConsRate  ()[execPer] * deltaExecVol;
+
+         myHeurAllMgr ()->adjustIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+
+      forEachEl (theBopEnt, theOpn->bop ())
+         {
+         if (not theBopEnt->inEffect (execPer))
+            continue;
+
+         thePart       = theBopEnt->myPart       ();
+         impactPer     = theBopEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBopEnt->effProdRate  ()[execPer] * deltaExecVol;
+
+         myHeurAllMgr ()->adjustIncAvailVol (thePart, impactPer, deltaAvailVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::adjustForSubVol (
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitPart *     subPart;
+   WitBomEntry * theBomEnt;
+   WitPart *     bomPart;
+   WitPeriod     execPer;
+   double        deltaSubVol;
+   WitPeriod     consPer;
+   double        deltaAvailVol;
+
+   stronglyAssert (active_);
+
+   checkSubVol (theSub, theVec);
+
+   subPart   = theSub   ->myPart   ();
+   theBomEnt = theSub   ->myBomEnt ();
+   bomPart   = theBomEnt->myPart   ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      deltaSubVol =
+           theVec           [execPer]
+         - theSub->subVol ()[execPer];
+
+      if (fabs (deltaSubVol) < NET_TOL)
+         continue;
+
+      if (theSub->inEffect (execPer))
+         {
+         consPer       =   theSub->impactPeriod ()[execPer];
+         deltaAvailVol = - theSub->effConsRate  ()[execPer] * deltaSubVol;
+
+         myHeurAllMgr ()->adjustIncAvailVol (subPart, consPer, deltaAvailVol);
+         }
+
+      if (theBomEnt->inEffect (execPer))
+         {
+         consPer       = theBomEnt->impactPeriod ()[execPer];
+         deltaAvailVol = theBomEnt->effConsRate  ()[execPer] * deltaSubVol;
+
+         myHeurAllMgr ()->adjustIncAvailVol (bomPart, consPer, deltaAvailVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::adjustForShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   WitPart * thePart;
+   WitPeriod shipPer;
+   double    deltaShipVol;
+
+   stronglyAssert (active_);
+
+   checkShipVol (theDemand, theVec);
+
+   thePart = theDemand->demandedPart ();
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      deltaShipVol =
+           theVec               [shipPer]
+         - theDemand->shipVol ()[shipPer];
+
+      if (fabs (deltaShipVol) < NET_TOL)
+         continue;
+
+      myHeurAllMgr ()->adjustIncAvailVol (thePart, shipPer, - deltaShipVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkPreconditions ()
+   {
+   verify (myHeurAllMgr ()->active (),              "heurAllocActive",   true);
+   verify (                 active_,                "heurAdjustActive",  false);
+   verify (myGlobalComp ()->selectionRecovery (),   "selectionRecovery", true);
+   verify (myGlobalComp ()->skipFailures (),        "skipFailures",      false);
+   verify (myGlobalComp ()->perfPegging (),         "perfPegging",       false);
+   verify (myGlobalComp ()->computeCriticalList (), "computeCriticalList",
+                                                                         false);
+   verify (myGlobalComp ()->pgdCritListMode (),     "pgdCritListMode",   false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::verify (
+      bool         theAttVal,
+      const char * theAttName,
+      bool         theReqVal)
+   {
+   if (theAttVal != theReqVal)
+      myMsgFac () ("globBoolAttReqSmsg",
+         theAttName,
+         theReqVal,
+         "witStartHeurAdjust");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkExecVol (
+      WitOperation *       theOpn,
+      const WitIVRealArg & theVec)
+   {
+   WitPeriod execPer;
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theOpn->execVol ()[execPer])
+         {
+         checkNonExecCon (theOpn, execPer, theVec[execPer]);
+         checkExecHUBCon (theOpn, execPer, theVec[execPer]); 
+         checkLotSizeCon (theOpn, execPer, theVec[execPer]);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkSubVol (
+      WitSubEntry *        theSub,
+      const WitIVRealArg & theVec)
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+
+   theBomEnt = theSub->myBomEnt ();
+
+   forEachPeriod (execPer, myProblem ())
+      {
+      if (theVec[execPer] != theSub->subVol ()[execPer])
+         {
+         if (not toSubCheck_ (theBomEnt)[execPer])
+            {
+            pairsToSubCheck_.push (theBomEnt, execPer);
+
+            toSubCheck_ (theBomEnt)[execPer] = true;
+            }
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkShipVol (
+      WitDemand *          theDemand,
+      const WitIVRealArg & theVec)
+   {
+   double    cumDemandVol;
+   double    cumShipVol;
+   WitPeriod shipPer;
+   double    violation;
+
+   cumDemandVol = 0.0;
+   cumShipVol   = 0.0;
+
+   forEachPeriod (shipPer, myProblem ())
+      {
+      cumDemandVol += theDemand->demandVol ()[shipPer];
+      cumShipVol   += theVec                 [shipPer];
+
+      violation     = positivePart (cumShipVol - cumDemandVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("heurAdjCumDemandViolSmsg",
+            theDemand->demandedPartName (),
+            theDemand->demandName       (),
+            shipPer,
+            cumShipVol,
+            cumDemandVol,
+            violation);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkNonExecCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   if (not theOpn->executable ()[execPer])
+      if (theValue > 0.0)
+         {
+         myMsgFac () ("heurAdjNonExecViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theValue);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkExecHUBCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   double hardUBVal;
+   double violation;
+
+   if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+      {
+      hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+
+      violation = positivePart (theValue - hardUBVal);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("heurAdjExecHUBViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theValue,
+            hardUBVal,
+            violation);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkLotSizeCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   double delta;
+   double violation;
+
+   delta     = theOpn->lotSizeDelta (execPer, theValue, 0.0);
+
+   violation = positivePart (delta);
+
+   if (violation > FEAS_TOL)
+      {
+      myMsgFac () ("heurAdjLotSizeViolSmsg",
+         theOpn->operationName (),
+         execPer,
+         theValue,
+         violation);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAdjMgr::checkSubCons ()
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+   double        sumSubVols;
+   WitSubEntry * theSub;
+   double        theExecVol;
+   double        violation;
+
+   while (pairsToSubCheck_.isNonEmpty ())
+      {
+      pairsToSubCheck_.pop (theBomEnt, execPer);
+
+      toSubCheck_ (theBomEnt)[execPer] = false;
+
+      sumSubVols = 0.0;
+
+      forEachEl (theSub, theBomEnt->mySubEntries ())
+         {
+         sumSubVols += theSub->subVol ()[execPer];
+         }
+
+      theExecVol = theBomEnt->myOperation ()->execVol ()[execPer];
+
+      violation  = positivePart (sumSubVols - theExecVol);
+
+      if (violation > FEAS_TOL)
+         {
+         myMsgFac () ("heurAdjSubViolSmsg",
+            theBomEnt->myOperationName (),
+            theBomEnt->localIndex      (),
+            execPer,
+            theExecVol,
+            sumSubVols,
+            violation);
+         }
+      }
+   }
+@
+
+
+1.15
+log
+@Heuristic Adjustment
+@
+text
+@@
+
+
+1.14
+log
+@Heuristic Adjustment
+@
+text
+@d35 3
+a37 1
+      active_            (false)
+d62 2
+d75 4
+d153 2
+d253 31
+a283 3
+      checkNonExecCon (theOpn, execPer, theVec[execPer]);
+      checkExecHUBCon (theOpn, execPer, theVec[execPer]); 
+      checkLotSizeCon (theOpn, execPer, theVec[execPer]);
+d389 41
+@
+
+
+1.13
+log
+@Heuristic Adjustment
+@
+text
+@d258 1
+d268 3
+a270 1
+      if (cumShipVol > cumDemandVol + FEAS_TOL)
+d278 1
+a278 1
+            cumShipVol - cumDemandVol);
+d308 1
+d314 3
+a316 1
+      if (theValue > hardUBVal + FEAS_TOL)
+d322 2
+a323 1
+            hardUBVal);
+d336 1
+a336 1
+   double lsViol;
+d338 1
+a338 1
+   delta  = theOpn->lotSizeDelta (execPer, theValue, 0.0);
+d340 1
+a340 1
+   lsViol = positivePart (delta);
+d342 1
+a342 1
+   if (lsViol > FEAS_TOL)
+d348 1
+a348 1
+         lsViol);
+@
+
+
+1.12
+log
+@Heuristic Adjustment
+@
+text
+@d80 1
+a80 1
+      const WitIVRealArg & theValue)
+d92 1
+a92 1
+   checkExecVol (theOpn, theValue);
+d97 1
+a97 1
+           theValue          [execPer]
+d133 1
+a133 1
+      const WitIVRealArg & theValue)
+d152 1
+a152 1
+           theValue         [execPer]
+d180 1
+a180 1
+      const WitIVRealArg & theValue)
+d188 2
+d195 1
+a195 1
+           theValue             [shipPer]
+d237 1
+a237 1
+      const WitIVRealArg & theValue)
+d243 35
+a277 4
+      checkNonExecCon (theOpn, execPer, theValue[execPer]);
+      checkExecHUBCon (theOpn, execPer, theValue[execPer]); 
+      checkLotSizeCon (theOpn, execPer, theValue[execPer]);
+     }
+@
+
+
+1.11
+log
+@Heuristic Adjustment
+@
+text
+@d295 2
+a296 1
+   }
+d298 1
+a298 1
+//------------------------------------------------------------------------------
+d300 1
+a300 9
+#if 0
+
+void WitHeurAdjMgr::checkLotSizeCon (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         theValue)
+   {
+   double deltaWTol;
+   double lsViol;
+d302 1
+a302 3
+   deltaWTol = theOpn->lotSizeDelta (execPer, theValue, 0.0);
+
+   if (deltaWTol > 0.0)
+d304 5
+a308 10
+      lsViol = theOpn->lotSizeDelta (execPer, theValue, 0.0);
+
+      if (lsViol > FEAS_TOL)
+         {
+         myMsgFac () ("heurAdjLotSizeViolSmsg",
+            theOpn->operationName (),
+            execPer,
+            theValue,
+            lsViol);
+         }
+a310 2
+
+#endif
+@
+
+
+1.10
+log
+@Heuristic Adjustment
+@
+text
+@a237 1
+   double    hardUBVal;
+d241 22
+a262 8
+      if (not theOpn->executable ()[execPer])
+         if (theValue[execPer] > 0.0)
+            {
+            myMsgFac () ("heurAdjNonExecViolSmsg",
+               theOpn->operationName ().myCstring (),
+               execPer,
+               theValue[execPer]);
+            }
+d264 14
+a277 1
+      if (theOpn->execBounds ()->hardUBIsFinite (execPer))
+d279 21
+a299 1
+         hardUBVal = theOpn->execBounds ()->hardUB ()[execPer];
+d301 21
+a321 8
+         if (theValue[execPer] > hardUBVal + FEAS_TOL)
+            {
+            myMsgFac () ("heurAdjExecHUBViolSmsg",
+               theOpn->operationName ().myCstring (),
+               execPer,
+               theValue[execPer],
+               hardUBVal);
+            }
+d325 2
+@
+
+
+1.9
+log
+@Heuristic Adjustment
+@
+text
+@d23 1
+d92 2
+d230 36
+@
+
+
+1.8
+log
+@Heuristic Adjustment
+@
+text
+@a69 2
+   myHeurAllMgr ()->updateForAdjust ();
+
+@
+
+
+1.7
+log
+@Heuristic Adjustment
+@
+text
+@d21 1
+a77 3
+// adjustForExecVol (...)
+// In progress
+//------------------------------------------------------------------------------
+d86 4
+a89 2
+
+   stronglyAssert (false);
+d104 20
+@
+
+
+1.6
+log
+@Heuristic Adjustment
+@
+text
+@d19 1
+a19 1
+#include <Opn.h>
+@
+
+
+1.5
+log
+@Heuristic Adjustment
+@
+text
+@d77 3
+d137 4
+a140 2
+      consPer       =   theSub->impactPeriod ()[execPer];
+      deltaAvailVol = - theSub->effConsRate  ()[execPer] * deltaSubVol;
+d142 2
+a143 1
+      myHeurAllMgr ()->adjustIncAvailVol (subPart, consPer, deltaAvailVol);
+d145 4
+a148 2
+      consPer       = theBomEnt->impactPeriod ()[execPer];
+      deltaAvailVol = theBomEnt->effConsRate  ()[execPer] * deltaSubVol;
+d150 2
+a151 1
+      myHeurAllMgr ()->adjustIncAvailVol (bomPart, consPer, deltaAvailVol);
+@
+
+
+1.4
+log
+@Heuristic Adjustment
+@
+text
+@d19 2
+a21 1
+#include <SubEntry.h>
+d78 29
+@
+
+
+1.3
+log
+@Heuristic Adjustment
+@
+text
+@d20 1
+d68 1
+a68 1
+   myProblem ()->myHeurAllMgr ()->updateForAdjust ();
+d77 41
+d122 1
+d128 2
+d133 5
+a137 2
+         theValue[shipPer]
+       - theDemand->shipVol ()[shipPer];
+d139 1
+a139 6
+      if (fabs (deltaShipVol) > NET_TOL)
+         {
+         myProblem ()->
+            myHeurAllMgr ()->
+               adjustForShipVol (theDemand, shipPer, deltaShipVol);
+         }
+@
+
+
+1.2
+log
+@Heuristic Adjustment
+@
+text
+@d19 2
+a64 1
+   stronglyAssert (heurAdjustAllowed_);
+d76 26
+@
+
+
+1.1
+log
+@Heuristic Adjustment
+@
+text
+@d66 2
+@
+

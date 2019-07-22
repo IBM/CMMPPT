@@ -1,0 +1,584 @@
+head	1.3;
+access;
+symbols
+	EndRw-branch:1.2.0.2
+	Root-of-EndRw:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2002.12.17.21.32.48;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.21.22.53.57;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.15.20.27.10;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Removed implementation of single-source by the old algorithm.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OldSgl.C"
+//
+// Contains the implementation of the following classes:
+//
+//    OldSglSite
+//    PmrOsSite
+//    CmrOsSite
+//    OldSglCand
+//    PmrOsCand
+//    CmrOsCand
+//------------------------------------------------------------------------------
+
+#include <HeurAtor.h>
+#include <Selector.h>
+#include <MrMgr.h>
+#include <OldSglSite.h>
+#include <OldSglCand.h>
+#include <Part.h>
+#include <BopEntry.h>
+#include <Global.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class OldSglSite.
+//------------------------------------------------------------------------------
+
+WitOldSglSite::~WitOldSglSite ()
+   {
+   deleteContents (myOsCands_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::init (WitBoolean forReinit)
+   {
+   selOsCandItr_.attachTo (myOsCands_);
+
+   if (! selOsCandItr_.advance (selOsCand_))
+      selOsCand_ = NULL;
+
+   printInit (forReinit);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::alterSel ()
+   {
+   witAssert (sglSrcMode ());
+
+   if (! selOsCandItr_.advance (selOsCand_))
+      switchToMS ();
+
+   prtAlter ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::switchToMS ()
+   {
+   selOsCand_ = NULL;
+
+   nonMS_.setToScalar (witFALSE);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::applySsSel ()
+   {
+   WitPeriod thePer;
+
+   witAssert (sglSrcMode ());
+
+   nonMS_.setToScalar (witFALSE);
+
+   forEachPeriod (thePer, myProblem ())
+      if (selOsCand_->valid (thePer))
+         if (! selOsCand_->matchesMrSel (thePer))
+            {
+            nonMS_[thePer] = witTRUE;
+
+            selOsCand_->selectForMr (thePer);
+            }
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglSite::hasMisMatch (WitPeriod thePer)
+   {
+   if (sglSrcMode ())
+      if (! selOsCand_->matchesMrSel (thePer))
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglSite::altered ()
+   {
+   return (selOsCand_ != myOsCands_.firstObject ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitOldSglSite::WitOldSglSite (WitProblem * theProblem):
+      WitProbAssoc  (theProblem),
+
+      myOsCands_    (myProblem ()),
+      selOsCandItr_ (),
+      selOsCand_    (NULL),
+      nonMS_        (myProblem (), witFALSE)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::setup (WitSelector * theSelector)
+   {
+   buildOsCands (myOsCands_, theSelector);
+
+   init (witFALSE);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::printInit (WitBoolean forReinit)
+   {
+   if (myGlobalComp ()->selPrintLevel () < 2)
+      return;
+
+   if (sglSrcMode ())
+      {
+      if (forReinit)
+         fprintf (msgFile (),
+            "\n"
+            "---------------------------------------------\n"
+            "-> Restoring Initial Single-Source Selection:\n"
+            "---------------------------------------------\n"
+            "\n");
+      else
+         fprintf (msgFile (),
+            "\n"
+            "-----------------------------------\n"
+            "-> Initial Single-Source Selection:\n"
+            "-----------------------------------\n"
+            "\n");
+
+      prtID ();
+
+      selOsCand_->prtAsSel ();
+      }
+   else
+      {
+      if (forReinit)
+         fprintf (msgFile (),
+            "\n"
+            "------------------------------------------\n"
+            "-> Restoring to Initial Multi-Source Mode:\n"
+            "------------------------------------------\n"
+            "\n");
+      else
+         fprintf (msgFile (),
+            "\n"
+            "-------------------------------------\n"
+            "-> Initializing in Multi-Source Mode:\n"
+            "-------------------------------------\n"
+            "\n");
+
+      prtID ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglSite::prtAlter ()
+   {
+   if (myGlobalComp ()->selPrintLevel () < 2)
+      return;
+
+   if (sglSrcMode ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "------------------------------------\n"
+         "-> Altering Single-Source Selection:\n"
+         "------------------------------------\n"
+         "\n");
+
+      prtID ();
+
+      selOsCand_->prtAsSel ();
+      }
+   else
+      {
+      fprintf (msgFile (),
+         "\n"
+         "----------------------------------\n"
+         "-> Switching to Multi-Source Mode:\n"
+         "----------------------------------\n"
+         "\n");
+
+      prtID ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PmrOsSite.
+//------------------------------------------------------------------------------
+
+WitPmrOsSite::WitPmrOsSite (WitPart * thePart, WitSelector * theSelector):
+
+      WitOldSglSite (thePart->myProblem ()),
+
+      myPart_       (thePart)
+   {
+   setup (theSelector);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPmrOsSite::~WitPmrOsSite ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPmrOsSite::buildOsCands (
+      WitObjStack <WitOldSglCand> & theOsCands,
+      WitSelector *                 theSelector)
+   {
+   WitBopEntStack  theBopEnts (myProblem ());
+   WitBopEntry *   theBopEnt;
+   WitOldSglCand * theOsCand;
+
+   theSelector->myPmrMgr ()->getCandBopEnts (myPart_, theBopEnts);
+
+   theOsCands.clear ();
+
+   while (theBopEnts.pop (theBopEnt))
+      {
+      theOsCand = new WitPmrOsCand (theBopEnt, theSelector->myPmrMgr ());
+
+      theOsCands.push (theOsCand);
+      }
+
+   theOsCands.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPmrOsSite::prtID ()
+   {
+   fprintf (msgFile (), "   Part %s\n", myPart_->partName ().myCstring ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class CmrOsSite.
+//------------------------------------------------------------------------------
+
+WitCmrOsSite::WitCmrOsSite (WitBomEntry * theBomEnt):
+
+      WitOldSglSite (theBomEnt->myProblem ()),
+
+      myBomEnt_     (theBomEnt)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCmrOsSite::WitCmrOsSite (WitBomEntry * theBomEnt, WitSelector * theSelector):
+
+      WitOldSglSite (theBomEnt->myProblem ()),
+
+      myBomEnt_     (theBomEnt)
+   {
+   setup (theSelector);
+   }
+
+//------------------------------------------------------------------------------
+
+WitCmrOsSite::~WitCmrOsSite ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCmrOsSite::buildOsCands (
+      WitObjStack <WitOldSglCand> & theOsCands,
+      WitSelector *                 theSelector)
+   {
+   WitConsEntStack theConsEnts (myProblem ());
+   WitConsEntry *  theConsEnt;
+   WitOldSglCand * theOsCand;
+
+   theSelector->myCmrMgr ()->getCandConsEnts (myBomEnt_, theConsEnts);
+
+   theOsCands.clear ();
+
+   while (theConsEnts.pop (theConsEnt))
+      {
+      theOsCand = new WitCmrOsCand (theConsEnt, theSelector->myCmrMgr ());
+
+      theOsCands.push (theOsCand);
+      }
+
+   theOsCands.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCmrOsSite::prtID ()
+   {
+   fprintf (msgFile (),
+      "   BomEntry: %s #%d\n",
+      myBomEnt_->myOperationName ().myCstring (),
+      myBomEnt_->localIndex      ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OldSglCand.
+//------------------------------------------------------------------------------
+
+WitOldSglCand::~WitOldSglCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOldSglCand::WitOldSglCand (WitProblem * theProblem):
+      WitProbAssoc (theProblem)
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PmrOsCand.
+//------------------------------------------------------------------------------
+
+WitPmrOsCand::WitPmrOsCand (WitBopEntry * theBopEnt, WitPmrMgr * thePmrMgr):
+
+      WitOldSglCand (theBopEnt->myProblem ()),
+
+      myBopEnt_     (theBopEnt),
+      myPmrMgr_     (thePmrMgr)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPmrOsCand::~WitPmrOsCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitPmrOsCand::valid (WitPeriod thePer)
+   {
+   return myPmrMgr_->valid (myBopEnt_, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitPmrOsCand::matchesMrSel (WitPeriod thePer)
+   {
+   return (myBopEnt_ == myPmrMgr_->selBopEntry (myBopEnt_->myPart (), thePer));
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPmrOsCand::selectForMr (WitPeriod thePer)
+   {
+   myPmrMgr_->select (myBopEnt_, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPmrOsCand::prtAsSel ()
+   {
+   fprintf (msgFile (),
+      "   Selected BopEntry: %s #%d\n",
+      myBopEnt_->myOperationName ().myCstring (),
+      myBopEnt_->localIndex      ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class CmrOsCand.
+//------------------------------------------------------------------------------
+
+WitCmrOsCand::WitCmrOsCand (WitConsEntry * theConsEnt, WitCmrMgr * theCmrMgr):
+
+      WitOldSglCand (theConsEnt->myProblem ()),
+
+      myConsEnt_    (theConsEnt),
+      myCmrMgr_     (theCmrMgr)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCmrOsCand::~WitCmrOsCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitCmrOsCand::valid (WitPeriod thePer)
+   {
+   return myCmrMgr_->valid (myConsEnt_, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitCmrOsCand::matchesMrSel (WitPeriod thePer)
+   {
+   WitConsEntry * theConsEnt;
+
+   theConsEnt = myCmrMgr_->selConsEntry (myConsEnt_->myBomEnt (), thePer);
+
+   return (myConsEnt_ == theConsEnt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCmrOsCand::selectForMr (WitPeriod thePer)
+   {
+   myCmrMgr_->select (myConsEnt_, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCmrOsCand::prtAsSel ()
+   {
+   WitSubEntry * theSub;
+
+   myConsEnt_->getSubEntry (theSub);
+
+   if (theSub == NULL)
+      fprintf (msgFile (),
+         "   Selected ConsEntry: Itself\n");
+   else
+      fprintf (msgFile (),
+         "   Selected ConsEntry: SubEntry #%d\n", theSub->localIndex ());
+   }
+@
+
+
+1.2
+log
+@Continued implementation of single-source with the new algorithm.
+@
+text
+@@
+
+
+1.1
+log
+@Began implementation of the new single-source algorithm.
+@
+text
+@d38 1
+a38 1
+   deleteContents (mySoCands_);
+d45 1
+a45 1
+   selSoCandItr_.attachTo (mySoCands_);
+d47 2
+a48 2
+   if (! selSoCandItr_.advance (selSoCand_))
+      selSoCand_ = NULL;
+d59 1
+a59 1
+   if (! selSoCandItr_.advance (selSoCand_))
+d69 1
+a69 1
+   selSoCand_ = NULL;
+d85 2
+a86 2
+      if (selSoCand_->valid (thePer))
+         if (! selSoCand_->matchesMrSel (thePer))
+d90 1
+a90 1
+            selSoCand_->selectForMr (thePer);
+d99 1
+a99 1
+      if (! selSoCand_->matchesMrSel (thePer))
+d109 1
+a109 1
+   return (selSoCand_ != mySoCands_.firstObject ());
+d117 3
+a119 3
+      mySoCands_    (myProblem ()),
+      selSoCandItr_ (),
+      selSoCand_    (NULL),
+d128 1
+a128 1
+   buildSoCands (mySoCands_, theSelector);
+d159 1
+a159 1
+      selSoCand_->prtAsSel ();
+d200 1
+a200 1
+      selSoCand_->prtAsSel ();
+d236 2
+a237 2
+void WitPmrOsSite::buildSoCands (
+      WitObjStack <WitOldSglCand> & theSoCands,
+d242 1
+a242 1
+   WitOldSglCand * theSoCand;
+d246 1
+a246 1
+   theSoCands.clear ();
+d250 1
+a250 1
+      theSoCand = new WitPmrOsCand (theBopEnt, theSelector->myPmrMgr ());
+d252 1
+a252 1
+      theSoCands.push (theSoCand);
+d255 1
+a255 1
+   theSoCands.reverse ();
+d296 2
+a297 2
+void WitCmrOsSite::buildSoCands (
+      WitObjStack <WitOldSglCand> & theSoCands,
+d302 1
+a302 1
+   WitOldSglCand * theSoCand;
+d306 1
+a306 1
+   theSoCands.clear ();
+d310 1
+a310 1
+      theSoCand = new WitCmrOsCand (theConsEnt, theSelector->myCmrMgr ());
+d312 1
+a312 1
+      theSoCands.push (theSoCand);
+d315 1
+a315 1
+   theSoCands.reverse ();
+@
+

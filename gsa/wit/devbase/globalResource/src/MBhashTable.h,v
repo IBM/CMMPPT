@@ -1,0 +1,556 @@
+head	1.2;
+access;
+symbols
+	beforeTiersAdded:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2002.04.05.01.02.52;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.03.28.15.42.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Modified source to overcome what seems to be a compiler problem on windows.
+@
+text
+@#ifndef MBHASH_TABLE
+#define MBHASH_TABLE
+
+#include <string.h>
+#include <assert.h>
+//#include "hashtbl.h"
+
+//------------------------------------------------------------------
+//
+// Hash Table Base Class
+// This is JP's feable attempt to implement John's speed hash tables
+//
+//------------------------------------------------------------------
+
+
+#include <list>
+#include <vector>
+#include "MBerror.h"
+
+
+class MBhashTable {
+public:
+
+  void addItemToHashTable( void * );
+  
+  virtual int dataTableSize() const = 0;
+
+  //static int unitTest();
+protected:
+  
+  // Default Constructor 
+  MBhashTable();
+  
+  // Copy constructor 
+  MBhashTable ( const MBhashTable &);
+  
+  // Assignment operator 
+  MBhashTable & operator=( const MBhashTable& rhs);
+  
+  // Destructor 
+  virtual ~MBhashTable();
+  
+protected:
+  static inline int gutsOfHashKey(int hk,int key)
+  {
+    char * xx = (char *) &key;
+    int n = hk;
+    int j;
+    int sizeOfInt = sizeof(int);
+    
+    for (j = 0; j < sizeOfInt; ++j) {
+      int iname = xx[j];
+      n += hash_mult[j] * iname;
+    }
+    return n;
+  };
+
+  static inline int gutsOfHashKey(int hk,const char * key)
+  {
+    const char * xx = (const char *) &key;
+    int n = hk;
+    int j;
+    int strLen = strlen(key);
+    for (j = 0; j < strLen; ++j) {
+      int iname = xx[j];
+      n += hash_mult[j] * iname;
+    }
+    return n;
+  };
+
+  static inline int gutsOfHashKey(int hk,const std::string & stringKey)
+  {
+    //const char * key = stringKey.c_str();
+    //const char * xx = (const char *) &key;
+    const char * xx = stringKey.c_str();
+    int n = hk;
+    int j;
+    int strLen = strlen(xx);
+    for (j = 0; j < strLen; ++j) {
+      int iname = xx[j];
+      n += hash_mult[j] * iname;
+    }
+    return n;
+  };
+    
+  inline void clearHashTable() {
+    if ( hashTable_!=NULL ) {
+      delete [] hashTable_;
+      hashTable_=NULL;
+      hashTableSize_=0;
+    }
+  };
+
+  inline int hashTableSize() const { return hashTableSize_; };
+
+  const void* gutsOfValue( const void* keys ) const throw(MBerror);
+  // returns null if key is undefined
+  const void * gutsOfValueAllowUndefinedKeys( const void* keys ) const;
+
+  virtual void dataTableInitNextItemPtr() const = 0;
+  virtual const void * dataTableGetNextItemPtr() const = 0;
+  virtual bool found( const void* item, const void* keys ) const = 0;
+  virtual int hashKey(const void* keys) const = 0;
+
+private:
+  
+  void initializeHashTable() const;
+  
+  // Primes used in computing hashIndex
+  static int hash_mult[81];
+  
+  struct Link {
+    const void * item;
+    int next;
+  };
+  //mutable std::vector<Link> hashTable_;
+  mutable Link * hashTable_;
+  mutable int hashTableSize_;
+  //mutable bool hashTableInitialized_;
+  
+};
+
+class MBhashTableIntIntToInt : public MBhashTable {
+public:
+
+  // insert value and keys into table
+  void insert( int key0, int key1, int value );
+
+  // get value associated with keys
+  inline int value( int key0, int key1 ) const throw(MBerror)
+  {
+    try {
+      IntIntIntTriple keys={ key0,key1,-1};
+      IntIntIntTriple * item = (IntIntIntTriple*)gutsOfValue(&keys);
+      int retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+  
+  // Default Constructor 
+  MBhashTableIntIntToInt ();
+  
+  // Copy constructor 
+  MBhashTableIntIntToInt ( const MBhashTableIntIntToInt &);
+  
+  // Assignment operator 
+  MBhashTableIntIntToInt & operator=( const MBhashTableIntIntToInt& rhs);
+  
+  // Destructor 
+  virtual ~MBhashTableIntIntToInt ();
+  
+  //static int unitTest();
+    
+  virtual int dataTableSize() const {
+    return dataTable_.size(); 
+  };
+
+protected:
+
+  void dataTableInitNextItemPtr() const
+  {
+    it_ = dataTable_.begin();
+  }
+
+  virtual const void * dataTableGetNextItemPtr() const 
+  { 
+    assert( it_!=dataTable_.end() );
+    const IntIntIntTriple & retVal = *it_;
+    ++it_;
+    return &retVal;
+  };
+
+  virtual bool found( const void* itemAsVoid, const void* keysAsVoid ) const
+  {
+    IntIntIntTriple * item = (IntIntIntTriple*)itemAsVoid;
+    IntIntIntTriple * keys = (IntIntIntTriple*)keysAsVoid;
+    return ( item->key0==keys->key0 && item->key1==keys->key1 );
+  };
+
+  virtual int hashKey(const void* keysAsVoid) const
+  {
+    IntIntIntTriple * item = (IntIntIntTriple*)keysAsVoid;
+    int hk = gutsOfHashKey(0,item->key0);
+    hk = gutsOfHashKey(hk,item->key1);
+    return (abs(hk) % hashTableSize() );
+  };
+
+private:
+  
+  struct IntIntIntTriple {
+    int key0;
+    int key1;
+    int value;
+  };
+  
+  std::list<IntIntIntTriple> dataTable_;
+  mutable std::list<IntIntIntTriple>::const_iterator it_;
+};
+
+
+//-----------------------------------
+
+class MBhashTableIntIntIntToInt : public MBhashTable {
+public:
+
+  // insert value and keys into table
+  void insert( int key0, int key1, int key2, int value );
+
+  // get value associated with keys
+  inline int value( int key0, int key1, int key2 ) const throw(MBerror)
+  {
+    try {
+      IntIntIntIntQuadruple keys={ key0,key1,key2,-1};
+      IntIntIntIntQuadruple * item = (IntIntIntIntQuadruple*)gutsOfValue(&keys);
+      int retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+
+  // get value associated with keys
+  // undefined key allowed, then -1 is returned
+  inline int valueAllowUndefinedKey( int key0, int key1, int key2, int key3 ) const
+  {
+    try {
+      IntIntIntIntQuadruple keys={ key0,key1,key2,-1};
+      IntIntIntIntQuadruple * item = (IntIntIntIntQuadruple*)gutsOfValueAllowUndefinedKeys(&keys);
+      int retVal = -1;
+      if ( item!=NULL ) retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+  
+  // Default Constructor 
+  MBhashTableIntIntIntToInt ();
+  
+  // Copy constructor 
+  MBhashTableIntIntIntToInt ( const MBhashTableIntIntIntToInt &);
+  
+  // Assignment operator 
+  MBhashTableIntIntIntToInt & operator=( const MBhashTableIntIntIntToInt& rhs);
+  
+  // Destructor 
+  virtual ~MBhashTableIntIntIntToInt ();
+  
+  //static int unitTest();
+
+  
+  virtual int dataTableSize() const { return dataTable_.size(); };
+
+protected:
+
+  void dataTableInitNextItemPtr() const
+  {
+    it_ = dataTable_.begin();
+  }
+  
+
+  virtual const void * dataTableGetNextItemPtr() const 
+  { 
+    assert( it_!=dataTable_.end() );
+    const IntIntIntIntQuadruple & retVal = *it_;
+    ++it_;
+    return &retVal;
+  };
+
+  virtual bool found( const void* itemAsVoid, const void* keysAsVoid ) const
+  {
+    IntIntIntIntQuadruple * item = (IntIntIntIntQuadruple*)itemAsVoid;
+    IntIntIntIntQuadruple * keys = (IntIntIntIntQuadruple*)keysAsVoid;
+    return ( 
+      item->key0==keys->key0 && 
+      item->key1==keys->key1 && 
+      item->key2==keys->key2 );
+  };
+
+  virtual int hashKey(const void* keysAsVoid) const
+  {
+    IntIntIntIntQuadruple * item = (IntIntIntIntQuadruple*)keysAsVoid;
+    int hk = 0;
+    hk = gutsOfHashKey(hk,item->key0);
+    hk = gutsOfHashKey(hk,item->key1);
+    hk = gutsOfHashKey(hk,item->key2);
+    return (abs(hk) % hashTableSize() );
+  };
+
+private:
+  
+  struct IntIntIntIntQuadruple {
+    int key0;
+    int key1;
+    int key2;
+    int value;
+  };
+  
+  std::list<IntIntIntIntQuadruple> dataTable_;
+  mutable std::list<IntIntIntIntQuadruple>::const_iterator it_; 
+};
+
+
+//-----------------------------------
+
+
+class MBhashTableStringToInt : public MBhashTable {
+public:
+
+  // insert value and keys into table
+  void insert( const std::string & key, int value );
+
+  // get value associated with keys
+  inline int value( const std::string & key ) const throw(MBerror)
+  {
+    try {
+      StringIntPair keys={ &key,-1};
+      StringIntPair * item = (StringIntPair*)gutsOfValue(&keys);
+      int retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+
+  // get value associated with keys
+  // undefined key allowed, then -1 is returned
+  inline int valueAllowUndefinedKey( const std::string & key ) const
+  {
+    try {
+      StringIntPair keys={ &key ,-1};
+      StringIntPair * item = (StringIntPair*)gutsOfValueAllowUndefinedKeys(&keys);
+      int retVal = -1;
+      if ( item!=NULL ) retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+  
+  // Default Constructor 
+  MBhashTableStringToInt ();
+  
+  // Copy constructor 
+  MBhashTableStringToInt ( const MBhashTableStringToInt &);
+  
+  // Assignment operator 
+  MBhashTableStringToInt & operator=( const MBhashTableStringToInt& rhs);
+  
+  // Destructor 
+  virtual ~MBhashTableStringToInt ();
+  
+  //static int unitTest();
+    
+  virtual int dataTableSize() const { return dataTable_.size(); };
+
+protected:
+
+  void dataTableInitNextItemPtr() const
+  {
+    it_ = dataTable_.begin();
+  }
+
+  virtual const void * dataTableGetNextItemPtr() const 
+  { 
+    assert( it_!=dataTable_.end() );
+    const StringIntPair & retVal = *it_;
+    ++it_;
+    return &retVal;
+  };
+
+  virtual bool found( const void* itemAsVoid, const void* keysAsVoid ) const
+  {
+    StringIntPair * item = (StringIntPair*)itemAsVoid;
+    StringIntPair * keys = (StringIntPair*)keysAsVoid;
+    return ( 
+      *(item->key) == *(keys->key) 
+      );
+  };
+
+  virtual int hashKey(const void* keysAsVoid) const
+  {
+    StringIntPair * item = (StringIntPair*)keysAsVoid;
+    int hk = 0;
+    hk = gutsOfHashKey(hk,*(item->key));
+    int ts = hashTableSize();
+    int retVal = ( abs(hk) % ts );
+    return retVal;
+  };
+
+private:
+  
+  struct StringIntPair {
+    const std::string * key;
+    int value;
+  };
+  
+  std::list<StringIntPair> dataTable_; 
+  mutable std::list<StringIntPair>::const_iterator it_;
+};
+
+
+//-----------------------------------
+class MBhashTableIntIntIntIntToInt : public MBhashTable {
+public:
+
+  // insert value and keys into table
+  void insert( int key0, int key1, int key2, int key3, int value );
+
+  // get value associated with keys
+  inline int value( int key0, int key1, int key2, int key3 ) const throw(MBerror)
+  {
+    try {
+      IntIntIntIntIntQuintuple keys={ key0,key1,key2,key3,-1};
+      IntIntIntIntIntQuintuple * item = (IntIntIntIntIntQuintuple*)gutsOfValue(&keys);
+      int retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+
+  // get value associated with keys
+  // undefined key allowed, then -1 is returned
+  inline int valueAllowUndefinedKey( int key0, int key1, int key2, int key3 ) const
+  {
+    try {
+      IntIntIntIntIntQuintuple keys={ key0,key1,key2,key3,-1};
+      IntIntIntIntIntQuintuple * item = (IntIntIntIntIntQuintuple*)gutsOfValueAllowUndefinedKeys(&keys);
+      int retVal = -1;
+      if ( item!=NULL ) retVal = item->value;
+      return retVal;
+    }
+    catch ( MBerror e ) {
+      throw e;
+    }
+  };
+  
+  // Default Constructor 
+  MBhashTableIntIntIntIntToInt ();
+  
+  // Copy constructor 
+  MBhashTableIntIntIntIntToInt ( const MBhashTableIntIntIntIntToInt &);
+  
+  // Assignment operator 
+  MBhashTableIntIntIntIntToInt & operator=( const MBhashTableIntIntIntIntToInt& rhs);
+  
+  // Destructor 
+  virtual ~MBhashTableIntIntIntIntToInt ();
+  
+  //static int unitTest();
+   
+  virtual int dataTableSize() const { return dataTable_.size(); };
+
+protected:
+  
+  void dataTableInitNextItemPtr() const
+  {
+    it_ = dataTable_.begin();
+  }
+ 
+
+  virtual const void * dataTableGetNextItemPtr() const 
+  { 
+    assert( it_!=dataTable_.end() );
+    const IntIntIntIntIntQuintuple & retVal = *it_;
+    ++it_;
+    return &retVal;
+  };
+
+  virtual bool found( const void* itemAsVoid, const void* keysAsVoid ) const
+  {
+    IntIntIntIntIntQuintuple * item = (IntIntIntIntIntQuintuple*)itemAsVoid;
+    IntIntIntIntIntQuintuple * keys = (IntIntIntIntIntQuintuple*)keysAsVoid;
+    return ( 
+      item->key0==keys->key0 && 
+      item->key1==keys->key1 && 
+      item->key2==keys->key2 && 
+      item->key3==keys->key3 );
+  };
+
+  virtual int hashKey(const void* keysAsVoid) const
+  {
+    IntIntIntIntIntQuintuple * item = (IntIntIntIntIntQuintuple*)keysAsVoid;
+    int hk = 0;
+    hk = gutsOfHashKey(hk,item->key0);
+    hk = gutsOfHashKey(hk,item->key1);
+    hk = gutsOfHashKey(hk,item->key2);
+    hk = gutsOfHashKey(hk,item->key3);
+    return (abs(hk) % hashTableSize() );
+  };
+
+private:
+  
+  struct IntIntIntIntIntQuintuple {
+    int key0;
+    int key1;
+    int key2;
+    int key3;
+    int value;
+  };
+  
+  std::list<IntIntIntIntIntQuintuple> dataTable_; 
+  mutable std::list<IntIntIntIntIntQuintuple>::const_iterator it_;
+};
+#endif
+@
+
+
+1.1
+log
+@Changes to add osl mip solver structure to code
+@
+text
+@d49 1
+d51 1
+a51 1
+    for (j = 0; j < sizeof(int); ++j) {
+@
+

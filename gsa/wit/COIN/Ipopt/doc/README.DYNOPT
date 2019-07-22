@@ -1,0 +1,300 @@
+Copyright (C) 2002, Carnegie Mellon University and others.
+All Rights Reserved.
+This code is published under the Common Public License.
+
+This is the README file for the dynamic optimization components of the
+IPOPT package.
+
+IMPORTANT:  This part of the IPOPT package is not (yet?) very well
+            documented, since the authors are not sure if there is
+            sufficient interest (beside thier own) to use it.
+            If you are interested in using it and would like to
+            obtain more information, please send a message to the
+            COIN-OR mailing list.
+
+1. General Description
+======================
+
+As part of the IPOPT distribution come components supporting the
+solution of dynamic optimization problems.  The component DAE2NLP
+provides an implementation of the discretization of a system of
+Dynamic Algebraic Equations (DAE) using orthogonal collocation.
+
+Given system of DAEs (we assume that it is of index one) of the form
+
+     F(t,z(t),dz/dt(t),y(t),u(t),p) = 0,       z(t_0) = ZINIT     (DAE)
+
+with differential variables z(t) of dimension NZ,
+     algebraic    variables y(t) of dimension NY,
+     control      variables u(t) of dimension NU,
+time-independent parameters p    of dimension NP, and
+initial conditions ZINIT,
+
+these routines provide a discretization over NELE given finite
+elements with element boundary TI(1), TI(2), ..., TI(NELE+1).  Within
+each finite element, the differential variables are approximated by
+polynomials of degree NCOL, and the algebraic and control variables
+are approximated by polynomials of degree NCOL-1, where NCOL is the
+number of collocation points.
+
+Using this approximation, the system (DAE) is discretized as follows.
+(For brevity, K = NCOL)
+
+     0 = Z(TI(1)) - ZINIT
+
+     0 = F(T(l,1),Z(TI(l)),Zdot(T(l,1)),Y(T(l,1)),U(T(l,1)),P)   \
+                           .                                      |
+                           .                                      |  for l
+                           .                                      |    =
+     0 = F(T(l,1),Z(TI(l)),Zdot(T(l,K)),Y(T(l,K)),U(T(l,K)),P)    | 1,..,NELE
+     0 = ADDCON(Z(TI(1)),Zdot(T(l,1)),Y(T(l,1)),U(T(l,1)),...     |
+                Z(TI(K)),Zdot(T(l,K)),Y(T(l,K)),U(T(l,K)))        |
+           continuity of Z across element boundaries             /
+
+Here, ADDCON are additional linear constraints that are posed on the
+coefficients in each element l, in order to reduce the order of the
+polynomial approximating the control variables to the specified degree
+NDEGU.
+
+The vector X (of optimization variables) containing the coefficients
+of the polynomial approximing the profiles within the finite elements
+is organized as follows:
+
+  X = [ Z(TI(1)) ,
+
+        Zdot(T(l,1)), Y(T(l,1)), ... , Zdot(T(l,K)), Y(T(l,K)), Z(TI(l+1)),
+                                (for each l = 1, NELE)
+
+
+        U(T(l,1)), U(T(l,2)), ... , U(T(l,K)),
+                                (for each l = 1, NELE)
+
+        P ]
+
+and thus is of dimension
+
+  NX = NZ + NELE*(NCOL*(NZ+NY) + NZ) + NELE*NCOL*NU + NP
+
+In the above notation:
+
+   T(l,j) = TI(l) + (TI(l+1)-TI(l))*RHO(j)  for l=1, NELE and j=1, NCOL
+   Z( t ) :  (approximated) values of differential variables z at time t
+Zdot( t ) :  (approximated) values of first derivatives of
+              differential variables z at time t
+   Y( t ) :  (approximated) values of algebraic variables y at time t
+   U( t ) :  (approximated) values of control variables u at time t
+   P      :  values of parameters
+
+
+The DAE model (i.e. the function F in equation (DAE)) can be provided
+as
+
+- a set of Fortran subroutines that evaluate the residual of the model
+  equations and the first (and possibly second) derivatives of the DAE
+  system, or
+- a Fortran routine that evaluates the residual of the model
+  equations, and derivative information is computed using the
+  automatic differential tool ADOL-C
+
+If you choose to use the discretization software together with IPOPT,
+the structure of the overall program may roughly be described as
+follows:
+
+   your driver routine
+           |
+           |
+           v
+         IPOPT          (performing the optimization of the NLP using
+           |             the reduced space approach)
+           |
+           v
+        constr.f        (interface routine for IPOPT to the constraints
+           |             that can be tailored to particular
+           |             applications, in this case to discretized DAE
+           v             systems)
+        DAE2NLP         (assembling overall discretized DAE system;
+           |             performing block-decomposition of Jacobian)
+         *or*--------
+           |        |
+           |        v
+           |     DAEMODEL_* subroutines
+           |            (user provided subroutines evaluating the DAE
+           |             system equations and its derivatives)
+           v
+       ADOLC2DAE        (interface between DAE2NLP and ADOL-C - allows
+           |             evaluation derivatives of the DAE system with
+           |             ADOL-C)
+           v
+        MODEL_F         (user provided Fortran subroutine evaluating
+                         the DAE function 'F' in (DAE))
+
+1.1. DAE2NLP
+------------
+
+This library (libd2n.a) is the core of the discretization.  It handles
+the evaluation of the discretized DAE system and operations with its
+Jacobian (and a square submatrix of the Jacobian, including a
+factorization of this submatrix).  The main routine, 'DAE2NLP', can be
+called from an optimization package as implementation of the
+constraints, if the optimization method computes the trial steps using
+a decomposition based on a partition of the variables into dependent
+and independent variables, such as IPOPT.
+
+If you are intending to use the provided routines with your own solver,
+you might want to read the beginning of the file
+$SRCROOTDIR/DYNOPT/dae2nlp/dae2nlp.f
+for more information.
+
+The DAE model and its derivatives are evaluated by DAE2NLP through
+calls to subroutines DAEMODEL_*.  The user may either write these
+routines him/her-self (see the beginning of the file
+$SRCROOTDIR/DYNOPT/dae2nlp/dae2nlp.F), or use the ADOLC2DAE component
+(see Section 1.2).
+
+See Section 2.1 for an example.
+
+1.2. ADOLC2DAE
+--------------
+
+This component implements the subroutines DAEMODEL_* required by
+DAE2NLP, using the automatic differential tool ADOL-C (see
+http://www.math.tu-dresden.de/wir/project/adolc/ for more details on
+ADOL-C).
+
+A user has to provide a Fortran subroutine 'MODEL'.  The Fortran file
+is then translated into C using 'f2c', and after some more additional
+changes to the C source code, the resulting source file is compiled
+and linked with ADOL-C (which is based on operator overloading in
+C++).
+
+See Section 2.2 for an example.
+
+1.3. User Interface (DYNOPC)
+----------------------------
+
+The component DYNOPC provides a user interface for performing dynamic
+optimization using DAE2NLP together with IPOPT.  It provides the
+opportunity to store data for individual projects, such as problem
+definition and size, initial conditions, results for previous runs
+etc.  The interface offers the option to run a simulation of the
+considered process before the optimization (using DASPK) in order to
+obtain a good starting point.  The Windows version in addition offers
+a nice graphical user interface, where for example for each iteration
+of the optimization algorithm the current estimate of the variable
+profiles are plotted.
+
+However, no documentation exists for this component at this point,
+even though the source code (in the subdirectories of
+$SRCROOTDIR/DYNOPT/DYNOPC) is working.  If you are interested in
+working with this part, please send a message to the COIN-OR mailing
+list.
+
+2. Examples
+===========
+
+These examples are intended to show a user how (s)he can use the
+provided components to solve his/her own dynamic optimization
+problems.  At this point, no documentation on the examples is provided
+(since we don't want to spend time writing about something, that
+possibily is never used :-).
+
+You can compile the provided examples as described below, and if you
+are interested in using DAE2NLP, the output of the 'make' command and
+the comments in the source code might be helpful.  If you are
+seriously interested in using the package, please send a message to
+the COIN-OR mailing list, and we can provide more information.
+
+2.1 Using DAE2NLP with IPOPT without ADOL-C
+-------------------------------------------
+
+To compile this (extremely simple tank) example, change into the
+directory
+
+$OBJROOTDIR/DYNOPT/Fortran_example
+
+and type 'make'.  You can execute the example by typing
+'./tank_Fortran'.  (A finite difference check of the model derivatives
+is done by 'tank_Fortran_check'.)
+
+2.2 Using DAE2NLP with IPOPT with ADOL-C
+----------------------------------------
+
+To compile this example (which is the same as the example in Section
+2.1), change into the directory
+
+$OBJROOTDIR/DYNOPT/ADOLC_example
+
+and type 'make'.  You can execute the example by typing
+'./tank_Fortran'.  (A finite difference check of the model derivatives
+is done by 'tank_Fortran_check'.)
+
+2.3 DYNOPC
+----------
+
+Currently, this only works, if you are compiling all libraries as
+shared objects, i.e. if you define the makefile variable SOLIBDIR in
+Makefile.defs.
+
+(NOTE: This component does not yet work on AIX)
+
+2.3.1  Preparation
+------------------
+
+You need to create a directory, in which the information for the
+models is stored.  Let's assume, you want to store this information in
+$HOME/MODELS .  Then type the following (where $SRCROOTDIR has the
+appropriate substitution):
+
+cp -r $SRCROOTDIR/DYNOPT/DYNOPC/MODELS $HOME
+
+DYNOPC receives the location of this directory from the environment
+varible PROCESS_DATA_DIR , so you need to set it, e.g. in the csh by
+typing
+
+setenv PROCESS_DATA_DIR $HOME/MODELS
+
+2.3.2  Simulation
+-----------------
+
+Change into the building directory for DYNOPC_simulation:
+
+cd $OBJROOTDIR/DYNOPT/DYNOPC/simulation
+
+and type 'make'
+
+After a hopefully successful compilation of the executable
+'DYNOPC_simulation', you need to create the shared object for the
+particular process that you want to solve.  In this example, the name
+of this model is 'tank':
+
+make model MODEL=tank
+
+This will translate the Fortran model to C++ and compile it as a
+shared object, which is stored in the directory
+$PROCESS_DATA_DIR/tank
+
+Now we can run the simulation by typing
+
+./DYNOPC_simulation tank
+
+If everything works fine, the last output line should state "IPOPT
+successfully obtained a feasible starting point".  If not, get a
+coffee.
+
+2.3.3 Optimization
+------------------
+
+Now that we have a starting point, we can change to the optimization
+directory:
+
+cd ../optimization
+
+and create the DYNOPC_optimization executable by typing
+
+make
+
+and finally do the optimization:
+
+./DYNOPC_optimization tank
+
+$Id: README.DYNOPT,v 1.2 2002/09/13 14:26:37 andreasw Exp $

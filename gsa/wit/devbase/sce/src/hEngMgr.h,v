@@ -1,0 +1,337 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_20_20051222:1.3
+	sce_4_10_30050426:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.14
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.12
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.10
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.2.0.8
+	sce_3_10_20010924:1.2
+	latest_sce_3_00_20010601:1.2.0.6
+	sce_3_00_20010601:1.2
+	latest_sce_2_31_20010308:1.2.0.4
+	sce_2_31_20010308:1.2
+	latest_sce_2_31_20001003:1.2.0.2
+	sce_2_31_20001003:1.2
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.19.36.55;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.10.04.15.48.38;	author ervolina;	state Exp;
+branches
+	1.2.14.1;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.50;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.50;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.14.1
+date	2003.01.08.17.43.14;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@// file: hEngMgr.h
+// author: robin and tom
+
+#ifndef  LGFRSCEHEURENGINEMGR_H
+#define  LGFRSCEHEURENGINEMGR_H
+
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+
+#include <stdlib.h>
+#include <wit/src/wit.h>
+
+#include <sce/src/sceDefin.h>
+#include <sce/src/scenSceP.h>
+
+// forward references
+class LgFrSceIterativeImpHelper;
+class LgFrCalendar;
+class LgFrSceCritList;
+class LgFrInitialProblemForSce;
+class LgFrMultiPlantHelper;
+
+class LgFrSceHeurEngineMgr {
+  
+public:
+  
+  // do set up and run optimization
+  virtual
+  void
+  implode(LgFrSceCritList & theCritList);
+
+  // place holder right now for code to do 2-pass implosion for feature building
+  virtual
+  void
+  heurImplodeOptFeaturesAndMins(LgFrSceCritList & theCritList);
+
+
+
+  // This is member function mucks up the demands - if you want to get back your
+  // original demands, you best have saved them somewhere safe before you invoke
+  // this member function.
+  //
+  // Calculate amount of pure option we want to try and build
+  // (code snipped from LgFrInitialProblemForSce::printStandAloneFeatureAnalysisReport, then
+  //  unabashedly mutated).
+  // Set the demand on the pure options nodes in the WitRun and zero-out all other
+  // demands.
+  void
+  setPureOptionBuildDemand(
+         WitRun * const theWitRun,   // WIT environment   
+         const int nPeriods,         // Number of periods 
+         const int nParts,           // Number of parts   
+         char ** partList,           // List of part names
+         const int nOperations,
+         char ** operationList,
+         int * nDemandsList,         // number of demands on each part
+         char *** allDemandsList,    // list of demands names 
+	 float ** allSupplyVols,
+         int * nBom,                 // Number of BOM entries for each part
+         int ** nSubsBom,            // Number of substitutes on each part's BOM entries 
+	 LgFrMultiPlantHelper * mpHelper,
+         LgFrSceIterativeImpHelper & iterativeImpHelper,
+         float **** glbSubsProdVol,  // substitute bom production vol
+         float *** glbShipSched,
+         float *** allDemandsVols,
+	 float ** globalExecSchedule);
+  
+
+ // get engine variable pointer
+  std::string 
+  getEngine();
+
+  // set engine variable
+  void
+  setEngine(const std::string & engine);
+
+  
+  // preform rollover heuristic "incrementally"
+  void
+  rolloverHeurImplode( WitRun * const theWitRun,
+                       LgFrSceCritList & theCritList,
+                       float *** glbShipSched,
+                       float ** glbExecSched,                       
+                       float **** glbSubProdSched,
+                       float ** glbExecUpperBounds,
+                       witBoolean computeCriticalList,                       
+                       int nPeriods,
+                       int nParts,
+                       int nOperations,                       
+                       char ** partList,
+                       char ** operationList,                       
+                       int * nBom,
+                       int ** nSubsBom,
+                       witBoolean isMinLotSizeUsedAnywhere,
+                       witBoolean * isMinLotSizeUsedForOperation );
+
+  // alternative method to calculate the (second pass) demand vols for features
+  // This method pegs the shipVolWithoutFeature to the liveDemandVol, and using the
+  // appropriate featureRatio, calculates the demand vol to try to build of the feature. 
+  void
+  calculateOneFeaturesBuildDemandVol ( int nPeriods,
+                                     float * liveDemandVol,
+                                     float * shipVolWithoutFeature,
+                                     float * featureRatio,
+                                     float * featureBuildDemandVols );
+
+  
+  // Set demand vols
+  // Use this member function to clean-up the mucked demand vols
+  void
+  setAllDemandVolsExceptFeatureDemands ( int nParts,
+                                       char ** partList,
+                                       int *  nDemandsList,
+                                       char *** allDemandsList,
+                                       float *** allDemandsVols );
+
+
+  // Dan's algorithm for calculating the amount of demand lost due to backlogYield.
+  // original source code from:  /u/dpc/implode/sce/src/test2.c
+  // Given the demandVol, the shipVol, and the backlogYield vector, this method calculates
+  // the amount of demandVol that was "lost" due to applying the backlogYield (where shipLateLimit = 0).
+  //
+  // Example: demand= ( 2, 4, 6 ), ship=( 1, 2, 3 ) and backlogYld=( 0.6, 0.6, 0.6 )
+  // then the lostDemandVol=( 0.400, 1.040, 1.824)
+
+  void
+  calculateLostDemandUnderBacklogYield ( int nPeriods,
+                                         float * demandVol,
+                                         float * shipVol,
+                                         float * backlogYield,
+                                         // method populates the lostDemandVol vector
+                                         float * lostDemandVol,
+                                         float * backlog);
+
+  // Dan's algorithm for calculating the amount of demand lost due to shipLateLimit.
+  // Also returns the backlog vector. 
+  // original source code from: /u/dpc/implode/sce/src/test3.c
+  void
+  calculateLostDemandUnderShipLateLimit ( int nPeriods,
+                                          int shipLateLimit,
+                                          float * demandVol,
+                                          float * shipVol,
+                                          // output vectors
+                                          float * lostDemandVol,
+                                          float * backlog);  
+
+  /* Calculates the minimum demand vols by un-cumming the cum ship soft lb's of theWitRun
+   * The residual "above min demands" vols are calculated and stored as demand appData.
+   * Remeber to clean up any "new-ed" demand appData.
+   */
+  void
+  setMinDemandsAndCalculateAboveMinDemands(
+                                           WitRun *     theWitRun,
+                                           int          nPeriods,
+                                           int          nParts,
+                                           char **      partList,
+                                           int *        nDemandsList,
+                                           char ***     allDemandsList,
+                                           float ***    allDemandsVols );
+  
+  // default constructor
+  LgFrSceHeurEngineMgr();
+  
+  // general constructor
+  LgFrSceHeurEngineMgr(
+                      LgFrScenarioForSceSmartPointer sceScenSP,
+                      WitRun * const theWitRun, 
+                      LgFrCalendar * theCal,
+                      LgFrMultiPlantHelper * mpHelper,
+                      const std::string & engine);
+
+    
+  // copy constructor
+  LgFrSceHeurEngineMgr(const LgFrSceHeurEngineMgr& source);
+  
+  // assignment operator
+  LgFrSceHeurEngineMgr&
+  operator=(const LgFrSceHeurEngineMgr& rhs);
+  
+  // destructor
+  virtual
+  ~LgFrSceHeurEngineMgr();
+  
+  
+  // self-test
+  static void test();
+  
+private:
+  LgFrScenarioForSceSmartPointer sceScenSP_;
+  WitRun * theWitRun_;
+  LgFrCalendar * theCal_;
+  LgFrMultiPlantHelper * mpHelper_;
+  std::string engine_;
+  
+};
+#endif
+@
+
+
+1.2
+log
+@modifications for sce 2.31
+@
+text
+@d7 4
+a11 1
+#include <rw/cstring.h>
+d71 1
+a71 1
+  RWCString 
+d76 1
+a76 1
+  setEngine(const RWCString & engine);
+d171 1
+a171 1
+                      const RWCString & engine);
+d194 1
+a194 1
+  RWCString engine_;
+@
+
+
+1.2.14.1
+log
+@Roguewave is gone
+@
+text
+@a6 4
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+
+d8 1
+d68 1
+a68 1
+  std::string 
+d73 1
+a73 1
+  setEngine(const std::string & engine);
+d168 1
+a168 1
+                      const std::string & engine);
+d191 1
+a191 1
+  std::string engine_;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d11 1
+d34 2
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@

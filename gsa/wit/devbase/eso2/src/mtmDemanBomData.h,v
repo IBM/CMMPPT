@@ -1,0 +1,502 @@
+head	1.10;
+access;
+symbols
+	abandoningEtnParts:1.8
+	beforeEtnParts:1.7
+	eso2InitialFileFormats:1.3;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2005.01.29.18.27.38;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.06.21.14.21.12;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.02.19.19.43.35;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.12.10.22.24.01;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.10.29.19.16.01;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.04.12.01.21.19;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.02.20.18.10.41;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.02.07.21.07.28;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.02.06.18.32.14;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.02.11.09.10;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@changed code to use std::string rather than BCP_string
+@
+text
+@#ifndef ESO2_mtmDemanBomData_h
+#define ESO2_mtmDemanBomData_h
+
+#include "scoFile.h"
+
+
+class ESO2mtmDemanBomData : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(mtm);
+  getFieldH(part);
+  getFieldH(srcLoc);
+  getIntFieldH(period);
+  getFloatFieldH(attachRate);
+  //getIntFieldH(etnFlag);
+  //getFloatFieldH(usageTime);
+  
+  // preferred constructor
+  ESO2mtmDemanBomData(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("feature");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(5);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & mtm, 
+    const std::string & part, 
+    const std::string & plantLoc, 
+    int period ) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = mtm+"$+&"+part+"$+&"+plantLoc+"$+&"+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ESO2mtmDemanBomData(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2mtmDemanBomData file("../data/example1/mtmDemanBomData.csv");
+    
+    // Test reading first record
+
+    assert( file.mtm(0)=="m1");
+    assert( file.part(0) == "p1" );
+    assert( file.srcLoc(0) == "pok" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.attachRateAsFloat(0) == 1.5f );
+    //assert( file.etnFlagAsInt(0) == 1 );
+    //assert( file.usageTimeAsFloat(0) == 5.5f );
+
+    
+    assert( file.mtm(key("m2","p2","wat",2))=="m2");
+    assert( file.part(key("m2","p2","wat",2)) == "p2" );
+    assert( file.srcLoc(key("m2","p2","wat",2)) == "wat" );
+    assert( file.periodAsInt(key("m2","p2","wat",2)) == 2 );
+    assert( file.attachRateAsFloat(key("m2","p2","wat",2)) == 2.1f );
+    //assert( file.etnFlagAsInt(key("m2","p2","wat",2)) == 0 );
+    //assert( file.usageTimeAsFloat(key("m2","p2","wat",1)) == 6.5f );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      mtm(recNum),
+      part(recNum),
+      srcLoc(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ESO2mtmDemanBomData();
+  
+  // copy constructor  -- don't use!
+  ESO2mtmDemanBomData( const ESO2mtmDemanBomData& source );
+  
+  // assignment operator -- don't use!
+  ESO2mtmDemanBomData&
+  operator=(const ESO2mtmDemanBomData& rhs);
+
+  
+};
+
+
+
+class ESO2mtmDemanBomDataIterator : public SCOfileIterator {
+public:
+    
+  // Fields
+  getFieldFileWithIteratorH(mtm);
+  getFieldFileWithIteratorH(part);
+  getFieldFileWithIteratorH(srcLoc);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(attachRate);
+  //getIntFieldFileWithIteratorH(etnFlag);
+  //getFloatFieldFileWithIteratorH(usageTime);
+
+  
+  // preferred constructor
+  ESO2mtmDemanBomDataIterator(const ESO2mtmDemanBomData & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ESO2mtmDemanBomDataIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2mtmDemanBomData file("../data/example1/mtmDemanBomData.csv");
+    ESO2mtmDemanBomDataIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.mtm()=="m1");
+        assert( fileIter.part() == "p1" );
+        assert( fileIter.srcLoc() == "pok" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.attachRateAsFloat() == 1.5f );
+        //assert( fileIter.etnFlagAsInt() == 1 );
+        //assert( fileIter.usageTimeAsFloat() == 5.5f );
+          
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ESO2mtmDemanBomDataIterator();
+  
+  // copy constructor  -- don't use!
+  ESO2mtmDemanBomDataIterator( const ESO2mtmDemanBomDataIterator& source );
+  
+  // assignment operator -- don't use!
+  ESO2mtmDemanBomDataIterator&
+  operator=(const ESO2mtmDemanBomDataIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.9
+log
+@Code restored to state before etnParts were added
+@
+text
+@d20 1
+a20 1
+  ESO2mtmDemanBomData(BCP_string filename)
+d35 4
+a38 4
+  static BCP_string key( 
+    const BCP_string & mtm, 
+    const BCP_string & part, 
+    const BCP_string & plantLoc, 
+d43 1
+a43 1
+    BCP_string retVal = mtm+"$+&"+part+"$+&"+plantLoc+"$+&"+periodchar;
+d79 1
+a79 1
+  virtual BCP_string key( unsigned int recNum ) const
+d81 1
+a81 1
+    BCP_string retVal = key(
+@
+
+
+1.8
+log
+@Code updated to read new format. (does not yet implement function supported by new format)
+@
+text
+@d16 1
+a16 1
+  getIntFieldH(etnFlag);
+d30 1
+a30 1
+    hasHeaderRecord(6);
+d37 1
+a37 2
+    const BCP_string & part,  
+    int etnFlag, 
+d43 1
+a43 3
+    char etn[100];
+    sprintf( etn, "%d", etnFlag );
+    BCP_string retVal = mtm+"$+&"+part+"$+&"+plantLoc+"$+&"+periodchar+"$+&"+etn;
+a58 1
+    assert( file.etnFlagAsInt(0) == 1 );
+d66 5
+a70 6
+    assert( file.mtm(key("m2","p2",1,"wat",2))=="m2");
+    assert( file.part(key("m2","p2",1,"wat",2)) == "p2" );
+    assert( file.etnFlagAsInt(key("m2","p2",1,"wat",2)) == 1 );
+    assert( file.srcLoc(key("m2","p2",1,"wat",2)) == "wat" );
+    assert( file.periodAsInt(key("m2","p2",1,"wat",2)) == 2 );
+    assert( file.attachRateAsFloat(key("m2","p2",1,"wat",2)) == 2.1f );
+a83 1
+      etnFlagAsInt(recNum),
+d115 1
+a115 1
+  getIntFieldFileWithIteratorH(etnFlag);
+d143 1
+a143 1
+        assert( fileIter.etnFlagAsInt() == 1 );
+@
+
+
+1.7
+log
+@moved etn flag from mtmDemanBom to partDemand files
+@
+text
+@d16 1
+a16 1
+  //getIntFieldH(etnFlag);
+d30 1
+a30 1
+    hasHeaderRecord(5);
+d37 2
+a38 1
+    const BCP_string & part, 
+d44 3
+a46 1
+    BCP_string retVal = mtm+"$+&"+part+"$+&"+plantLoc+"$+&"+periodchar;
+d62 1
+d70 6
+a75 5
+    assert( file.mtm(key("m2","p2","wat",2))=="m2");
+    assert( file.part(key("m2","p2","wat",2)) == "p2" );
+    assert( file.srcLoc(key("m2","p2","wat",2)) == "wat" );
+    assert( file.periodAsInt(key("m2","p2","wat",2)) == 2 );
+    assert( file.attachRateAsFloat(key("m2","p2","wat",2)) == 2.1f );
+d89 1
+d121 1
+a121 1
+  //getIntFieldFileWithIteratorH(etnFlag);
+d149 1
+a149 1
+        //assert( fileIter.etnFlagAsInt() == 1 );
+@
+
+
+1.6
+log
+@Replaced std::string with BCP_string to work around VAC compiler problem
+@
+text
+@d16 1
+a16 1
+  getIntFieldH(etnFlag);
+d30 1
+a30 1
+    hasHeaderRecord(6);
+d62 1
+a62 1
+    assert( file.etnFlagAsInt(0) == 1 );
+d71 1
+a71 1
+    assert( file.etnFlagAsInt(key("m2","p2","wat",2)) == 0 );
+d115 1
+a115 1
+  getIntFieldFileWithIteratorH(etnFlag);
+d143 1
+a143 1
+        assert( fileIter.etnFlagAsInt() == 1 );
+@
+
+
+1.5
+log
+@Updated to change 1 to be the first period.
+Added additional test to see if objValue has changed
+@
+text
+@d20 1
+a20 1
+  ESO2mtmDemanBomData(std::string filename)
+d35 4
+a38 4
+  static std::string key( 
+    const std::string & mtm, 
+    const std::string & part, 
+    const std::string & plantLoc, 
+d43 1
+a43 1
+    std::string retVal = mtm+"$+&"+part+"$+&"+plantLoc+"$+&"+periodchar;
+d79 1
+a79 1
+  virtual std::string key( unsigned int recNum ) const
+d81 1
+a81 1
+    std::string retVal = key(
+@
+
+
+1.4
+log
+@modifications to accomodate 2/18 file format changes
+@
+text
+@d60 1
+a60 1
+    assert( file.periodAsInt(0) == 0 );
+d66 6
+a71 6
+    assert( file.mtm(key("m2","p2","wat",1))=="m2");
+    assert( file.part(key("m2","p2","wat",1)) == "p2" );
+    assert( file.srcLoc(key("m2","p2","wat",1)) == "wat" );
+    assert( file.periodAsInt(key("m2","p2","wat",1)) == 1 );
+    assert( file.attachRateAsFloat(key("m2","p2","wat",1)) == 2.1f );
+    assert( file.etnFlagAsInt(key("m2","p2","wat",1)) == 0 );
+d141 1
+a141 1
+        assert( fileIter.periodAsInt() == 0 );
+@
+
+
+1.3
+log
+@removed usageTime in mtmDemBom data file, because mtmFile has demanufacturing time.
+@
+text
+@d13 1
+a13 1
+  getFieldH(plantLoc);
+d15 2
+a16 1
+  getFloatFieldH(prodRate);
+d30 1
+a30 1
+    hasHeaderRecord(5);
+d59 1
+a59 1
+    assert( file.plantLoc(0) == "pok" );
+d61 2
+a62 1
+    assert( file.prodRateAsFloat(0) == 1.5f );
+d68 1
+a68 1
+    assert( file.plantLoc(key("m2","p2","wat",1)) == "wat" );
+d70 2
+a71 1
+    assert( file.prodRateAsFloat(key("m2","p2","wat",1)) == 2.1f );
+d84 1
+a84 1
+      plantLoc(recNum),
+d112 1
+a112 1
+  getFieldFileWithIteratorH(plantLoc);
+d114 2
+a115 1
+  getFloatFieldFileWithIteratorH(prodRate);
+d140 1
+a140 1
+        assert( fileIter.plantLoc() == "pok" );
+d142 2
+a143 1
+        assert( fileIter.prodRateAsFloat() == 1.5f );
+@
+
+
+1.2
+log
+@Updated to match current understanding of file formats
+@
+text
+@d16 1
+a16 1
+  getFloatFieldH(usageTime);
+d29 1
+a29 1
+    hasHeaderRecord(6);
+d61 1
+a61 1
+    assert( file.usageTimeAsFloat(0) == 5.5f );
+d69 1
+a69 1
+    assert( file.usageTimeAsFloat(key("m2","p2","wat",1)) == 6.5f );
+d112 1
+a112 1
+  getFloatFieldFileWithIteratorH(usageTime);
+d139 1
+a139 1
+        assert( fileIter.usageTimeAsFloat() == 5.5f );
+@
+
+
+1.1
+log
+@Added code to read mtmDemanBomData file
+@
+text
+@d64 6
+a69 6
+    assert( file.mtm(key("m2","p2","kgn",1))=="m2");
+    assert( file.part(key("m2","p2","kgn",1)) == "p2" );
+    assert( file.plantLoc(key("m2","p2","kgn",1)) == "kgn" );
+    assert( file.periodAsInt(key("m2","p2","kgn",1)) == 1 );
+    assert( file.prodRateAsFloat(key("m2","p2","kgn",1)) == 2.1f );
+    assert( file.usageTimeAsFloat(key("m2","p2","kgn",1)) == 6.5f );
+@
+

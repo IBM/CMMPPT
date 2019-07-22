@@ -1,0 +1,905 @@
+head	1.22;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.22
+date	2008.02.27.23.19.11;	author rjw;	state dead;
+branches;
+next	1.21;
+
+1.21
+date	2008.02.27.22.49.17;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2007.09.10.21.01.34;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2007.08.24.20.17.24;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2007.08.15.19.15.33;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2007.08.09.19.30.36;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2007.06.25.23.12.23;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2007.06.22.19.04.04;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2007.06.07.17.08.58;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2007.05.30.21.02.11;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.12.01.19.55.17;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.10.26.20.53.48;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.10.26.19.03.15;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.10.19.21.54.30;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.10.13.20.47.03;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.10.12.18.43.51;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.10.11.22.37.21;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.10.04.18.45.07;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.10.03.15.08.59;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.09.29.22.56.40;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.08.18.19.32.52;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.08.18.18.43.39;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.22
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef OptProbH
+#define OptProbH
+
+//------------------------------------------------------------------------------
+// Header file: "OptProb.h"
+//
+// Contains the declaration of class OptProb.
+//------------------------------------------------------------------------------
+
+#include <List.h>
+#include <ObjStack.h>
+#include <PtrVec.h>
+#include <Assoc.h>
+
+//------------------------------------------------------------------------------
+// class OptProb.
+//
+// An optimization problem, either:
+//    linear programming, or
+//    mixed integer programming.
+//
+// Class hierarchy:
+//
+//    ProbAssoc
+//       OptProb
+//          DetImpOP
+//          StochImpOP
+//------------------------------------------------------------------------------
+
+class WitOptProb: public WitProbAssoc
+   {
+   public:
+
+      //-----------------------------------------------------------------------
+      // Public pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual bool needDual () = 0;
+         //
+         // Returns true, iff a dual solution is needed.
+
+      virtual void reportInfeasible () = 0;
+         //
+         // Does any special error reporting for an infeasible solution,
+         // (over and above what is automatically done by the solver).
+
+      virtual void reportUnbounded () = 0;
+         //
+         // Does any special error reporting for an unbounded solution,
+         // (over and above what is automatically done by the solver).
+
+      //-----------------------------------------------------------------------
+      // Data access functions.
+      //-----------------------------------------------------------------------
+
+      accessFunc (const WitList <WitOptVar> &, myOptVars)
+      accessFunc (const WitList <WitOptCon> &, myOptCons)
+      accessFunc (int,                         nCoeffs)
+      accessFunc (WitOptObj *,                 mainObj)
+      accessFunc (FILE *,                      optProbFile)
+
+      inline int nOptVars ()
+         {
+         return myOptVars ().nElements ();
+         }
+
+      inline int nOptCons ()
+         {
+         return myOptCons ().nElements ();
+         }
+
+      inline int nOptObjs ()
+         {
+         return myOptObjs_.nElements ();
+         }
+
+      //-----------------------------------------------------------------------
+      // Other public member functions.
+      //-----------------------------------------------------------------------
+
+      void store (WitOptVar * theVar);
+         //
+         // theVar is a new OptVar created for this OptProb.
+         // This function stores theVar.
+
+      void store (WitOptCon * theCon);
+         //
+         // theCon is a new OptCon created for this OptProb.
+         // This function stores theCon.
+
+      void store (WitOptObj * theObj);
+         //
+         // theObj is a new OptObj created for this OptProb.
+         // This function stores theObj.
+
+      void generateFixed ();
+         //
+         // Generates the fixed aspects of this OptProb (the aspects that do
+         // not change in accelerated mode).
+
+      void countIntVars ();
+         //
+         // Sets nIntVars_.
+
+      void incCoeff (WitOptVar * theVar, double delta);
+         //
+         // Adds delta to the Coeff of theVar in curCon_, constructing it,
+         // if neccesary.  No-op, if delta is (nearly) 0.0.
+
+      void generateFlexible ();
+         //
+         // Generates the flexible aspects of this OptProb (the aspects that
+         // may change in accelerated mode).
+
+      const WitBoundPair & preScreenBounds (const WitOptVar * theVar);
+         //
+         // Returns the value that theVar->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      const WitBoundPair & preScreenBounds (const WitOptCon * theCon);
+         //
+         // Returns the value that theCon->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      void calcInitSoln ();
+         //
+         // Calculates an initial solution.
+
+      void getMatrixByCols (
+            WitVector <int> &    firstCoeffIdx,
+            WitVector <int> &    rowIdx,
+            WitVector <double> & coeffVal);
+         //
+         // Retrieves the constraint matrix in the column major ordered format.
+
+      void print ();
+         //
+         // Prints this OptProb.
+
+      void solve ();
+         //
+         // Solves this OptProb.
+
+   protected:
+
+      //-----------------------------------------------------------------------
+      // Constructor functions.
+      //-----------------------------------------------------------------------
+
+      WitOptProb (WitProblem *);
+
+      //-----------------------------------------------------------------------
+      // Destructor function.
+      //-----------------------------------------------------------------------
+
+      virtual ~WitOptProb ();
+
+      //-----------------------------------------------------------------------
+      // Protected pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void generateVariables () = 0;
+         //
+         // Generates all variables.
+
+      virtual void generateConstraints () = 0;
+         //
+         // Generates all OptCons.
+
+      virtual WitOptObj * generateObjectives () = 0;
+         //
+         // Generates all OptObjs.
+         // Returns the main objective.
+
+      virtual void postGenFixed () = 0;
+         //
+         // Takes actions appropriate at the conclusion of generateFixed ().
+
+      virtual void postGenFlexible () = 0;
+         //
+         // Takes actions appropriate at the conclusion of generateFlexible ().
+
+      virtual void printOptVCHeading () = 0;
+         //
+         // Prints a heading for OptVCs to optProbFile ().
+
+      //-----------------------------------------------------------------------
+      // Protected non-pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void displayDerived ();
+         //
+         // Display any problem-specific message in pre-release mode.
+         // This default version is a no-op.
+
+      virtual void printDerived ();
+         //
+         // Prints problem-specific aspects of this OptProb.
+         // This default version is a no-op.
+
+      virtual void initDepVars ();
+         //
+         // Initializes the dependent variables, i.e., those variables whose
+         // initial value depends on the initial value of other variables.
+
+      //-----------------------------------------------------------------------
+      // Other protected member functions.
+      //-----------------------------------------------------------------------
+
+      void saveBounds ();
+         //
+         // Copies bounds for each OptVar and OptCon into varPreScreenBounds_ 
+         // and conPreScreenBounds_.
+
+      int screen (WitOptCon * theCon);
+         //
+         // Performs generic screening on theCon and the variables it
+         // intersects.
+         // Returns # OptVars fixed.
+         // No-op, if theCon is NULL.
+
+   private:
+
+      //-----------------------------------------------------------------------
+      // Private member functions.
+      //-----------------------------------------------------------------------
+
+      void generateCoeffs ();
+         //
+         // Generates all Coeffs for all OptCons and stores them in the
+         // OptVC myCoeffs_ vectors.
+
+      void buildCoeffs ();
+         //
+         // Generates all Coeffs for all OptCons.
+
+      void allocVarCoeffs ();
+         //
+         // Invokes allocMyCoeffs for each OptVar in this OptProb.
+
+      void storeCoeffs ();
+         //
+         // Stores all Coeffs in each OptVC, in OptCon order for OptVars and
+         // OptVar order for OptCons.
+
+      inline WitCoeff * & varLastCoeff (const WitOptVar * theVar);
+         //
+         // Return the most recently generated Coeff whose OptVar is theVar, or
+         // NULL is none exists.
+
+      void generateMainObjCoeffs ();
+         //
+         // For each OptVar, theVar, computes theVar->mainObjCoeffVal.
+
+      void printVars ();
+         //
+         // Prints all OptVars in this OptProb.
+
+      void printCons ();
+         //
+         // Prints all OptCons in this OptProb.
+
+      void printObjs ();
+         //
+         // Prints all OptObjs in this OptProb.
+
+      void prtMatrixByCols ();
+         //
+         // Prints the matrix in the column major ordered format.
+
+      virtual void doScreening () = 0;
+         //
+         // Performs screening of constraints and variables.
+
+      void checkVarBounds ();
+         //
+         // Verifies that the lower bound on each OptVar is <= the upper bound.
+
+      void reconstructDual ();
+         //
+         // Assuming the optimization problem was screened and an optimal dual
+         // solution to the screened problem has been obtained, this function
+         // modifies the dual solution, in order to make it optimal and feasible
+         // for the dual of the unscreened problem.
+
+      noCopyCtorAssign (WitOptProb);
+
+      //-----------------------------------------------------------------------
+      // Private member data.
+      //-----------------------------------------------------------------------
+
+      WitOptSolver * myOptSolver_;
+         //
+         // The OptSolver owned by this OptProb.
+
+      WitList <WitOptVar> myOptVars_;
+         //
+         // The list of all OptVars in this OptProb.
+
+      WitList <WitOptCon> myOptCons_;
+         //
+         // The list of all OptCons in this OptProb.
+
+      WitList <WitOptObj> myOptObjs_;
+         //
+         // List of all OptObjs in this OptProb.
+
+      int nCoeffs_;
+         //
+         // # Coeffs in optimization problem.
+
+      WitOptCon * curCon_;
+         //
+         // The OptCon whose Coeffs are currently being generated.
+
+      WitObjStack <WitCoeff> curConCoeffs_;
+         //
+         // The Coeffs for curCon_;
+
+      WitPtrVec <WitCoeff> varLastCoeff_;
+         //
+         // varLastCoeff_[theVar->index ()] is the most recently
+         // generated Coeff whose OptVar is theVar, or NULL is none exists.
+         // Allocated only during buildCoeffs.
+
+      WitOptObj * mainObj_;
+         //
+         // The main objective function.
+
+      int nIntVars_;
+         //
+         // # integer variables in this OptProb.
+
+      WitPtrVec <WitBoundPair> varPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (OptVar *).
+
+      WitPtrVec <WitBoundPair> conPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (OptCon *).
+
+      WitList <WitCoeff> screenedCoeffs_;
+         //
+         // For each Coeff in screenedCoeffs_, theCoeff:
+         //    theCoeff->myVar () is a variable that was screened out.
+         //    theCoeff->myCon () is the constraint that enabled the
+         //    variable to be screened out.
+         // The Coeffs are stored in reverse of the order in which the
+         // screening was performed.
+         // Valid iff needDual () is true.
+
+      FILE * optProbFile_;
+         //
+         // Optimization problem output file.
+   };
+
+#endif
+@
+
+
+1.21
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.20
+log
+@Stochastic Implosion
+@
+text
+@d192 1
+a192 1
+      virtual void printOptProbElHeading () = 0;
+d194 1
+a194 1
+         // Prints a heading for OptProbEls to optProbFile ().
+d240 1
+a240 1
+         // OptProbEl myCoeffs_ vectors.
+d252 1
+a252 1
+         // Stores all Coeffs in each OptProbEl, in OptCon order for OptVars and
+@
+
+
+1.19
+log
+@Stochastic Implosion
+@
+text
+@d188 4
+@
+
+
+1.18
+log
+@Stochastic Implosion
+@
+text
+@d69 1
+a69 5
+
+      inline FILE * optProbFile ()
+         {
+         return optProbFile_;
+         }
+@
+
+
+1.17
+log
+@Stochastic Implosion
+@
+text
+@a263 4
+      void generateBounds (const WitList <WitOptProbEl> & theOptProbEls);
+         //
+         // Generates the bounds for each OptProbEl in theOptProbEls.
+
+@
+
+
+1.16
+log
+@Stochastic Implosion
+@
+text
+@d224 1
+a224 1
+      int screen (const WitOptCon * theCon);
+@
+
+
+1.15
+log
+@Stochastic Implosion
+@
+text
+@d36 1
+@
+
+
+1.14
+log
+@Stochastic Implosion
+@
+text
+@d35 1
+a35 1
+//          ImpOptProb
+@
+
+
+1.13
+log
+@Stochastic Implosion
+@
+text
+@a42 12
+      // Constructor functions.
+      //-----------------------------------------------------------------------
+
+      WitOptProb (WitOptImploder *);
+
+      //-----------------------------------------------------------------------
+      // Destructor function.
+      //-----------------------------------------------------------------------
+
+      virtual ~WitOptProb ();
+
+      //-----------------------------------------------------------------------
+a63 1
+      accessFunc (WitOptImploder *,            myOptImploder)
+d159 12
+a303 4
+      WitOptImploder * const myOptImploder_;
+         //
+         // The OptImploder under which this OptProb is operating.
+
+@
+
+
+1.12
+log
+@External opt implosion.
+@
+text
+@d188 4
+@
+
+
+1.11
+log
+@External opt implosion.
+@
+text
+@a101 5
+      inline bool isaMIP ()
+         {
+         return (nIntVars_ > 0);
+         }
+
+@
+
+
+1.10
+log
+@External opt implosion.
+@
+text
+@a173 5
+      void setExtOptColSol (const WitIVRealArg & theVector);
+         //
+         // To be used in external opt implosion mode.
+         // Sets the primal solution to theVector.
+
+@
+
+
+1.9
+log
+@External opt implosion.
+@
+text
+@a158 20
+      void getExtOptProb (
+            WitVector <int> &    start,
+            WitVector <int> &    index,
+            WitVector <double> & value,
+            WitVector <double> & collb,
+            WitVector <double> & colub,
+            WitVector <double> & obj,
+            WitVector <double> & rowlb,
+            WitVector <double> & rowub,
+            WitVector <int> &    intIndices,
+            double &             objSense);
+         //
+         // To be used in external opt implosion mode.
+         // Retrieves data specifying the optimization problem, using
+         // "standard column major ordered format". On return, the args can be
+         // passed to the following COIN functions:
+         //    OsiSolverInterface::loadProblem (...).
+         //    OsiSolverInterface::setInteger  (...).
+         //    OsiSolverInterface::setObjSense (...).
+
+a289 21
+      void getExtOptColData (
+            WitVector <double> & collb,
+            WitVector <double> & colub,
+            WitVector <double> & obj);
+         //
+         // Retrieves data specifying column data for the optimization problem,
+         // for getExtOptProb (...).
+
+      void getExtOptRowData (
+            WitVector <double> & rowlb,
+            WitVector <double> & rowub);
+         //
+         // Retrieves data specifying row data for the optimization problem,
+         // for getExtOptProb (...).
+
+      void getExtOptIntIndices (WitVector <int> & intIndices);
+         //
+         // Retrieves a list of the column indices of all of the
+         // integer-constrained variables in the optimization problem,
+         // for getExtOptProb (...).
+
+@
+
+
+1.8
+log
+@External opt implosion.
+@
+text
+@d159 1
+a159 1
+      void getExtOptProblem (
+d194 1
+a194 1
+      void setExtOptColSolution (const WitIVRealArg & theVector);
+d316 1
+a316 1
+         // for getExtOptProblem (...).
+d323 1
+a323 1
+         // for getExtOptProblem (...).
+d329 1
+a329 1
+         // for getExtOptProblem (...).
+@
+
+
+1.7
+log
+@External opt implosion.
+@
+text
+@d159 1
+a159 1
+      void getOptProbData (
+d171 1
+d194 5
+d310 1
+a310 1
+      void getOptColData (
+d316 1
+a316 1
+         // for getOptProbData (...).
+d318 1
+a318 1
+      void getOptRowData (
+d323 1
+a323 1
+         // for getOptProbData (...).
+d325 1
+a325 1
+      void getIntIndices (WitVector <int> & intIndices);
+d329 1
+a329 1
+         // for getOptProbData (...).
+@
+
+
+1.6
+log
+@Assisted opt implosion.
+@
+text
+@a188 4
+      void checkVarBounds ();
+         //
+         // Verifies that the lower bound on each OptVar is <= the upper bound.
+
+a192 7
+      void reconstructDual ();
+         //
+         // Assuming the optimization problem was screened and an optimal dual
+         // solution to the screened problem has been obtained, this function
+         // modifies the dual solution, in order to make it optimal and feasible
+         // for the dual of the unscreened problem.
+
+d325 15
+@
+
+
+1.5
+log
+@App controlled opt implosion.
+@
+text
+@a159 2
+            int &                numcols,
+            int &                numrows,
+d167 3
+a169 1
+            WitVector <double> & rowub);
+d173 4
+a176 1
+         // passed to the COIN function OsiSolverInterface::loadProblem (...).
+d183 1
+a183 1
+         // Retrieves the contraint matrix in the column major ordered format.
+d315 21
+@
+
+
+1.4
+log
+@App controlled opt implosion.
+@
+text
+@d159 20
+a178 4
+      void defMatrixByCols (
+            WitVector <int> &    indexRow,
+            WitVector <int> &    startOfEachColumn,
+            WitVector <double> & elements);
+d180 1
+a180 1
+         // Defines the matrix in the column major ordered format.
+@
+
+
+1.3
+log
+@App controlled opt implosion.
+@
+text
+@d27 1
+a27 1
+// An optimization model, either:
+d82 1
+a82 1
+      inline FILE * modelFile ()
+d84 1
+a84 1
+         return modelFile_;
+d180 4
+a183 4
+         // Assuming the model was screened and an optimal dual solution to the
+         // screened model has been obtained, this function modifies the dual
+         // solution, in order to make it optimal and feasible for the dual of
+         // the unscreened model.
+d206 1
+a206 1
+         // Prints a heading for OptProbEls to modelFile ().
+d214 1
+a214 1
+         // Display any model-specific message in pre-release mode.
+d219 1
+a219 1
+         // Prints model-specific aspects of this OptProb.
+d324 1
+a324 1
+         // # Coeffs in model.
+d366 1
+a366 1
+      FILE * modelFile_;
+d368 1
+a368 1
+         // Optimization model output file.
+@
+
+
+1.2
+log
+@App controlled opt implode.
+@
+text
+@d170 4
+d178 7
+a295 11
+      void checkVarBounds ();
+         //
+         // Verifies that the lower bound on each OptVar is <= the upper bound.
+
+      void reconstructDual ();
+         //
+         // Assuming the model was screened and an optimal dual solution to the
+         // screened model has been obtained, this function modifies the dual
+         // solution, in order to make it optimal and feasible for the dual of
+         // the unscreened model.
+
+@
+
+
+1.1
+log
+@App controlled opt implosion.
+@
+text
+@d65 1
+a65 1
+         // (over and above what is automatically done by myCoinSolver_).
+d70 1
+a70 1
+         // (over and above what is automatically done by myCoinSolver_).
+d306 1
+a306 1
+      WitCoinSolver * myCoinSolver_;
+d308 1
+a308 1
+         // The CoinSolver owned by this OptProb.
+@
+

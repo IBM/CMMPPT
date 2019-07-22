@@ -1,0 +1,1457 @@
+#include <iostream.h>
+#include <fstream.h>
+#include <iomanip.h>
+
+#include <rw/regexp.h>
+
+#include <scenario/src/scenario.h>
+#include <scenario/src/schFctry.h>
+#include <scenario/src/multiSch.h>
+#include <scenario/src/msItemIt.h>
+#include <scenario/src/msAttrIt.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/schdDeSt.h>
+#include <scenario/src/sortSchP.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/util.h>
+
+/*#if defined (WIN32) || defined (__OS2__) || defined (__WINDOWS__)
+#include <strstrea.h>
+#else
+#include <strstream.h>
+#endif*/
+
+// Implementation notes:
+//   I think a good way to implement this is by using a RWGSlist
+// of classes that contain LgFrScheduleDescriptors and
+// LgFrSortingScheduleFloats.  The priorities can be changed just by
+// changing the order of the entries in the list.
+//   An alternative is to use an RWHashDictionary to maintain the
+// descriptor-schedule association and a RWSlistCollectables to keep
+// the ordering of the descriptors but that will require the creation of
+// a subclass of RWCollectable just for the LgFrSortingScheduleFloats.
+//   Since (1) most LgFrMultiScheduleFloats are unlikely to contain a lot of
+// schedules, (2) the minor iterator is likely to use the sequence set
+// A LOT and (3) insertions and deletions into the set of schedules
+// are probably rare, the former approach is probably better.
+//   For now, the former approach is used.
+// The helper class for this class is LgFrDescriptorSchedulePairFloat.
+// We can just put the LgFrDescriptorSchedulePairFloats we need on the heap
+// and we pass them to the MultiSchedule users.
+// They pick from that set so they aren't allowed to make them themselves.
+
+// ---------------------------------------------------------------------
+// ASSUMPTION(just for demo):
+//   Selection schedule is identical to the order schedule.
+// ---------------------------------------------------------------------
+
+// Global tester function for the dsListIterator to find the item which matches
+// the LgFrScheduleDescriptor sd.
+
+
+RWBoolean
+findDescSched(const LgFrDescriptorSchedulePairFloat* dsPairPtr,
+              const void* sd)
+{
+  return ( dsPairPtr->descriptor() == *( (const LgFrScheduleDescriptor*)sd ) );
+}
+
+// ---------------------------------------------------------------------
+// Return the first item matches sd.
+// return NULL if not found, else return that item.
+// ---------------------------------------------------------------------
+LgFrDescriptorSchedulePairFloat*
+  LgFrMultiScheduleFloat::find(const LgFrScheduleDescriptor& sd)
+     const
+{
+  return descScheduleList_.find(findDescSched,&sd);
+}
+
+// ---------------------------------------------------------------------
+// Return the schedule type
+// This method will return OTHER
+// The subclass of ms should return the right type.
+// ---------------------------------------------------------------------
+LgFrScheduleType
+  LgFrMultiScheduleFloat::schedType()
+     const
+{
+  // Subclass of ms should return the right type
+  return OTHER;
+}
+
+// ---------------------------------------------------------------------
+// Return a list of schedule descriptor abbreviations in MS.
+// ---------------------------------------------------------------------
+LgFrVectorRWCString
+  LgFrMultiScheduleFloat::schedAbbrevVec ()
+     const
+{
+  int size = this->entries();
+  LgFrVectorRWCString abbrevVec(size);
+  for (int i = 0; i < size; i++ ) {
+    LgFrDescriptorSchedulePairFloat* dsPairPtr = descScheduleList_.at(i);
+    LgFrScheduleDescriptor desc = dsPairPtr->descriptor();
+    abbrevVec(i) = this->abbreviationOf(desc);
+  }
+  return abbrevVec;
+}
+
+// ---------------------------------------------------------------------
+// Return the abbreviation of a schedule descriptor.
+// ---------------------------------------------------------------------
+RWCString
+  LgFrMultiScheduleFloat::abbreviationOf (const LgFrScheduleDescriptor & desc)
+     const
+{
+  return scenarioPtr_->scheduleFactory()->abbreviationOf(desc);
+}
+
+// ---------------------------------------------------------------------
+// Return a list of schedule descriptors  in MS
+// ---------------------------------------------------------------------
+LgFrVectorScheduleDescriptor
+  LgFrMultiScheduleFloat::schedDescVec()
+    const
+{
+  int size = this->entries();
+  LgFrVectorScheduleDescriptor retVal(size);
+  for (int i = 0; i < size; i++ ) {
+    LgFrDescriptorSchedulePairFloat* dsPairPtr = descScheduleList_.at(i);
+    retVal[i] = dsPairPtr->descriptor();
+  }
+  return retVal;
+}
+
+
+// ---------------------------------------------------------------------
+// Return the list of LgFrDescriptorSchedulePairFloat
+// ---------------------------------------------------------------------
+const LgFrDescriptorSchedulePairFloatGSList&
+  LgFrMultiScheduleFloat::descSchedPairList()
+     const
+{
+  return descScheduleList_;
+}
+
+LgFrDescriptorSchedulePairFloatGSList&
+  LgFrMultiScheduleFloat::descSchedPairList()
+{
+  return descScheduleList_;
+}
+
+#ifdef WANT_MULTISCHEDULE_TO_BE_NON_ABSTRACT
+// ---------------------------------------------------------------------
+// Add a new schedule if it isn't already in the multi-schedule.
+// The derived class should have the right implementation, issue an error
+// message and return FALSE if the base class method is invoked.
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::newSchedule(const LgFrScheduleDescriptor& )
+{
+//  cerr << "ERROR: Should not use this method!!!" << endl;
+  return FALSE;
+}
+#endif
+
+// ---------------------------------------------------------------------
+// Add a new schedule's subscription.
+// This method needs to be called by the derived classes newSchedule
+// method.
+// ---------------------------------------------------------------------
+void
+  LgFrMultiScheduleFloat::addSubscription(
+     LgFrDescriptorSchedulePairFloat* sdpPtr)
+{
+  sdpPtr->addDependent( this );
+}
+
+// ---------------------------------------------------------------------
+// Remove a descriptorSchedule from the multi-schedule's descScheduleList_.
+// Return TRUE : if found and removed.
+//        FALSE: if not found.
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::deleteSchedule(const LgFrScheduleDescriptor& sd)
+{
+  // Visits all the items in descScheduleList_
+  // And remove the one matches sd.
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr == NULL ) return FALSE;
+  else {
+    descScheduleList_.removeReference(dsPairPtr);
+    dsPairPtr->removeDependent( this );
+    delete dsPairPtr;
+    // If the one to be deleted is a selection schedule, set the first one in
+    // the list as the new selection schedule.  Same thing applies to the
+    // order schedule.
+    if ( sd == itemSelectionSchedule_ )
+      itemSelectionSchedule_ = descScheduleList_.first()->descriptor();
+    if ( sd == itemOrderSchedule_ )
+      itemOrderSchedule_ = descScheduleList_.first()->descriptor();
+    return TRUE;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Return the index of the first schedule that matches sd.
+// ---------------------------------------------------------------------
+int
+  LgFrMultiScheduleFloat::index(const LgFrScheduleDescriptor& sd)
+     const
+{
+  int len = descScheduleList_.entries();
+  for ( int i = 0; i < len; i++ )
+ {
+   LgFrDescriptorSchedulePairFloat* dsPairPtr = descScheduleList_.at(i);
+   if ( dsPairPtr->descriptor() == sd ) return i;
+ }
+  // The schedule with sd is not in the list, return -1;
+  return -1;
+}
+
+// ---------------------------------------------------------------------
+// Return the relative priority of a schedule.  The schedule with priority
+// 0 is processed first by the minor iterator, 1 is next, and so on.
+// When a schedule is inserted, it is given the highest numerical priority-value.
+// If the schedule is not in the list, return -1.
+// ---------------------------------------------------------------------
+int
+  LgFrMultiScheduleFloat::priority (const LgFrScheduleDescriptor& sd)
+     const
+{
+  return this->index(sd);
+}
+
+// ---------------------------------------------------------------------
+// Shift priorities (e.g. moving one schedule before another)
+// Move schedule "from" to schedule "to" either BEFORE or AFTER.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::priorityShift(const LgFrScheduleDescriptor& from,
+                                      const LgFrScheduleDescriptor& to,
+                                      const LgFrSchedulePosition position)
+{
+  assert ( position == BEFORE || position == AFTER );
+  int fromIndex = this->index(from);
+  int toIndex = this->index(to);
+  // Return FALSE if at least one of them is not in the list.
+  if ( fromIndex == -1 || toIndex == -1 ) return FALSE;
+  LgFrDescriptorSchedulePairFloat* fromDsPairPtr = descScheduleList_.at(fromIndex);
+  descScheduleList_.removeReference(fromDsPairPtr); // Remove it first
+  toIndex = this->index(to);    // Get the new toIndex
+  if ( position == BEFORE )
+    descScheduleList_.insertAt(toIndex,fromDsPairPtr);       // Insert BEFORE "to"
+  else descScheduleList_.insertAt(toIndex+1,fromDsPairPtr);  // Insert AFTER "to"
+  return TRUE;
+}
+
+// ---------------------------------------------------------------------
+// Swap priorities.  Exchange the priority of a and b
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::prioritySwap(const LgFrScheduleDescriptor& a,
+                                     const LgFrScheduleDescriptor& b)
+{
+  int aIndex = this->index(a);
+  int bIndex = this->index(b);
+  // Return FALSE if at least one of them is not in the list.
+  if ( aIndex == -1 || bIndex == -1 ) return FALSE;
+  LgFrDescriptorSchedulePairFloat* aDsPairPtr = descScheduleList_.at(aIndex);
+  LgFrDescriptorSchedulePairFloat* bDsPairPtr = descScheduleList_.at(bIndex);
+  descScheduleList_.at(aIndex) = bDsPairPtr;
+  descScheduleList_.at(bIndex) = aDsPairPtr;
+  return TRUE;
+}
+
+// ---------------------------------------------------------------------
+// Get the selection schedule descriptor.
+// ---------------------------------------------------------------------
+const LgFrScheduleDescriptor&
+LgFrMultiScheduleFloat::itemSelectionSchedule()
+     const
+{
+  return (itemSelectionSchedule_);
+}
+
+// ---------------------------------------------------------------------
+// Set a selection schedule.
+// If a LgFrFilterStrategy is specified, it is associated with the (new)
+// selection schedule.
+// This method removes the filter from the current selection schedule.
+// Implementation note: this call can be used to change the filter if sd is
+// the descriptor of the old selection-schedule
+// Return TRUE  :if sd is found and changes are made.
+//        FALSE :if sd is not found.
+// A clone copy of the FilterStrategy is made by this method.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::itemSelectionSchedule(const LgFrScheduleDescriptor& sd,
+                                              LgFrFilterStrategy* fsPtr)
+{
+  if ( !this->contains(sd) ) return FALSE;  // Not found
+
+  // Check to see if the current itemSelectionSchedule_ is the same as sd.
+  // -If it is same and if the new filter strategy is different from the current one,
+  //  change the schedule's filter strategy and re-populate.
+  // -If it is not same, set the new selection schedule and the new filter strategy.
+  //  Re-populate it if necessary.
+  //  Remove the old filter strategy from the old selection schedule and re-populate.
+
+  if ( itemSelectionSchedule_ != sd ) {
+    if ( this->contains(itemSelectionSchedule_) ) {
+      LgFrSortingScheduleFloatSmartPointer oldSchedPtr = this->schedule(itemSelectionSchedule_);
+      oldSchedPtr->filterStrategy(LgFrFilterStrategy());  // set the filter strategy to default
+      oldSchedPtr->populate();
+    }
+    itemSelectionSchedule_ = sd;        // set the new selection schedule
+    // following line is a temp. solution, for demo only
+    // set the order schedule to be same as the selection schedule
+    if ( itemOrderSchedule_ != itemSelectionSchedule_)
+         this->itemOrderSchedule(sd, LgFrNullRWCString);
+  }
+  if ( fsPtr ) {
+    LgFrSortingScheduleFloatSmartPointer schedPtr = this->schedule(itemSelectionSchedule_);
+#if 0
+    Changed because isA is not good enough to identify that two
+    filter strategies exclude the same itemTimeVecs
+
+    if ( (schedPtr->filterStrategy()).isA() != fsPtr->isA() ) {
+#else
+    if ( &(schedPtr->filterStrategy()) != fsPtr ) {
+#endif
+      schedPtr->filterStrategy(*fsPtr);
+      schedPtr->populate();
+    }
+  }
+  return TRUE;
+}
+
+
+//---------------------------------------------------------------------------
+// Set a Selection schedule using a FilterDescriptor
+// This method removes the filter from the current selection schedule.
+// Implementation note: this call can be used to change the filter if sd is
+// the descriptor of the old selection-schedule
+// Return TRUE  :if sd is found and changes are made.
+//        FALSE :if sd is not found.
+//---------------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::filterItemSelectionSchedule(
+   const LgFrScheduleDescriptor& sd,
+   const LgFrFilterDescriptor & fd,
+   const RWCString & /* s1 */  ,
+   const RWCString & /* s2 */  )
+{
+   RWBoolean retVal = FALSE;
+
+   if ( fd == LGFRFilterNothing ) {
+      LgFrFilterStrategy filterNothing;
+      retVal = itemSelectionSchedule( sd, &filterNothing );
+   }
+
+   else {
+      cerr <<"LgFrFilterDescriptor : " <<fd <<endl;
+      assert( 1==0 && "Unrecognized LgFrFilterDescriptor Specified");
+   }
+
+   return retVal;
+}
+
+
+// ---------------------------------------------------------------------
+// Return a pair compair strategy that is corresponding to the
+// sorting descriptor and optional second parameter period.
+// Client of this method has to free the memory of LgFrPairCompareFloat*
+// returned.
+// This method only handles general pair compare strategies,
+// other strategies(part or demand) will be handles by the derived class.
+// ---------------------------------------------------------------------
+LgFrPairCompareFloat*
+  LgFrMultiScheduleFloat::makePairCompareStrategy
+                            (LgFrSortDescriptor sortDesc,
+                             int /* period */ )
+        const
+{
+  LgFrPairCompareFloat* pcPtr = NULL;
+  if ( sortDesc == LgFrNullRWCString ) {
+  } // do nothing here, just return NULL.
+  else {
+    cerr <<"LgFrSortDescriptor : " << sortDesc << endl;
+    assert( 1==0 && "Unrecognized LgFrSortDescriptor Specified");
+  }
+  return pcPtr;
+}
+
+// ---------------------------------------------------------------------
+// Get the order schedule descriptor.
+// ---------------------------------------------------------------------
+const LgFrScheduleDescriptor&
+LgFrMultiScheduleFloat::itemOrderSchedule()
+     const
+{
+  return (itemOrderSchedule_);
+}
+
+// ---------------------------------------------------------------------
+// Sort the current order schedule
+// Return TRUE  :if the sort descriptor is "" or sorting is done.
+//        FALSE :if order schedule is not found(would never happen, sanity check).
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::sort (
+                              const LgFrSortDescriptor& sortDesc,
+                              int period,
+                              const RWBoolean ascending
+                              )
+{
+  if ( sortDesc == LgFrNullRWCString ) return TRUE; // Do nothing
+  // Find the current order schedule
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(itemOrderSchedule_);
+  if (!dsPairPtr) return FALSE;
+  LgFrScheduleDescriptor sd = dsPairPtr->descriptor();
+  RWBoolean result = this->itemOrderSchedule(sd, sortDesc, period, ascending);
+  // Need to sort the selection schedule if it is not order schedule
+  // For demo, this is fine.
+  return result;
+}
+
+// ---------------------------------------------------------------------
+// Chose an Order schedule with an optional sorting descriptor.
+// The default sorting descriptor is "" meaning keeping the original
+// sorting strategy if any.
+// If a sorting descriptor is specified, it is associated with the (new)
+// order schedule.
+// Implementation note: this call can be used to change the pairCompare if sd is
+// the descriptor of the old order-schedule
+// Return TRUE  :if sd is found and sorting is done.
+//        FALSE :if sd is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::itemOrderSchedule
+                        (const LgFrScheduleDescriptor& sd,
+                         const LgFrSortDescriptor& sortDesc,
+                         int period,
+                         const RWBoolean ascending
+                         )
+{
+  if ( !this->contains(sd) ) return FALSE;  // Not found
+  // Set up the pair compare strategy corresponding with the new sorting descriptor.
+  LgFrPairCompareFloat* pcNewPtr = this->makePairCompareStrategy(sortDesc,period);
+  RWBoolean result = this->itemOrderSchedule(sd, pcNewPtr, ascending);
+  delete pcNewPtr;
+  // Need to sort the selection schedule if it is not order schedule
+  // For demo, this is fine.
+  return result;
+}
+
+// ---------------------------------------------------------------------
+// Chose an Order schedule.
+// If a LgFrPairCompareFloat is specified, it is associated with the (new)
+// order schedule.
+// Implementation note: this call can be used to change the pairCompare if sd is
+// the descriptor of the old order-schedule
+// Return TRUE  :if sd is found and sorting is done.
+//        FALSE :if sd is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::itemOrderSchedule
+                        (const LgFrScheduleDescriptor& sd,
+                         LgFrPairCompareFloat* pcPtr,
+                         const RWBoolean ascending)
+{
+  if ( !this->contains(sd) ) return FALSE;  // Not found
+
+  // Check to see if the current itemOrderSchedule_ is the same as sd.
+  // -If it is same and if the new pairCompare strategy is different from the current one,
+  //  change the schedule's pairCompare strategy and re-populate.
+  // -If it is not same, set the new order schedule and the new pairCompare strategy.
+  //  Re-populate it if necessary.
+  //  Remove the old pairCompare strategy from the old order schedule and re-populate.
+
+  if ( itemOrderSchedule_ != sd ) {
+    if ( this->contains(itemOrderSchedule_) ) {
+      LgFrSortingScheduleFloatSmartPointer oldSchedPtr = this->schedule(itemOrderSchedule_);
+      // set pair compare strategy to NULL and re-sort to its original order
+      oldSchedPtr->sort();
+    }
+    itemOrderSchedule_ = sd;     // set the new order schedule
+    // following line is a temp. assumption, for demo only
+    // set the selection schedule to be same as the order schedule
+    if ( itemOrderSchedule_ != itemSelectionSchedule_)
+         this->itemSelectionSchedule(sd);
+  }
+  if ( pcPtr ) {
+    LgFrSortingScheduleFloatSmartPointer schedPtr = this->schedule(itemOrderSchedule_);
+    const LgFrPairCompareFloat* pcOld = schedPtr->compareStrategy();
+    if ( ( pcOld == NULL) ||
+         ( (pcOld !=NULL) && (pcOld->isA() != pcPtr->isA()) )
+       ) {
+      schedPtr->sort(pcPtr, ascending);  // Make new clone of *pcPtr
+    }
+    // We also need to sort the selection schedule here based on the
+    // new order in the itemOrderSchedule_. NOT yet implemented.
+    // For demo, this is not needed since we make order schedule = selection schedule.
+  }
+  return TRUE;
+}
+
+
+// ---------------------------------------------------------------------
+// Return index of next item.printingName() which matches the specified
+// regular expression
+// ---------------------------------------------------------------------
+size_t
+LgFrMultiScheduleFloat::index( 
+  const RWCString & regularExpression,
+  const size_t startingIndex )
+const
+{
+  RWCRegexp regExp( regularExpression );
+
+  // Test to insure regExp is valid
+  if (regExp.status() != RWCRegexp::OK) {
+     cout <<"WARN: LgFrMultiScheduleFloat::index. "
+          <<"Invalid Regular Expression: "
+          <<regularExpression
+          <<endl;
+     return RW_NPOS;
+  }
+
+  size_t retVal = startingIndex;
+  LgFrMultiScheduleItemIterator iter( this, startingIndex );
+  LgFrMultiScheduleItemIterator * nextItemPtr;
+
+  // loop once for each item
+  while( nextItemPtr = iter()) {
+
+    // Get item printing name w/ trailing blanks removed
+    const RWCString name = nextItemPtr->item().printingName(FALSE).strip();   
+
+    // Match name with regular expression
+    const RWCString matchedName = name( regExp );
+
+    // Check to see if name matches regular expression
+    if ( name == matchedName ) return retVal;
+
+    retVal++;
+
+  }
+
+  return RW_NPOS;
+}
+
+// ---------------------------------------------------------------------
+// Return index of next item.printingName() which contains the search
+// string
+// ---------------------------------------------------------------------
+size_t
+LgFrMultiScheduleFloat::index( 
+  const RWCString & searchString,
+  const RWBoolean ignoreCase,
+  const size_t startingIndex )
+const
+{
+
+  size_t retVal = startingIndex;
+  LgFrMultiScheduleItemIterator iter( this, startingIndex );
+  LgFrMultiScheduleItemIterator * nextItemPtr;
+
+  // loop once for each item
+  while( nextItemPtr = iter()) {
+
+    // Get item printing name w/ trailing blanks removed
+    const RWCString name = nextItemPtr->item().printingName(FALSE).strip();
+
+    RWBoolean contains = name.contains( searchString,
+                           ignoreCase ? RWCString::ignoreCase : RWCString::exact );
+
+    // Check to see if name matches regular expression
+    if ( contains ) return retVal;
+
+    retVal++;
+
+  }
+
+  return RW_NPOS;
+}
+
+// ---------------------------------------------------------------------
+// Change a value in the schedule for an item
+// Return TRUE : schedule is found and changed.
+//        FALSE: schedule is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::changeValueInSchedule(const LgFrItem& item,
+						const LgFrScheduleDescriptor& sd,
+						const int& index,
+						const float& newValue
+						)
+{
+   LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr == NULL ) return FALSE;
+  else {
+    LgFrSortingScheduleFloat& sched = *(dsPairPtr->schedule());
+    const LgFrItemTimeVecPairFloat& itv = sched[item];
+    LgFrTimeVecFloat tv = itv.timeVecFloat();
+    tv[index] = newValue;
+    sched.insertKeyAndValue(item,tv);
+    return TRUE;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Change a value in the schedule for an item whose guiName() is guiName.
+// Return TRUE : schedule is found and changed.
+//        FALSE: schedule is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::changeValueInSchedule
+  (const RWCString & guiName,
+   const LgFrScheduleDescriptor& sd,
+   const int& index,
+   const float& newValue
+   )
+{
+  const LgFrItem * itemPtr = this->findItem(guiName);
+  if (itemPtr == NULL)
+    return FALSE;
+  else
+    return this->changeValueInSchedule(*itemPtr, sd, index, newValue);
+}
+
+
+// ---------------------------------------------------------------------
+// Change a time-vector in the schedule for an item
+// Return TRUE : schedule is found and changed.
+//        FALSE: schedule is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::changeTimeVecInSchedule(const LgFrItem& item,
+						  const LgFrScheduleDescriptor& sd,
+						  const LgFrTimeVecFloat& newTimeVec
+						  )
+{
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr == NULL ) return FALSE;
+  else {
+    LgFrSortingScheduleFloat& sched = *(dsPairPtr->schedule());
+    sched.insertKeyAndValue(item,newTimeVec);
+    return TRUE;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Change a time-vector in the schedule for an item
+// Return TRUE : schedule is found and changed.
+//        FALSE: schedule is not found.
+// ---------------------------------------------------------------------
+RWBoolean
+LgFrMultiScheduleFloat::changeTimeVecInSchedule(const RWCString & guiName,
+                                                const LgFrScheduleDescriptor& sd,
+                                                const LgFrTimeVecFloat& newTimeVec
+                                                )
+{
+  const LgFrItem * itemPtr = this->findItem(guiName);
+  if (itemPtr == NULL)
+    return FALSE;
+  else
+    return this->changeTimeVecInSchedule(*itemPtr, sd, newTimeVec);
+}
+
+// ---------------------------------------------------------------------
+// Get a time-vector in the schedule for an item
+// ---------------------------------------------------------------------
+const LgFrTimeVecFloat *
+  LgFrMultiScheduleFloat::getTimeVecFloat(const LgFrItem& item,
+                                          const LgFrScheduleDescriptor& sd
+                                          )
+{
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr != NULL ) {
+    const LgFrSortingScheduleFloat& sched = *(dsPairPtr->constSchedule());
+    const LgFrItemTimeVecPairFloat& itv = sched[item];
+    const LgFrTimeVecFloat& tv = itv.timeVecFloat();
+    return &tv;
+  }
+  else return NULL;
+}
+
+// ---------------------------------------------------------------------
+// Get a time-vector in the schedule for an item whose guiName() is guiName
+// ---------------------------------------------------------------------
+const LgFrTimeVecFloat *
+  LgFrMultiScheduleFloat::getTimeVecFloat(const RWCString & guiName,
+                                          const LgFrScheduleDescriptor& sd
+                                          )
+{
+  const LgFrItem * itemPtr = this->findItem(guiName);
+  if (itemPtr == NULL)
+    return NULL;
+  else
+    return this->getTimeVecFloat( *itemPtr, sd );
+}
+
+// ---------------------------------------------------------------------
+// Get a non-const schedule
+// ---------------------------------------------------------------------
+LgFrSortingScheduleFloatSmartPointer
+  LgFrMultiScheduleFloat::schedule(const LgFrScheduleDescriptor& sd)
+     const
+{
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr != NULL )
+      return dsPairPtr->schedule();
+  else
+      return LgFrSortingScheduleFloatSmartPointer();
+}
+
+// ---------------------------------------------------------------------
+// Return number of items in ms (from the itemSelectionSchedule_)
+// ---------------------------------------------------------------------
+size_t
+  LgFrMultiScheduleFloat::numberOfItems()
+    const
+{
+  LgFrSortingScheduleFloat& selectionSched
+    = *(this->schedule(itemSelectionSchedule_));
+  return selectionSched.entries();
+}
+
+// ---------------------------------------------------------------------
+// Return number of schedules
+// ---------------------------------------------------------------------
+size_t
+  LgFrMultiScheduleFloat::entries()
+    const
+{
+  return descScheduleList_.entries();
+}
+
+// ---------------------------------------------------------------------
+//  Remove all items in the list and delete them
+// ---------------------------------------------------------------------
+void
+  LgFrMultiScheduleFloat::clear()
+{
+  LgFrDescriptorSchedulePairFloat * dsPairPtr;
+  while (NULL != (dsPairPtr = descScheduleList_.get())) {
+    dsPairPtr->removeDependent(this);
+    delete dsPairPtr;
+  }
+  assert(0 == descScheduleList_.entries());
+  return;
+}
+
+// ---------------------------------------------------------------------
+//  Returns TRUE if the list contains sd
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::contains(const LgFrScheduleDescriptor& sd)
+     const
+{
+ return descScheduleList_.contains(findDescSched, &sd);
+}
+
+// ---------------------------------------------------------------------
+// Return TRUE iff schedule is mutable
+// Return TRUE: if found and mutable
+//        FALSE: if (not found) or (found and not mutable).
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::isMutable (const LgFrScheduleDescriptor& sd)
+{
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr == NULL ) {
+//    cerr << "Schedule: " << sd << " is not found." << endl;
+    return FALSE;
+  }
+  return dsPairPtr->schedule()->isMutable();
+}
+
+// ---------------------------------------------------------------------
+// Return VALID: if descriptor found and all values are valid
+//        INVALID: if (descriptor not found) or (found and invalid value).
+// ---------------------------------------------------------------------
+LgFrValidity
+  LgFrMultiScheduleFloat::validity (const LgFrScheduleDescriptor& sd,
+                                   const LgFrTimeVecFloat& proposedTimeVec)
+{
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = this->find(sd);
+  if ( dsPairPtr == NULL ) {
+//    cerr << "Schedule: " << sd << " is not found." << endl;
+    return INVALID;
+  }
+  if ( dsPairPtr->schedule()->isMutable() ) {
+    return dsPairPtr->schedule()->validity(proposedTimeVec);
+  }
+  else {
+    return INVALID;
+  }
+}
+
+// ---------------------------------------------------------------------
+//  Returns TRUE if the list is empty
+// ---------------------------------------------------------------------
+RWBoolean
+  LgFrMultiScheduleFloat::isEmpty()
+     const
+{
+ return ( descScheduleList_.entries() == 0 );
+}
+
+// ---------------------------------------------------------------------
+// Return the pointer to the scenario
+// ---------------------------------------------------------------------
+LgFrScenarioSmartPointerToConst
+LgFrMultiScheduleFloat::scenario()
+     const
+{
+  return (scenarioPtr_);
+}
+
+
+// ---------------------------------------------------------------------
+// Following routine is used by copy constructors and assignment operator.
+// --------------------------------------------------------------------
+
+struct LgFrMultiScheduleCopyAppendDescSchedArg {
+  LgFrDescriptorSchedulePairFloatGSList * listPtr;
+  LgFrScenarioSmartPointer sPtr;
+  LgFrMultiScheduleFloat * thisMultiSchedPtr;
+};
+
+// Make a copy (using the scenario pointer in *tPtr)
+// of *dsPairPtr and append it to the list in *tPtr.
+// Used in copy constructors for the same or new scenario.
+// And used in the assignemnt operator too.
+static
+void
+copyDescSchedAndAppend (LgFrDescriptorSchedulePairFloat* dsPairPtr,
+                     void * tPtr)
+{
+  LgFrMultiScheduleCopyAppendDescSchedArg * targetDataPtr
+    = (LgFrMultiScheduleCopyAppendDescSchedArg *) tPtr;
+  LgFrScenarioSmartPointer scenario = targetDataPtr->sPtr;
+
+  LgFrDescriptorSchedulePairFloat* dsPairClonePtr;
+
+  if ( !scenario.null() )
+    dsPairClonePtr = dsPairPtr->clone(*scenario);
+  else
+    dsPairClonePtr = dsPairPtr->clone();
+
+  (targetDataPtr->listPtr)->append( dsPairClonePtr );
+  dsPairClonePtr->addDependent( targetDataPtr->thisMultiSchedPtr );
+}
+
+// ---------------------------------------------------------------------
+// Assignment operator (deep copy in the same scenario)
+// Since this is in the private section, no need to test at this point
+// wait until we need it.(not allowed at this time)
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat &
+  LgFrMultiScheduleFloat::operator=(const LgFrMultiScheduleFloat& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    scenarioPtr_ = rhs.scenarioPtr_;
+    // Clone all of the LgFrDescriptorSchedulePairFloat's in rhs.descScheduleList_
+    // into this->descScheduleList_.
+    LgFrMultiScheduleCopyAppendDescSchedArg target;
+    target.listPtr = & descScheduleList_;
+    target.sPtr = LgFrScenarioSmartPointer(NULL);
+    target.thisMultiSchedPtr = this;
+    LgFrDescriptorSchedulePairFloatGSList * rhsDSLPtr
+      = (LgFrDescriptorSchedulePairFloatGSList *)
+      & (rhs.descScheduleList_);  // OK to cast away const,
+                                     // not really changing source's list
+    rhsDSLPtr->apply (copyDescSchedAndAppend, &target);
+    itemSelectionSchedule_ = rhs.itemSelectionSchedule_;
+    itemOrderSchedule_ = rhs.itemOrderSchedule_;
+  }
+  return *this;
+}
+
+// ---------------------------------------------------------------------
+// Copy constructor (deep copy in the same scenario)
+// Since this is in the private section, no need to test at this point
+// wait until we need it. (not allowed at this time)
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat::LgFrMultiScheduleFloat
+  (const LgFrMultiScheduleFloat & source)
+:
+  LgFrSubscription(),
+  scenarioPtr_(source.scenarioPtr_),
+  descScheduleList_(),
+  itemSelectionSchedule_(source.itemSelectionSchedule_),
+  itemOrderSchedule_(source.itemOrderSchedule_)
+{
+  // Clone all of the LgFrDescriptorSchedulePairFloat's in source.descScheduleList_
+  // into this->descScheduleList_.
+  LgFrMultiScheduleCopyAppendDescSchedArg target;
+  target.listPtr = & descScheduleList_;
+  target.sPtr = LgFrScenarioSmartPointer(NULL);
+  target.thisMultiSchedPtr = this;
+  LgFrDescriptorSchedulePairFloatGSList * sourceDSLPtr
+    = (LgFrDescriptorSchedulePairFloatGSList *)
+      & (source.descScheduleList_);  // OK to cast away const,
+                                     // not really changing source's list
+  sourceDSLPtr->apply (copyDescSchedAndAppend, &target);
+}
+
+// ---------------------------------------------------------------------
+// Copy constructor (deep copy to a new and different scenario)
+// Used by clone method only so that it can check if the new scenario
+// is different from the current one.
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat::LgFrMultiScheduleFloat
+  (const LgFrMultiScheduleFloat & source,
+   LgFrScenarioSmartPointer newScenario
+   )
+: LgFrSubscription(),
+  scenarioPtr_(newScenario),
+  descScheduleList_(),          // copying is done in body of this function
+  itemSelectionSchedule_(source.itemSelectionSchedule_),
+  itemOrderSchedule_(source.itemOrderSchedule_)
+{
+  // Clone all of the LgFrDescriptorSchedulePairFloat's in source.descScheduleList_
+  // into this->descScheduleList_.
+  LgFrMultiScheduleCopyAppendDescSchedArg target;
+  target.listPtr = & descScheduleList_;
+  target.sPtr = scenarioPtr_;
+  target.thisMultiSchedPtr = this;
+  LgFrDescriptorSchedulePairFloatGSList * sourceDSLPtr
+    = (LgFrDescriptorSchedulePairFloatGSList *)
+      & (source.descScheduleList_);  // OK to cast away const,
+                                     // not really changing source's list
+  sourceDSLPtr->apply (copyDescSchedAndAppend, &target);
+}
+
+#ifdef WANT_MULTISCHEDULE_TO_BE_NON_ABSTRACT
+// ---------------------------------------------------------------------
+// Create a copy of the *this on the heap for a new and different
+// scenario and return a pointer to it.
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat*
+LgFrMultiScheduleFloat::clone (LgFrScenarioSmartPointer newScenario)
+     const
+{
+  if ( &newScenario == this->scenario() ) {
+    cerr << "Clone a multi-schedule in the same scenario is not allowed." << endl;
+    return NULL;
+  }
+  else return new LgFrMultiScheduleFloat(*this, newScenario);
+}
+#endif
+
+// ---------------------------------------------------------------------
+// Default constructor
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat::LgFrMultiScheduleFloat ()
+:
+    LgFrSubscription(),
+    scenarioPtr_(NULL),
+    descScheduleList_(),
+    itemSelectionSchedule_(),
+    itemOrderSchedule_()
+{
+  // Nothing to do in here
+}
+
+// ---------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat::LgFrMultiScheduleFloat (LgFrScenarioSmartPointer scenPtr)
+:   LgFrSubscription(),
+    scenarioPtr_(scenPtr),
+    descScheduleList_(),
+    itemSelectionSchedule_(),
+    itemOrderSchedule_()
+{
+  // Nothing to do in here
+}
+
+// ---------------------------------------------------------------------
+// Destructor
+// ---------------------------------------------------------------------
+LgFrMultiScheduleFloat::~LgFrMultiScheduleFloat ()
+{
+  this->clear();
+}
+
+// ---------------------------------------------------------------------
+// LgFrCreateITVMatrix:
+// Create a matrix of ItemTimeVector pair float pointers for all the
+// floats in this multi schedule.
+// ---------------------------------------------------------------------
+LgFrItemTimeVecPairFloat *
+LgFrMultiScheduleFloat::LgFrCreateITVMatrix(
+				     int totAttrs,
+				     int nperiods,
+				     int nattrs)
+const
+{
+      // size_tMax used to avoid suspected problem with purify or RW
+      LgFrItemTimeVecPairFloat* itvMatrixPtr
+	= new LgFrItemTimeVecPairFloat[size_tMax(1,totAttrs)];
+
+      const LgFrTimeVecFloat zerotv(nperiods,0.0);
+ 
+      LgFrMultiScheduleItemIterator majorI (this);
+      LgFrMultiScheduleItemIterator* nextItemIterPtr;
+      int itemIndex = -1;
+      int attrIndex = -1;
+
+      // Iterate through all of the (major) rows
+      while ( nextItemIterPtr = majorI()) {
+	  const LgFrItem& item = nextItemIterPtr->item();
+	  itemIndex++;
+	  attrIndex = -1;
+	  // Create an attribute (minor) iterator
+	  LgFrMultiScheduleAttributeIterator minorI (*nextItemIterPtr);
+	  LgFrMultiScheduleAttributeIterator* nextAttrIterPtr;
+	  while ( nextAttrIterPtr = minorI() ) {   // Not end of list
+	      attrIndex++;
+	      int index = itemIndex*nattrs + attrIndex;
+	      const LgFrItemTimeVecPairFloat * const
+		curITV = nextAttrIterPtr->itemTimeVec();
+	      if ( curITV ) {
+		  *(itvMatrixPtr+index) = *curITV;
+		  // curITV->print();
+	      }
+	      else {
+		  LgFrItemTimeVecPairFloat zeroitv(item,zerotv);
+		  *(itvMatrixPtr+index) = zeroitv;
+	      }
+	  }
+      }
+      return itvMatrixPtr;
+};
+
+
+// ---------------------------------------------------------------------
+// Create a RWString of the schedule names for this multiSchedule
+// ---------------------------------------------------------------------
+RWCString *
+LgFrMultiScheduleFloat::LgFrCreateScheduleNamesRWCString(int nattrs)
+const
+{
+      RWCString* schedNames = new RWCString[size_tMax(1,nattrs)];
+
+      for ( int i = 0; i < nattrs; i++ )
+      {
+	  LgFrDescriptorSchedulePairFloat* dsPairPtr = descScheduleList_.at(i);
+	  LgFrScheduleDescriptor desc = dsPairPtr->descriptor();
+	  schedNames[i] = desc.name();
+      }
+      return schedNames;
+};
+
+
+
+ 
+// ---------------------------------------------------------------------
+// Print time vectors by part and then by attributes.
+// ---------------------------------------------------------------------
+void LgFrMultiScheduleFloat::printByItemAndAttribute(
+  const LgFrSchedulePrintStyle style,
+  ofstream * cofs)
+{
+   if (cofs == NULL) {
+     cout << endl;
+     cout << "************************************************" << endl;
+     cout << "*               Multi-Schedule                 *" << endl;
+     cout << "************************************************" << endl;
+   }
+
+   int nitems = this->numberOfItems();
+   int nattrs = this->entries();
+   int nperiods = scenarioPtr_->numberOfPeriods();
+   int totAttrs = nitems*nattrs;
+
+    LgFrItemTimeVecPairFloat * itvMatrixPtr = LgFrCreateITVMatrix(totAttrs,
+						     nperiods,
+						     nattrs);
+
+    RWCString* schedNames = LgFrCreateScheduleNamesRWCString(nattrs);
+
+   ostream * ofsP;	// Pointer to ofstream to write to
+   if (cofs == NULL)
+     ofsP = &cout;
+   else
+     ofsP = cofs;
+
+   // Print column headings which are the period dates
+   RWCString dates = scenarioPtr_->calendar().format(TimeVecPeriodStarts);
+   if (style == TEXT) {
+
+     // Determine number of blanks for proper column alignment
+     int nBlanks = 0;      
+     if ( totAttrs > 0 )
+       nBlanks = (itvMatrixPtr+0)->item().printingName().length();
+     int savedIoFieldWidth = ofsP -> width();
+     
+     (*ofsP) <<setw(nBlanks+1)
+             <<" "
+             <<setw(savedIoFieldWidth)
+             << dates << "\n";
+   }  
+   else if (style == CSV){
+     (*ofsP) << "\"\",\"\","
+             << LgFrCSV( dates )
+             << "\n";
+   }
+
+       
+   for ( int item = 0; item < nitems; item++ ) {
+     for ( int attr = 0; attr < nattrs; attr++ ) {
+       int index = item*nattrs+ attr;
+       if (style == TEXT) {
+	 (*ofsP)
+	    << "---------------------------------------------" 
+	    << schedNames[attr]
+	    << "---------------------------------------------" << "\n"
+	    << (itvMatrixPtr+index)->format() << "\n";
+       }
+       else {
+	 RWCString numbers =
+           LgFrCSV(
+                  (itvMatrixPtr+index)->timeVecFloat().format()
+                  );
+
+         (*ofsP)
+	   << "\"" << (itvMatrixPtr+index)->item().printingName(TRUE)
+	   << "\",\"" << schedNames[attr] << "\"," << numbers << '\n';
+       }
+     }
+   }
+   delete [] schedNames;
+   delete [] itvMatrixPtr;
+}
+
+
+// ---------------------------------------------------------------------
+// Format created at Rochester to show a multischedule in the
+// following format:
+//
+//                           Period1 heading..PeriodX heading
+// Item name--Schedule name--Period1 value  ..PeriodX value
+// ---------------------------------------------------------------------
+void LgFrMultiScheduleFloat::printMultiScheduleReport(
+		       const LgFrSchedulePrintStyle style,
+		       ostream * cofs,
+                       RWBoolean useGuiName ) const
+{
+    LgFrCalendarFormatStyle calendarPeriodFormat = TimeVecPeriodStarts;
+    int i;
+//    LgFrTimeVecFloat tempEmptyVec;
+//    const LgFrTimeVecFloat & highLight = tempEmptyVec;
+
+    //This next line is causing a memory leak
+    // const LgFrTimeVecFloat & highLight = *(new LgFrTimeVecFloat);
+    // The following line is a replacement to the above line to avoid leak
+    LgFrTimeVecFloat highLight;
+    
+    const char highLightFlag = '*';
+    const int width = 11;
+    const int precision = 1;
+    const long iosFlags = ios::fixed | ios::showpoint | ios::right;
+
+    if (cofs == NULL) {
+	cout << endl;
+	cout << "************************************************************"
+	  << endl;
+	cout << "*                 " << this->itemHeading() <<
+	  " MultiSchedule Report";
+	for ( i=this->itemHeading().length()+40; i < 60; i++){
+	    cout << ' ';
+	};
+	cout << '*' << endl;
+	cout << "************************************************************"
+	  << endl << endl;
+    };
+
+    int nitems = this->numberOfItems();
+    int nattrs = this->entries();
+    int nperiods = scenarioPtr_->numberOfPeriods();
+    int totAttrs = nitems*nattrs;
+    const RWBoolean truncate = TRUE;
+    LgFrItemTimeVecPairFloat * itvMatrixPtr = LgFrCreateITVMatrix(totAttrs,
+						     nperiods,
+						     nattrs);
+
+    RWCString* schedNames = LgFrCreateScheduleNamesRWCString(nattrs);
+
+    //The following will find the maximum length of the Schedule names.
+    int maxLengthOfAttr = 0;
+    for ( i = 0; i < nattrs; i++ ) {
+	if (maxLengthOfAttr < schedNames[i].length()){
+	    maxLengthOfAttr = schedNames[i].length();
+	};
+    };
+    //Add one space between the itemName and the schedule name.
+    maxLengthOfAttr++;
+
+    //The following will determine the maximum length of the item names
+    int maxLengthOfItems = 0;
+    int itemLength;
+    for ( i = 0; i < nitems; i++ ) {
+	for (int y = 0; y < nattrs; y++ ) {
+	    int index = i*nattrs + y;
+            if ( useGuiName )
+              itemLength = (itvMatrixPtr+index)->item().guiName().length();
+            else
+              itemLength = (itvMatrixPtr+index)->
+                              item().printingName(truncate).length();
+	    if (maxLengthOfItems < itemLength ) maxLengthOfItems = itemLength;
+	};
+    };
+    maxLengthOfItems++; //Add one space between the schedule name and the
+                        //float values.
+
+    ostream * ofsP;	// Pointer to ofstream to write to
+    if (cofs == NULL)
+	ofsP = &cout;
+    else
+	ofsP = cofs;
+
+    if (style == TEXT){
+	for (i = 0; i< (maxLengthOfItems + maxLengthOfAttr); ++i){
+	    (*ofsP) << " ";  //place spaces before periods are printed.
+	};
+
+	//The following will print out the periods in a TimeVector
+	//period starts format.
+	(*ofsP) << scenarioPtr_->calendar().format(calendarPeriodFormat,
+						   width, precision, iosFlags)
+                << '\n';
+
+
+    }
+    else if (style == CSV){
+	(*ofsP) << "\"\",\"\",";  //The format for the text is a quoted
+	//string.  ""
+
+	RWCString dates =
+          LgFrCSV( scenarioPtr_->calendar().format(calendarPeriodFormat) );
+
+	(*ofsP) << dates << "\n";
+
+    };
+
+
+    for ( int item = 0; item < nitems; item++ ) {
+	for ( int attr = 0; attr < nattrs; attr++ ) {
+	    int index = item*nattrs+ attr;
+	    if (style == TEXT) { 
+		if (attr == 0){ //Print the item name only if this is the
+		                //first row of a new item name.
+                  
+                    RWCString itemName;
+                    if ( useGuiName )
+                      itemName = (itvMatrixPtr+index)->item().guiName();
+                    else
+                      itemName = (itvMatrixPtr+index)->
+                                    item().printingName(truncate);
+		    (*ofsP) << itemName;
+                                                                                
+		    //Need to print blanks following the items to match the
+		    //length determined to be the maximum length.
+		    for (int blankIter = itemName.length();
+			 blankIter < maxLengthOfItems;	blankIter++){
+			(*ofsP) << ' ';
+		    }
+		}
+		else{ //Do not print the Item name for readability
+		    for (int blankIter = 0; blankIter < maxLengthOfItems;
+		          blankIter++){
+			(*ofsP) << ' ';
+		    }
+		};
+
+		(*ofsP) << schedNames[attr];
+
+		for (int spacePadIter = schedNames[attr].length();
+		     spacePadIter < maxLengthOfAttr; spacePadIter++){
+		    (*ofsP) << ' '; //This will pad the attributes with blanks
+		                    //so they are properly aligned with each other.
+		}; 
+
+		(*ofsP) << (itvMatrixPtr+index)->timeVecFloat().format
+		  (highLight, highLightFlag, width, precision, iosFlags)
+		  << "\n";
+	    }
+	    else if (style == CSV){
+                  
+                RWCString itemName;
+                if ( useGuiName )
+                  itemName = (itvMatrixPtr+index)->item().guiName();
+                else
+                  itemName = (itvMatrixPtr+index)->item().printingName(TRUE);
+                
+		RWCString numbers =
+                  LgFrCSV((itvMatrixPtr+index)->timeVecFloat().format());
+
+		(*ofsP)
+		  << "\"" << itemName
+		  << "\",\"" << schedNames[attr] << "\"," << numbers << '\n';
+	    }
+	}
+    }
+    delete [] schedNames;
+    delete [] itvMatrixPtr;
+}
+
+
+// ---------------------------------------------------------------------
+// format
+// ---------------------------------------------------------------------
+RWCString LgFrMultiScheduleFloat::format(
+                       const LgFrSchedulePrintStyle style,
+                       RWBoolean useGuiName ) const
+{
+  ostrstream buffer;
+  printMultiScheduleReport( style, &buffer, useGuiName );
+  char * formatedString = buffer.str();
+  RWCString retVal( formatedString, buffer.pcount() );
+  delete formatedString;
+  return retVal;
+}
+
+// ---------------------------------------------------------------------
+// Print member data in class( one schedule followed by the next one)
+// ---------------------------------------------------------------------
+
+// ---------------------------------------------------------------------
+// Print member data in class( one schedule followed by the next one)
+// ---------------------------------------------------------------------
+void LgFrMultiScheduleFloat::print() const
+{
+   cout <<"************************************************" <<endl;
+   cout << "LgFrMultiScheduleFloat:" << endl;
+   int size = this->entries();
+   cout << "Number of schedules =  " << this->entries() << endl;
+   for ( int i = 0; i < this->entries(); i++ )  {
+     cout <<"**********************************" << endl;
+     cout <<" schedule " << i << ":" << endl;
+     cout <<"**********************************" << endl;
+     LgFrDescriptorSchedulePairFloat* dsPtr = descScheduleList_.at(i);
+     dsPtr->print();
+   }
+   cout <<"**********************************************************" << endl;
+}
+
+
+#ifdef WANT_MULTISCHEDULE_TO_BE_NON_ABSTRACT
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <scenario/src/pcatPC.h>
+// ---------------------------------------------------------------------
+// test LgFrMultiScheduleFloat methods
+// Expects the data to come from
+// "/u/implode/wit/data/examples/diner12/wit.data"
+// multPSch.C and multDSch.C have more meaningful context tests
+// ---------------------------------------------------------------------
+void
+LgFrMultiScheduleFloat::contextTest(
+                                    LgFrScenarioSmartPointer scenarioPtr,
+                                    LgFrScenarioSmartPointer newScenarioPtr)
+{
+  // Test default, copy constructors and assignment
+  LgFrMultiScheduleFloat defms;
+  LgFrMultiScheduleFloat copyms = defms;
+  LgFrMultiScheduleFloat assignms;
+  assignms = defms;
+  assert ( defms.entries() == 0 );
+  assert ( copyms.isEmpty() );
+  assert ( assignms.isEmpty() && !assignms.contains(LGFRBacklogVolume));
+  LgFrMultiScheduleFloat ms(scenarioPtr);
+  assert ( ms.isEmpty() && ms.scenario() != NULL );
+
+  // Test the clone method and the destructor
+  {
+    LgFrMultiScheduleFloat* clonems = defms.clone(*newScenarioPtr);
+    assert ( clonems->isEmpty() );
+    delete clonems;             // leak fix attempt by Wally, 9/27/94
+  }
+
+  // Test newSchedule, deleteSchedule
+  assert ( !ms.newSchedule (LGFRSupplyVolume));
+  assert (ms.entries() == 0);
+  assert ( !ms.deleteSchedule (LGFRProductionVolume));
+  assert (ms.entries() == 0);
+
+  // Test priority, priorityShift, and prioritySwap
+  assert ( ms.priority(LGFRSupplyVolume) == -1 );
+  assert ( ms.priority(LGFRRequirementVolume) == -1 );
+  assert ( ms.priority(LGFRProductionVolume) == -1 );
+  assert ( !ms.priorityShift(LGFRSupplyVolume, LGFRProductionVolume, AFTER));
+  assert ( !ms.prioritySwap(LGFRSupplyVolume, LGFRProductionVolume));
+
+  // Test index, find, isMutable
+  assert ( ms.index(LGFRSupplyVolume) == -1 );
+  assert ( ms.index(LGFRRequirementVolume) == -1 );
+  assert ( ms.index(LGFRProductionVolume) == -1 );
+  LgFrDescriptorSchedulePairFloat* dsPairPtr = ms.find(LGFRSupplyVolume);
+  assert ( dsPairPtr == NULL );
+
+  assert ( !ms.isMutable(LGFRSupplyVolume) );
+  assert ( !ms.isMutable(LGFRProductionVolume) );
+  assert ( !ms.isMutable(LGFRBacklogVolume) );
+
+  // Test itemSelectionSchedule and itemOrderSchedule
+  assert ( ms.itemSelectionSchedule() == "" );
+  assert ( ms.itemOrderSchedule() == "" );
+  assert ( !ms.itemSelectionSchedule(LGFRSupplyVolume));
+  assert ( ms.itemSelectionSchedule() == "" );
+  LgFrPartCategoryPairCompareFloat pc( *scenarioPtr );
+  assert ( !ms.itemOrderSchedule(LGFRProductionVolume,&pc));
+  assert ( ms.itemOrderSchedule() == "" );
+
+  // Test clone with new scenario
+  LgFrMultiScheduleFloat * msClonePtr = ms.clone(*newScenarioPtr);
+  {
+    LgFrMultiScheduleFloat& msClone = * msClonePtr;
+    assert ( msClone.isEmpty() );
+    assert ( msClone.entries() == 0 );
+    assert ( msClone.index(LGFRSupplyVolume) == -1 );
+    assert ( msClone.index(LGFRRequirementVolume) == -1 );
+    assert ( msClone.index(LGFRBacklogVolume) == -1 );
+
+    // Test changeTimeVecInSchedule and changeValueInSchedule
+    LgFrPart egg("Egg",1);
+    LgFrPart butter("Butter",2);
+    assert ( !ms.changeValueInSchedule( egg, LGFRSupplyVolume, 1, 10.0));
+    LgFrTimeVecFloat newTV(2,"1.0 3.5");
+    assert ( !ms.changeTimeVecInSchedule( butter, LGFRSupplyVolume, newTV));
+
+    // Test descSchedPairList, schedule, scenario
+    assert ( ms.scenario() != NULL && msClone.scenario() != NULL );
+    assert ( msClone.scenario() != ms.scenario() );
+    assert ( !ms.schedule(LGFRSupplyVolume));
+    const LgFrDescriptorSchedulePairFloatGSList& dsPairList = ms.descSchedPairList();
+    const LgFrDescriptorSchedulePairFloatGSList& dsPairListClone = msClone.descSchedPairList();
+    assert ( dsPairList.entries() == 0 );
+    assert ( dsPairList.entries() == dsPairListClone.entries() );
+
+    // Test schedType
+    LgFrScheduleType stype = ms.schedType();
+    assert ( stype == OTHER );
+
+    // Test clear and destructor
+    msClone.clear();
+    assert ( msClone.isEmpty() );
+  }
+  delete msClonePtr;               // leak fix attempt by Wally, 9/27/94, 10/1/94
+
+  // Test schedDescVec.
+  // This is not a very complete test, because this base classes
+  // newSchedule method does not add a schedule to the multiSched.
+  LgFrVectorScheduleDescriptor sdv = ms.schedDescVec();
+  assert( sdv.length() == 0) ;
+
+}
+
+#endif

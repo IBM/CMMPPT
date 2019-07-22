@@ -1,0 +1,953 @@
+head	1.22;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.22
+date	2011.07.19.21.13.17;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2011.07.19.19.22.02;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2011.07.15.21.46.55;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2011.07.15.17.42.34;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2011.07.12.22.40.01;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.06.22.22.09.45;	author rjw;	state dead;
+branches;
+next	1.16;
+
+1.16
+date	2011.06.22.14.08.08;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.06.16.23.36.14;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.06.09.18.19.24;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.06.09.18.09.23;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.06.08.20.13.58;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.06.07.22.05.17;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.06.06.20.33.34;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.05.31.19.26.21;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.05.27.23.55.12;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.05.26.18.49.08;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.05.24.23.44.42;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.05.24.21.09.39;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.24.18.46.17;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.24.17.56.48;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.24.00.11.52;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.22.02.10.44;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.22
+log
+@Embodiment ==> ModelInstance
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File TupleMgr.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+
+/*******************************************************************************
+ * "Tuple Manager"<br>
+ * A TupleMgr is responsible for maintaining the Tuples of a particular
+ * TupleCategory that belong to a particular ModelInstance.
+ *******************************************************************************
+ */
+final class TupleMgr extends ItemMgr <Tuple>
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The dimensions of the TupleCategory for this TupleMgr.
+ *******************************************************************************
+ */
+   private final List <ItemCategory <?>> myDimensions;
+   
+/*******************************************************************************
+ * The ModelInstance to which this TupleMgr belongs.
+ *******************************************************************************
+ */
+   private final ModelInstance myModelInstance;
+   
+/*******************************************************************************
+ * myTupleMap.get (theCoordList) is the Tuple stored by this TupleMgr
+ * whose coordinate list matches theCoordList, if any; otherwise null.
+ *******************************************************************************
+ */
+   private final HashMap <List <Item>, Tuple> myTupleMap;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the coordinate pattern that the
+ * Tuples in the slice are to match; otherwise null.
+ *******************************************************************************
+ */
+   private Item[] curPattern;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is the Slice currently being
+ * built-up; otherwise null.
+ *******************************************************************************
+ */
+   private ArrayList <Tuple> curSlice;
+   
+/*******************************************************************************
+ * During the execution of getSlice (), this is coordinate list currently being
+ * built-up or used to look up the next Tuple in the slice.
+ *******************************************************************************
+ */
+   private final ArrayList <Item> curCoordList;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Populates the slice for getSlice with Tuples whose coordinates for
+ * indices < coordIdx match those in curCoordList and whose coordinate at
+ * coordIdx is theItem.
+ *******************************************************************************
+ */
+   private void popSliceWithItem (int coordIdx, Item theItem)
+      {
+      Tuple theTuple;
+      
+      curCoordList.set (coordIdx, theItem);
+         
+      if (coordIdx == myDimensions.size () - 1)
+         {
+         theTuple = myTupleMap.get (curCoordList);
+            
+         if (theTuple != null)
+            curSlice.add (theTuple);
+         }
+      else
+         {
+         popSliceFromIdx (coordIdx + 1);
+         }
+         
+      curCoordList.set (coordIdx, null);
+      }
+   
+/*******************************************************************************
+ * Populates the slice for getSlice with Tuples whose coordinates for
+ * indices < coordIdx match those in curCoordList.
+ *******************************************************************************
+ */
+   private void popSliceFromIdx (int coordIdx)
+      {
+      ItemCategory <?> theItemCat;
+      ItemMgr <?>      theItemMgr;
+      
+      if (curPattern[coordIdx] == null)
+         {
+         theItemCat = myDimensions.get (coordIdx);
+      
+         theItemMgr = myModelInstance.getItemMgr (theItemCat);
+      
+         for (Item theItem: theItemMgr.getAll ())
+            {
+            popSliceWithItem (coordIdx, theItem);
+            }
+         }
+      else
+         {
+         popSliceWithItem (coordIdx, curPattern[coordIdx]);
+         }
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+   
+   TupleMgr (TupleCategory theTupleCat, ModelInstance theInst)
+      {
+      int nDimens;
+      int theIdx;
+      
+      myDimensions = theTupleCat.getDimensions ();
+   
+      myModelInstance = theInst;
+   
+      myTupleMap      = new HashMap <List <Item>, Tuple> ();
+      
+      curPattern      = null;
+      curSlice        = null;
+      
+      nDimens         = myDimensions.size ();
+      
+      curCoordList    = new ArrayList <Item> (nDimens);
+      
+      for (theIdx = 0; theIdx < nDimens; theIdx ++)
+         curCoordList.add (null);
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Stores theTuple in this TupleMgr.
+ *******************************************************************************
+ */
+   void storeTuple (Tuple theTuple)
+      {
+      List <Item> theCoordList;
+      Tuple       oldTuple;
+      
+      storeItem (theTuple);
+      
+      theCoordList = theTuple.getCoordinateList ();
+      
+      oldTuple     = myTupleMap.put (theCoordList, theTuple);
+      
+      assert (oldTuple == null);
+      }
+   
+/*******************************************************************************
+ * Builds and returns the String to be used by theTuple.getID ().
+ *******************************************************************************
+ */
+   String makeIDFor (Tuple theTuple)
+      {
+      int      nStrings;
+      String[] theStringArr;
+      int      theIdx;
+      
+      nStrings     = (2 * theTuple.getCoordinateList ().size ()) + 1;
+      
+      theStringArr = new String[nStrings];
+      
+      theIdx       = 0;
+      
+      theStringArr[theIdx ++] = "(";
+      
+      for (Item theItem: theTuple.getCoordinateList ())
+         {
+         theStringArr[theIdx ++] = theItem.toString ();
+         
+         theStringArr[theIdx ++] = ", ";
+         }
+      
+      theStringArr[theIdx - 1] = ")";
+      
+      return concatenation (theStringArr);
+      }
+   
+/*******************************************************************************
+ * @@return The Tuple stored by this TupleMgr whose coordinate list matches
+ *         theCoordArr, if any; otherwise null.
+ *******************************************************************************
+ */
+   Tuple getTuple (Item[] theCoordArr)
+      {
+      List <Item> theCoordList;
+      
+      theCoordList = Arrays.asList (theCoordArr);
+      
+      return myTupleMap.get (theCoordList);
+      }
+   
+/*******************************************************************************
+ * Computes and returns a "slice": the set of all Tuples maintained by this
+ * TupleMgr whose coordinates match thePattern.<br>
+ * The sparse algorithm is used.
+ *******************************************************************************
+ */
+   ArrayList <Tuple> getSliceSparse (Item[] thePattern)
+      {
+      ArrayList <Tuple> theSlice;
+      int               theIdx;
+      Item              theItem;
+      
+      theSlice = new ArrayList <Tuple> ();
+      
+   loopThruTuples:
+      for (Tuple theTuple: getAll ())
+         {
+         for (theIdx = 0; theIdx < myDimensions.size (); theIdx ++)
+            if (thePattern[theIdx] != null)
+               {
+               theItem = theTuple.getCoordinateList ().get (theIdx);
+               
+               if (theItem != thePattern[theIdx])
+                  continue loopThruTuples;
+               }
+         
+         theSlice.add (theTuple);
+         }
+      
+      return theSlice;
+      }
+   
+/*******************************************************************************
+ * Computes and returns a "slice": the set of all Tuples maintained by this
+ * TupleMgr whose coordinates match thePattern.<br>
+ * The dense algorithm is used.
+ *******************************************************************************
+ */
+   ArrayList <Tuple> getSliceDense (Item[] thePattern)
+      {
+      ArrayList <Tuple> theSlice;
+      
+      curPattern = thePattern;
+      
+      curSlice   = new ArrayList <Tuple> ();
+      
+      popSliceFromIdx (0);
+      
+      theSlice   = curSlice;
+      curPattern = null;
+      curSlice   = null;
+      
+      return theSlice;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.21
+log
+@Efficient String concatenation.
+@
+text
+@d18 1
+a18 1
+ * TupleCategory that belong to a particular Embodiment.
+d34 1
+a34 1
+ * The Embodiment to which this TupleMgr belongs.
+d37 1
+a37 1
+   private final Embodiment myEmbodiment;
+d112 1
+a112 1
+         theItemMgr = myEmbodiment.getItemMgr (theItemCat);
+d114 1
+a114 1
+         for (Item theItem: theItemMgr.getInstances ())
+d129 1
+a129 1
+   TupleMgr (TupleCategory theTupleCat, Embodiment theEmb)
+d136 1
+a136 1
+      myEmbodiment = theEmb;
+d138 1
+a138 1
+      myTupleMap   = new HashMap <List <Item>, Tuple> ();
+d140 2
+a141 2
+      curPattern   = null;
+      curSlice     = null;
+d143 1
+a143 1
+      nDimens      = myDimensions.size ();
+d145 1
+a145 1
+      curCoordList = new ArrayList <Item> (nDimens);
+d159 1
+a159 1
+   void store (Tuple theTuple)
+d164 1
+a164 1
+      storeInstance (theTuple);
+d232 1
+a232 1
+      for (Tuple theTuple: getInstances ())
+@
+
+
+1.20
+log
+@Long names.
+@
+text
+@d8 2
+a66 7
+/*******************************************************************************
+ * A buffer for building the result of getID () for Tuples maintained by this
+ * TupleMgr.
+ *******************************************************************************
+ */
+   private final StringBuilder myStringBuilder;
+   
+a148 2
+      
+      myStringBuilder = new StringBuilder (100);
+d174 1
+a174 3
+ * Builds the String to be used by theTuple.getID ().
+ * 
+ * @@return The String
+d177 1
+a177 1
+   String buildIDFor (Tuple theTuple)
+d179 3
+a181 3
+      int    nCoords;
+      int    theIdx;
+      String theString;
+d183 1
+a183 1
+      assert (myStringBuilder.length () == 0);
+d185 1
+a185 1
+      myStringBuilder.append ("(");
+d187 1
+a187 1
+      myStringBuilder.append (theTuple.getCoordinateList ().get (0));
+d189 1
+a189 1
+      nCoords = theTuple.getCoordinateList ().size ();
+d191 1
+a191 1
+      for (theIdx = 1; theIdx < nCoords; theIdx ++)
+d193 3
+a195 3
+         myStringBuilder.append (", ");
+      
+         myStringBuilder.append (theTuple.getCoordinateList ().get (theIdx));
+d198 1
+a198 5
+      myStringBuilder.append (")");
+      
+      theString = myStringBuilder.toString ();
+      
+      myStringBuilder.setLength (0);
+d200 1
+a200 1
+      return theString;
+@
+
+
+1.19
+log
+@Category ==> ItemCategory
+@
+text
+@d66 1
+a66 1
+ * A buffer for building the result of toString for Tuples maintained by this
+d181 1
+a181 1
+ * Builds the String to be used by theTuple.toString ().
+d186 1
+a186 1
+   String toStringFor (Tuple theTuple)
+d194 1
+a194 3
+      myStringBuilder.append (theTuple.getTupleCategory ().getName ());
+      
+      myStringBuilder.append (" (");
+@
+
+
+1.18
+log
+@Compound ==> Tuple
+@
+text
+@d29 1
+a29 1
+   private final List <Category <?>> myDimensions;
+d110 2
+a111 2
+      Category <?> theCat;
+      ItemMgr <?>  theItemMgr;
+d115 1
+a115 1
+         theCat     = myDimensions.get (coordIdx);
+d117 1
+a117 1
+         theItemMgr = myEmbodiment.getItemMgr (theCat);
+@
+
+
+1.17
+log
+@Tuple ==> Compound
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d6 1
+a6 3
+package       com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+d8 1
+d15 2
+a16 2
+ * A TupleMgr is is responsible for maintaining the Tuples of a particular
+ * TupleCategory that belong to a particular Implementation.
+d21 36
+a56 3
+//==============================================================================
+// Package Internal
+//==============================================================================
+d59 2
+a60 1
+ * Constructor.
+d63 20
+a82 1
+   TupleMgr ()
+d84 17
+a100 1
+      myTupleMap = new HashMap <List <Item>, Tuple> ();
+d104 59
+d181 38
+d232 31
+a262 3
+//==============================================================================
+// Private
+//==============================================================================
+d265 3
+a267 2
+ * myTupleMap.get (theCoordList) is the Tuple stored by this TupleMgr whose
+ * coordinate list matches theCoordList, if any; otherwise null.
+d270 16
+a285 1
+   private final HashMap <List <Item>, Tuple> myTupleMap;
+d287 1
+a287 1
+//==============================================================================
+@
+
+
+1.16
+log
+@Internal Tuple look-up.
+@
+text
+@@
+
+
+1.15
+log
+@ItemMgr <I>
+@
+text
+@d10 4
+d32 1
+d41 3
+d45 20
+d71 7
+@
+
+
+1.14
+log
+@theImple ==> theImpl
+@
+text
+@a9 4
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+d16 1
+a16 1
+final class TupleMgr
+d26 1
+a26 1
+   TupleMgr (Implementation theImpl, TupleCategory theTupleCat)
+a27 6
+      myImplementation = theImpl;
+      myTupleCategory  = theTupleCat;
+
+      myTupleList      = new ArrayList <Tuple> ();
+      
+      myTupleView      = Collections.unmodifiableList (myTupleList);
+d36 1
+a36 14
+      assert (theTuple.getImplementation () == myImplementation);
+      assert (theTuple.getTupleCategory  () == myTupleCategory);
+      
+      myTupleList.add (theTuple);
+      }
+   
+/*******************************************************************************
+ * @@return An unmodifiable List of all Tuples maintained by this TupleMgr,
+ *         listed in the order in which they were created.
+ *******************************************************************************
+ */
+   List <Tuple> getTuples ()
+      {
+      return myTupleView;
+a42 25
+/*******************************************************************************
+ * The Implementation to which this TupleMgr belongs.
+ *******************************************************************************
+ */
+   private final Implementation myImplementation;
+   
+/*******************************************************************************
+ * The TupleCategory of the Tuples maintained by this TupleMgr.
+ *******************************************************************************
+ */
+   private final TupleCategory myTupleCategory;
+   
+/*******************************************************************************
+ * The List of all Tuples maintained by this TupleMgr, listed in the
+ * order in which they were created.
+ *******************************************************************************
+ */
+   private final ArrayList <Tuple> myTupleList;
+   
+/*******************************************************************************
+ * An unmodifiable view of myTupleList.
+ *******************************************************************************
+ */
+   private List <Tuple> myTupleView;
+   
+@
+
+
+1.13
+log
+@Reverting to state as of yesterday 6/8/11 15:00.
+@
+text
+@d30 1
+a30 1
+   TupleMgr (Implementation theImple, TupleCategory theTupleCat)
+d32 1
+a32 1
+      myImplementation = theImple;
+@
+
+
+1.12
+log
+@Matching current Scheme to current Implementation.
+@
+text
+@d30 1
+a30 1
+   TupleMgr (Implementation theImpl, TupleCategory theTupleCat)
+d32 1
+a32 1
+      myImplementation = theImpl;
+@
+
+
+1.11
+log
+@Minor revision.
+@
+text
+@d30 1
+a30 1
+   TupleMgr (Implementation theImple, TupleCategory theTupleCat)
+d32 1
+a32 1
+      myImplementation = theImple;
+@
+
+
+1.10
+log
+@Type ==> Category
+@
+text
+@d30 1
+a30 1
+   TupleMgr (Implementation theImp, TupleCategory theTupleCat)
+d32 1
+a32 1
+      myImplementation = theImp;
+@
+
+
+1.9
+log
+@Embodiment ==> Implementation
+@
+text
+@d17 1
+a17 1
+ * TupleType that belong to a particular Implementation.
+d30 1
+a30 1
+   TupleMgr (Implementation theImp, TupleType theTupleType)
+d33 1
+a33 1
+      myTupleType      = theTupleType;
+d47 1
+a47 1
+      assert (theTuple.getTupleType      () == myTupleType);
+d73 1
+a73 1
+ * The TupleType of the Tuples maintained by this TupleMgr.
+d76 1
+a76 1
+   private final TupleType myTupleType;
+@
+
+
+1.8
+log
+@theTupleType.getAll
+@
+text
+@d17 1
+a17 1
+ * TupleType that belong to a particular Embodiment.
+d30 1
+a30 1
+   TupleMgr (Embodiment theEmbodiment, TupleType theTupleType)
+d32 2
+a33 2
+      myEmbodiment = theEmbodiment;
+      myTupleType  = theTupleType;
+d35 1
+a35 1
+      myTupleList  = new ArrayList <Tuple> ();
+d37 1
+a37 1
+      myTupleView  = Collections.unmodifiableList (myTupleList);
+d46 2
+a47 2
+      assert (theTuple.getEmbodiment () == myEmbodiment);
+      assert (theTuple.getTupleType  () == myTupleType);
+d67 1
+a67 1
+ * The Embodiment to which this TupleMgr belongs.
+d70 1
+a70 1
+   private final Embodiment myEmbodiment;
+@
+
+
+1.7
+log
+@Dimensions and Coordinates
+@
+text
+@d10 4
+d34 4
+d48 12
+d78 13
+@
+
+
+1.6
+log
+@newTuple
+@
+text
+@d26 1
+a26 1
+   TupleMgr (Embodiment theEmbodiment, TupleType thePrimType)
+d29 1
+a29 1
+      myTupleType  = thePrimType;
+@
+
+
+1.5
+log
+@Storing of objects.
+@
+text
+@d12 2
+a13 3
+ * A TupleMgr is associated with a particular Embodiment and a particular
+ * TupleType is responsible for maintaining the Tuples of the TupleType that
+ * belong to the Embodiment.
+d32 10
+@
+
+
+1.4
+log
+@Category ==> Type
+@
+text
+@a32 13
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new Tuple that will be maintained by this TupleMgr.
+ *   
+ * @@param  theElemArr The coordinate Elements for the Tuple.
+ * @@return            The new Tuple
+ *******************************************************************************
+ */
+   Tuple newTuple (Element[] theElemArr)
+      {
+      return new Tuple (myTupleType, myEmbodiment, theElemArr);
+      }
+   
+@
+
+
+1.3
+log
+@Fulfillment ==> Embodiment
+@
+text
+@d13 2
+a14 2
+ * TupleCategory is responsible for maintaining the Tuples of the
+ * TupleCategory that belong to the Embodiment.
+d27 1
+a27 1
+   TupleMgr (Embodiment theEmbodiment, TupleCategory thePrimCat)
+d29 2
+a30 2
+      myEmbodiment   = theEmbodiment;
+      myTupleCategory = thePrimCat;
+d43 1
+a43 1
+      return new Tuple (myTupleCategory, myEmbodiment, theElemArr);
+d57 1
+a57 1
+ * The TupleCategory of the Tuples maintained by this TupleMgr.
+d60 1
+a60 1
+   private final TupleCategory myTupleCategory;
+@
+
+
+1.2
+log
+@Primitives
+@
+text
+@d12 1
+a12 1
+ * A TupleMgr is associated with a particular Fulfillment and a particular
+d14 1
+a14 1
+ * TupleCategory that belong to the Fulfillment.
+d27 1
+a27 1
+   TupleMgr (Fulfillment theFulfillment, TupleCategory thePrimCat)
+d29 1
+a29 1
+      myFulfillment   = theFulfillment;
+d43 1
+a43 1
+      return new Tuple (myTupleCategory, myFulfillment, theElemArr);
+d51 1
+a51 1
+ * The Fulfillment to which this TupleMgr belongs.
+d54 1
+a54 1
+   private final Fulfillment myFulfillment;
+@
+
+
+1.1
+log
+@Compound ==> Tuple
+@
+text
+@d43 1
+a43 1
+      return new Tuple (myFulfillment, myTupleCategory, theElemArr);
+a53 1
+   @@SuppressWarnings("unused")
+a59 1
+   @@SuppressWarnings("unused")
+@
+

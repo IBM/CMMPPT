@@ -1,0 +1,154 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2006.02.24.22.18.50;	author dpc;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Adding appl.mk to the dp repository
+@
+text
+@# Make file for compiling and linking WIT
+
+# Notes:
+# This makefile is included in makefiles in this directory and in 
+# the ../$(platform) directories, so don't assume that the current
+# directory is the one this makefile is in.
+
+# $Header: /u/wit/devbase/rcp/src/appl.mk,v 1.29 2005/01/13 22:49:53 fasano Exp $
+
+include $(config_dir)ds.mk
+
+lib_objects = \
+	checkWitRC.$(obj_suffix) \
+	demandPlanning.$(obj_suffix) \
+	demandPlanningProblem.$(obj_suffix) \
+	dpException.$(obj_suffix) \
+	dpIntException.$(obj_suffix) \
+	populateDP.$(obj_suffix) \
+	problemBase.$(obj_suffix) \
+	resourceAppData.$(obj_suffix) \
+	scoFile.$(obj_suffix) \
+	solutionAppData.$(obj_suffix)
+
+objects = \
+	demandPlanningMain.$(obj_suffix) \
+	unitTest.$(obj_suffix) \
+	$(lib_objects) 
+
+# Get list of source files
+cxx_suffix=cpp
+
+vpath %.$(cxx_suffix) $(src_dir)
+vpath %.h $(src_dir)
+
+sources = $(objects:.$(obj_suffix)=.$(cxx_suffix))
+
+
+headers =        \
+	CoinFinite.h   \
+	CoinFloatEqual.h   \
+	appData.h   \
+	checkWitRC.h \
+	demandPlanningDll.h \
+	demandPlanning.h \
+	demandPlanningMain.h \
+	demandPlanningProblem.h \
+	dpException.h \
+	dpIntException.h \
+	gnrlDemandFile.h \
+	gnrlResourceFile.h \
+	gnrlSolutionBomFile.h \
+	gnrlSolutionFile.h \
+	globalAttrFile.h \
+	populateDP.h \
+	problemBase.h   \
+	resourceAppData.h \
+	scoException.h   \
+	scoFile.h   \
+	solutionAppData.h 
+
+
+ld_path_flags = -L.
+
+# CPPFLAGS - for C Pre-Processor
+# CXXFLAGS - for C++ Compiler
+# CXX=/usr/vacpp/bin/xlC   (dpc)
+#CXX=g++
+#CXX=xlC
+# CC=/usr/vacpp/bin/xlC (dpc)
+#CC=g++
+#CC=xlC
+CPPFLAGS	= -I$(src_dir). -I$(wituse_includes_dir) -I$(wit_api_includes_dir) -I../.. -I. 
+CFLAGS		= $(ds_comp_flags)
+CXXFLAGS	= $(ds_comp_flags)
+LDFLAGS1 	= $(ds_link_flags) $(ld_path_flags) 
+#reloc_ld=/usr/vacpp/bin/xlC (dpc)
+#reloc_ld=g++
+# E (dpc) ds_make_depend_flags        = -I/usr/vacpp/include
+
+ifeq ($(platform),sun4)
+LDFLAGS2 	= -L..$(sep)..$(sep)wit$(sep)$(platform) \
+		  -L..$(sep)..$(sep)mcl$(sep)$(platform) 
+else
+LDFLAGS2 	= -L..$(sep)..$(sep)wit$(sep)$(platform) 
+endif
+
+# last line above added by wally 5/23/96 because libwit.a currently needs
+# RW code that isn't in libwit.a (especially on Sun's)
+LDFLAGS 	= $(LDFLAGS1) $(LDFLAGS2) 
+# LOADLIBES	= $(wit_api_lib) $(ds_math_lib)  \
+# 		  $(ds_fortran_lib) \
+# 		  $(lex_yacc_lib) \
+# 		  $(ds_osl_lib) \
+# 		  $(rw_lib)
+
+ifeq ($(platform),sun4)
+	# Use -lrwtoolgs for now ... 
+#	LOADLIBES	= -lwitnl \
+	LOADLIBES	= -lwit \
+			  -lmcl \
+			  $(ds_osl_lib) \
+			  $(ds_math_lib) $(rw_lib) $(ds_fortran_lib) \
+			  $(lex_yacc_lib)
+else
+LOADLIBES	+= $(wit_api_lib) $(ds_math_lib)  \
+		  $(ds_fortran_lib) \
+		  $(lex_yacc_lib) 
+endif
+
+# last two above added by wally 5/23/96 because libwit.a currently needs
+# RW code that isn't in libwit.a (especially on Sun's)
+
+# $(ds_fortran_lib) $(rw_lib)
+# PTRPATH is to be used with cfront-based compilers
+PTRPATHOPTS	= -ptr./ptrepository -ptr../../wit/$(platform)/ptrepository
+
+vpath %.$(cxx_suffix) $(src_dir)
+
+libdp.a:	$(lib_objects)
+	$(AR) $(ds_ar_update_flags) $@@ $^
+	$(RANLIB) $@@
+
+-ldp:	libdp.a
+
+# Rule to build the demandPlanningMain stand-alone executable:
+
+demandPlanningMain:	demandPlanningMain.o libdp.a ../../wit/$(platform)/libwit.a
+	$(CXX) $(ds_link_flags) $^ -o $@@ 
+
+unitTest:	unitTest.o libdp.a ../../wit/$(platform)/libwit.a 
+	$(CXX) $(ds_link_flags) $^ -o $@@ 
+@

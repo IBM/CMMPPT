@@ -1,0 +1,526 @@
+head	1.2;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2001.04.11.20.21.09;	author liusz;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@By Shuzheng Liu: add wit enhancements for determining the order of objects.
+@
+text
+@/*
+ *	Description: WitXML.h
+ *		class WitXML is used to read an input file in xml format for
+ *		project WIT	
+ *		
+ *	Owner:
+ *		IBM T. J. Watson Research Center
+ *		Route 134
+ *		Yorktown Heights, NY 10598
+ *
+ *	Author: Shuzheng Liu (LSZ)     
+ *		35-238   liusz@@watson.ibm.com    8-862-2952
+ *
+ *	Proprietary Statement:
+ *		IBM Confidential
+ *		(C) Copyright IBM Corp. 2000
+ *
+ * 	Change History:
+ *    	March, 2001  LSZ: New code.
+ */
+
+
+// ---------------------------------------------------------------------------
+//  Includes
+// ---------------------------------------------------------------------------
+#ifndef WitXML_h
+#define WitXML_h
+
+#include <util/PlatformUtils.hpp>
+#include <parsers/DOMParser.hpp>
+#include <dom/DOM_Node.hpp>
+#include <dom/DOM_NamedNodeMap.hpp>
+#include <iostream.h>
+#include <fstream.h>
+#include <stdlib.h>
+#include "wit.h"
+
+
+enum witCommand	{
+		  set,
+		  add,
+		  read};
+enum witObject	{
+		  Problem,
+		  Part,
+		  Demand,
+		  Operation,
+		  BomEntry,
+		  SubEntry,
+		  BopEntry};
+
+// ---------------------------------------------------------------------------
+// Functional variables for witWriteXML
+// ---------------------------------------------------------------------------
+extern "C" {
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetInt)(WitRun * const theWitRun,int * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetFloat)(WitRun * const theWitRun,float * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetText)(WitRun * const theWitRun,char ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetObjInt)(WitRun * const theWitRun,const char * const name,int * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetObjInts)(WitRun * const theWitRun,const char * const name,int ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetObjFloat)(WitRun * const theWitRun,const char * const name,float * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetObjFloats)(WitRun * const theWitRun,const char * const name,float ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetObjBoundSet)(WitRun * const theWitRun,const char * const name,float ** hardlower,float ** softlower,float ** hardupper);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetDemandInt)(WitRun * const theWitRun,const char * const partname,const char * const demandname,int * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetDemandInts)(WitRun * const theWitRun,const char * const partname,const char * const demandname,int ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetDemandFloat)(WitRun * const theWitRun,const char * const partname,const char * const demandname,float * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetDemandFloats)(WitRun * const theWitRun,const char * const partname,const char * const demandname,float ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetDemandBoundSet)(WitRun * const theWitRun,const char * const partname,const char * const demandname,float ** hardlower,float ** softlower,float ** hardupper);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetEntryInt)(WitRun * const theWitRun,const char * const opname,const int index,int * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetEntryInts)(WitRun * const theWitRun,const char * const opname,const int index,int ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetEntryFloat)(WitRun * const theWitRun,const char * const opname,const int index,float * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetEntryFloats)(WitRun * const theWitRun,const char * const opname,const int index,float ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetSubEntryInt)(WitRun * const theWitRun,const char * const opname,const int index,const int subindex,int * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetSubEntryInts)(WitRun * const theWitRun,const char * const opname,const int index,const int subindex,int ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetSubEntryFloat)(WitRun * const theWitRun,const char * const opname,const int index,const int subindex,float * value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitGetSubEntryFloats)(WitRun * const theWitRun,const char * const opname,const int index,const int subindex,float ** value);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitSetObjBoundSet)(WitRun * const theWitRun,const char * const name,const float * const hardlower,const float * const softlower,const float * const hardupper);
+	typedef WIT_DECLSPEC witReturnCode (STDCALL * WitSetDemandBoundSet)(WitRun * const theWitRun,const char * const partname,const char * const demandname,const float * const hardlower,const float * const softlower,const float * const hardupper);
+}
+
+class  WitXML
+{
+  public:
+	// -----------------------------------------------------------------------
+	//  Constructors and Destructor
+	// -----------------------------------------------------------------------
+	WitXML():NPeriods_(0),optInitMethod_(NULL),outFile_(),XMLFile_(NULL)
+	{
+	};
+
+	WitXML(WitXML &aWitXML);
+
+	WitXML(int nPeriod):NPeriods_(nPeriod),optInitMethod_(NULL),outFile_(),XMLFile_(NULL)
+	{
+	};
+
+	~WitXML()
+	{
+	};
+
+	WitXML& operator=(const WitXML &aWitXML);
+
+	// ---------------------------------------------------------------------------
+	// Public method to read an input file in xml format 
+	// ---------------------------------------------------------------------------
+	int WitReadXML(WitRun * const theWitRun,const char *fn);
+	int WitWriteXML(WitRun * const theWitRun,const char *fndtd,const char *fnout,const char *release=NULL);
+
+    // ------------------------------------------------------------------------
+    //	Public method for converting a DOMStringe into a char *.
+	//  The caller owns the (char *) string that is returned, and is responsible
+	//  for deleting it.
+	// ------------------------------------------------------------------------ 
+	static	char * transcode(const DOMString& toShow);
+
+  private:
+    // ---------------------------------------------------------------------------
+    // Private data structures and values for wit objects and attributes
+    // ---------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------
+    //  Wit commands
+    // ---------------------------------------------------------------------------
+    static const int	numOfCmd;
+    static const char *	witcommand[];
+
+    // ---------------------------------------------------------------------------
+    //  Wit objects 
+    // ---------------------------------------------------------------------------
+    static const int	numOfObj;
+    static const char *	witobject[];
+
+    // ---------------------------------------------------------------------------
+    //  Name of some attributes
+    // ---------------------------------------------------------------------------
+    static const char 	*MATERIAL,
+						*CAPACITY,
+						*RELEASE,
+						*OUTFILENAME;
+
+	// ---------------------------------------------------------------------------
+	// Private method for reading a node in input xml file
+	// ---------------------------------------------------------------------------
+	int	ReadANode(WitRun * const theWitRun,DOM_Node&,int nodeLevel);
+
+	// ---------------------------------------------------------------------------
+	// Private method for invoking ReadPart, ReadDemand, etc. for each object
+	// ---------------------------------------------------------------------------
+	int RunWitCommand(WitRun * const theWitRun,DOM_Node&);
+
+	// ---------------------------------------------------------------------------
+	// Private methods for invoking witSet functions in "wit.h" for
+	// each attribute
+	// ---------------------------------------------------------------------------
+	int ReadProblem(WitRun * const theWitRun,DOM_Node&);
+	int ReadPart(WitRun * const theWitRun,DOM_Node&,int Cmd);
+	int ReadDemand(WitRun * const theWitRun,DOM_Node&,int Cmd);
+	int ReadOperation(WitRun * const theWitRun,DOM_Node&,int Cmd);
+	int ReadBomEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+	int ReadSubEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+	int ReadBopEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+
+	// ---------------------------------------------------------------------------
+    // Private generic methods for setting a bound set attribute for different objects
+    // ---------------------------------------------------------------------------
+    int SetBoundSetAttr(WitRun * const theWitRun,WitSetObjBoundSet set_fn,DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char * const objname,const char *prefix);
+    int SetBoundSetAttr(WitRun * const theWitRun,WitSetDemandBoundSet set_fn,DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char * const partname,const char * const demandname,const char *prefix);
+
+    // ---------------------------------------------------------------------------
+    // Private method for retrieving the values of a bound set 
+    // --------------------------------------------------------------------------
+    int GetBoundSetAttr(DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char *prefix,float **hardLB,float **softLB,float **hardUB);
+    
+    // ---------------------------------------------------------------------------
+    // Private method for finding the index of the name of an attribute in a list of
+    // strings, return -1 if the name of this attribute is not included in the list
+    // ---------------------------------------------------------------------------
+    int GetAttributeIndex(const DOMString &attribute,int attrCount,const char ** names);
+
+    // ---------------------------------------------------------------------------
+    // Private method for retrieving the value of an attributes of a specific name 
+    // in a Node
+    // --------------------------------------------------------------------------
+    int GetAttributeValue(DOM_Node& toRun,const char *name,DOMString& String);
+
+    // ---------------------------------------------------------------------------
+    // Private method for retrieving the value of an attributes of a specific name 
+    // in a list of attributes. If Mode=0, stop whenever this attribute does not exist
+    // --------------------------------------------------------------------------
+    int GetAttributeValue(DOM_NamedNodeMap &attributes,const char *name,DOMString& String);
+
+    // ---------------------------------------------------------------------------
+    // Private method for setting the default WitRun
+    // ---------------------------------------------------------------------------
+	int SetDefaultWitRun(WitRun * const wr,WitRun *defaultwr);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing Global section into an output file
+    // ---------------------------------------------------------------------------
+    int WriteProblem(WitRun * const theWitRun,WitRun * fefaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing Part section into an output file
+    // ---------------------------------------------------------------------------
+	int WritePart(WitRun *const wr,WitRun *defaultwr,char *partname);
+    int WriteParts(WitRun * const theWitRun,WitRun * defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing Demand section into an output file
+    // ---------------------------------------------------------------------------
+	int WriteDemand(WitRun * const wr,WitRun *defaultwr,char *partname,char *demandname);
+    int WriteDemands(WitRun * const theWitRun,WitRun * defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing Operation section into an output file
+    // ---------------------------------------------------------------------------
+	int WriteOperation(WitRun *const wr,WitRun *defaultwr,char *operationname);
+    int WriteOperations(WitRun * const theWitRun,WitRun * defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing BomEntry section into an output file
+    // ---------------------------------------------------------------------------
+	int WriteBomEntry(WitRun * const wr,WitRun * defaultwr,char *operationname,int bomindex);
+    int WriteBomEntries(WitRun * const theWitRun,WitRun * defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing SubBomEntry section into an output file
+    // ---------------------------------------------------------------------------
+	int WriteSubEntry(WitRun *const wr,WitRun *defaultwr,char *operationname,int bomindex,int subindex);
+    int WriteSubEntries(WitRun * const theWitRun,WitRun * defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private method for writing BopEntry section into an output file
+    // ---------------------------------------------------------------------------
+	int WriteBopEntry(WitRun *const wr,WitRun *defaultwr,char *operationname,int bopindex);
+    int WriteBopEntries(WitRun * const theWitRun,WitRun *defaultWR);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a boolean attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteBoolAttr(const char *attrname,int value);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetInt get_fn,const char *attrname);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjInt get_fn,const char *attrname,const char * const operationname);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjInt get_fn,const char *attrname,const char * const partname,witAttr partCategory);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandInt get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetEntryInt get_fn,const char *attrname,const char * const operationname,const int index,bool bom=WitTRUE);
+    int WriteBoolAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetSubEntryInt get_fn,const char *attrname,const char * const operationname,const int bomindex,const int sumindex);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing an integer attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteIntAttr(const char *attrname,int value);
+    int WriteIntAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetInt get_fn,const char *attrname);
+    int WriteIntAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandInt get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname);
+    int WriteIntAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetEntryInt get_fn,const char *attrname,const char * const operationname,const int index,bool bom=WitTRUE);
+    int WriteIntAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetSubEntryInt get_fn,const char *attrname,const char * const operationname,const int bomindex,const int sumindex);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a list of integer attribute for different objects
+    // ---------------------------------------------------------------------------
+     int WriteIntsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjInts get_fn,const char *attrname,const char * const partname,witAttr partCategory);
+    int WriteIntsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandInts get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a float attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteFloatAttr(const char *attrname,float value);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetFloat get_fn,const char *attrname);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjFloat get_fn,const char *attrname,const char * const operationname);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjFloat get_fn,const char *attrname,const char * const partname,witAttr partCategory);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandFloat get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetEntryFloat get_fn,const char *attrname,const char * const operationname,const int index,bool bom=WitTRUE);
+    int WriteFloatAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetSubEntryFloat get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subindex);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a list of floats attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteFloatsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjFloats get_fn,const char *attrname,const char * const operationname);
+    int WriteFloatsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjFloats get_fn,const char *attrname,const char * const partname,witAttr partCategory);
+    int WriteFloatsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandFloats get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname);
+    int WriteFloatsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetEntryFloats get_fn,const char *attrname,const char * const operationname,const int index,bool bom=WitTRUE);
+    int WriteFloatsAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetSubEntryFloats get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subindex);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a bound set attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteBoundSetAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetObjBoundSet get_fn,const char * const objname,const char *prefix,bool part=WitTRUE);
+    int WriteBoundSetAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetDemandBoundSet get_fn,const char * const partname,const char * const demandname,const char *prefix);
+    int PrintSetBoundsAttr(const char *prefix,float *hardlower,float *softlower,float *hardupper,float *dfhardlower,float *dfsoftlower,float *dfhardupper);
+
+    // ---------------------------------------------------------------------------
+    // Private generic methods for writing a character string attribute for different objects
+    // ---------------------------------------------------------------------------
+    int WriteTextAttr(WitRun * const theWitRun,WitRun * const defaultWR,WitGetText get_fn,const char *attrname);
+
+    // ---------------------------------------------------------------------------
+    // Private methods for comparing 2 vectors, return 0 if they are equal, return 1
+    // otherwise
+    // ---------------------------------------------------------------------------
+    int IntVectorCmp(int *vector1,int *vector2);
+    int FloatVectorCmp(float *vector1,float *vector2);
+
+    // ----------------------------------------------------------------------------
+    //	Private method for displaying a DOMStringe
+    // ---------------------------------------------------------------------------
+    ostream& operator<<(const DOMString& toDump);
+
+    // ---------------------------------------------------------------------------
+    //  Variable and flag for the number of periods
+    // ---------------------------------------------------------------------------
+    int	 NPeriods_;
+
+    // ---------------------------------------------------------------------------
+    //  The value of optInitMethod in input file
+    // ---------------------------------------------------------------------------
+    witAttr optInitMethod_;
+
+    // ---------------------------------------------------------------------------
+    //  Name of input file
+    // ---------------------------------------------------------------------------
+    const char * XMLFile_;
+
+    // ---------------------------------------------------------------------------
+    //  Output file
+    // ---------------------------------------------------------------------------
+    ofstream outFile_;
+
+};
+
+// ---------------------------------------------------------------------------
+//  A class derived from DOMParser, the only difference is the overriding
+//  method startElement(), so that the extra line number info can be inserted
+// ---------------------------------------------------------------------------
+class WitXMLParser : public DOMParser
+{
+public:
+    // -----------------------------------------------------------------------
+    //  Constructors and Destructor
+    // -----------------------------------------------------------------------
+	WitXMLParser()
+	{
+	}
+
+	~WitXMLParser()
+	{
+	} 
+
+	virtual void startElement
+	(
+		const XMLElementDecl&		elemDecl,
+		const unsigned int		urlId,
+		const XMLCh* const		elemPrefix,
+		const RefVectorOf<XMLAttr>&	attrList,
+		const unsigned int		attrCount,
+		const bool			isEmpty,
+		const bool			isRoot
+	);
+};
+
+#endif
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d12 1
+a12 1
+ *			35-238   liusz@@watson.ibm.com    8-862-2952
+d19 1
+a19 1
+ *    		March, 2001  LSZ: New code.
+d36 1
+a36 1
+#include <wit.h>
+d84 16
+a99 6
+    // -----------------------------------------------------------------------
+    //  Constructors and Destructor
+    // -----------------------------------------------------------------------
+    WitXML():NPeriods_(0),outFile_(),XMLFile_(NULL)
+    {
+    };
+d101 1
+a101 1
+    WitXML(WitXML &aWitXML);
+d103 5
+a107 15
+    WitXML(int nPeriod):NPeriods_(nPeriod),outFile_(),XMLFile_(NULL)
+    {
+    };
+
+    ~WitXML()
+    {
+    };
+
+    WitXML& operator=(const WitXML &aWitXML);
+
+    // ---------------------------------------------------------------------------
+    // Public method to read an input file in xml format 
+    // ---------------------------------------------------------------------------
+    int WitReadXML(WitRun * const theWitRun,const char *fn);
+    int WitWriteXML(WitRun * const theWitRun,const char *fndtd,const char *fnout,const char *release=NULL);
+d112 2
+a113 2
+    //  for deleting it.
+    // ------------------------------------------------------------------------ 
+d136 3
+a138 3
+			*CAPACITY,
+			*RELEASE,
+			*OUTFILENAME;
+d140 4
+a143 4
+    // ---------------------------------------------------------------------------
+    // Private method for reading a node in input xml file
+    // ---------------------------------------------------------------------------
+    int	ReadANode(WitRun * const theWitRun,DOM_Node&,int nodeLevel);
+d145 4
+a148 4
+    // ---------------------------------------------------------------------------
+    // Private method for invoking ReadPart, ReadDemand, etc. for each object
+    // ---------------------------------------------------------------------------
+    int RunWitCommand(WitRun * const theWitRun,DOM_Node&);
+d150 11
+a160 11
+    // ---------------------------------------------------------------------------
+    // Private methods for invoking witSet functions in "wit.h" for
+    // each attribute
+    // ---------------------------------------------------------------------------
+    int ReadProblem(WitRun * const theWitRun,DOM_Node&);
+    int ReadPart(WitRun * const theWitRun,DOM_Node&,int Cmd);
+    int ReadDemand(WitRun * const theWitRun,DOM_Node&,int Cmd);
+    int ReadOperation(WitRun * const theWitRun,DOM_Node&,int Cmd);
+    int ReadBomEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+    int ReadSubEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+    int ReadBopEntry(WitRun * const theWitRun,DOM_Node&,int Cmd);
+d197 1
+a197 1
+    // Private method for writing Global section of an output file
+d202 1
+a202 1
+    // Private method for writing Part section of an output file
+d204 2
+a205 1
+    int WritePart(WitRun * const theWitRun,WitRun * defaultWR);
+d208 1
+a208 1
+    // Private method for writing Demand section of an output file
+d210 2
+a211 1
+    int WriteDemand(WitRun * const theWitRun,WitRun * defaultWR);
+d214 1
+a214 1
+    // Private method for writing Operation section of an output file
+d216 2
+a217 1
+    int WriteOperation(WitRun * const theWitRun,WitRun * defaultWR);
+d220 1
+a220 1
+    // Private method for writing BomEntry section of an output file
+d222 2
+a223 1
+    int WriteBomEntry(WitRun * const theWitRun,WitRun * defaultWR);
+d226 1
+a226 1
+    // Private method for writing SubBomEntry section of an output file
+d228 2
+a229 1
+    int WriteSubEntry(WitRun * const theWitRun,WitRun * defaultWR);
+d232 1
+a232 1
+    // Private method for writing BopEntry section of an output file
+d234 2
+a235 1
+    int WriteBopEntry(WitRun * const theWitRun,WitRun *defaultWR);
+d313 1
+a313 1
+    //  Release_ of input file
+d315 1
+a315 1
+    DOMString Release_;
+@
+
+
+1.1.1.1
+log
+@Importing wit xml code
+@
+text
+@@

@@ -1,0 +1,378 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	UsedBySCE:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.47;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.36;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.42;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.42;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.30;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+#include <scenario/src/filtStrt.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/algorthm.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/machdep.h>
+
+// Do Filtering
+bool
+LgFrFilterStrategy::exclude(
+   const LgFrItemTimeVecPairFloat & )
+const
+{
+   return false;
+}
+
+// Return the LastProblemSolved which belongs to a scenario
+const LgFrLastProblemSolved&
+LgFrFilterStrategy::lastProblemSolved(
+   const LgFrScenario & scenario)
+const
+{
+   return scenario.lastProblemSolved();
+}
+
+// updateFrom - This method is invoked when the data used by the exclude 
+// filter method has changed.
+/*
+void
+LgFrFilterStrategy::localUpdate (
+   LgFrModel *,
+   void * )
+{
+   // Inform all objects dependent on this strategy that there has been
+   // a change in the data used in the exclude method
+  cout << "object changing has address " << (unsigned long)this << endl;
+}
+*/
+
+// Get a set of parts from scenario.
+// Static protected member used by derived classes.  This function is a
+// friend of scenario
+const LgFrSetOfParts &
+LgFrFilterStrategy::setOfParts(
+   const LgFrScenario * scenPtr,
+   int setOfPartsIdentifier )
+{
+   assert( scenPtr != 0 );
+   return scenPtr->constSetOfParts( setOfPartsIdentifier );
+}
+
+// Make clone copy of object
+LgFrFilterStrategy *
+LgFrFilterStrategy::clone()
+const
+{
+  LgFrFilterStrategy* newInst = 
+      new LgFrFilterStrategy(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with new Scenario
+LgFrFilterStrategy *
+LgFrFilterStrategy::clone(LgFrScenario & newScenario)
+const
+{
+  LgFrFilterStrategy* newInst = 
+      new LgFrFilterStrategy(*this, newScenario);
+  return (newInst);
+}
+
+// Assignment operator
+LgFrFilterStrategy &
+LgFrFilterStrategy::operator=(
+			  const LgFrFilterStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+     (this->LgFrSubscription::operator= ) (rhs);
+     if ( algorithmPtr_ != 0 ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+     algorithmPtr_ = rhs.algorithmPtr_;
+     if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrFilterStrategy::
+   LgFrFilterStrategy (
+      const LgFrFilterStrategy & source)
+: 
+   LgFrSubscription(),       
+   algorithmPtr_( source.algorithmPtr_ ),
+   id_(__LGFRFILTERSTRATEGY)
+{
+   if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+}
+
+
+// Copy constructor with newScenario
+LgFrFilterStrategy::
+   LgFrFilterStrategy (
+      const LgFrFilterStrategy & source,
+      LgFrScenario & newScenario )
+: 
+   LgFrSubscription(),         
+   algorithmPtr_( 0 ),
+   id_(__LGFRFILTERSTRATEGY)
+{
+   if ( source.algorithmPtr_ != 0 ) {
+      algorithmPtr_ = source.algorithmPtr_ -> counterPart( newScenario );
+      algorithmPtr_->addDependent( this );
+   }
+}
+
+
+// Default Constructor
+LgFrFilterStrategy::
+   LgFrFilterStrategy (
+      LgFrAlgorithm * algorithmPtr )
+: 
+   LgFrSubscription(),
+   algorithmPtr_(algorithmPtr),
+   id_(__LGFRFILTERSTRATEGY)
+{
+  if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+}
+
+// Destructor
+LgFrFilterStrategy::
+   ~LgFrFilterStrategy ()
+{
+   if ( algorithmPtr_ != 0 ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrFilterStrategy methods.
+void
+LgFrFilterStrategy::test()
+{
+  // Test default constructor
+  LgFrFilterStrategy cs1;
+
+  // Test copy constructor
+  LgFrFilterStrategy cs2(cs1);
+
+  // Test assignment operator
+  LgFrFilterStrategy cs3;
+  cs3 = cs2;
+
+  // Test clone method
+  LgFrFilterStrategy *cs4Ptr = cs1.clone();
+
+  // Test destructor
+  delete cs4Ptr;
+
+  // Test exclude
+  LgFrItemTimeVecPairFloat itvp1( LgFrPart("abc"), LgFrTimeVecFloat(2,2.) );
+  assert( !cs1.exclude( itvp1 ) );
+
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 4
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+d13 1
+a13 1
+RWBoolean
+d18 1
+a18 1
+   return FALSE;
+d52 1
+a52 1
+   assert( scenPtr != NULL );
+a75 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrFilterStrategy::isA()
+const
+{
+   return id_;
+}
+
+a80 1
+  assert( id_ == rhs.id_ );
+d83 1
+a83 1
+     if ( algorithmPtr_ != NULL ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+d85 1
+a85 1
+     if ( algorithmPtr_ != NULL ) algorithmPtr_->addDependent( this );
+d100 1
+a100 2
+   assert( id_ == source.id_ );
+   if ( algorithmPtr_ != NULL ) algorithmPtr_->addDependent( this );
+d111 1
+a111 1
+   algorithmPtr_( NULL ),
+d114 1
+a114 2
+   assert( id_ == source.id_ );
+   if ( source.algorithmPtr_ != NULL ) {
+d130 1
+a130 1
+  if ( algorithmPtr_ != NULL ) algorithmPtr_->addDependent( this );
+d137 1
+a137 1
+   if ( algorithmPtr_ != NULL ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+a150 4
+  assert( cs1.id_ == __LGFRFILTERSTRATEGY );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFRFILTERSTRATEGY );
+a153 1
+  assert( cs2.isA() == __LGFRFILTERSTRATEGY );
+a157 1
+  assert( cs3.isA() == cs2.isA() );
+a160 1
+  assert( cs4Ptr->isA() == cs1.isA() );
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d10 1
+a10 1
+bool
+d15 1
+a15 1
+   return false;
+d49 1
+a49 1
+   assert( scenPtr != 0 );
+d73 8
+d86 1
+d89 1
+a89 1
+     if ( algorithmPtr_ != 0 ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+d91 1
+a91 1
+     if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+d106 2
+a107 1
+   if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+d118 1
+a118 1
+   algorithmPtr_( 0 ),
+d121 2
+a122 1
+   if ( source.algorithmPtr_ != 0 ) {
+d138 1
+a138 1
+  if ( algorithmPtr_ != 0 ) algorithmPtr_->addDependent( this );
+d145 1
+a145 1
+   if ( algorithmPtr_ != 0 ) algorithmPtr_->removeDependentFromHeterogeneousList( this );
+d159 4
+d166 1
+d171 1
+d175 1
+@
+

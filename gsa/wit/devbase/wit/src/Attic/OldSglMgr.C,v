@@ -1,0 +1,824 @@
+head	1.5;
+access;
+symbols
+	EndRw-branch:1.3.0.2
+	Root-of-EndRw:1.3;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2002.12.17.21.32.49;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2002.12.06.20.38.25;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.11.22.21.17.59;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.21.22.53.57;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.15.20.27.11;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Removed implementation of single-source by the old algorithm.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OldSglMgr.C"
+//
+// Contains the implementation of class OldSglMgr.
+//------------------------------------------------------------------------------
+
+#include <OldSglMgr.h>
+#include <HeurAtor.h>
+#include <Selector.h>
+#include <SelPt.h>
+#include <OldSglSite.h>
+#include <Part.h>
+#include <BopEntry.h>
+#include <Global.h>
+#include <Repos.h>
+#include <MsgFac.h>
+#include <PtrMapI.h>
+#include <FlexVecI.h>
+
+//------------------------------------------------------------------------------
+
+typedef WitObjStItr <WitOldSglSite> WitOldSglSiteItr;
+
+//------------------------------------------------------------------------------
+
+WitOldSglMgr::WitOldSglMgr (WitSelector * theSelector):
+      WitProbAssoc       (theSelector),
+
+      mySelector_        (theSelector),
+      myOsSiteForPart_   (),
+      myOsSiteForBomEnt_ (),
+      sglSrcMode_        (witTRUE),
+      alteredSites_      (myProblem ()),
+      pureMS_            (witTRUE),
+      cmrMisMatch_       (witFALSE),
+      misMatchSite_      (NULL),
+      nextAltSite_       (NULL),
+      allocRepos_        (NULL),
+      configRepos_       (NULL),
+      nItrs_             (0),
+      nAlts_             (0),
+      swToMS_            (0)
+   {
+   WitPart *        thePart;
+   WitBomEntry *    theBomEnt;
+   WitOldSglSiteItr theItr;
+   WitOldSglSite *  theOsSite;
+
+   allocRepos_  = new WitDataRepos (myProblem ());
+   configRepos_ = new WitDataRepos (myProblem ());
+
+   verifyRestrictions ();
+
+   myMsgFac () ("sglSrcMsg");
+
+   if (DEVELOPMENT)
+      myMsgFac () ("oldSglSrcMsg");
+
+   myOsSiteForPart_.allocate (myProblem ());
+
+   forEachPart (thePart, myProblem ())
+      if (thePart->singleSource ())
+         myOsSiteForPart_ (thePart) =
+            new WitPmrOsSite (thePart, theSelector);
+
+   myOsSiteForBomEnt_.allocate (myProblem ());
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      if (theBomEnt->singleSource ())
+         myOsSiteForBomEnt_ (theBomEnt) =
+            new WitCmrOsSite (theBomEnt, theSelector);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOldSglMgr::~WitOldSglMgr ()
+   {
+   WitPart *     thePart;
+   WitBomEntry * theBomEnt;
+
+   if (DEVELOPMENT)
+      myMsgFac () ("oldSglSrcCountsMsg", nItrs_, nAlts_, swToMS_);
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      delete myOsSiteForBomEnt_ (theBomEnt);
+
+   forEachPart (thePart, myProblem ())
+      delete myOsSiteForPart_ (thePart);
+
+   delete configRepos_;
+   delete allocRepos_;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::sglSrcReq (WitProblem * theProblem)
+   {
+   WitPart *     thePart;
+   WitBomEntry * theBomEnt;
+
+   forEachPart (thePart, theProblem)
+      if (thePart->singleSource ())
+         return witTRUE;
+
+   forEachBomEntry (theBomEnt, theProblem)
+      if (theBomEnt->singleSource ())
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::commitMaxQty (double & netQty)
+   {
+   double origNetQty;
+
+   stronglyAssert (allocRepos_ ->isEmpty ());
+   stronglyAssert (configRepos_->isEmpty ());
+
+   origNetQty = netQty;
+
+   while (witTRUE)
+      {
+      prepSelCMQ ();
+
+      mySelector_->commitMaxQty (netQty);
+
+      if (nextAltSite_ == NULL)
+         if (pureMS_)
+            {
+            prtPureMS ();
+
+            break;
+            }
+
+      if (netQty <= SEARCH_TOL)
+         {
+         configRepos_->restore ();
+
+         prtDesIncVolAch ();
+
+         break;
+         }
+
+      configRepos_->restore ();
+      allocRepos_ ->restore ();
+
+      netQty = origNetQty;
+
+      if (nextAltSite_ == NULL)
+         {
+         exhaustedCMQ (netQty);
+
+         break;
+         }
+
+      alterNextAltSite ();
+      }
+
+   reset ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::prepCmqSel ()
+   {
+   if (! sglSrcMode_)
+      return;
+
+   misMatchSite_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::findPmrMisMatch (
+      WitPart * thePart,
+      WitPeriod expPer,
+      WitPeriod fillPer)
+   {
+   WitOldSglSite * theOsSite;
+
+   if (! sglSrcMode_)
+      return witFALSE;
+
+   theOsSite = myOsSiteForPart_ (thePart);
+
+   if (theOsSite != NULL)
+      if (theOsSite->hasMisMatch (expPer))
+         {
+         mySelector_->recFundShortage (thePart, fillPer);
+
+         misMatchSite_ = theOsSite;
+
+         return witTRUE;
+         }
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::noteCmrMisMatch (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      WitPeriod     fillPer,
+      WitBopEntry * theBopEnt)
+   {
+   WitOldSglSite * theOsSite;
+
+   if (! sglSrcMode_)
+      return;
+
+   if (cmrMisMatch_)
+      return;
+
+   theOsSite = myOsSiteForBomEnt_ (theBomEnt);
+
+   if (theOsSite != NULL)
+      if (theOsSite->hasMisMatch (execPer))
+         {
+         mySelector_->recFundShortage (theBopEnt->myPart (), fillPer);
+
+         misMatchSite_ = theOsSite;
+
+         cmrMisMatch_  = witTRUE;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::checkCmrMisMatch ()
+   {
+   WitBoolean cmrMM;
+
+   if (! sglSrcMode_)
+      return witFALSE;
+
+   cmrMM        = cmrMisMatch_;
+
+   cmrMisMatch_ = witFALSE;
+
+   return cmrMM;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::placeReqs (WitSelPt * theSelPt)
+   {
+   WitOldSglSite * theOsSite;
+
+   if (! sglSrcMode_)
+      return;
+
+   theOsSite = myOsSiteFor (theSelPt);
+
+   if (theOsSite != NULL)
+      if (theOsSite->sglSrcMode ())
+         if (pureMS_)
+            if (theOsSite->nonMS ()[theSelPt->myPeriod ()])
+               pureMS_ = witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::mustSkip (WitSelPt * theSelPt)
+   {
+   if (sglSrcMode_)
+      if (nextAltSite_ != NULL)
+         if (sglSrcMode (theSelPt))
+            return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::sglSrcMode (WitSelPt * theSelPt)
+   {
+   WitOldSglSite * theOsSite;
+
+   if (! sglSrcMode_)
+      return witFALSE;
+
+   theOsSite = myOsSiteFor (theSelPt);
+
+   if (theOsSite != NULL)
+      if (theOsSite->sglSrcMode ())
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitOldSglMgr::sglSrcMode (WitBomEntry * theBomEnt)
+   {
+   WitOldSglSite * theOsSite;
+
+   if (! sglSrcMode_)
+      return witFALSE;
+
+   theOsSite = myOsSiteForBomEnt_ (theBomEnt);
+
+   if (theOsSite != NULL)
+      if (theOsSite->sglSrcMode ())
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::alterSelections ()
+   {
+   WitObjStItr <WitSelPt> theItr;
+   WitSelPt *             theSelPt;
+
+   if (sglSrcMode_)
+      if (nextAltSite_ == NULL)
+         {
+         if (misMatchSite_ != NULL)
+            {
+            nextAltSite_ = misMatchSite_;
+
+            prtNextAltSite (witTRUE);
+ 
+            return;
+            }
+
+         theItr.attachTo (mySelector_->pendingPts ());
+
+         while (theItr.advance (theSelPt))
+            {
+            seekNextAltSite (theSelPt);
+
+            if (nextAltSite_ != NULL)
+               return;
+            }
+         }
+
+   mySelector_->alterSelections ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::alterSelection (WitSelPt * theSelPt)
+   {
+   if (sglSrcMode_)
+      if (nextAltSite_ == NULL)
+         {
+         if (misMatchSite_ != NULL)
+            {
+            nextAltSite_ = misMatchSite_;
+
+            prtNextAltSite (witTRUE);
+
+            return;
+            }
+
+         seekNextAltSite (theSelPt);
+
+         if (nextAltSite_ != NULL)
+            return;
+         }
+
+   mySelector_->alterSelection (theSelPt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::saveAllocVal (int & theVar)
+   {
+   if (sglSrcMode_)
+      allocRepos_->saveVal (theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::saveAllocVal (double & theVar)
+   {
+   if (sglSrcMode_)
+      allocRepos_->saveVal (theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::saveConfigVal (int & theVar)
+   {                                       
+   if (sglSrcMode_)
+      configRepos_->saveVal (theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::saveConfigVal (WitSelCand * & theVar)
+   {                                       
+   if (sglSrcMode_)
+      savePtrVal (configRepos_, theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::verifyRestrictions ()
+   {
+   WitDemand * theDemand;
+
+   stronglyAssert (sglSrcReq (myProblem ()));
+
+   if (mySelector_->penExec ())
+      myMsgFac () ("sglSrcAndPenExecSmsg");
+
+   if (myGlobalComp ()->computeCriticalList ())
+      myMsgFac () ("sglSrcAndCritListSmsg");
+
+   if (myGlobalComp ()->equitability () > 1)
+      myMsgFac () ("sglSrcAndEqAllSmsg");
+
+   forEachDemand (theDemand, myProblem ())
+      if (! (theDemand->buildAheadUB () == 0))
+         myMsgFac () ("sglSrcAndBaByDemSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::prepSelCMQ ()
+   {
+   WitOldSglSiteItr theItr;
+   WitOldSglSite *  theOsSite;
+
+   nItrs_ ++;
+
+   pureMS_      = witTRUE;
+
+   nextAltSite_ = NULL;
+
+   theItr.attachTo (alteredSites_);
+
+   while (theItr.advance (theOsSite))
+      if (theOsSite->sglSrcMode ())
+         theOsSite->applySsSel ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::prtPureMS ()
+   {
+   if (myGlobalComp ()->selPrintLevel () >= 2)
+      fprintf (msgFile (),
+         "\n"
+         "---------------------------------------\n"
+         "-> Allocation Retained as Multi-Source.\n"
+         "---------------------------------------\n"
+         "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::prtDesIncVolAch ()
+   {
+   if (myGlobalComp ()->selPrintLevel () >= 2)
+      fprintf (msgFile (),
+         "\n"
+         "--------------------------------------------\n"
+         "-> DesIncVol Achieved in Single-Source Mode.\n"
+         "--------------------------------------------\n"
+         "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::exhaustedCMQ (double & netQty)
+   {
+   if (myGlobalComp ()->selPrintLevel () >= 2)
+      fprintf (msgFile (),
+         "\n"
+         "---------------------------------------\n"
+         "-> No Single-Source Alteration Found.  \n"
+         "-> Pure Multi-Source Mode Will Be Used.\n"
+         "---------------------------------------\n"
+         "\n");
+
+   sglSrcMode_ = witFALSE;
+
+   mySelector_->commitMaxQty (netQty);
+
+   sglSrcMode_ = witTRUE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::alterNextAltSite ()
+   {
+   if (! nextAltSite_->altered ())
+      alteredSites_.push (nextAltSite_);
+
+   nextAltSite_->alterSel ();
+
+   if (nextAltSite_->sglSrcMode ())
+      nAlts_ ++;
+   else
+      swToMS_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::reset ()
+   {
+   WitOldSglSite * theOsSite;
+
+   allocRepos_ ->clear ();
+   configRepos_->clear ();
+
+   while (alteredSites_.pop (theOsSite))
+      {
+      theOsSite->switchToMS ();
+
+      theOsSite->init (witTRUE);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::seekNextAltSite (WitSelPt * theSelPt)
+   {
+   WitOldSglSite * theOsSite;
+
+   theOsSite = myOsSiteFor (theSelPt);
+
+   if (theOsSite != NULL)
+      if (theOsSite->sglSrcMode ())
+         {
+         nextAltSite_ = theOsSite;
+
+         prtNextAltSite (witFALSE);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOldSglMgr::prtNextAltSite (WitBoolean forMisMatch)
+   {
+   if (myGlobalComp ()->selPrintLevel () < 2)
+      return;
+
+   fprintf (msgFile (),
+      "\n"
+      "--------------------------------------\n"
+      "-> Next Single-Source Alteration Site:\n"  
+      "--------------------------------------\n"
+      "\n");
+
+   nextAltSite_->prtID ();
+
+   if (forMisMatch)
+      fprintf (msgFile (),
+         "\n"
+         "   (Single-Source vs. Multi-Route Mis-Match)\n");
+   }
+
+//------------------------------------------------------------------------------
+
+WitOldSglSite * WitOldSglMgr::myOsSiteFor (WitSelPt * theSelPt)
+   {
+   WitPart *     thePart;
+   WitBomEntry * theBomEnt;
+
+   thePart = theSelPt->myPmrPart ();
+
+   if (thePart != NULL)
+      return myOsSiteForPart_ (thePart);
+
+   theBomEnt = theSelPt->myCmrBomEnt ();
+
+   if (theBomEnt != NULL)
+      return myOsSiteForBomEnt_ (theBomEnt);
+
+   return NULL;
+   }
+@
+
+
+1.4
+log
+@Continued implementation of single-source by the new algorithm.
+@
+text
+@@
+
+
+1.3
+log
+@Continued implementation of single-source with the new algorithm.
+Fixed a null pointer bug in single-source with the old algorithm.
+@
+text
+@d91 1
+a91 1
+      myMsgFac () ("sglSrcCountsMsg", nItrs_, nAlts_, swToMS_);
+@
+
+
+1.2
+log
+@Continued implementation of single-source with the new algorithm.
+@
+text
+@d197 4
+a200 3
+   if (theOsSite->hasMisMatch (expPer))
+      {
+      mySelector_->recFundShortage (thePart, fillPer);
+d202 1
+a202 1
+      misMatchSite_  = theOsSite;
+d204 2
+a205 2
+      return witTRUE;
+      }
+d228 4
+a231 3
+   if (theOsSite->hasMisMatch (execPer))
+      {
+      mySelector_->recFundShortage (theBopEnt->myPart (), fillPer);
+d233 1
+a233 1
+      misMatchSite_ = theOsSite;
+d235 2
+a236 2
+      cmrMisMatch_  = witTRUE;
+      }
+@
+
+
+1.1
+log
+@Began implementation of the new single-source algorithm.
+@
+text
+@d39 2
+a40 2
+      mySoSiteForPart_   (),
+      mySoSiteForBomEnt_ (),
+d56 1
+a56 1
+   WitOldSglSite *  theSoSite;
+d68 1
+a68 1
+   mySoSiteForPart_.allocate (myProblem ());
+d72 1
+a72 1
+         mySoSiteForPart_ (thePart) =
+d75 1
+a75 1
+   mySoSiteForBomEnt_.allocate (myProblem ());
+d79 1
+a79 1
+         mySoSiteForBomEnt_ (theBomEnt) =
+d94 1
+a94 1
+      delete mySoSiteForBomEnt_ (theBomEnt);
+d97 1
+a97 1
+      delete mySoSiteForPart_ (thePart);
+d105 1
+a105 1
+WitBoolean WitOldSglMgr::hasSglSrcComp (WitProblem * theProblem)
+d190 1
+a190 1
+   WitOldSglSite * theSoSite;
+d195 1
+a195 1
+   theSoSite = mySoSiteForPart_ (thePart);
+d197 1
+a197 1
+   if (theSoSite->hasMisMatch (expPer))
+d201 1
+a201 1
+      misMatchSite_  = theSoSite;
+d217 1
+a217 1
+   WitOldSglSite * theSoSite;
+d225 1
+a225 1
+   theSoSite = mySoSiteForBomEnt_ (theBomEnt);
+d227 1
+a227 1
+   if (theSoSite->hasMisMatch (execPer))
+d231 1
+a231 1
+      misMatchSite_ = theSoSite;
+d257 1
+a257 1
+   WitOldSglSite * theSoSite;
+d262 1
+a262 1
+   theSoSite = mySoSiteFor (theSelPt);
+d264 2
+a265 2
+   if (theSoSite != NULL)
+      if (theSoSite->sglSrcMode ())
+d267 1
+a267 1
+            if (theSoSite->nonMS ()[theSelPt->myPeriod ()])
+d287 1
+a287 1
+   WitOldSglSite * theSoSite;
+d292 1
+a292 1
+   theSoSite = mySoSiteFor (theSelPt);
+d294 2
+a295 2
+   if (theSoSite != NULL)
+      if (theSoSite->sglSrcMode ())
+d305 1
+a305 1
+   WitOldSglSite * theSoSite;
+d310 1
+a310 1
+   theSoSite = mySoSiteForBomEnt_ (theBomEnt);
+d312 2
+a313 2
+   if (theSoSite != NULL)
+      if (theSoSite->sglSrcMode ())
+d415 1
+a415 1
+   stronglyAssert (hasSglSrcComp (myProblem ()));
+d436 1
+a436 1
+   WitOldSglSite *  theSoSite;
+d446 3
+a448 3
+   while (theItr.advance (theSoSite))
+      if (theSoSite->sglSrcMode ())
+         theSoSite->applySsSel ();
+d516 1
+a516 1
+   WitOldSglSite * theSoSite;
+d521 1
+a521 1
+   while (alteredSites_.pop (theSoSite))
+d523 1
+a523 1
+      theSoSite->switchToMS ();
+d525 1
+a525 1
+      theSoSite->init (witTRUE);
+d533 1
+a533 1
+   WitOldSglSite * theSoSite;
+d535 1
+a535 1
+   theSoSite = mySoSiteFor (theSelPt);
+d537 2
+a538 2
+   if (theSoSite != NULL)
+      if (theSoSite->sglSrcMode ())
+d540 1
+a540 1
+         nextAltSite_ = theSoSite;
+d570 1
+a570 1
+WitOldSglSite * WitOldSglMgr::mySoSiteFor (WitSelPt * theSelPt)
+d578 1
+a578 1
+      return mySoSiteForPart_ (thePart);
+d583 1
+a583 1
+      return mySoSiteForBomEnt_ (theBomEnt);
+@
+

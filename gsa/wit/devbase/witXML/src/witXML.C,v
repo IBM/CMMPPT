@@ -1,0 +1,3135 @@
+head	1.4;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2001.04.11.20.21.09;	author liusz;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.04.06.19.16.36;	author liusz;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.04.05.16.28.08;	author liusz;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@By Shuzheng Liu: add wit enhancements for determining the order of objects.
+@
+text
+@/*
+ *	Description: witXML.cpp
+ *		class WitXML is used to read an input file in xml format for
+ *		project WIT	
+ *		
+ *	Owner:
+ *		IBM T. J. Watson Research Center
+ *		Route 134
+ *		Yorktown Heights, NY 10598
+ *
+ *	Author: Shuzheng Liu (LSZ)     
+ *			35-238   liusz@@watson.ibm.com    8-862-2952
+ *
+ *	Proprietary Statement:
+ *		IBM Confidential
+ *		(C) Copyright IBM Corp. 2000
+ *
+ *  Acknowledgments:
+ *      This product includes software developed by the
+ *      Apache Software Foundation (http://www.apache.org/).
+ *      The Apache Software License, Version 1.1
+ *      Copyright (c) 1999-2000 The Apache Software Foundation.
+ *      All rights reserved.
+ * 
+ * 	Change History:
+ *    		March, 2001  LSZ: New code.
+ *
+*/
+
+// ---------------------------------------------------------------------------
+//  Includes
+// ---------------------------------------------------------------------------
+#include <dom/DOM_DOMException.hpp>
+#include <internal/XMLScanner.hpp>
+#include <sax/Locator.hpp>
+#include "witXML.h"
+#include "witXMLText.h"
+#include "witXMLErrorReporter.h"
+#include "witXMLErrorHandler.h"
+
+// ---------------------------------------------------------------------------
+//  Definitions 
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Wit commands
+// ---------------------------------------------------------------------------
+const int	WitXML::numOfCmd = 3;
+const char *WitXML::witcommand[numOfCmd] = {
+					"set",
+					"add",
+					"read"};
+
+// ---------------------------------------------------------------------------
+//  Wit objects 
+// ---------------------------------------------------------------------------
+const int	WitXML::numOfObj = 7;
+const char *WitXML::witobject[numOfObj]	= {
+					"Problem",
+					"Part",
+					"Demand",
+					"Operation",
+					"BomEntry",
+					"SubEntry",
+					"BopEntry"};
+
+// ---------------------------------------------------------------------------
+//  Names of attribute in input file
+// ---------------------------------------------------------------------------
+const char *WitXML::MATERIAL="material";
+const char *WitXML::CAPACITY="capacity";
+const char *WitXML::RELEASE="release";
+const char *WitXML::OUTFILENAME="filename";
+const char *DEFAULTMATERIAL="defaultMaterial";
+const char *DEFAULTCAPACITY="defaultCapacity";
+const char *DEFAULTDEMAND="defaultDemand";
+const char *DEFAULTOPERATION="defaultOperation";
+const int DEFAULTBOMINDEX=0;
+const int DEFAULTBOPINDEX=0;
+const int DEFAULTSUBINDEX=0;
+
+
+WitXML::WitXML(WitXML &aWitXML)
+{
+	if (this!=&aWitXML)
+		NPeriods_ = aWitXML.NPeriods_;
+}
+
+WitXML& WitXML::operator=(const WitXML &aWitXML)
+{
+	if (this!=&aWitXML)
+		NPeriods_ = aWitXML.NPeriods_;
+
+	return *this;
+}
+
+int WitXML::WitReadXML(WitRun * const theWitRun,const char *xmlFile)
+{
+    // -----------------------------------------------------------------------
+    // Two varibles used for XML's initialization, parser and error handling 
+    // -----------------------------------------------------------------------
+    bool doValidation=true;//do validity checks against the DTD in the input XML document
+    bool doEscapes=true;
+    static DOMParser::ValSchemes    gValScheme=DOMParser::Val_Auto;
+
+    //
+    // Create our validator, then attach an error handler to the parser.
+    // The parser will call back to methods of the ErrorHandler if it
+    // discovers errors during the course of parsing the XML document.
+    //
+    // Initialize the XML4C2 system
+    try
+    {
+        XMLPlatformUtils::Initialize();
+    }
+
+    catch(const XMLException& toCatch)
+    {
+        cerr << "Error during Initialization.\n"
+             << "  Exception message:";
+		this->operator<<(toCatch.getMessage()) << endl;
+        return 1;
+    }
+
+    // WitXMLParser's parser derived from DOMParser's parser;
+    WitXMLParser parser;
+    parser.setValidationScheme(gValScheme);
+    parser.setDoValidation(doValidation);
+    parser.setDoNamespaces(false);
+    ErrorHandler *errReporter = new WitXMLErrorReporter();
+    parser.setErrorHandler(errReporter);
+    parser.setCreateEntityReferenceNodes(false);
+    parser.setToCreateXMLDeclTypeNode(true);
+
+    //
+    //  Parse the XML file, catching any XML exceptions that might propogate
+    //  out of it.
+    //
+    bool errorsOccured = false;
+    XMLFile_ = xmlFile;
+    try
+    {
+        parser.parse(XMLFile_);
+    }
+
+    catch (const SAXParseException& toCatch)
+    {
+        DOMString msg = toCatch.getMessage(); // this is a nonsense. I put it here only for avoiding a warning message when compliling in Windows
+        errorsOccured = true;
+    }
+
+    catch (const XMLException& toCatch)
+    {
+        cerr << "An error occured during parsing\n   Message: ";
+	this->operator<<(DOMString(toCatch.getMessage())) << endl;
+        errorsOccured = true;
+    }
+
+    catch (const DOM_DOMException& toCatch)
+    {
+        cerr << "An error occured during parsing\n   Message: ";
+	this->operator<<(DOMString(toCatch.msg)) << endl;
+        errorsOccured = true;
+    }
+
+    catch (...)
+    {
+        cerr << "An error occured during parsing\n   Message: " << endl;
+        errorsOccured = true;
+    }
+
+    // If the parse was successful, read document data from the DOM tree
+    //  and call corresponding wit funtions
+    if (!errorsOccured)
+    {
+        try
+	{
+           witGetNPeriods(theWitRun,&NPeriods_);// get the curren value of nPeriods
+           DOM_Document doc= parser.getDocument();
+           ReadANode(theWitRun,doc,0);
+        }
+ 
+        catch (WitXMLErrorHandler& errorHandler)
+        {
+            this->operator<<(errorHandler.GetErrorMsg()) << endl;
+            errorsOccured = true;
+        }
+
+        catch (XMLException& toCatch)
+        {
+            cerr << "An error occurred during reading input file. Msg is:"
+                 << endl;
+            this->operator<<(DOMString(toCatch.getMessage())) << endl;
+            errorsOccured = true;
+        }
+    }
+
+
+    //
+    //  Clean up the element counter object. The parser does not adopt handlers
+    //  since they could be many objects or one object installed for multiple
+    //  handlers.
+    //
+    delete errReporter;
+    XMLFile_ = NULL;
+
+    // Call the termination method
+    //XMLPlatformUtils::Terminate();
+
+    return errorsOccured;
+}
+
+// ---------------------------------------------------------------------------
+//	Travel thru the whole DOM tree by recursively call this function
+// ---------------------------------------------------------------------------
+int WitXML::ReadANode(WitRun * const theWitRun,DOM_Node& toRun, int nodeLevel)
+{
+    // Get the name and value out for convenience
+    DOMString   nodeName = toRun.getNodeName();
+    DOMString   nodeValue = toRun.getNodeValue();
+
+    // check the type of this node
+    switch (toRun.getNodeType())
+    {
+        case DOM_Node::DOCUMENT_NODE :
+        {
+	  DOM_Node child = toRun.getFirstChild();
+	  while( child != 0)
+	  {
+		// This is the start point, it begins recursive running
+                ReadANode(theWitRun,child,nodeLevel);
+                child = child.getNextSibling();
+          }
+          break;
+        }
+
+        case DOM_Node::ELEMENT_NODE :
+        {
+            // find the command and object
+			switch (nodeLevel)
+			{
+				case 0:		// WIT node
+					break;
+
+				case 1:		// object (set.part, add.operation, ...) node
+				{
+					RunWitCommand(theWitRun,toRun);
+					break;
+				}
+
+				default:
+					break;
+			}
+
+            //
+            //  Test for the presence of children, which includes both
+            //  text content and nested elements.
+            //
+            DOM_Node child = toRun.getFirstChild();
+            if (child != 0)
+            {
+				int nextNodeLevel = nodeLevel +1;
+
+                // There are children. Close start-tag, and output children.
+                while( child != 0)
+                {
+					// read child node
+                    ReadANode(theWitRun,child,nextNodeLevel);
+					// after finished this node, read next sibling node if there is one
+                    child = child.getNextSibling();
+                }
+            }
+
+            break;
+        }
+
+	case DOM_Node::TEXT_NODE:
+			break;
+
+        case DOM_Node::CDATA_SECTION_NODE:
+			break;
+
+        case DOM_Node::ENTITY_REFERENCE_NODE:
+        {
+			DOM_Node child;
+			for (child = toRun.getFirstChild(); child != 0; child = child.getNextSibling())
+				ReadANode(theWitRun,child,nodeLevel);
+			break;
+        }
+
+        case DOM_Node::PROCESSING_INSTRUCTION_NODE :
+			break;
+        
+	case DOM_Node::COMMENT_NODE:
+			break;
+
+	case DOM_Node::DOCUMENT_TYPE_NODE:
+			break;
+
+	case DOM_Node::XML_DECL_NODE:
+			break;
+
+        default:
+			cerr << "Unrecognized node type = "
+			     << (long)toRun.getNodeType() << endl;
+	}
+
+	// clean memory
+	delete toRun.getUserData();
+
+	return 0;
+}
+
+int WitXML::RunWitCommand(WitRun * const theWitRun,DOM_Node& toRun)
+{
+	int Cmd,Obj;
+	DOMString Name,nodeName=toRun.getNodeName();
+	char *NodeName=transcode(nodeName);
+
+	// Get the command: set, add, read
+	for (Cmd=0;Cmd<numOfCmd;Cmd++)
+		if (strstr(NodeName,witcommand[Cmd]))
+			break;
+
+	if (Cmd==numOfCmd)		// an unexpected command
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetErrorMsg("command",nodeName,XMLFile_, *(int *)toRun.getUserData());
+		throw(errorHandler);
+	}
+
+	// Get the object. Problem, Part, Demand, Object, ....
+	for (Obj=0;Obj<numOfObj;Obj++)
+		if (strstr(NodeName,witobject[Obj]))
+			break;
+
+	if (Obj==numOfObj)		// an unexpected object
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetErrorMsg("object",nodeName,XMLFile_, *(int *)toRun.getUserData());
+		throw(errorHandler);
+	}
+
+	Name = witcommand[Cmd];	// an unexpected command-object combination
+	Name += witobject[Obj];
+	if (!nodeName.equals(Name))
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetErrorMsg("command-object combination",nodeName,XMLFile_, *(int *)toRun.getUserData());
+		throw(errorHandler);
+	}
+
+
+	if (Cmd==read)			// recursively call witReadXML();
+	{
+		DOMString fileName;
+		char *FileName;
+		GetAttributeValue(toRun,OUTFILENAME,fileName);
+		FileName = transcode(fileName);
+		WitReadXML(theWitRun,FileName);
+		delete [] FileName;
+	}
+	else
+	{
+		switch (Obj)
+		{
+		case Problem:
+			ReadProblem(theWitRun,toRun);
+			break;
+
+		case Part:
+			ReadPart(theWitRun,toRun,Cmd);
+			break;
+
+		case Demand:
+			ReadDemand(theWitRun,toRun,Cmd);
+			break;
+
+		case Operation:
+			ReadOperation(theWitRun,toRun,Cmd);
+			break;
+
+		case BomEntry:
+			ReadBomEntry(theWitRun,toRun,Cmd);
+			break;
+
+		case SubEntry:
+			ReadSubEntry(theWitRun,toRun,Cmd);
+			break;
+
+		case BopEntry:
+			ReadBopEntry(theWitRun,toRun,Cmd);
+			break;
+		}
+	}
+
+	return 0;
+}
+
+
+int WitXML::ReadProblem(WitRun * const theWitRun,DOM_Node& toRun)
+{
+	const int  numOfProbAttr = 34;
+	const char *witprobattr[] = {	
+					"accAfterOptImp",
+					"accAfterSoftLB",
+					"autoPriority",
+					"capCost",
+					"computeCriticalList",
+					"equitability",
+					"execEmptyBom",
+					"expCutoff",
+					"forcedMultiEq",
+					"hashTableSize",
+					"independentOffsets",
+					"invCost",
+					"lotSizeTol",
+					"multiExec",
+					"multiRoute",
+					"nPeriods",
+					"obj2Winv",
+					"obj2Wrev",
+					"obj2Wserv",
+					"obj2Wsub",
+					"objChoice",
+					"optInitMethod",
+					"oslMesgFileName",
+					"outputPrecision",
+					"penExec",
+					"periodsPerYear",
+					"roundReqVols",
+					"skipFailures",
+					"title",
+					"truncOffsets",
+					"twoWayMultiExec",
+					"useFocusHorizons",
+					"wbounds",
+					"wit34Compatible"};
+	enum	witProbAttr	{	
+					accAfterOptImp,
+					accAfterSoftLB,
+					autoPriority,
+					capCost,
+					computeCriticalList,
+					equitability,
+					execEmptyBom,
+					expCutoff,
+					forcedMultiEq,
+					hashTableSize,
+					independentOffsets,
+					invCost,
+					lotSizeTol,
+					multiExec,
+					multiRoute,
+					nPeriods,
+					obj2Winv,
+					obj2Wrev,
+					obj2Wserv,
+					obj2Wsub,
+					objChoice,
+					optInitMethod,
+					oslMesgFileName,
+					outputPrecision,
+					penExec,
+					periodsPerYear,
+					roundReqVols,
+					skipFailures,
+					title,
+					truncOffsets,
+					twoWayMultiExec,
+					useFocusHorizons,
+					wbounds,
+					wit34Compatible};
+
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	int Attr,index,attrCount = attributes.getLength();
+	witAttr OptInitMethod;
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		Attr = GetAttributeIndex(thisNode.getNodeName(),numOfProbAttr,witprobattr);
+
+		if (Attr==-1)		// an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("problem",thisNode.getNodeName(),XMLFile_, *(int *)toRun.getUserData());
+			throw(errorHandler);
+		}
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case accAfterSoftLB:
+			witSetAccAfterSoftLB(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case accAfterOptImp:
+			witSetAccAfterOptImp(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case autoPriority: 
+			witSetAutoPriority(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case capCost:
+			witSetCapCost(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case computeCriticalList:
+			witSetComputeCriticalList(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case equitability:
+			witSetEquitability(theWitRun,aWitXMLText.GetInteger());
+			break;
+
+		case execEmptyBom:
+			witSetExecEmptyBom(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case expCutoff:
+			witSetExpCutoff(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case forcedMultiEq:
+			witSetForcedMultiEq(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case hashTableSize:
+			witSetHashTableSize(theWitRun,aWitXMLText.GetInteger());
+			break;
+
+		case independentOffsets:
+			witSetIndependentOffsets(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case invCost:
+			witSetInvCost(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case lotSizeTol:
+			witSetLotSizeTol(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case multiExec:
+			witSetMultiExec(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case multiRoute:
+			witSetMultiRoute(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case nPeriods:
+			NPeriods_ = aWitXMLText.GetInteger();
+			witSetNPeriods(theWitRun,NPeriods_);
+			break;
+
+		case obj2Winv:
+			witSetObj2Winv(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case obj2Wrev:
+			witSetObj2Wrev(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case obj2Wserv:
+			witSetObj2Wserv(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case obj2Wsub:
+			witSetObj2Wsub(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case objChoice:
+			witSetObjChoice(theWitRun,aWitXMLText.GetInteger());
+			break;
+
+		case optInitMethod:
+			OptInitMethod = aWitXMLText.GetText();
+			if ( !strcmp(OptInitMethod,"heurOptInitMethod") )
+				witSetOptInitMethod(theWitRun,WitHEUR_OPT_INIT_METHOD);
+			else if ( !strcmp(OptInitMethod,"accOptInitMethod") )
+				witSetOptInitMethod(theWitRun,WitACC_OPT_INIT_METHOD);
+			else if ( !strcmp(OptInitMethod,"schedOptInitMethod") )
+				witSetOptInitMethod(theWitRun,WitSCHED_OPT_INIT_METHOD);
+			else if ( !strcmp(OptInitMethod,"crashOptInitMethod") )
+				witSetOptInitMethod(theWitRun,WitCRASH_OPT_INIT_METHOD);
+			delete OptInitMethod;
+			break;
+
+		case oslMesgFileName:
+			witSetOslMesgFileName(theWitRun,aWitXMLText.GetText());
+			break;
+
+		case outputPrecision:
+			witSetOutputPrecision(theWitRun,aWitXMLText.GetInteger());
+			break;
+
+		case penExec:
+			witSetPenExec(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case periodsPerYear:
+			witSetPeriodsPerYear(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case roundReqVols:
+			witSetRoundReqVols(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case skipFailures:
+			witSetSkipFailures(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case title:
+			witSetTitle(theWitRun,aWitXMLText.GetText());
+			break;
+
+		case truncOffsets:
+			witSetTruncOffsets(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case twoWayMultiExec:
+			witSetTwoWayMultiExec(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case useFocusHorizons:
+			witSetUseFocusHorizons(theWitRun,aWitXMLText.GetBool());
+			break;
+
+		case wbounds:
+			witSetWbounds(theWitRun,aWitXMLText.GetFloat());
+			break;
+
+		case wit34Compatible:
+			witSetWit34Compatible(theWitRun,aWitXMLText.GetBool());
+			break;
+		}
+	}
+
+	return 0;
+}
+
+int WitXML::ReadPart(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfPartAttr = 13;
+	const char *witpartattr[] = {
+					"partName",
+					"partCategory",
+					"buildAheadUB",
+					"buildAsap",
+					"buildNstn",
+					"obj1ScrapCost",
+					"obj1StockCost",
+					"selForDel",
+					"supplyVol",
+					"unitCost",
+					"stockBoundsHardLB",
+					"stockBoundsSoftLB",
+					"stockBoundsHardUB" };
+
+	enum	witPartAttr	{
+					partName,
+					partCategory,
+					buildAheadUB,
+					buildAsap,
+					buildNstn,
+					obj1ScrapCost,
+					obj1StockCost,
+					selForDel,
+					supplyVol,
+					unitCost,
+					stockBoundsHardLB,
+					stockBoundsSoftLB,
+					stockBoundsHardUB };
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString PartName,PartCategory;
+	int Attr,index,*iVector,attrCount = attributes.getLength();
+	bool setStockBoundsFlag=WitFALSE;
+	float *fVector=NULL;
+	char *Text,*partname;
+
+	// Get partname
+	GetAttributeValue(toRun,witpartattr[partName],PartName);
+	partname = transcode(PartName);
+
+	// If Cmd is 'add', then get the partCategory and add this part
+
+	if (Cmd==add)
+	{
+		GetAttributeValue(toRun,witpartattr[partCategory],PartCategory);
+		if (PartCategory.equals(MATERIAL))
+		  	witAddPart(theWitRun,partname,WitMATERIAL);
+		else  
+			witAddPart(theWitRun,partname,WitCAPACITY);
+	}
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		Attr = GetAttributeIndex(thisNode.getNodeName(),numOfPartAttr,witpartattr);
+
+		if (Attr==-1)		  // an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("part",PartName,XMLFile_, *(int *)toRun.getUserData());
+			throw(errorHandler);
+		}
+
+		if (Attr<2)		  // skip partName and partCategory
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case buildAheadUB:
+			iVector = aWitXMLText.GetIntegerVector(NPeriods_);
+			witSetPartBuildAheadUB(theWitRun,partname,iVector);
+			delete iVector;
+			break;
+
+		case buildAsap:
+			witSetPartBuildAsap(theWitRun,partname,aWitXMLText.GetBool());
+			break;
+
+		case buildNstn:
+			witSetPartBuildNstn(theWitRun,partname,aWitXMLText.GetBool());
+			break;
+
+		case obj1ScrapCost:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetPartObj1ScrapCost(theWitRun,partname,fVector);
+			delete fVector;
+			break;
+
+		case obj1StockCost:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetPartObj1StockCost(theWitRun,partname,fVector);
+			delete fVector;
+			break;
+
+		case selForDel:
+			Text = aWitXMLText.GetText();
+			if (strcmp(Text,"True")==0)
+				witSetPartSelForDel(theWitRun,partname,WitTRUE);
+			else
+				witSetPartSelForDel(theWitRun,partname,WitFALSE);
+			delete Text;
+			break;
+
+		case supplyVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetPartSupplyVol(theWitRun,partname,fVector);
+			delete fVector;
+			break;
+
+		case unitCost:
+			witSetPartUnitCost(theWitRun,partname,aWitXMLText.GetFloat());
+			break;
+
+		case stockBoundsHardLB:
+			setStockBoundsFlag = WitTRUE;
+			break;
+
+		case stockBoundsSoftLB:
+			setStockBoundsFlag = WitTRUE;
+			break;
+
+		case stockBoundsHardUB:
+			setStockBoundsFlag = WitTRUE;
+			break;
+		}
+	}
+
+	if (setStockBoundsFlag==WitTRUE)
+		SetBoundSetAttr(theWitRun,witSetPartStockBounds,toRun,attributes,partname,"stock");
+
+	// clean memory
+	delete [] partname;
+
+	return 0;
+}
+
+int WitXML::ReadDemand(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfDemandAttr = 17;
+	const char *witdemandattr[] = {
+					"partName",
+					"demandName",
+					"buildAheadUB",
+					"demandVol",
+					"focusHorizon",
+					"fssShipVol",
+					"grossRev",
+					"obj1CumShipReward",
+					"obj1ShipReward",
+					"prefBuildAhead",
+					"priority",
+					"selForDel",
+					"shipLateUB",
+					"shipVol",
+					"cumShipBoundsHardLB",
+					"cumShipBoundsSoftLB",
+					"cumShipBoundsHardUB" };
+	enum	witDemandAttr {	
+					partName,
+					demandName,
+					buildAheadUB,
+					demandVol,
+					focusHorizon,
+					fssShipVol,
+					grossRev,
+					obj1CumShipReward,
+					obj1ShipReward,
+					prefBuildAhead,
+					priority,
+					selForDel,
+					shipLateUB,
+					shipVol,
+					cumShipBoundsHardLB,
+					cumShipBoundsSoftLB,
+					cumShipBoundsHardUB};
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString PartName,DemandName;
+	int Attr,index,*iVector,attrCount = attributes.getLength();
+	bool setCumShipBoundsFlag=WitFALSE;
+	float *fVector=NULL;
+	char *partname,*demandname;
+
+	// Get partname and demandname
+	GetAttributeValue(toRun,witdemandattr[partName],PartName);
+	partname = transcode(PartName);
+	GetAttributeValue(toRun,witdemandattr[demandName],DemandName);
+	demandname = transcode(DemandName);
+
+	// If Cmd is 'add', then add this demand
+	if (Cmd==add)
+		witAddDemand(theWitRun,partname,demandname);
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		Attr = GetAttributeIndex(thisNode.getNodeName(),numOfDemandAttr,witdemandattr);
+
+		if (Attr==-1)			// an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("demand",DemandName,thisNode.getNodeName(),XMLFile_, *(int *)thisNode.getUserData());
+			throw(errorHandler);
+		}
+		
+		if (Attr<2)				// skip partName and demandName
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case buildAheadUB:
+			iVector = aWitXMLText.GetIntegerVector(NPeriods_);
+			witSetDemandBuildAheadUB(theWitRun,partname,demandname,iVector);
+			delete iVector;
+			break;
+
+		case demandVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetDemandDemandVol(theWitRun,partname,demandname,fVector);
+			delete fVector;
+			break;
+
+		case focusHorizon:
+			witSetDemandFocusHorizon(theWitRun,partname,demandname,aWitXMLText.GetInteger());
+			break;
+
+		case fssShipVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetDemandFssShipVol(theWitRun,partname,demandname,fVector);
+			delete fVector;
+			break;
+
+		case grossRev:
+			witSetDemandGrossRev(theWitRun,partname,demandname,aWitXMLText.GetFloat());
+			break;
+
+		case obj1CumShipReward:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetDemandObj1CumShipReward(theWitRun,partname,demandname,fVector);
+			delete fVector;
+			break;
+
+		case obj1ShipReward:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetDemandObj1ShipReward(theWitRun,partname,demandname,fVector);
+			delete fVector;
+			break;
+
+		case prefBuildAhead:
+			witSetDemandPrefBuildAhead(theWitRun,partname,demandname,aWitXMLText.GetBool());
+			break;
+
+		case priority:
+			iVector = aWitXMLText.GetIntegerVector(NPeriods_);
+			witSetDemandPriority(theWitRun,partname,demandname,iVector);
+			delete iVector;
+			break;
+
+		case selForDel:
+			witSetDemandSelForDel(theWitRun,partname,demandname,aWitXMLText.GetBool());
+			break;
+
+		case shipLateUB:
+			iVector = aWitXMLText.GetIntegerVector(NPeriods_);
+			witSetDemandShipLateUB(theWitRun,partname,demandname,iVector);
+			delete iVector;
+			break;
+
+		case shipVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetDemandShipVol(theWitRun,partname,demandname,fVector);
+			delete fVector;
+			break;
+
+		case cumShipBoundsHardLB:
+			setCumShipBoundsFlag = WitTRUE;
+			break;
+
+		case cumShipBoundsSoftLB:
+			setCumShipBoundsFlag = WitTRUE;
+			break;
+
+		case cumShipBoundsHardUB:
+			setCumShipBoundsFlag = WitTRUE;
+			break;
+		}
+	}
+
+	if (setCumShipBoundsFlag==WitTRUE)
+		SetBoundSetAttr(theWitRun,witSetDemandCumShipBounds,toRun,attributes,partname,demandname,"cumShip");
+
+	// clean memory
+	delete [] partname;
+	delete [] demandname;
+
+	return 0;
+}
+
+int WitXML::ReadOperation(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfOperationAttr = 12;
+	const char *witoperationattr[] = {
+					"operationName",
+					"execPenalty",
+					"execVol",
+					"incLotSize",
+					"minLotSize",
+					"obj1ExecCost",
+					"obj2AuxCost",
+					"selForDel",
+					"yieldRate",
+					"execBoundsHardLB",
+					"execBoundsSoftLB",
+					"execBoundsHardUB" };
+	enum	witOperationAttr {
+					operationName,
+					execPenalty,
+					execVol,
+					incLotSize,
+					minLotSize,
+					obj1ExecCost,
+					obj2AuxCost,
+					selForDel,
+					yieldRate,
+					execBoundsHardLB,
+					execBoundsSoftLB,
+					execBoundsHardUB};
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString OperationName;
+	int Attr,index,attrCount = attributes.getLength();
+	bool setExecBoundsFlag=WitFALSE;
+	float *fVector=NULL;
+	char *operationname;
+
+	// Get operationname
+	GetAttributeValue(toRun,witoperationattr[operationName],OperationName);
+	operationname = transcode(OperationName);
+
+	// If Cmd is 'add', then add this operation
+	if (Cmd==add)
+		witAddOperation(theWitRun,operationname);
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		Attr = GetAttributeIndex(thisNode.getNodeName(),numOfOperationAttr,witoperationattr);
+
+		if (Attr==-1)			// an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("operation",OperationName,thisNode.getNodeName(),XMLFile_, *(int *)thisNode.getUserData());
+			throw(errorHandler);
+		}
+
+		if (Attr<1)			// skip operationName
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case execPenalty:
+			witSetOperationExecPenalty(theWitRun,operationname,aWitXMLText.GetFloat());
+			break;
+
+		case execVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetOperationExecVol(theWitRun,operationname,fVector);
+			delete fVector;
+			break;
+		
+		case incLotSize:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetOperationIncLotSize(theWitRun,operationname,fVector);
+			delete fVector;
+			break;
+		
+		case minLotSize:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetOperationMinLotSize(theWitRun,operationname,fVector);
+			delete fVector;
+			break;
+		
+		case obj1ExecCost:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetOperationObj1ExecCost(theWitRun,operationname,fVector);
+			delete fVector;
+			break;
+		
+		case obj2AuxCost:
+			witSetOperationObj2AuxCost(theWitRun,operationname,aWitXMLText.GetFloat());
+			break;
+
+		case selForDel:
+			witSetOperationSelForDel(theWitRun,operationname,aWitXMLText.GetBool());
+			break;
+						
+		case yieldRate:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetOperationYieldRate(theWitRun,operationname,fVector);
+			delete fVector;
+			break;
+
+		case execBoundsHardLB:
+			setExecBoundsFlag = WitTRUE;
+			break;
+
+		case execBoundsSoftLB:
+			setExecBoundsFlag = WitTRUE;
+			break;
+
+		case execBoundsHardUB:
+			setExecBoundsFlag = WitTRUE;
+			break;
+		}
+	}
+
+	if (setExecBoundsFlag==WitTRUE)
+		SetBoundSetAttr(theWitRun,witSetOperationExecBounds,toRun,attributes,operationname,"exec");
+
+	// clean memory
+	delete [] operationname;
+
+	return 0;
+}
+
+int WitXML::ReadBomEntry(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfBomEntryAttr = 9;
+	const char *witsetbomentryattr[] = {
+					"operationName",
+					"index",
+					"consRate",
+					"earliestPeriod",
+					"falloutRate",
+					"latestPeriod",
+					"mandEC",
+					"offset",
+					"selForDel"};
+	const char *witaddbomentryattr[] = {
+					"operationName",
+					"partName",
+					"consRate",
+					"earliestPeriod",
+					"falloutRate",
+					"latestPeriod",
+					"mandEC",
+					"offset",
+					"selForDel"};
+	enum	witBOMEntryAttr {
+					operationName,
+					partName_Index,
+					consRate,
+					earliestPeriod,
+					falloutRate,
+					latestPeriod,
+					mandEC,
+					offset,
+					selForDel};
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString OperationName,PartName_Index;
+	int Attr,index,bomEntryIndex,attrCount = attributes.getLength();
+	float *fVector;
+	char *operationname,*partname;
+
+	// Get operationname
+	GetAttributeValue(toRun,witsetbomentryattr[operationName],OperationName);
+	operationname = transcode(OperationName);
+
+	// If Cmd is 'add', then get partName and add this bomEntry; otherwise get the bomEntryIndex
+	if (Cmd==add)
+	{
+		GetAttributeValue(toRun,witaddbomentryattr[partName_Index],PartName_Index);
+		partname = transcode(PartName_Index);	// get the partName
+		witAddBomEntry(theWitRun,operationname,partname);	// add this bomEntry
+		witGetOperationNBomEntries(theWitRun,operationname,&bomEntryIndex);
+		bomEntryIndex--;	// a new bomEntry
+		delete [] partname;
+	}
+	else
+	{
+		WitXMLText aWitXMLText(attributes.getNamedItem(witsetbomentryattr[partName_Index]),XMLFile_, *(int *)toRun.getUserData());
+		bomEntryIndex = aWitXMLText.GetInteger(); // must be an integet
+	}
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		if (Cmd==add)
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfBomEntryAttr,witaddbomentryattr);
+		else
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfBomEntryAttr,witsetbomentryattr);
+
+		if (Attr==-1)	       // an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("bomEntry",OperationName,thisNode.getNodeName(),XMLFile_, *(int *)thisNode.getUserData());
+			throw(errorHandler);
+		}
+		
+		if (Attr<2)	      // skip operationName and partName_Index
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case consRate:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetBomEntryConsRate(theWitRun,operationname,bomEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case earliestPeriod:
+			witSetBomEntryEarliestPeriod(theWitRun,operationname,bomEntryIndex,aWitXMLText.GetInteger());
+			break;
+
+		case falloutRate:
+			witSetBomEntryFalloutRate(theWitRun,operationname,bomEntryIndex,aWitXMLText.GetFloat());
+			break;
+		
+		case latestPeriod:
+			witSetBomEntryLatestPeriod(theWitRun,operationname,bomEntryIndex,aWitXMLText.GetInteger());
+			break;
+		
+		case mandEC:
+			witSetBomEntryMandEC(theWitRun,operationname,bomEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case offset:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetBomEntryOffset(theWitRun,operationname,bomEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case selForDel:
+			witSetBomEntrySelForDel(theWitRun,operationname,bomEntryIndex,aWitXMLText.GetBool());
+			break;
+		}
+	}
+
+	// clean memory
+	delete [] operationname;
+
+	return 0;
+}
+
+int WitXML::ReadSubEntry(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfSubEntryAttr = 16;
+	const char *witsetsubentryattr[] = {
+					"operationName",
+					"bomIndex",
+					"index",
+					"consRate",
+					"earliestPeriod",
+					"expAllowed",
+					"expNetAversion",
+					"falloutRate",
+					"latestPeriod",
+					"mrpNetAllowed",
+					"netAllowed",
+					"obj1SubCost",
+					"obj2SubPenalty",
+					"offset",
+					"selForDel",
+					"subVol"};
+	const char *witaddsubentryattr[] = {
+					"operationName",
+					"bomIndex",
+					"partName",
+					"consRate",
+					"earliestPeriod",
+					"expAllowed",
+					"expNetAversion",
+					"falloutRate",
+					"latestPeriod",
+					"mrpNetAllowed",
+					"netAllowed",
+					"obj1SubCost",
+					"obj2SubPenalty",
+					"offset",
+					"selForDel",
+					"subVol"};
+	enum	witSubEntryAttr {	
+					operationName,
+					bomIndex,
+					partName_Index,
+					consRate,
+					earliestPeriod,
+					expAllowed,
+					expNetAversion,
+					falloutRate,
+					latestPeriod,
+					mrpNetAllowed,
+					netAllowed,
+					obj1SubCost,
+					obj2SubPenalty,
+					offset,
+					selForDel,
+					subVol};
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString OperationName,bomEntryIndex,PartName_Index;
+	int Attr,index,bomindex,subEntryIndex,attrCount=attributes.getLength();
+	float *fVector;
+	char *operationname,*partname;
+
+	// Get operationname and bomIndex
+	GetAttributeValue(toRun,witsetsubentryattr[operationName],OperationName);
+	operationname = transcode(OperationName);							// get operation name
+	GetAttributeValue(toRun,witsetsubentryattr[bomIndex],bomEntryIndex);	// get subEntryIndex
+	{
+		WitXMLText aWitXMLText("bomIndex",bomEntryIndex,XMLFile_, *(int *)toRun.getUserData());
+		bomindex = aWitXMLText.GetInteger();							// must be an integet
+	}
+
+	// If Cmd is 'add', then get partName and add this subEntry; otherwise get the subEntryIndex
+	if (Cmd==add)
+	{
+		GetAttributeValue(toRun,witaddsubentryattr[partName_Index],PartName_Index);
+		partname = transcode(PartName_Index);							// get the partName
+		witAddSubsBomEntry(theWitRun,operationname,bomindex,partname);	// add this subEntry
+		// Get the # of SubBomEntries and set it as the index of this new subEntry
+		witGetBomEntryNSubsBomEntries(theWitRun,operationname,bomindex,&subEntryIndex);
+		subEntryIndex--;
+	}
+	else
+	{
+		WitXMLText aWitXMLText(attributes.getNamedItem(witsetsubentryattr[partName_Index]),XMLFile_, *(int *)toRun.getUserData());
+		subEntryIndex = aWitXMLText.GetInteger();						// must be an integet
+	}
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		if (Cmd==add)
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfSubEntryAttr,witaddsubentryattr);
+		else
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfSubEntryAttr,witsetsubentryattr);
+
+		if (Attr==-1)			// an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("subEntry",OperationName,thisNode.getNodeName(),XMLFile_, *(int *)thisNode.getUserData());
+			throw(errorHandler);
+		}
+		
+		if (Attr<3)				// skip operationName, bomEntryIndex and partName_Index
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case consRate:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetSubsBomEntryConsRate(theWitRun,operationname,bomindex,subEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case earliestPeriod:
+			witSetSubsBomEntryEarliestPeriod(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetInteger());
+			break;
+
+		case expAllowed:
+			witSetSubsBomEntryExpAllowed(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case expNetAversion:
+			witSetSubsBomEntryExpNetAversion(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetFloat());
+			break;
+
+		case falloutRate:
+			witSetSubsBomEntryFalloutRate(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetFloat());
+			break;
+
+		case latestPeriod:
+			witSetSubsBomEntryLatestPeriod(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetInteger());
+			break;
+
+		case mrpNetAllowed:
+			witSetSubsBomEntryMrpNetAllowed(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case netAllowed:
+			witSetSubsBomEntryNetAllowed(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case obj1SubCost:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetSubsBomEntryObj1SubCost(theWitRun,operationname,bomindex,subEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case obj2SubPenalty:
+			witSetSubsBomEntryObj2SubPenalty(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetFloat());
+			break;
+
+		case offset:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetSubsBomEntryOffset(theWitRun,operationname,bomindex,subEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case selForDel:
+			witSetSubsBomEntrySelForDel(theWitRun,operationname,bomindex,subEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case subVol:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetSubsBomEntrySubVol(theWitRun,operationname,bomindex,subEntryIndex,fVector);
+			delete fVector;
+			break;
+		}
+	}
+
+	// clean memory
+	delete [] operationname;
+
+	return 0;
+}
+
+int WitXML::ReadBopEntry(WitRun * const theWitRun,DOM_Node& toRun,int Cmd)
+{
+	const int  numOfBopEntryAttr = 9;
+	const char *witsetbopentryattr[] = {	
+					"operationName",
+					"index",
+					"earliestPeriod",
+					"expAllowed",
+					"expAversion",
+					"latestPeriod",
+					"offset",
+					"productRate",
+					"selForDel"};
+	const char *witaddbopentryattr[] = {	
+					"operationName",
+					"partName",
+					"earliestPeriod",
+					"expAllowed",
+					"expAversion",
+					"latestPeriod",
+					"offset",
+					"productRate",
+					"selForDel"};
+	enum	witBOPEntryAttr {	
+					operationName,
+					partName_Index,
+					earliestPeriod,
+					expAllowed,
+					expAversion,
+					latestPeriod,
+					offset,
+					productRate,
+					selForDel};
+
+	// Get info out from the Node
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	DOMString OperationName,PartName_Index;
+	int Attr,index,bopEntryIndex,attrCount = attributes.getLength();
+	float *fVector;
+	char *operationname,*partname;
+
+	// Get operationname
+	GetAttributeValue(toRun,witsetbopentryattr[operationName],OperationName);
+	operationname = transcode(OperationName);
+
+	// If Cmd is 'add', then get partName and add this bopEntry; otherwise get the bopEntryIndex
+	if (Cmd==add)
+	{
+		GetAttributeValue(toRun,witaddbopentryattr[partName_Index],PartName_Index);
+		partname = transcode(PartName_Index);				// get the partName
+		witAddBopEntry(theWitRun,operationname,partname);	// add this bopEntry
+		witGetOperationNBopEntries(theWitRun,operationname,&bopEntryIndex);
+		bopEntryIndex--;									// a new bopEntry
+	}
+	else
+	{
+		WitXMLText aWitXMLText(attributes.getNamedItem(witsetbopentryattr[partName_Index]),XMLFile_, *(int *)toRun.getUserData());
+		bopEntryIndex = aWitXMLText.GetInteger();			// must be an integet
+	}
+
+	// Set each attribute
+	for (index=0;index<attrCount;index++)
+	{
+		DOM_Node thisNode = attributes.item(index);
+
+		// Find which wit attribute it is from the list of wit attributes
+		if (Cmd==add)
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfBopEntryAttr,witaddbopentryattr);
+		else
+			Attr = GetAttributeIndex(thisNode.getNodeName(),numOfBopEntryAttr,witsetbopentryattr);
+
+		if (Attr==-1)	      // an unexpected attribute
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetErrorMsg("bopEntry",OperationName,thisNode.getNodeName(),XMLFile_, *(int *)thisNode.getUserData());
+			throw(errorHandler);
+		}
+		
+		if (Attr<2)	      // skip operationName and partName_Index
+			continue;
+
+		// Convert the value of this attribute
+		WitXMLText aWitXMLText(thisNode,XMLFile_, *(int *)toRun.getUserData());
+
+		// Evoke wit function
+		switch (Attr)
+		{
+		case earliestPeriod: 
+			witSetBopEntryEarliestPeriod(theWitRun,operationname,bopEntryIndex,aWitXMLText.GetInteger());
+			break;
+
+		case expAllowed: 
+			witSetBopEntryExpAllowed(theWitRun,operationname,bopEntryIndex,aWitXMLText.GetBool());
+			break;
+
+		case expAversion:
+			witSetBopEntryExpAversion(theWitRun,operationname,bopEntryIndex,aWitXMLText.GetFloat());
+			break;
+
+		case latestPeriod:
+			witSetBopEntryLatestPeriod(theWitRun,operationname,bopEntryIndex,aWitXMLText.GetInteger());
+			break;
+
+		case offset:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetBopEntryOffset(theWitRun,operationname,bopEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case productRate:
+			fVector = aWitXMLText.GetFloatVector(NPeriods_);
+			witSetBopEntryProductRate(theWitRun,operationname,bopEntryIndex,fVector);
+			delete fVector;
+			break;
+
+		case selForDel:
+			witSetBopEntrySelForDel(theWitRun,operationname,bopEntryIndex,aWitXMLText.GetBool());
+			break;
+		}
+	}
+
+	// clean memory
+	delete [] operationname;
+	delete [] partname;
+
+	return 0;
+}
+
+int WitXML::SetBoundSetAttr(WitRun * const theWitRun,WitSetObjBoundSet set_fn,DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char * const objname,const char *prefix)
+{
+	int setFlag=0;
+	float *hardLB,*softLB,*hardUB;
+
+	hardLB = softLB = hardUB = NULL;
+
+	// get float values
+	setFlag = GetBoundSetAttr(toRun,attributes,prefix,&hardLB,&softLB,&hardUB);
+
+	// set the Bound Set
+	set_fn(theWitRun,objname,hardLB,softLB,hardUB);
+
+	// clean memory
+	if (hardLB) delete hardLB;
+	if (softLB) delete softLB;
+	if (hardUB) delete hardUB;
+
+	return setFlag;
+}
+
+int WitXML::SetBoundSetAttr(WitRun * const theWitRun,WitSetDemandBoundSet set_fn,DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char * const partname,const char * const demandname,const char *prefix)
+{
+	int setFlag=0;
+	float *hardLB,*softLB,*hardUB;
+
+	hardLB = softLB = hardUB = NULL;
+
+	// get float values
+	setFlag = GetBoundSetAttr(toRun,attributes,prefix,&hardLB,&softLB,&hardUB);
+
+	// set the Bound Set
+	set_fn(theWitRun,partname,demandname,hardLB,softLB,hardUB);
+
+	// clean memory
+	if (hardLB) delete hardLB;
+	if (softLB) delete softLB;
+	if (hardUB) delete hardUB;
+
+	return setFlag;
+}
+
+int WitXML::GetBoundSetAttr(DOM_Node &toRun,DOM_NamedNodeMap &attributes,const char *prefix,float **hardLB,float **softLB,float **hardUB)
+{
+	int i,setFlag=0,StrLen=0;
+	char *BoundName[3];
+
+	// initialize and define strings
+	StrLen = strlen(prefix) + strlen("BoundsHardLB");
+	for (i=0;i<3;i++)
+	{
+		BoundName[i] = new char[StrLen+1];
+		strcpy(BoundName[i],prefix);
+	}
+	strcat(BoundName[0],"BoundsHardLB");
+	strcat(BoundName[1],"BoundsSoftLB");
+	strcat(BoundName[2],"BoundsHardUB");
+
+	// get all vlues
+	for (i=0;i<3;i++)
+	{
+		DOMString VectorValue;
+		if (!GetAttributeValue(attributes,BoundName[i],VectorValue))
+		{
+			WitXMLText aWitXMLText(BoundName[i],VectorValue,XMLFile_, *(int *)toRun.getUserData());
+			switch (i)
+			{
+			case 0:
+				*hardLB = aWitXMLText.GetFloatVector(NPeriods_);
+				break;
+
+			case 1:
+				*softLB = aWitXMLText.GetFloatVector(NPeriods_);
+				break;
+
+			case 2:
+				*hardUB = aWitXMLText.GetFloatVector(NPeriods_);
+				break;
+			}
+			setFlag = 1;
+		}
+	}
+
+	// clean memory
+	for (i=0;i<3;i++)
+		if (BoundName[i]) 
+			delete BoundName[i];
+
+	return setFlag;
+}
+
+int WitXML::GetAttributeIndex(const DOMString &attribute,int listCount,const char ** names)
+{
+	int index;
+
+	// Get the index
+  	for (index=0;index<listCount;index++)
+		if (attribute.equals(names[index]))
+			break;
+
+	// an undefined attribute
+	if (index>=listCount)
+		index = -1;
+
+    return index;
+}
+
+int WitXML::GetAttributeValue(DOM_Node& toRun,const char *name,DOMString& String)
+{
+	int retVal;
+
+	DOM_NamedNodeMap attributes = toRun.getAttributes();
+	retVal = GetAttributeValue(attributes,name,String);
+	if (retVal)
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetErrorMsg(name,XMLFile_, *(int *)toRun.getUserData());
+		throw(errorHandler);
+	}
+
+	return retVal;
+}
+
+int WitXML::GetAttributeValue(DOM_NamedNodeMap &attributes,const char *name,DOMString& String)
+{
+	DOM_Node AttrNode = attributes.getNamedItem(name);
+
+	if (AttrNode!=NULL)
+	{
+		String = AttrNode.getNodeValue();
+		return 0;
+	}
+	else
+		return 1;
+
+}
+
+int WitXML::WitWriteXML(WitRun * const wr,const char * fndtd,const char * fnout,const char *release)
+{
+	int retVal=0;
+
+	// Create a default WitRun and initiate it
+	WitRun * defaultwr;
+	witNewRun(&defaultwr);
+	witInitialize(defaultwr);
+	witSetMesgTimesPrint(defaultwr,WitTRUE,WitINFORMATIONAL_MESSAGES,0);
+
+	try
+	{
+		outFile_.open(fnout);
+
+		if (outFile_.fail())
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetOpenFileErrorMsg(fnout);
+			throw(errorHandler);
+		}
+
+		// Write head lines
+		outFile_ << "<?xml version=\"1.0\"?>\n";
+		outFile_ << "<!DOCTYPE WIT SYSTEM \"" << fndtd << "\">\n";
+		outFile_ << "<WIT";
+		if (release)
+			outFile_ << " release=\"" << release << "\"";
+		outFile_ << ">\n";
+
+		// Write problem attributes
+		WriteProblem(wr,defaultwr);
+
+		// set defaultwr
+		SetDefaultWitRun(wr,defaultwr);
+
+//#define USE_ENHANCED_WIT_API
+# ifdef USE_ENHANCED_WIT_API
+		witAttr itrState;
+		witInitItr(wr);
+  
+		witGetItrState(wr, &itrState);
+
+		while (itrState!=WitITR_FINAL) 
+		{
+			switch ( itrState )
+			{
+			case WitITR_INITIAL:
+				break;
+
+			case WitITR_AT_PART:
+				char *partName;
+				witGetPartAtItr(wr,&partName );
+				WritePart(wr,defaultwr,partName);
+				witFree(partName);
+				break;
+
+			case WitITR_AT_DEMAND
+				char *partName;
+				char *demandName;
+				witGetDemandAtItr(wr,&partName,&demandName );
+				WriteDemand(wr,defaultwr,partName,demandName);
+				witFree(partName);
+				witFree(demandName);
+				break;
+
+			case WitITR_AT_OPERATION:
+				char *operationName;
+				witGetOperationAtItr(wr,&operationName );
+				WriteOperation(wr,defaultwr,operationName);
+				witFree(operationName);
+				break;
+
+			case WitITR_AT_BOM_ENTRY:
+				char *operationName;
+				int bomIndex;
+				witGetBomEntryAtItr(wr,&operationName,&bomIndex);
+				WriteBomEntry(wr,defaultwr,operationName,bomIndex);
+				witFree(operationName);
+				break;
+
+			case WitITR_AT_SUB_ENTRY:
+				char *operationName;
+				int bomIndex,subIndex;
+				witGetBomEntryAtItr(wr,&operationName,&bomIndex,&subIndex);
+				WriteBomEntry(wr,defaultwr,operationName,bomIndex,subIndex);
+				witFree(operationName);
+				break;
+
+			case WitITR_AT_BOP_ENTRY:
+				char *operationName;
+				int bopIndex;
+				witGetBomEntryAtItr(wr,&operationName,&bopIndex);
+				WriteBopEntry(wr,defaultwr,operationName,bopIndex);
+				witFree(operationName);
+				break;
+			}
+			witAdvanceItr(wr);
+		}
+#else
+		// Write Parts
+		WriteParts(wr,defaultwr);
+
+		// Write Demands
+		WriteDemands(wr,defaultwr);
+
+		// Write Operations
+		WriteOperations(wr,defaultwr);
+
+		// Write BomEntries
+		WriteBomEntries(wr,defaultwr);
+
+		// Write SubBomEntries
+		WriteSubEntries(wr,defaultwr);
+
+		// Write BopEntries
+		WriteBopEntries(wr,defaultwr);
+#endif
+		outFile_ << "</WIT>";
+
+		outFile_.close();
+	}
+
+	catch (XMLException& toCatch)
+	{
+		cerr << "An error occurred during writing output file. Msg is:"
+			 << endl;
+		this->operator<<(DOMString(toCatch.getMessage())) << endl;
+		retVal = 1;
+	}
+
+	witDeleteRun(defaultwr);
+
+	return retVal;
+}
+
+int WitXML::SetDefaultWitRun(WitRun * const wr,WitRun * defaultwr)
+{
+	int objChoice;
+
+	witSetNPeriods(defaultwr,NPeriods_);
+	witGetObjChoice(wr,&objChoice);
+	witSetObjChoice(defaultwr,objChoice);
+	witAddPart(defaultwr,DEFAULTMATERIAL,WitMATERIAL);
+	witAddPart(defaultwr,DEFAULTCAPACITY,WitCAPACITY);
+	witAddDemand(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND);
+	witAddDemand(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND);
+	witAddOperation(defaultwr,DEFAULTOPERATION);
+	witAddBomEntry(defaultwr,DEFAULTOPERATION,DEFAULTMATERIAL);
+	witAddBomEntry(defaultwr,DEFAULTOPERATION,DEFAULTCAPACITY);
+	witAddSubsBomEntry(defaultwr,DEFAULTOPERATION,0,DEFAULTMATERIAL);
+	witAddSubsBomEntry(defaultwr,DEFAULTOPERATION,0,DEFAULTCAPACITY);
+	witAddBopEntry(defaultwr,DEFAULTOPERATION,DEFAULTMATERIAL);
+	witAddBopEntry(defaultwr,DEFAULTOPERATION,DEFAULTCAPACITY);
+
+	return 0;
+}
+
+int WitXML::WriteProblem(WitRun * const wr,WitRun * defaultwr)
+{
+	outFile_ << "\t<" << witcommand[set] << witobject[Problem];
+
+	// write each attribute
+	WriteBoolAttr(wr,defaultwr,witGetAccAfterOptImp,"accAfterOptImp");
+	WriteBoolAttr(wr,defaultwr,witGetAccAfterSoftLB,"accAfterSoftLB");
+	WriteBoolAttr(wr,defaultwr,witGetAutoPriority,"autoPriority");
+	WriteFloatAttr(wr,defaultwr,witGetCapCost,"capCost");
+	WriteBoolAttr(wr,defaultwr,witGetComputeCriticalList,"computeCriticalList");
+	WriteIntAttr(wr,defaultwr,witGetEquitability,"equitability");
+	WriteBoolAttr(wr,defaultwr,witGetExecEmptyBom,"execEmptyBom");
+	WriteFloatAttr(wr,defaultwr,witGetExpCutoff,"expCutoff");
+	WriteBoolAttr(wr,defaultwr,witGetForcedMultiEq,"forcedMultiEq");
+	WriteIntAttr(wr,defaultwr,witGetHashTableSize,"hashTableSize");
+	WriteBoolAttr(wr,defaultwr,witGetIndependentOffsets,"independentOffsets");
+	WriteFloatAttr(wr,defaultwr,witGetInvCost,"invCost");
+	WriteFloatAttr(wr,defaultwr,witGetLotSizeTol,"lotSizeTol");
+	WriteBoolAttr(wr,defaultwr,witGetMultiExec,"multiExec");
+	WriteBoolAttr(wr,defaultwr,witGetMultiRoute,"multiRoute");
+	WriteIntAttr(wr,defaultwr,witGetNPeriods,"nPeriods");
+	WriteFloatAttr(wr,defaultwr,witGetObj2Winv,"obj2Winv");
+	WriteFloatAttr(wr,defaultwr,witGetObj2Wrev,"obj2Wrev");
+	WriteFloatAttr(wr,defaultwr,witGetObj2Wserv,"obj2Wserv");
+	WriteFloatAttr(wr,defaultwr,witGetObj2Wsub,"obj2Wsub");
+	WriteIntAttr(wr,defaultwr,witGetObjChoice,"objChoice");
+	//	WriteTextAttr(wr,defaultwr,witGetOptInitMethod,"optInitMethod");
+	WriteTextAttr(wr,defaultwr,witGetOslMesgFileName,"oslMesgFileName");
+	WriteIntAttr(wr,defaultwr,witGetOutputPrecision,"outputPrecision");
+	WriteBoolAttr(wr,defaultwr,witGetPenExec,"penExec");
+	WriteFloatAttr(wr,defaultwr,witGetPeriodsPerYear,"periodsPerYear");
+	WriteBoolAttr(wr,defaultwr,witGetRoundReqVols,"roundReqVols");
+	WriteBoolAttr(wr,defaultwr,witGetSkipFailures,"skipFailures");
+	WriteTextAttr(wr,defaultwr,witGetTitle,"title");
+	WriteBoolAttr(wr,defaultwr,witGetTruncOffsets,"truncOffsets");
+	WriteBoolAttr(wr,defaultwr,witGetTwoWayMultiExec,"twoWayMultiExec");
+	WriteBoolAttr(wr,defaultwr,witGetUseFocusHorizons,"useFocusHorizons");
+	WriteFloatAttr(wr,defaultwr,witGetWbounds,"wbounds");
+	WriteBoolAttr(wr,defaultwr,witGetWit34Compatible,"wit34Compatible");
+
+	outFile_ << "/>\n";
+
+	// set Objective choice for defaultwr, so that its values can be accessed
+	witSetObjChoice(defaultwr,1);
+
+	return 0;
+}
+
+int WitXML::WriteParts(WitRun * const wr,WitRun * defaultwr)
+{
+	int nParts;
+	char ** partList;
+
+	witGetParts(wr,&nParts,&partList);
+
+	for( int i=0; i<nParts; i++ )
+	{
+		WritePart(wr,defaultwr,partList[i]);
+		witFree(partList[i]);
+	}
+
+	witFree(partList);
+
+	return 0;
+}
+
+int WitXML::WriteDemands(WitRun * const wr,WitRun * defaultwr)
+{
+	int nParts,nDemands;
+	char **partList,** demandList;
+
+	witGetParts(wr,&nParts,&partList);
+
+	for( int i=0; i<nParts; i++ )
+	{
+		// Get demand list
+		witGetPartDemands(wr,partList[i],&nDemands,&demandList);	
+
+		for( int j=0; j<nDemands; j++ )
+		{
+			WriteDemand(wr,defaultwr,partList[i],demandList[j]);
+			witFree(demandList[j]);
+		}
+
+		witFree(demandList);
+		witFree(partList[i]);
+	}
+
+	witFree(partList);
+
+	return 0;
+}
+
+
+int WitXML::WriteOperations(WitRun * const wr,WitRun * defaultwr)
+{
+	int nOperations;
+	char ** operationList;
+
+	witGetOperations(wr,&nOperations,&operationList);
+
+	for( int i=0; i<nOperations; i++ )
+	{
+		WriteOperation(wr,defaultwr,operationList[i]);
+		witFree(operationList[i]);
+	}
+
+	witFree(operationList);
+
+	return 0;
+}
+
+
+int WitXML::WriteBomEntries(WitRun * const wr,WitRun * defaultwr)
+{
+	int nOperations,nBomEntries;
+	char ** operationList;
+
+	witGetOperations(wr,&nOperations,&operationList);
+	
+	// For each operation
+	for( int i=0; i<nOperations; i++ )
+	{
+		witGetOperationNBomEntries(wr,operationList[i],&nBomEntries);
+
+		// Write each BomEntry
+		for( int j=0; j<nBomEntries; j++ )
+			WriteBomEntry(wr,defaultwr,operationList[i],j);
+
+		witFree(operationList[i]);
+	}
+
+	witFree(operationList);
+
+	return 0;
+}
+
+int WitXML::WriteSubEntries(WitRun * const wr,WitRun * defaultwr)
+{
+	int nOperations,nBomEntries,nSubBomEntries;
+	char ** operationList;
+
+	witGetOperations(wr,&nOperations,&operationList);
+
+	// For each operation
+	for( int i=0; i<nOperations; i++ )
+	{
+		witGetOperationNBomEntries(wr,operationList[i],&nBomEntries);
+
+		// Write each BomEntry
+		for( int j=0; j<nBomEntries; j++ )
+		{
+			// Get the # of SubBomEntries
+			witGetBomEntryNSubsBomEntries(wr,operationList[i],j,&nSubBomEntries);
+
+			for( int k=0; k<nSubBomEntries; k++ )
+				WriteSubEntry(wr,defaultwr,operationList[i],j,k);
+		}
+		witFree(operationList[i]);
+	}
+
+	witFree(operationList);
+
+	return 0;
+}
+
+int WitXML::WriteBopEntries(WitRun * const wr,WitRun * defaultwr)
+{
+	int nOperations,nBopEntries;
+	char ** operationList;
+
+	witGetOperations(wr,&nOperations,&operationList);
+	
+	// For each operation
+	for( int i=0; i<nOperations; i++ )
+	{
+		witGetOperationNBopEntries(wr,operationList[i],&nBopEntries);
+
+		// Write each BopEntry
+		for( int j=0; j<nBopEntries; j++ )
+			WriteBopEntry(wr,defaultwr,operationList[i],j);
+
+		witFree(operationList[i]);
+	}
+
+	witFree(operationList);
+
+	return 0;
+}
+
+int WitXML::WritePart(WitRun *const wr,WitRun *defaultwr,char *partname)
+{
+	int objChoice;
+	witAttr partCategory;
+
+	witGetObjChoice(wr,&objChoice);
+
+	// Get part category
+	witGetPartCategory(wr,partname,&partCategory);
+
+	// Write Add part
+	outFile_ << "\t<"  << witcommand[add] << witobject[Part] << " partName=\"" << partname << "\" partCategory=";
+	if ( partCategory==WitCAPACITY )
+		outFile_ << "\"capacity\"";
+     	else
+		outFile_ << "\"material\"";
+
+	// write each attribute
+	if (partCategory==WitMATERIAL)
+	{
+		WriteIntsAttr(wr,defaultwr,witGetPartBuildAheadUB,"buildAheadUB",partname,partCategory);
+		WriteBoolAttr(wr,defaultwr,witGetPartBuildAsap,"buildAsap",partname,partCategory);
+		WriteBoolAttr(wr,defaultwr,witGetPartBuildNstn,"buildNstn",partname,partCategory);
+		if (objChoice==1)
+			WriteFloatsAttr(wr,defaultwr,witGetPartObj1StockCost,"obj1StockCost",partname,partCategory);
+	}
+	if (objChoice==1)
+		WriteFloatsAttr(wr,defaultwr,witGetPartObj1ScrapCost,"obj1ScrapCost",partname,partCategory);
+	WriteBoolAttr(wr,defaultwr,witGetPartSelForDel,"selForDel",partname,partCategory);
+	WriteFloatsAttr(wr,defaultwr,witGetPartSupplyVol,"supplyVol",partname,partCategory);
+	WriteFloatAttr(wr,defaultwr,witGetPartUnitCost,"unitCost",partname,partCategory);
+	if (partCategory==WitMATERIAL)
+		WriteBoundSetAttr(wr,defaultwr,witGetPartStockBounds,partname,"stock");
+	outFile_ << "/>\n";
+
+	return 0;
+}
+
+int WitXML::WriteDemand(WitRun * const wr,WitRun * defaultwr,char *partname,char *demandname)
+{
+	int objChoice;
+	witAttr partCategory;
+
+	witGetObjChoice(wr,&objChoice);
+
+	// Get part category
+	witGetPartCategory(wr,partname,&partCategory);
+
+	// Write Add part
+	outFile_ << "\t<"  << witcommand[add] << witobject[Demand] << " partName=\"" << partname << "\" demandName=\"" << demandname << "\"";
+
+	// write each attribute
+	WriteIntsAttr(wr,defaultwr,witGetDemandBuildAheadUB,"buildAheadUB",partname,partCategory,demandname);
+	WriteFloatsAttr(wr,defaultwr,witGetDemandDemandVol,"demandVol",partname,partCategory,demandname);
+	WriteIntAttr(wr,defaultwr,witGetDemandFocusHorizon,"focusHorizon",partname,partCategory,demandname);
+	WriteFloatsAttr(wr,defaultwr,witGetDemandFssShipVol,"fssShipVol",partname,partCategory,demandname);
+	WriteFloatAttr(wr,defaultwr,witGetDemandGrossRev,"grossRev",partname,partCategory,demandname);
+	if (objChoice==1)
+	{
+		WriteFloatsAttr(wr,defaultwr,witGetDemandObj1CumShipReward,"obj1CumShipReward",partname,partCategory,demandname);
+		WriteFloatsAttr(wr,defaultwr,witGetDemandObj1ShipReward,"obj1ShipReward",partname,partCategory,demandname);
+	}
+	WriteIntAttr(wr,defaultwr,witGetDemandPrefBuildAhead,"prefBuildAhead",partname,partCategory,demandname);
+	WriteIntsAttr(wr,defaultwr,witGetDemandPriority,"priority",partname,partCategory,demandname);
+	WriteBoolAttr(wr,defaultwr,witGetDemandSelForDel,"selForDel",partname,partCategory,demandname);
+	WriteIntsAttr(wr,defaultwr,witGetDemandShipLateUB,"shipLateUB",partname,partCategory,demandname);
+	WriteFloatsAttr(wr,defaultwr,witGetDemandShipVol,"shipVol",partname,partCategory,demandname);
+	WriteBoundSetAttr(wr,defaultwr,witGetDemandCumShipBounds,partname,demandname,"cumShip");
+	outFile_ << "/>\n";
+
+	return 0;
+}
+
+
+int WitXML::WriteOperation(WitRun *const wr,WitRun *defaultwr,char *operationname)
+{
+	int objChoice;
+
+	witGetObjChoice(wr,&objChoice);
+
+	// Write Add operation
+	outFile_ << "\t<"  << witcommand[add] << witobject[Operation] << " operationName=\"" << operationname << "\"";
+
+	// write each attribute
+	WriteFloatAttr(wr,defaultwr,witGetOperationExecPenalty,"execPenalty",operationname);
+	WriteFloatsAttr(wr,defaultwr,witGetOperationExecVol,"execVol",operationname);
+	WriteFloatsAttr(wr,defaultwr,witGetOperationIncLotSize,"incLotSize",operationname);
+	WriteFloatsAttr(wr,defaultwr,witGetOperationMinLotSize,"minLotSize",operationname);
+	if (objChoice==1)
+		WriteFloatsAttr(wr,defaultwr,witGetOperationObj1ExecCost,"obj1ExecCost",operationname);
+	WriteFloatAttr(wr,defaultwr,witGetOperationObj2AuxCost,"obj2AuxCost",operationname);
+	WriteBoolAttr(wr,defaultwr,witGetOperationSelForDel,"selForDel",operationname);
+	WriteFloatsAttr(wr,defaultwr,witGetOperationYieldRate,"yieldRate",operationname);
+	WriteBoundSetAttr(wr,defaultwr,witGetOperationExecBounds,operationname,"exec",WitFALSE);
+	outFile_ << "/>\n";
+
+	return 0;
+}
+
+
+int WitXML::WriteBomEntry(WitRun * const wr,WitRun * defaultwr,char *operationname,int bomindex)
+{
+	char *partName;
+
+	// Write each BomEntry
+	// Get partName
+	witGetBomEntryConsumedPart(wr,operationname,bomindex,&partName);
+
+	// Write Add operation
+	outFile_ << "\t<"  << witcommand[add] << witobject[BomEntry] << " operationName=\"" << operationname << "\" partName=\"" 
+			 << partName << "\"";
+		
+	// write each attribute
+	WriteFloatsAttr(wr,defaultwr,witGetBomEntryConsRate,"consRate",operationname,bomindex);
+	WriteIntAttr(wr,defaultwr,witGetBomEntryEarliestPeriod,"earliestPeriod",operationname,bomindex);
+	WriteFloatAttr(wr,defaultwr,witGetBomEntryFalloutRate,"falloutRate",operationname,bomindex);
+	WriteIntAttr(wr,defaultwr,witGetBomEntryLatestPeriod,"latestPeriod",operationname,bomindex);
+	WriteBoolAttr(wr,defaultwr,witGetBomEntryMandEC,"mandEC",operationname,bomindex);
+	WriteFloatsAttr(wr,defaultwr,witGetBomEntryOffset,"offset",operationname,bomindex);
+	WriteBoolAttr(wr,defaultwr,witGetBomEntrySelForDel,"selForDel",operationname,bomindex);
+	outFile_ << "/>\n";
+	witFree(partName);
+
+	return 0;
+}
+
+int WitXML::WriteSubEntry(WitRun *const wr,WitRun *defaultwr,char *operationname,int bomindex,int subindex)
+{
+	int objChoice,offSet;
+	char *partName;
+
+	witGetObjChoice(wr,&objChoice);
+	witGetIndependentOffsets(wr,&offSet);
+
+	// Get partName
+	witGetSubsBomEntryConsumedPart(wr,operationname,bomindex,subindex,&partName);
+
+	// Write Add operation
+	outFile_ << "\t<"  << witcommand[add] << witobject[SubEntry] << " operationName=\"" << operationname 
+			 << "\" bomIndex=\"" << bomindex << "\" partName=\"" << partName << "\"";
+		
+	// write each attribute
+	WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryConsRate,"consRate",operationname,bomindex,subindex);
+	WriteIntAttr(wr,defaultwr,witGetSubsBomEntryEarliestPeriod,"earliestPeriod",operationname,bomindex,subindex);
+	WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryExpAllowed,"expAllowed",operationname,bomindex,subindex);
+	WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryExpNetAversion,"expNetAversion",operationname,bomindex,subindex);
+	WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryFalloutRate,"falloutRate",operationname,bomindex,subindex);
+	WriteIntAttr(wr,defaultwr,witGetSubsBomEntryLatestPeriod,"latestPeriod",operationname,bomindex,subindex);
+	WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryMrpNetAllowed,"mrpNetAllowed",operationname,bomindex,subindex);
+	WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryNetAllowed,"netAllowed",operationname,bomindex,subindex);
+	if (objChoice==1)
+		WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryObj1SubCost,"obj1SubCost",operationname,bomindex,subindex);
+	WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryObj2SubPenalty,"obj2SubPenalty",operationname,bomindex,subindex);
+	if (offSet==WitTRUE)
+		WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryOffset,"offset",operationname,bomindex,subindex);
+	WriteBoolAttr(wr,defaultwr,witGetSubsBomEntrySelForDel,"selForDel",operationname,bomindex,subindex);
+	WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntrySubVol,"subVol",operationname,bomindex,subindex);
+ 	outFile_ << "/>\n";
+	witFree(partName);
+
+	return 0;
+}
+
+int WitXML::WriteBopEntry(WitRun *const wr,WitRun *defaultwr,char *operationname,int bopindex)
+{
+	char *partName;
+
+	// Get partName
+	witGetBopEntryProducedPart(wr,operationname,bopindex,&partName);
+
+	// Write Add operation
+	outFile_ << "\t<"  << witcommand[add] << witobject[BopEntry] << " operationName=\"" << operationname << "\" partName=\"" 
+			 << partName << "\"";
+	
+	// write each attribute
+	WriteIntAttr(wr,defaultwr,witGetBopEntryEarliestPeriod,"earliestPeriod",operationname,bopindex,WitFALSE);
+	WriteBoolAttr(wr,defaultwr,witGetBopEntryExpAllowed,"expAllowed",operationname,bopindex,WitFALSE);
+	WriteFloatAttr(wr,defaultwr,witGetBopEntryExpAversion,"expAversion",operationname,bopindex,WitFALSE);
+	WriteIntAttr(wr,defaultwr,witGetBopEntryLatestPeriod,"latestPeriod",operationname,bopindex,WitFALSE);
+	WriteFloatsAttr(wr,defaultwr,witGetBopEntryOffset,"offset",operationname,bopindex,WitFALSE);
+	WriteFloatsAttr(wr,defaultwr,witGetBopEntryProductRate,"productRate",operationname,bopindex,WitFALSE);
+	WriteBoolAttr(wr,defaultwr,witGetBopEntrySelForDel,"selForDel",operationname,bopindex,WitFALSE);
+	outFile_ << "/>\n";
+	witFree(partName);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(const char *attrname,int value)
+{
+	if (value==0)
+		outFile_ << " " << attrname << "=\"False\"";
+	else
+		outFile_ << " " << attrname << "=\"True\"";
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetInt get_fn,const char *attrname)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,&value);
+	get_fn(defaultwr,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjInt get_fn,const char *attrname,const char * const operationname)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,operationname,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjInt get_fn,const char *attrname,const char * const partname,witAttr partCategory)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,partname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandInt get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,partname,demandname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetEntryInt get_fn,const char *attrname,const char * const operationname,const int index,bool bom)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,operationname,index,&value);
+	if (bom==WitTRUE)
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOPINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteBoolAttr(WitRun * const wr,WitRun * const defaultwr,WitGetSubEntryInt get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subindex)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,operationname,bomindex,subindex,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,DEFAULTSUBINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteBoolAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteIntAttr(const char *attrname,int value)
+{
+	outFile_ << " " << attrname << "=\"" << value << "\"";
+
+	return 0;
+}
+
+int WitXML::WriteIntAttr(WitRun * const wr,WitRun * const defaultwr,WitGetInt get_fn,const char *attrname)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,&value);
+	get_fn(defaultwr,&defaultvalue);
+
+	if (value != defaultvalue )
+	    WriteIntAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteIntAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandInt get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,partname,demandname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND,&defaultvalue);
+
+	if (value != defaultvalue )
+	    WriteIntAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteIntAttr(WitRun * const wr,WitRun * const defaultwr,WitGetEntryInt get_fn,const char *attrname,const char * const operationname,const int index,bool bom)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,operationname,index,&value);
+	if (bom==WitTRUE)
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOPINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+	    WriteIntAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteIntAttr(WitRun * const wr,WitRun * const defaultwr,WitGetSubEntryInt get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subbomindex)
+{
+	int value,defaultvalue;
+
+	get_fn(wr,operationname,bomindex,subbomindex,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,DEFAULTSUBINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+	    WriteIntAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteIntsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjInts get_fn,const char *attrname,const char * const partname,witAttr partCategory)
+{
+	int *value,*defaultvalue;
+
+	get_fn(wr,partname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,&defaultvalue);
+
+	if (IntVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteIntsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandInts get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname)
+{
+	int *value,*defaultvalue;
+
+	get_fn(wr,partname,demandname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND,&defaultvalue);
+
+	if (IntVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(const char *attrname,float value)
+{
+	outFile_ << " " << attrname << "=\"" << value << "\"";
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetFloat get_fn,const char *attrname)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,&value);
+	get_fn(defaultwr,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjFloat get_fn,const char *attrname,const char * const operationname)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,operationname,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjFloat get_fn,const char *attrname,const char * const partname,witAttr partCategory)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,partname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandFloat get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,partname,demandname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetEntryFloat get_fn,const char *attrname,const char * const operationname,const int index,bool bom)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,operationname,index,&value);
+	if (bom==WitTRUE)
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOPINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatAttr(WitRun * const wr,WitRun * const defaultwr,WitGetSubEntryFloat get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subindex)
+{
+	float value,defaultvalue;
+
+	get_fn(wr,operationname,bomindex,subindex,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,DEFAULTSUBINDEX,&defaultvalue);
+
+	if (value != defaultvalue )
+		WriteFloatAttr(attrname,value);
+
+	return 0;
+}
+
+int WitXML::WriteFloatsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjFloats get_fn,const char *attrname,const char * const operationname)
+{
+	float *value,*defaultvalue;
+
+	get_fn(wr,operationname,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,&defaultvalue);
+
+	if (FloatVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteFloatsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjFloats get_fn,const char *attrname,const char * const partname,witAttr partCategory)
+{
+	float *value,*defaultvalue;
+
+	get_fn(wr,partname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,&defaultvalue);
+
+	if (FloatVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteFloatsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandFloats get_fn,const char *attrname,const char * const partname,witAttr partCategory,const char * const demandname)
+{
+	float *value,*defaultvalue;
+
+	get_fn(wr,partname,demandname,&value);
+	if ( partCategory==WitMATERIAL )
+		get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTCAPACITY,DEFAULTDEMAND,&defaultvalue);
+
+	if (FloatVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteFloatsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetEntryFloats get_fn,const char *attrname,const char * const operationname,const int index,bool bom)
+{
+	float *value,*defaultvalue;
+
+	get_fn(wr,operationname,index,&value);
+	if (bom==WitTRUE)
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,&defaultvalue);
+	else
+		get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOPINDEX,&defaultvalue);
+
+	if (FloatVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteFloatsAttr(WitRun * const wr,WitRun * const defaultwr,WitGetSubEntryFloats get_fn,const char *attrname,const char * const operationname,const int bomindex,const int subindex)
+{
+	float *value,*defaultvalue;
+
+	get_fn(wr,operationname,bomindex,subindex,&value);
+	get_fn(defaultwr,DEFAULTOPERATION,DEFAULTBOMINDEX,DEFAULTSUBINDEX,&defaultvalue);
+
+	if (FloatVectorCmp(value,defaultvalue))
+		WitXMLText::PrintVector(attrname,value,outFile_,NPeriods_);
+
+	witFree(value);
+	witFree(defaultvalue);
+
+	return 0;
+}
+
+int WitXML::WriteBoundSetAttr(WitRun * const wr,WitRun * const defaultwr,WitGetObjBoundSet get_fn,const char * const objname,const char *prefix,bool part)
+{
+	int returnValue;
+	float * hardlower,* softlower,* hardupper,* dfhardlower,* dfsoftlower,* dfhardupper;
+
+	get_fn(wr,objname,&hardlower,&softlower,&hardupper);
+	if (part==WitTRUE)
+		get_fn(defaultwr,DEFAULTMATERIAL,&dfhardlower,&dfsoftlower,&dfhardupper);
+	else
+		get_fn(defaultwr,DEFAULTOPERATION,&dfhardlower,&dfsoftlower,&dfhardupper);
+
+	returnValue = PrintSetBoundsAttr(prefix,hardlower,softlower,hardupper,dfhardlower,dfsoftlower,dfhardupper);
+
+	witFree(hardlower);
+	witFree(softlower);
+	witFree(hardupper);
+	witFree(dfhardlower);
+	witFree(dfsoftlower);
+	witFree(dfhardupper);
+
+	return returnValue;
+}
+
+int WitXML::WriteBoundSetAttr(WitRun * const wr,WitRun * const defaultwr,WitGetDemandBoundSet get_fn,const char * const partname,const char * const demandname,const char *prefix)
+{
+	int returnValue;
+	float * hardlower,* softlower,* hardupper,* dfhardlower,* dfsoftlower,* dfhardupper;
+
+	get_fn(wr,partname,demandname,&hardlower,&softlower,&hardupper);
+	get_fn(defaultwr,DEFAULTMATERIAL,DEFAULTDEMAND,&dfhardlower,&dfsoftlower,&dfhardupper);
+
+	returnValue = PrintSetBoundsAttr(prefix,hardlower,softlower,hardupper,dfhardlower,dfsoftlower,dfhardupper);
+
+	witFree(hardlower);
+	witFree(softlower);
+	witFree(hardupper);
+	witFree(dfhardlower);
+	witFree(dfsoftlower);
+	witFree(dfhardupper);
+
+	return returnValue;
+}
+
+int WitXML::PrintSetBoundsAttr(const char *prefix,float *hardlower,float *softlower,float *hardupper,float *dfhardlower,float *dfsoftlower,float *dfhardupper)
+{
+	int i;
+
+	if (FloatVectorCmp(hardlower,dfhardlower))
+	{
+		outFile_ << " " << prefix << "BoundsHardLB=\"dense";
+		for ( i=0; i<NPeriods_-1; i++ )
+			outFile_ << " " << hardlower[i];
+		outFile_ << " " << hardlower[NPeriods_-1] << "\"";
+	}
+	if (FloatVectorCmp(softlower,dfsoftlower))
+	{
+		outFile_ << " " << prefix << "BoundsSoftLB=\"dense";
+		for ( i=0; i<NPeriods_-1; i++ )
+			outFile_ << " " << softlower[i];
+		outFile_ << " " << softlower[NPeriods_-1] << "\"";
+	}
+	if (FloatVectorCmp(hardupper,dfhardupper))
+	{
+		outFile_ << " " << prefix << "BoundsHardUB=\"dense";
+		for ( i=0; i<NPeriods_-1; i++ )
+			outFile_ << " " << hardupper[i];
+		outFile_ << " " << hardupper[NPeriods_-1] << "\"";
+		return WitTRUE;
+	}
+	
+	return WitTRUE;
+}
+
+int WitXML::WriteTextAttr(WitRun * const wr,WitRun * const defaultwr,WitGetText get_fn,const char *attrname)
+{
+	char *value,*defaultvalue;
+
+	get_fn(wr,&value);
+	get_fn(defaultwr,&defaultvalue);
+
+	if (strcmp(value,defaultvalue))
+	{
+		outFile_ << " " << attrname << "=\"";
+		int length=strlen(value);
+		for (int i=0;i<length;i++)
+		{
+			switch(value[i])
+			{
+			case '"':					// XML predefined entities
+				outFile_ << "&quot;";
+				break;
+			case '<':
+				outFile_ << "&lt;";
+				break;
+			case '>':
+				outFile_ << "&gt;";
+				break;
+			case '\'':
+				outFile_ << "&apos;";
+				break;
+			case '&':
+				outFile_ << "&amp;";
+				break;
+			default:
+				outFile_ << value[i]; 
+			}
+		}
+		outFile_ << "\"";
+	}
+
+#ifndef _MSC_VER
+	witFree(value);
+	witFree(defaultvalue);
+#endif
+
+	return 0;
+}
+
+int WitXML::IntVectorCmp(int *vector1,int *vector2)
+{
+	for (int i=0;i<NPeriods_;i++)
+		if (vector1[i]!=vector2[i])
+			return 1;
+
+	return 0;
+}
+
+int WitXML::FloatVectorCmp(float *vector1,float *vector2)
+{
+	for (int i=0;i<NPeriods_;i++)
+		if (vector1[i]!=vector2[i])
+			return 1;
+
+	return 0;
+}
+
+// ------------------------------------------------------------------------
+//  Public method for converting a DOMStringe into a char *.
+//  The caller owns the (char *) string that is returned, and is responsible
+//  for deleting it.
+// ------------------------------------------------------------------------ 
+char * WitXML::transcode(const DOMString& toShow)
+{
+	char *retVal = toShow.transcode();
+
+#ifdef _MSC_VER
+	const char *temp=retVal;
+	retVal = new char[strlen(temp)+1];
+	strcpy(retVal,temp);
+#endif
+
+	return retVal;
+}
+
+// ---------------------------------------------------------------------------
+// Private method for displaying a DOMStringe
+// ---------------------------------------------------------------------------
+ostream& WitXML::operator<<(const DOMString& toDump)
+{
+    char *p = transcode(toDump);
+    cerr << p;
+    delete [] p;
+
+    return cerr;
+}
+
+
+
+// ---------------------------------------------------------------------------
+//  The overriding method startElement() of class WitXMLParser derived from
+//  DOMParser, so that the extra line number info can be inserted
+// ---------------------------------------------------------------------------
+void WitXMLParser::startElement(const XMLElementDecl&		elemDecl,
+				const unsigned int 		urlId,
+				const XMLCh* const		elemPrefix,
+				const RefVectorOf<XMLAttr>&	attrList,
+				const unsigned int		attrCount,
+				const bool			isEmpty,
+				const bool			isRoot)
+{
+	DOMParser::startElement(elemDecl,urlId,elemPrefix,attrList,attrCount,isEmpty,isRoot);
+
+	// attach extra data to DOM nodes, should be deleted specifically
+	int *LineNumber=new int(((this->getScanner()).getLocator())->getLineNumber());
+	DOMParser::getCurrentNode().setUserData(LineNumber);
+
+}
+@
+
+
+1.3
+log
+@By Shuzheng Liu, modify the function "WritePart", so that if the category of a part is "RAW" or "PRODUCT", the output will be "material".
+@
+text
+@d1690 1
+a1690 1
+	  outFile_.open(fnout);
+d1692 6
+a1697 6
+	  if (outFile_.fail())
+	  {
+	    WitXMLErrorHandler errorHandler;
+	    errorHandler.SetOpenFileErrorMsg(fnout);
+	    throw(errorHandler);
+	  }
+d1699 20
+a1718 7
+	  // Write head lines
+	  outFile_ << "<?xml version=\"1.0\"?>\n";
+	  outFile_ << "<!DOCTYPE WIT SYSTEM \"" << fndtd << "\">\n";
+	  outFile_ << "<WIT";
+	  if (release)
+	    outFile_ << " release=\"" << release << "\"";
+	  outFile_ << ">\n";
+d1720 6
+a1725 2
+	  // Write problem attributes
+	  WriteProblem(wr,defaultwr);
+d1727 6
+a1732 2
+	  // set defaultwr
+	  SetDefaultWitRun(wr,defaultwr);
+d1734 8
+a1741 2
+	  // Write Parts
+	  WritePart(wr,defaultwr);
+d1743 36
+a1778 2
+	  // Write Demands
+	  WriteDemand(wr,defaultwr);
+d1780 2
+a1781 2
+	  // Write Operations
+	  WriteOperation(wr,defaultwr);
+d1783 2
+a1784 2
+	  // Write BomEntries
+	  WriteBomEntry(wr,defaultwr);
+d1786 2
+a1787 2
+	  // Write SubBomEntries
+	  WriteSubEntry(wr,defaultwr);
+d1789 2
+a1790 2
+	  // Write BopEntries
+	  WriteBopEntry(wr,defaultwr);
+d1792 4
+a1795 1
+	  outFile_ << "</WIT>";
+d1797 1
+a1797 2
+	  outFile_.close();
+	
+d1802 4
+a1805 4
+	  cerr << "An error occurred during writing output file. Msg is:"
+	       << endl;
+	  this->operator<<(DOMString(toCatch.getMessage())) << endl;
+	  retVal = 1;
+d1883 1
+a1883 1
+int WitXML::WritePart(WitRun * const wr,WitRun * defaultwr)
+d1885 2
+a1886 2
+	int nParts,objChoice;
+        char ** partList;
+a1888 1
+	witGetObjChoice(wr,&objChoice);
+d1892 1
+a1892 30
+		witAttr partCategory;
+
+		// Get part category
+		witGetPartCategory(wr,partList[i],&partCategory);
+
+		// Write Add part
+		outFile_ << "\t<"  << witcommand[add] << witobject[Part] << " partName=\"" << partList[i] << "\" partCategory=";
+		if ( partCategory==WitCAPACITY )
+			outFile_ << "\"capacity\"";
+		else
+			outFile_ << "\"material\"";
+
+		// write each attribute
+		if (partCategory==WitMATERIAL)
+		{
+			WriteIntsAttr(wr,defaultwr,witGetPartBuildAheadUB,"buildAheadUB",partList[i],partCategory);
+			WriteBoolAttr(wr,defaultwr,witGetPartBuildAsap,"buildAsap",partList[i],partCategory);
+			WriteBoolAttr(wr,defaultwr,witGetPartBuildNstn,"buildNstn",partList[i],partCategory);
+			if (objChoice==1)
+			  WriteFloatsAttr(wr,defaultwr,witGetPartObj1StockCost,"obj1StockCost",partList[i],partCategory);
+		}
+		if (objChoice==1)
+		  WriteFloatsAttr(wr,defaultwr,witGetPartObj1ScrapCost,"obj1ScrapCost",partList[i],partCategory);
+		WriteBoolAttr(wr,defaultwr,witGetPartSelForDel,"selForDel",partList[i],partCategory);
+		WriteFloatsAttr(wr,defaultwr,witGetPartSupplyVol,"supplyVol",partList[i],partCategory);
+		WriteFloatAttr(wr,defaultwr,witGetPartUnitCost,"unitCost",partList[i],partCategory);
+		if (partCategory==WitMATERIAL)
+			WriteBoundSetAttr(wr,defaultwr,witGetPartStockBounds,partList[i],"stock");
+		outFile_ << "/>\n";
+
+d1901 1
+a1901 1
+int WitXML::WriteDemand(WitRun * const wr,WitRun * defaultwr)
+d1903 1
+a1903 1
+	int nParts,nDemands,objChoice;
+a1906 1
+	witGetObjChoice(wr,&objChoice);
+a1909 4
+		// Get part category
+		witAttr partCategory;
+		witGetPartCategory(wr,partList[i],&partCategory);
+
+d1915 1
+a1915 21
+			// Write Add part
+			outFile_ << "\t<"  << witcommand[add] << witobject[Demand] << " partName=\"" << partList[i] << "\" demandName=\"" << demandList[j] << "\"";
+
+			// write each attribute
+			WriteIntsAttr(wr,defaultwr,witGetDemandBuildAheadUB,"buildAheadUB",partList[i],partCategory,demandList[j]);
+			WriteFloatsAttr(wr,defaultwr,witGetDemandDemandVol,"demandVol",partList[i],partCategory,demandList[j]);
+			WriteIntAttr(wr,defaultwr,witGetDemandFocusHorizon,"focusHorizon",partList[i],partCategory,demandList[j]);
+			WriteFloatsAttr(wr,defaultwr,witGetDemandFssShipVol,"fssShipVol",partList[i],partCategory,demandList[j]);
+			WriteFloatAttr(wr,defaultwr,witGetDemandGrossRev,"grossRev",partList[i],partCategory,demandList[j]);
+			if (objChoice==1)
+			{
+			  WriteFloatsAttr(wr,defaultwr,witGetDemandObj1CumShipReward,"obj1CumShipReward",partList[i],partCategory,demandList[j]);
+			  WriteFloatsAttr(wr,defaultwr,witGetDemandObj1ShipReward,"obj1ShipReward",partList[i],partCategory,demandList[j]);
+			}
+			WriteIntAttr(wr,defaultwr,witGetDemandPrefBuildAhead,"prefBuildAhead",partList[i],partCategory,demandList[j]);
+			WriteIntsAttr(wr,defaultwr,witGetDemandPriority,"priority",partList[i],partCategory,demandList[j]);
+			WriteBoolAttr(wr,defaultwr,witGetDemandSelForDel,"selForDel",partList[i],partCategory,demandList[j]);
+			WriteIntsAttr(wr,defaultwr,witGetDemandShipLateUB,"shipLateUB",partList[i],partCategory,demandList[j]);
+			WriteFloatsAttr(wr,defaultwr,witGetDemandShipVol,"shipVol",partList[i],partCategory,demandList[j]);
+			WriteBoundSetAttr(wr,defaultwr,witGetDemandCumShipBounds,partList[i],demandList[j],"cumShip");
+			outFile_ << "/>\n";
+d1929 1
+a1929 1
+int WitXML::WriteOperation(WitRun * const wr,WitRun * defaultwr)
+d1931 1
+a1931 1
+	int nOperations,objChoice;
+a1934 1
+	witGetObjChoice(wr,&objChoice);
+d1938 1
+a1938 15
+		// Write Add operation
+		outFile_ << "\t<"  << witcommand[add] << witobject[Operation] << " operationName=\"" << operationList[i] << "\"";
+
+		// write each attribute
+		WriteFloatAttr(wr,defaultwr,witGetOperationExecPenalty,"execPenalty",operationList[i]);
+		WriteFloatsAttr(wr,defaultwr,witGetOperationExecVol,"execVol",operationList[i]);
+		WriteFloatsAttr(wr,defaultwr,witGetOperationIncLotSize,"incLotSize",operationList[i]);
+		WriteFloatsAttr(wr,defaultwr,witGetOperationMinLotSize,"minLotSize",operationList[i]);
+		if (objChoice==1)
+			WriteFloatsAttr(wr,defaultwr,witGetOperationObj1ExecCost,"obj1ExecCost",operationList[i]);
+		WriteFloatAttr(wr,defaultwr,witGetOperationObj2AuxCost,"obj2AuxCost",operationList[i]);
+		WriteBoolAttr(wr,defaultwr,witGetOperationSelForDel,"selForDel",operationList[i]);
+		WriteFloatsAttr(wr,defaultwr,witGetOperationYieldRate,"yieldRate",operationList[i]);
+		WriteBoundSetAttr(wr,defaultwr,witGetOperationExecBounds,operationList[i],"exec",WitFALSE);
+		outFile_ << "/>\n";
+d1948 1
+a1948 1
+int WitXML::WriteBomEntry(WitRun * const wr,WitRun * defaultwr)
+d1951 1
+a1951 1
+	char ** operationList,*partName;
+d1962 1
+a1962 3
+		{
+			// Get partName
+			witGetBomEntryConsumedPart(wr,operationList[i],j,&partName);
+a1963 15
+			// Write Add operation
+			outFile_ << "\t<"  << witcommand[add] << witobject[BomEntry] << " operationName=\"" << operationList[i] << "\" partName=\"" 
+				 << partName << "\"";
+		
+			// write each attribute
+			WriteFloatsAttr(wr,defaultwr,witGetBomEntryConsRate,"consRate",operationList[i],j);
+			WriteIntAttr(wr,defaultwr,witGetBomEntryEarliestPeriod,"earliestPeriod",operationList[i],j);
+			WriteFloatAttr(wr,defaultwr,witGetBomEntryFalloutRate,"falloutRate",operationList[i],j);
+			WriteIntAttr(wr,defaultwr,witGetBomEntryLatestPeriod,"latestPeriod",operationList[i],j);
+			WriteBoolAttr(wr,defaultwr,witGetBomEntryMandEC,"mandEC",operationList[i],j);
+			WriteFloatsAttr(wr,defaultwr,witGetBomEntryOffset,"offset",operationList[i],j);
+			WriteBoolAttr(wr,defaultwr,witGetBomEntrySelForDel,"selForDel",operationList[i],j);
+			outFile_ << "/>\n";
+			witFree(partName);
+		}
+d1972 1
+a1972 1
+int WitXML::WriteSubEntry(WitRun * const wr,WitRun * defaultwr)
+d1974 2
+a1975 2
+	int nOperations,nBomEntries,nSubBomEntries,objChoice,offSet;
+        char ** operationList,*partName;
+a1977 2
+	witGetObjChoice(wr,&objChoice);
+	witGetIndependentOffsets(wr,&offSet);
+d1991 1
+a1991 27
+			{
+				// Get partName
+				witGetSubsBomEntryConsumedPart(wr,operationList[i],j,k,&partName);
+
+				// Write Add operation
+				outFile_ << "\t<"  << witcommand[add] << witobject[SubEntry] << " operationName=\"" << operationList[i] 
+					<< "\" bomIndex=\"" << j << "\" partName=\"" << partName << "\"";
+		
+				// write each attribute
+				WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryConsRate,"consRate",operationList[i],j,k);
+				WriteIntAttr(wr,defaultwr,witGetSubsBomEntryEarliestPeriod,"earliestPeriod",operationList[i],j,k);
+				WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryExpAllowed,"expAllowed",operationList[i],j,k);
+				WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryExpNetAversion,"expNetAversion",operationList[i],j,k);
+				WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryFalloutRate,"falloutRate",operationList[i],j,k);
+				WriteIntAttr(wr,defaultwr,witGetSubsBomEntryLatestPeriod,"latestPeriod",operationList[i],j,k);
+				WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryMrpNetAllowed,"mrpNetAllowed",operationList[i],j,k);
+				WriteBoolAttr(wr,defaultwr,witGetSubsBomEntryNetAllowed,"netAllowed",operationList[i],j,k);
+				if (objChoice==1)
+					WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryObj1SubCost,"obj1SubCost",operationList[i],j,k);
+				WriteFloatAttr(wr,defaultwr,witGetSubsBomEntryObj2SubPenalty,"obj2SubPenalty",operationList[i],j,k);
+				if (offSet==WitTRUE)
+					WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntryOffset,"offset",operationList[i],j,k);
+				WriteBoolAttr(wr,defaultwr,witGetSubsBomEntrySelForDel,"selForDel",operationList[i],j,k);
+				WriteFloatsAttr(wr,defaultwr,witGetSubsBomEntrySubVol,"subVol",operationList[i],j,k);
+ 				outFile_ << "/>\n";
+				witFree(partName);
+			}
+d2001 1
+a2001 1
+int WitXML::WriteBopEntry(WitRun * const wr,WitRun * defaultwr)
+d2004 1
+a2004 1
+	char ** operationList,*partName;
+d2015 1
+a2015 3
+		{
+			// Get partName
+			witGetBopEntryProducedPart(wr,operationList[i],j,&partName);
+a2016 15
+			// Write Add operation
+			outFile_ << "\t<"  << witcommand[add] << witobject[BopEntry] << " operationName=\"" << operationList[i] << "\" partName=\"" 
+				 << partName << "\"";
+	
+			// write each attribute
+			WriteIntAttr(wr,defaultwr,witGetBopEntryEarliestPeriod,"earliestPeriod",operationList[i],j,WitFALSE);
+			WriteBoolAttr(wr,defaultwr,witGetBopEntryExpAllowed,"expAllowed",operationList[i],j,WitFALSE);
+			WriteFloatAttr(wr,defaultwr,witGetBopEntryExpAversion,"expAversion",operationList[i],j,WitFALSE);
+			WriteIntAttr(wr,defaultwr,witGetBopEntryLatestPeriod,"latestPeriod",operationList[i],j,WitFALSE);
+			WriteFloatsAttr(wr,defaultwr,witGetBopEntryOffset,"offset",operationList[i],j,WitFALSE);
+			WriteFloatsAttr(wr,defaultwr,witGetBopEntryProductRate,"productRate",operationList[i],j,WitFALSE);
+			WriteBoolAttr(wr,defaultwr,witGetBopEntrySelForDel,"selForDel",operationList[i],j,WitFALSE);
+			outFile_ << "/>\n";
+			witFree(partName);
+		}
+d2021 188
+@
+
+
+1.2
+log
+@By Shuzheng Liu,
+  unitTest.C: put the temp file in working directory.
+  witXML.C: modify function WriteProblem so that the value of optInitMethod will not be printed out.
+  witXMLApi.C: change the error message so the reference to the WitRun is the first/second WitRun instead of WitRun1/WitRun2.
+@
+text
+@d1837 3
+a1839 1
+		if ( partCategory==WitMATERIAL )
+a1840 2
+		else
+			outFile_ << "\"capacity\"";
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d594 1
+a594 1
+
+d1798 1
+a1798 1
+	WriteTextAttr(wr,defaultwr,witGetOptInitMethod,"optInitMethod");
+@
+
+
+1.1.1.1
+log
+@Importing wit xml code
+@
+text
+@@

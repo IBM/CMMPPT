@@ -1,0 +1,196 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.3
+date	2007.03.28.14.53.42;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.03.22.15.28.54;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.03.21.18.25.38;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to use example_acquire and fix array index bug
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#pragma warning(disable:4290)
+#pragma warning(disable:4267)
+#endif
+
+
+#include <iostream>
+#include "rcpProblem.h"
+#include "rcpOptCal.h"
+#include "populateRCP.h"
+
+/*
+ * This is a sample program which is intended to show how to populate 
+ * an RCPproblem with data and then extract that data.
+ */
+int main(int argc, char * argv[])
+{
+  
+  // Specify a directory of rcp input files.
+  // These are in cvs at rcp/data.
+
+  //std::string inputDirectory  = "../../data/example4";
+  //std::string inputDirectory  = "../../data/example_tucson";
+  //std::string inputDirectory  = "../../data/IGS";
+  std::string inputDirectory  = "../../data/example_acquire";
+
+  
+  // Populate the rcpProblem with data
+  RCPproblem rcpProb;
+  RcpOptCalendar rcpCal;
+  populate(rcpProb, inputDirectory, inputDirectory, rcpCal);
+
+  
+  //----------------------------------------------------
+
+  // get engagements
+  std::vector<std::string> engagements;
+  rcpProb.getEngagementNames(engagements);
+  for ( size_t e=0; e<engagements.size(); ++e ) {
+      std::cout <<"The " <<e <<"'th engagement is " <<engagements[e] <<std::endl;
+  }
+
+  // get some scalar engagement attributes
+  for ( size_t e=0; e<engagements.size(); ++e ) {
+      int startPeriod = rcpProb.getEngagementStartPeriod(engagements[e]);
+      int lateAllowance = rcpProb.getEngagementLateAllowance(engagements[e]);
+      int priority = rcpProb.getEngagementPriority(engagements[e]);
+      float quantity = rcpProb.getEngagementQuantity(engagements[e]);
+      std::cout 
+          <<"Engagement: " <<engagements[e] 
+          <<" startPeriod: " <<startPeriod
+          <<" lateAllowance: " <<lateAllowance
+          <<" priority: " <<priority
+          <<" quantity: " <<quantity
+          <<std::endl;
+  }
+
+  //----------------------------------------------------
+
+  // Get names of fields that identify a resource(ie: "Job Roll", "Skill Set", "Geography")
+  std::vector<std::string> resourceIds = rcpProb.getResourceIdentifierNames();
+  
+  // Get resources
+  std::vector<RCPvectorString> resources;
+  rcpProb.getResourceNames( resources );
+  for ( size_t r=0; r<resources.size(); ++r ) {
+      RCPvectorString resource=resources[r];
+      std::cout <<"The " <<r <<"th resource has ";
+      for ( size_t a=0; a<resource.size(); ++a ) {
+          std::cout <<resourceIds[a] <<":" <<resource[a] <<" ";
+      }
+      std::cout <<std::endl;
+  }
+
+  // Get resource scalar attribute values
+  for ( size_t r=0; r<resources.size(); ++r ) {
+      float acquireCost = rcpProb.getResourceAcquireCost(resources[r]);
+      float acquireTime = rcpProb.getResourceAcquireTime(resources[r]);
+      float releaseCost = rcpProb.getResourceReleaseCost(resources[r]);
+      float releaseTime = rcpProb.getResourceReleaseTime(resources[r]);
+      std::cout 
+          <<"Resource " <<r 
+          <<" acquireCost: " <<acquireCost
+          <<" acquireTime: " <<acquireTime
+          <<" releaseCost: " <<releaseCost
+          <<" releaseTime: " <<releaseTime
+          <<std::endl;
+  }
+
+  //----------------------------------------------------
+
+  // Get BOM Arcs connecting engagements to resources
+  std::vector<std::string> bomEnagements;
+  std::vector<RCPvectorString> bomResources;
+  rcpProb.getBomNames( bomEnagements, bomResources );
+  for ( size_t b=0; b<bomEnagements.size(); ++b ) {
+      RCPvectorString resource=bomResources[b];
+      std::cout 
+          <<b <<"th BomArc connects Engagement " <<bomEnagements[b]
+          <<" to Resource ";
+      for ( size_t a=0; a<resource.size(); ++a ) {
+          std::cout <<resourceIds[a] <<":" <<resource[a] <<" ";
+      }
+      std::cout <<std::endl;
+  }
+
+  // Get the usage of resource in bom arc for each period of engagement
+  for ( size_t b=0; b<bomEnagements.size(); ++b ) {
+      RCPvectorString resource=bomResources[b];
+      std::vector<float> usageQuantity = rcpProb.getBomUsageQuantity(bomEnagements[b], bomResources[b]);
+      for ( size_t t=0; t<usageQuantity.size(); ++t ) {
+          std::cout 
+              <<b <<"'th BomArc consumes " 
+              <<usageQuantity[t] <<" units of resource in period " <<t
+              <<std::endl;
+      }
+  }
+
+
+
+  
+  return 0;
+
+}
+@
+
+
+1.2
+log
+@Updated to get resource and bom info
+@
+text
+@d26 2
+a27 1
+  std::string inputDirectory  = "../../data/IGS";
+d99 1
+a99 1
+      RCPvectorString resource=resources[b];
+d111 2
+a112 2
+      RCPvectorString resource=resources[b];
+      std::vector<float> usageQuantity = rcpProb.getBomUsageQuantity(bomEnagements[b], resources[b]);
+@
+
+
+1.1
+log
+@Added example to show how to populate rcpProblem and then extract data
+@
+text
+@d23 1
+d25 3
+a27 3
+  std::string inputDirectory  = "../../data/example_tucson";
+  //std::string inputDirectory  = "../../data/IGS";
+  std::string outputDirectory = inputDirectory;
+d32 4
+a35 1
+  populate(rcpProb, inputDirectory, outputDirectory, rcpCal);
+d59 62
+@
+

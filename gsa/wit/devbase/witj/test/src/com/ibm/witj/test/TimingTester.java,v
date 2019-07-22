@@ -1,0 +1,893 @@
+head	1.9;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.9
+date	2011.05.04.22.15.55;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.05.02.18.32.45;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.04.22.20.00.44;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.02.25.16.07.26;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.09.08.18.53.00;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.06.15.15.54.13;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.05.08.22.13.13;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.05.04.21.49.58;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.04.24.17.42.53;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.9
+log
+@setValue ==> set
+getValue ==> get
+@
+text
+@
+//==============================================================================
+// WIT-J/Test Source File TimingTester.java.
+//==============================================================================
+
+package       com.ibm.witj.test;
+
+import        com.ibm.witj.*;
+import static com.ibm.witj.Attribute.*;
+import static com.ibm.witj.Part.Category.*;
+import static com.ibm.witj.MessageGroup.*;
+
+import       java.lang.management.*;
+
+//==============================================================================
+// Class TimingTester
+//
+// Reponsible for performing a timing test on WIT-J.
+//==============================================================================
+
+final class TimingTester
+{
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// performTest ().
+//
+// Performs a timing test on WIT-J.
+//------------------------------------------------------------------------------
+
+   static void performTest (String[] theArgs)
+      {
+      TimingTester theTimingTester;
+
+      theTimingTester = new TimingTester ();
+
+      theTimingTester.perfTest (theArgs);
+      }
+
+//==============================================================================
+// Private Constructor
+//==============================================================================
+
+   private TimingTester ()
+      {
+      }
+
+//==============================================================================
+// Private Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// perfTest ().
+//
+// Internal implementation of performTest ().
+//------------------------------------------------------------------------------
+
+   private void perfTest (String[] theArgs)
+      {
+      int runIdx;
+
+      System.out.printf (
+         "\n"
+       + "---------------------------------------------------\n"
+       + " WIT-J Timing Test: Java WIT-J Application Program\n"
+       + "---------------------------------------------------\n");
+
+      parseArgs (theArgs);
+
+      aveNonHeurTime = 0.0;
+      aveTotalTime   = 0.0;
+
+      for (runIdx = 0; runIdx < nRuns; runIdx ++)
+         {
+         do1Run ();
+         }
+
+      displayCpuTimes ();
+      }
+
+//------------------------------------------------------------------------------
+// parseArgs (theArgs)
+//
+// Parses theArgs to set the parameter values.
+//------------------------------------------------------------------------------
+
+   private void parseArgs (String[] theArgs)
+      {
+      int    fillerLength;
+      char[] fillerArr;
+      int    theIdx;
+
+      nPers        = Integer.parseInt (theArgs[1]);
+      nChains      = Integer.parseInt (theArgs[2]);
+      chainLength  = Integer.parseInt (theArgs[3]);
+      supVol       = Integer.parseInt (theArgs[4]);
+      fillerLength = Integer.parseInt (theArgs[5]);
+      nRuns        = Integer.parseInt (theArgs[6]);
+
+      System.out.printf (
+         "\n"
+       + "Parameters:\n"
+       + "   # Periods:     %6d\n"
+       + "   # Chains:      %6d\n"
+       + "   Chain Length:  %6d\n"
+       + "   SupplyVol:     %6d\n"
+       + "   Filler Length: %6d\n"
+       + "   # Runs:        %6d\n",
+         nPers,
+         nChains,
+         chainLength,
+         supVol,
+         fillerLength,
+         nRuns);
+
+      fillerArr = new char[fillerLength];
+
+      for (theIdx = 0; theIdx < fillerLength; theIdx ++)
+         {
+         fillerArr[theIdx] = '-';
+         }
+
+      filler = new String (fillerArr);
+      }
+
+//------------------------------------------------------------------------------
+// do1Run ()
+//
+// Does one run of the timing test.
+//------------------------------------------------------------------------------
+
+   private void do1Run ()
+      {
+      double timeAtStart;
+      double timeBefHeur;
+      double timeAftHeur;
+      double timeAtEnd;
+
+      timeAtStart     = getCpuTime ();
+
+      createInitProblem ();
+      populateProblem   ();
+
+      timeBefHeur     = getCpuTime ();
+
+      aveNonHeurTime += (timeBefHeur - timeAtStart) / nRuns;
+
+      myProblem.heurImplode ();
+
+      timeAftHeur     = getCpuTime ();
+
+      retrieveSoln ();
+
+      myProblem.deactivate ();
+
+      myProblem       = null;
+
+      timeAtEnd       = getCpuTime ();
+
+      aveNonHeurTime += (timeAtEnd - timeAftHeur) / nRuns;
+      aveTotalTime   += (timeAtEnd - timeAtStart) / nRuns;
+      }
+
+//------------------------------------------------------------------------------
+// createInitProblem ()
+//
+// Creates and sets up myProblem, unpopulated.
+//------------------------------------------------------------------------------
+
+   private void createInitProblem ()
+      {
+      myProblem = Problem.newInstance ();
+
+      myProblem.getMessageMgr ().setMesgTimesPrint (INFORMATIONAL, 0);
+//    myProblem.getMessageMgr ().setMesgTimesPrint (750,          -1);
+//    myProblem.getMessageMgr ().setMesgTimesPrint (751,          -1);
+//    myProblem.getMessageMgr ().setMesgTimesPrint (752,          -1);
+      myProblem.getMessageMgr ().setMesgTimesPrint (338,           0);
+      }
+
+//------------------------------------------------------------------------------
+// populateProblem ()
+//
+// Builds up the contents of myProblem.
+//------------------------------------------------------------------------------
+
+   private void populateProblem ()
+      {
+      double[]  supVolArr;
+      double[]  demVolArr;
+      int       thePer;
+      int       chainIdx;
+      String    theName;
+      Part      thePart;
+      int       vertIdx;
+      Operation theOpn;
+      Demand    theDemand;
+
+      supVolArr = new double[nPers];
+      demVolArr = new double[nPers];
+
+      for (thePer = 0; thePer < nPers; thePer ++)
+         {
+         supVolArr[thePer] = supVol;
+         }
+
+      demVolArr[nPers - 1] = supVol * (nPers + 1);
+
+      myProblem.set (nPeriods, nPers);
+
+      for (chainIdx = 0; chainIdx < nChains; chainIdx ++)
+         {
+         theName = "Cap" + chainIdx + filler;
+
+         thePart = Part.newInstance (myProblem, theName, CAPACITY);
+
+         thePart.set (supplyVol, supVolArr);
+
+         for (vertIdx = 0; vertIdx < chainLength; vertIdx ++)
+            {
+            theName = "Opn" + chainIdx + "-" + vertIdx + filler;
+            
+            theOpn  = Operation.newInstance (myProblem, theName);
+
+            BomEntry.newInstance (theOpn, thePart);
+
+            theName = "Mat" + chainIdx + "-" + vertIdx + filler;
+            
+            thePart = Part.newInstance (myProblem, theName, MATERIAL);
+
+            BopEntry.newInstance (theOpn, thePart);
+            }
+
+         thePart.set (buildNstn, true);
+
+         theName   = "Dem" + chainIdx + filler;
+
+         theDemand = Demand.newInstance (thePart, theName);
+
+         theDemand.set (demandVol, demVolArr);
+         }
+      }
+
+//------------------------------------------------------------------------------
+// retrieveSoln ()
+//
+// Retrieves (and discards) the solution.
+//------------------------------------------------------------------------------
+
+   private void retrieveSoln ()
+      {
+      for (Demand theDemand: myProblem.getDemands ())
+         {
+         theDemand.get (shipVol);
+         }
+
+      for (Operation theOpn: myProblem.getOperations ())
+         {
+         theOpn.get (execVol);
+         }
+      }
+//------------------------------------------------------------------------------
+// getCpuTime ()
+//
+// Returns the current cumulative CPU time of the program process in seconds.
+//------------------------------------------------------------------------------
+
+   private static double getCpuTime ()
+      {
+      long   nanoTime;
+      double secTime;
+
+      nanoTime =
+         ManagementFactory.
+            getThreadMXBean ().
+               getCurrentThreadCpuTime ();
+
+      secTime  = ((double) nanoTime) / 1000000000.0;
+
+      return secTime;
+      }
+
+//------------------------------------------------------------------------------
+// displayCpuTimes ()
+//------------------------------------------------------------------------------
+
+   private void displayCpuTimes ()
+      {
+      System.out.printf (
+         "\n"
+       + "Ave. Non-Heur Time: %6.2f\n"
+       + "Ave. Total    Time: %6.2f\n",
+         aveNonHeurTime,
+         aveTotalTime);
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// nPers
+//
+// # periods
+//------------------------------------------------------------------------------
+
+   private int nPers;
+
+//------------------------------------------------------------------------------
+// nChains
+//
+// # Chains
+//------------------------------------------------------------------------------
+
+   private int nChains;
+
+//------------------------------------------------------------------------------
+// chainLength
+//
+// # Operations in each chain.
+//------------------------------------------------------------------------------
+
+   private int chainLength;
+
+//------------------------------------------------------------------------------
+// supVol
+//
+// The supplyVol value of each capacity in each period.
+//------------------------------------------------------------------------------
+
+   private int supVol;
+
+//------------------------------------------------------------------------------
+// filler
+//
+// A String to be included in names to make them longer.
+//------------------------------------------------------------------------------
+
+   private String filler;
+
+//------------------------------------------------------------------------------
+// nRuns
+//
+// # runs to be done.
+//------------------------------------------------------------------------------
+
+   private int nRuns;
+
+//------------------------------------------------------------------------------
+// aveNonHeurTime
+//
+// Average CPU time without heuristic implosion.
+//------------------------------------------------------------------------------
+
+   double aveNonHeurTime;
+
+//------------------------------------------------------------------------------
+// aveTotalTime
+//
+// Average total CPU time.
+//------------------------------------------------------------------------------
+
+   double aveTotalTime;
+
+//------------------------------------------------------------------------------
+// myProblem
+//------------------------------------------------------------------------------
+
+   private Problem myProblem;
+
+//------------------------------------------------------------------------------
+}
+@
+
+
+1.8
+log
+@Reduced heading comments.
+@
+text
+@d211 1
+a211 1
+      myProblem.setValue (nPeriods, nPers);
+d219 1
+a219 1
+         thePart.setValue (supplyVol, supVolArr);
+d236 1
+a236 1
+         thePart.setValue (buildNstn, true);
+d242 1
+a242 1
+         theDemand.setValue (demandVol, demVolArr);
+d256 1
+a256 1
+         theDemand.getValue (shipVol);
+d261 1
+a261 1
+         theOpn.getValue (execVol);
+@
+
+
+1.7
+log
+@Cleared up some of the code that was flagged with warnings by Eclipse.
+@
+text
+@a3 2
+//
+// Contains the declaration of class TimingTester.
+@
+
+
+1.6
+log
+@Moved GlobalAspect responsibilities to class Problem.
+Removed class GlobalAspect.
+@
+text
+@a14 1
+import       java.util.*;
+@
+
+
+1.5
+log
+@Revised the timing tests.
+@
+text
+@d214 1
+a214 1
+      myProblem.getGlobalAspect ().setValue (nPeriods, nPers);
+@
+
+
+1.4
+log
+@Replaced public accessor methods for the Attributes with piublic fields.
+@
+text
+@d65 2
+d75 2
+a76 1
+      timeAtStart = getCpuTime ();
+d78 4
+a81 14
+      createInitProblem ();
+      populateProblem   ();
+
+      timeBefHeur = getCpuTime ();
+
+      myProblem.heurImplode ();
+
+      timeAftHeur = getCpuTime ();
+
+      retrieveSoln ();
+
+      myProblem.deactivate ();
+
+      timeAtEnd   = getCpuTime ();
+d92 1
+a92 1
+   void parseArgs (String[] theArgs)
+d103 1
+d112 2
+a113 1
+       + "   Filler Length: %6d\n",
+d118 2
+a119 1
+         fillerLength);
+d129 39
+a167 1
+      }     
+d180 3
+a182 3
+      myProblem.getMessageMgr ().setMesgTimesPrint (750,          -1);
+      myProblem.getMessageMgr ().setMesgTimesPrint (751,          -1);
+      myProblem.getMessageMgr ().setMesgTimesPrint (752,          -1);
+a266 1
+
+a293 9
+      double heurTime;
+      double totTime;
+      double fracNonHeur;
+
+      heurTime    = timeAftHeur - timeBefHeur;
+      totTime     = timeAtEnd   - timeAtStart;
+
+      fracNonHeur = 1 - heurTime / totTime;
+
+d296 4
+a299 9
+       + "HeurImplode Time: %6.2f\n"
+       + "Non-Heur    Time: %6.2f\n"
+       + "Total       Time: %6.2f\n"
+       + "Non-Heur Portion: %6.2f%%\n",
+         
+         heurTime,
+         totTime - heurTime,
+         totTime,
+         fracNonHeur * 100);
+a306 6
+// myProblem
+//------------------------------------------------------------------------------
+
+   private Problem myProblem;
+
+//------------------------------------------------------------------------------
+d347 25
+a371 6
+// timeAtStart;
+// timeBefHeur;
+// timeAftHeur;
+// timeAtEnd;
+//
+// CPU times.
+d374 1
+a374 4
+   private double timeAtStart;
+   private double timeBefHeur;
+   private double timeAftHeur;
+   private double timeAtEnd;
+@
+
+
+1.3
+log
+@Removed the "enabled" concept from WIT-J.
+@
+text
+@d180 1
+a180 1
+      myProblem.getGlobalAspect ().setValue (nPeriods (), nPers);
+d188 1
+a188 1
+         thePart.setValue (supplyVol (), supVolArr);
+d205 1
+a205 1
+         thePart.setValue (buildNstn (), true);
+d211 1
+a211 1
+         theDemand.setValue (demandVol (), demVolArr);
+d225 1
+a225 1
+         theDemand.getValue (shipVol ());
+d230 1
+a230 1
+         theOpn.getValue (execVol ());
+@
+
+
+1.2
+log
+@Moved the iAmModifiable field to AttID class.
+@
+text
+@a144 2
+      myProblem.getMessageMgr ().setQuiet (true);
+
+a149 2
+
+      myProblem.enable ();
+@
+
+
+1.1
+log
+@Timing test.
+@
+text
+@a64 5
+      double timeAtStart;
+      double timeAftBuild;
+      double timeAftHeur;
+      double timeAtEnd;
+
+d67 3
+a69 3
+       + "-------------------------------------------------\n"
+       + " Timing Test\n"
+       + "-------------------------------------------------\n");
+d71 1
+a71 1
+      parseArgs     (theArgs);
+d73 1
+a73 1
+      timeAtStart  = getCpuTime ();
+d75 2
+a76 4
+      createProblem ();
+      buildTop      ();
+      buildChain    ();
+      buildFan      ();
+d78 1
+a78 1
+      timeAftBuild = getCpuTime ();
+d82 1
+a82 1
+      timeAftHeur  = getCpuTime ();
+d84 1
+a84 4
+      for (Operation theOpn: myProblem.getOperations ())
+         {
+         theOpn.getValue (execVol ());
+         }
+d88 1
+a88 1
+      timeAtEnd    = getCpuTime ();
+d90 1
+a90 11
+      System.out.printf (
+         "\n"
+       + "Build-Up    Time: %6.2f\n"
+       + "HeurImplode Time: %6.2f\n"
+       + "Extract     Time: %6.2f\n"
+       + "Total       Time: %6.2f\n",
+         
+         timeAftBuild - timeAtStart,
+         timeAftHeur  - timeAftBuild,
+         timeAtEnd    - timeAftHeur,
+         timeAtEnd    - timeAtStart);
+d106 2
+a107 2
+      chainLength  = Integer.parseInt (theArgs[2]);
+      fanWidth     = Integer.parseInt (theArgs[3]);
+d115 1
+a116 1
+       + "   Fan   Width:   %6d\n"
+d120 1
+a121 1
+         fanWidth,
+d125 1
+a125 1
+      fillerArr    = new char[fillerLength];
+d136 1
+a136 1
+// createProblem ()
+d141 1
+a141 1
+   private void createProblem ()
+a153 2
+
+      myGlobal = myProblem.getGlobalAspect ();
+d157 1
+a157 1
+// buildTop ()
+d159 1
+a159 1
+// Builds up the top portion of the Problem.
+d162 1
+a162 29
+   private void buildTop ()
+      {
+      Part     thePart;
+      Demand   theDemand;
+      double[] theDemandVol;
+
+      myGlobal.setValue (nPeriods   (), nPers);
+      myGlobal.setValue (multiRoute (), true);
+
+      thePart      = Part.newInstance (myProblem, "TopPart", MATERIAL);
+
+      thePart.setValue (buildNstn (), true);
+
+      theDemand    = Demand.newInstance (thePart, "Demand");
+
+      theDemandVol = new double[nPers];
+
+      theDemandVol[nPers - 1] = supVol * fanWidth * nPers + 100.0;
+
+      theDemand.setValue (demandVol (), theDemandVol);
+      }
+
+//------------------------------------------------------------------------------
+// buildChain ()
+//
+// Builds up the chain portion of the Problem.
+//------------------------------------------------------------------------------
+
+   private void buildChain ()
+d164 5
+d170 1
+a170 2
+      int       theIdx;
+      String    theName;
+d172 1
+d174 2
+a175 1
+      thePart = myProblem.getParts ().get (0);
+d177 1
+a177 1
+      for (theIdx = 0; theIdx < chainLength; theIdx ++)
+d179 1
+a179 13
+         theName = "ChainOpn" + theIdx + filler;
+
+         theOpn = Operation.newInstance (myProblem, theName);
+
+         BopEntry.newInstance (theOpn, thePart);
+
+         theName = "ChainPart" + theIdx + filler;
+         
+         thePart = Part.newInstance (myProblem, theName, MATERIAL);
+
+         thePart.setValue (buildNstn (), true);
+         
+         BomEntry.newInstance (theOpn, thePart);
+a180 1
+      }
+d182 1
+a182 5
+//------------------------------------------------------------------------------
+// buildFan ()
+//
+// Builds up the fan portion of the Problem.
+//------------------------------------------------------------------------------
+d184 1
+a184 10
+   private void buildFan ()
+      {
+      int       chainEndIdx;
+      Part      chainEnd;
+      double[]  supVolArr;
+      int       thePer;
+      int       theIdx;
+      String    theName;
+      Operation theOpn;
+      Part      thePart;
+d186 3
+a188 1
+      chainEndIdx = myProblem.getParts ().size () - 1;
+d190 1
+a190 1
+      chainEnd    = myProblem.getParts ().get (chainEndIdx);
+d192 1
+a192 1
+      supVolArr   = new double[nPers];
+d194 11
+a204 4
+      for (thePer = 0; thePer < nPers; thePer ++)
+         {
+         supVolArr[thePer] = supVol;
+         }
+d206 2
+a207 3
+      for (theIdx = 0; theIdx < fanWidth; theIdx ++)
+         {
+         theName = "FanOpn" + theIdx + filler;
+d209 1
+a209 1
+         theOpn = Operation.newInstance (myProblem, theName);
+d211 1
+a211 1
+         BopEntry.newInstance (theOpn, chainEnd);
+d213 1
+a213 3
+         theName = "FanPart" + theIdx + filler;
+         
+         thePart = Part.newInstance (myProblem, theName, CAPACITY);
+d215 1
+a215 3
+         thePart.setValue (supplyVol (), supVolArr);
+         
+         BomEntry.newInstance (theOpn, thePart);
+d220 3
+a222 1
+// display (theCompName, theAttName, theArray)
+d225 1
+a225 4
+   private void display (
+         List      <? extends Component> theList,
+         Attribute <String>              theNameAtt,
+         Attribute <double[]>            theDblVecAtt)
+d227 4
+a230 3
+      String   theName;
+      double[] theDblArr;
+      int      thePer;
+d232 1
+a232 3
+      System.out.printf ("\n");
+
+      for (Component theComp: theList)
+d234 1
+a234 10
+         theName   = theComp.getValue (theNameAtt);
+         theDblArr = theComp.getValue (theDblVecAtt);
+
+         for (thePer = 0; thePer < nPers; thePer ++)
+            System.out.printf (
+               "%s.%s[%2d] = %.0f\n",
+               theName,
+               theDblVecAtt,
+               thePer,
+               theDblArr[thePer]);
+d259 28
+d291 5
+a295 2
+   Problem      myProblem = null;
+   GlobalAspect myGlobal  = null;
+d303 1
+a303 1
+   int nPers;
+d306 1
+a306 1
+// chainLength
+d308 1
+a308 1
+// # Parts in the chain.
+d311 1
+a311 1
+   int chainLength;
+d314 1
+a314 1
+// fanWidth
+d316 1
+a316 1
+// # Parts in the fan.
+d319 1
+a319 1
+   int fanWidth;
+d327 1
+a327 1
+   int supVol;
+d335 15
+a349 1
+   String filler;
+@
+

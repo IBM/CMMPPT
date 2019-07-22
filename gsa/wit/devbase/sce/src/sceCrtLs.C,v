@@ -1,0 +1,353 @@
+head	1.4;
+access;
+symbols
+	sce_5_01_20080919:1.4
+	latest_sce_4_20_20060523:1.4.0.4
+	sce_4_20_20060523:1.4
+	latest_sce4_20_OSL:1.4.0.2
+	sce_4_20_OSL:1.4
+	sce_4_20_20051222:1.4
+	sce_4_10_30050426:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.2
+	nextGenBranch:1.2.0.2
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2004.05.07.03.10.00;	author ervolina;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.03.04.20.28.12;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.57;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.43.17;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@more memory fixes
+@
+text
+@#include <mcl/src/mdsPragma.h>
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+// file: sceCrtLs.C
+// author:  tom and robin
+
+#include <stdlib.h>
+#include <assert.h>
+#include <sce/src/sceCrtLs.h>
+#include <scenario/src/machdep.h>
+#include <sce/src/sceDefin.h>
+#include <wit/src/wit.h>
+
+
+#ifndef ELIMINATE_OLD_MAIN
+
+// return the i-th part in the critList
+std::string
+LgFrSceCritList::getPart( int i )
+{
+  return list_[i];
+}
+
+// return the i-th period in the critList
+int
+LgFrSceCritList::getPeriod( int i )
+{
+  return periods_[i];
+}
+
+// return the length of the critList
+int
+LgFrSceCritList::getLength( )
+{
+  assert (list_.size() == periods_.size());
+  return list_.size();
+}
+
+// merge the critList
+void
+LgFrSceCritList::merge(  WitRun * theWitRun )
+
+{
+  int length;
+  char ** witCritList;
+  int * witCritPds;
+  witGetCriticalList( theWitRun, &length, &witCritList, &witCritPds);
+  LgFrSceCritList local(length, witCritList, witCritPds);
+  this->merge(local);
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<length; i++) {
+    witFree(witCritList[i]);
+  }
+  witFree(witCritList);
+  witFree(witCritPds);
+  
+}
+
+// merge the critList
+void
+LgFrSceCritList::merge(  int       length, 
+                         char   ** witCritList, 
+                         int     * witCritPds )
+
+{
+  LgFrSceCritList local(length, witCritList, witCritPds);
+  this->merge(local);
+}
+
+// merge the critList
+void
+LgFrSceCritList::merge( LgFrSceCritList & inList) 
+
+{
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<inList.getLength(); i++)  {
+    int found = 0;
+    int period = inList.getPeriod(i);
+    std::string part = inList.getPart(i);
+    int j = 0; // Pulled out of the for below by RW2STL
+    for (j=0; j< this->getLength(); j++) {
+      if (this->getPeriod(j) == period) {
+        if (this->getPart(j) == part) {
+          found = 1;
+          break ;
+        }
+      }
+    }
+    if (found)
+      continue;
+
+    this->list_.push_back(part);
+    this->periods_.push_back(period);
+  }
+  assert (list_.size() == periods_.size());
+
+}
+
+// default constructor:
+LgFrSceCritList::LgFrSceCritList()
+  :   list_(),
+      periods_()
+{
+    // all the work is done in initializer
+}
+
+
+// fairly general constructor:
+LgFrSceCritList::LgFrSceCritList( int length, char ** witCritList, int * witCritPds)
+  :   list_(),
+      periods_()
+{
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<length; i++) {
+    list_.push_back(witCritList[i]);
+    periods_.push_back(witCritPds[i]);
+  }
+  assert (list_.size() == periods_.size());
+}
+
+  
+  
+
+// copy constructor -- need to work out (?)
+LgFrSceCritList::LgFrSceCritList(const LgFrSceCritList& source)
+  :  list_(source.list_),
+     periods_(source.periods_)
+{
+  // nothing to do
+}
+
+// assignment operator
+LgFrSceCritList&
+LgFrSceCritList::operator=(const LgFrSceCritList& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    list_ = rhs.list_;
+    periods_ = rhs.periods_;
+  }
+  return *this;
+}
+
+// destructor
+LgFrSceCritList::~LgFrSceCritList()
+{
+  // nothing to do, 
+}
+
+#endif
+@
+
+
+1.3
+log
+@Modified to reduce microsoft compiler warning messages
+@
+text
+@d53 1
+a53 1
+    portableFree(witCritList[i]);
+d55 2
+a56 2
+  portableFree(witCritList);
+  portableFree(witCritPds);
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 1
+a1 1
+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+d19 1
+a19 1
+RWCString
+d36 2
+a37 2
+  assert (list_.entries() == periods_.entries());
+  return list_.entries();
+d51 2
+a52 1
+  for (int i=0; i<length; i++) {
+d76 2
+a77 1
+  for (int i=0; i<inList.getLength(); i++)  {
+d80 3
+a82 2
+    RWCString part = inList.getPart(i);
+    for (int j=0; j< this->getLength(); j++) {
+d93 2
+a94 2
+    this->list_.insert(part);
+    this->periods_.insert(period);
+d96 1
+a96 1
+  assert (list_.entries() == periods_.entries());
+d114 4
+a117 3
+  for (int i=0; i<length; i++) {
+    list_.insert(witCritList[i]);
+    periods_.insert(witCritPds[i]);
+d119 1
+a119 1
+  assert (list_.entries() == periods_.entries());
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@a0 4
+
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+d15 1
+a15 1
+std::string
+d32 2
+a33 2
+  assert (list_.size() == periods_.size());
+  return list_.size();
+d47 1
+a47 2
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<length; i++) {
+d71 1
+a71 2
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<inList.getLength(); i++)  {
+d74 2
+a75 3
+    std::string part = inList.getPart(i);
+    int j = 0; // Pulled out of the for below by RW2STL
+    for (j=0; j< this->getLength(); j++) {
+d86 2
+a87 2
+    this->list_.push_back(part);
+    this->periods_.push_back(period);
+d89 1
+a89 1
+  assert (list_.size() == periods_.size());
+d107 3
+a109 4
+  int i = 0; // Pulled out of the for below by RW2STL
+  for (i=0; i<length; i++) {
+    list_.push_back(witCritList[i]);
+    periods_.push_back(witCritPds[i]);
+d111 1
+a111 1
+  assert (list_.size() == periods_.size());
+@
+

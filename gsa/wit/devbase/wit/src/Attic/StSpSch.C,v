@@ -1,0 +1,702 @@
+head	1.13;
+access;
+symbols
+	EndRw-branch:1.12.0.8
+	Root-of-EndRw:1.12
+	rwToStl:1.12.0.6
+	latest_sce_3_10_20010924:1.12.0.4
+	sce_3_10_20010924:1.12
+	latest_sce_3_00_20010601:1.12.0.2
+	sce_3_00_20010601:1.12
+	latest_sce_2_31_20010308:1.9.0.2
+	sce_2_31_20010308:1.9;
+locks; strict;
+comment	@ * @;
+
+
+1.13
+date	2003.03.03.23.27.05;	author rjw;	state dead;
+branches;
+next	1.12;
+
+1.12
+date	2001.05.25.14.53.28;	author bobw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2001.05.17.15.11.17;	author bobw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2001.03.29.00.10.16;	author bobw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2001.02.01.16.24.45;	author bobw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2001.01.27.00.24.39;	author bobw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2001.01.26.21.46.03;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.01.24.20.05.58;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.01.15.19.01.52;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.01.11.16.35.11;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.12.28.22.13.39;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.12.22.16.18.27;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.12.20.20.08.38;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.12
+log
+@Implemented and used class SplitPt.
+Removed generic class StackSpSched.
+@
+text
+@@
+
+
+1.11
+log
+@Used rusage for timing on AIX.
+Made generic class StackSpSched use only 1 argument.
+Added baSelSplit attribute.
+Removed selSplit development parameter.
+Added selSplitAll development parameter.
+@
+text
+@a0 208
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "StSpSch.C"
+//
+// Contains the implementation of generic class StackSpSched (TheType).
+//------------------------------------------------------------------------------
+
+#include <StSpSch.h>
+#include <PtrVec.h>
+#include <PtrTVec.h>
+#include <ObjStack.h>
+#include <PairSt.h>
+#include <CompMgr.h>
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class StackSpSched (TheType).
+//------------------------------------------------------------------------------
+
+#define WitStackSpSchedimplement(TheType)                                      \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+inline WitTl * WitStackSpSched (TheType)::myTlPtr (                            \
+      TheType * theDomEl,                                                      \
+      WitPeriod thePer)                                                        \
+      const                                                                    \
+   {                                                                           \
+   return myVec_ (theDomEl->mappingIndex ())[thePer];                          \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitStackSpSched (TheType)::WitStackSpSched (TheType) (WitProblem * theProblem):\
+                                                                               \
+      WitProbAssoc                                        (theProblem),        \
+      nonEmptyStacks_ (* new WitObjStack  (WitTl)         (theProblem)),       \
+      savedPairs_     (* new WitPairStack (WitTl, double) (theProblem)),       \
+      savedStacks_    (* new WitObjStack  (WitTl)         (theProblem)),       \
+      myVec_          (* new WitPtrVec    (WitTlPtrTVec))                      \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitStackSpSched (TheType)::~WitStackSpSched (TheType) ()                       \
+   {                                                                           \
+   int       theIdx;                                                           \
+   WitPeriod thePer;                                                           \
+                                                                               \
+   for (theIdx = 0; theIdx < myVec_.length (); theIdx ++)                      \
+      if (myVec_[theIdx] != NULL)                                              \
+         {                                                                     \
+         WitTlPtrTVec & theRow = myVec_ (theIdx);                              \
+                                                                               \
+         forEachPeriod (thePer, myProblem ())                                  \
+            delete & asaStack (theRow[thePer]);                                \
+                                                                               \
+         delete myVec_[theIdx];                                                \
+         }                                                                     \
+                                                                               \
+   delete & myVec_;                                                            \
+   delete & savedStacks_;                                                      \
+   delete & savedPairs_;                                                       \
+   delete & nonEmptyStacks_;                                                   \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::allocate1D ()                                  \
+   {                                                                           \
+   myVec_.resize (myCompMgr ()->nInstances ((TheType *) NULL));                \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::allocateRow (TheType * theDomEl)               \
+   {                                                                           \
+   int       theIdx;                                                           \
+   WitPeriod thePer;                                                           \
+                                                                               \
+   theIdx = theDomEl->mappingIndex ();                                         \
+                                                                               \
+   if (myVec_[theIdx] != NULL)                                                 \
+      return;                                                                  \
+                                                                               \
+   myVec_[theIdx]        = new WitTlPtrTVec (myProblem ());                    \
+                                                                               \
+   WitTlPtrTVec & theRow = myVec_ (theIdx);                                    \
+                                                                               \
+   forEachPeriod (thePer, myProblem ())                                        \
+      theRow[thePer] =                                                         \
+         (WitTl *) new WitPairStack (WitTl, double) (myProblem ());            \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::push (                                         \
+      TheType * theDomEl,                                                      \
+      WitPeriod thePer,                                                        \
+      WitTl *   theTlObj,                                                      \
+      double    theVal)                                                        \
+   {                                                                           \
+   asaNonEmptyStack (myTlPtr (theDomEl, thePer)).push (theTlObj, theVal);      \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::slowAppend (                                   \
+      TheType * theDomEl,                                                      \
+      WitPeriod thePer,                                                        \
+      WitTl *   theTlObj,                                                      \
+      double    theVal)                                                        \
+   {                                                                           \
+   asaNonEmptyStack (myTlPtr (theDomEl, thePer)).slowAppend (theTlObj, theVal);\
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::clear ()                                       \
+   {                                                                           \
+   WitTl * theTlObj;                                                           \
+                                                                               \
+   while (nonEmptyStacks_.pop (theTlObj))                                      \
+      asaStack (theTlObj).clear ();                                            \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::saveAndClear ()                                \
+   {                                                                           \
+   WitTl * theStackAsaTlObj;                                                   \
+   WitTl * theTlObj;                                                           \
+   double  theValue;                                                           \
+                                                                               \
+   savedPairs_ .clear ();                                                      \
+   savedStacks_.clear ();                                                      \
+                                                                               \
+   while (nonEmptyStacks_.pop (theStackAsaTlObj))                              \
+      while (asaStack (theStackAsaTlObj).pop (theTlObj, theValue))             \
+         {                                                                     \
+         savedPairs_ .push (theTlObj, theValue);                               \
+         savedStacks_.push (theStackAsaTlObj);                                 \
+         }                                                                     \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitStackSpSched (TheType)::restore ()                                     \
+   {                                                                           \
+   WitObjStItr (WitTl)          theStacksItr;                                  \
+   WitPairStItr (WitTl, double) thePairsItr;                                   \
+   WitTl *                      theStackAsaTlObj;                              \
+   WitTl *                      theTlObj;                                      \
+   double                       theValue;                                      \
+                                                                               \
+   clear ();                                                                   \
+                                                                               \
+   theStacksItr.attachTo (savedStacks_);                                       \
+   thePairsItr .attachTo (savedPairs_);                                        \
+                                                                               \
+   while (theStacksItr.advance (theStackAsaTlObj))                             \
+      {                                                                        \
+      thePairsItr                        .advance (theTlObj, theValue);        \
+      asaNonEmptyStack (theStackAsaTlObj).push    (theTlObj, theValue);        \
+      }                                                                        \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+const WitPairStack (WitTl, double) &                                           \
+         WitStackSpSched (TheType)::operator () (                              \
+      TheType * theDomEl,                                                      \
+      WitPeriod thePer)                                                        \
+      const                                                                    \
+   {                                                                           \
+   return asaStack (myTlPtr (theDomEl, thePer));                               \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairStack (WitTl, double) &                                                 \
+      WitStackSpSched (TheType)::asaNonEmptyStack (WitTl * theTlObj)           \
+   {                                                                           \
+   WitPairStack (WitTl, double) & theStack = asaStack (theTlObj);              \
+                                                                               \
+   if (theStack.isEmpty ())                                                    \
+      nonEmptyStacks_.push (theTlObj);                                         \
+                                                                               \
+   return theStack;                                                            \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementations of all specific cases of the generic classes implemented in
+// this file.
+//------------------------------------------------------------------------------
+
+implement (WitStackSpSched, WitPart)
+implement (WitStackSpSched, WitMaterial)
+implement (WitStackSpSched, WitBomEntry)
+implement (WitStackSpSched, WitBopEntry)
+@
+
+
+1.10
+log
+@Re-factoring for selection splitting.
+@
+text
+@d13 1
+a13 1
+// Contains the implementation of generic class StackSpSched (DomType, ObjType).
+d24 1
+a24 1
+// Implementation macro for generic class StackSpSched (DomType, ObjType).
+d27 1
+a27 1
+#define WitStackSpSchedimplement2(DomType, ObjType)                            \
+d31 2
+a32 2
+inline WitTl * WitStackSpSched (DomType, ObjType)::myTlPtr (                   \
+      DomType * theDomEl,                                                      \
+d41 1
+a41 2
+WitStackSpSched (DomType, ObjType)::WitStackSpSched (DomType, ObjType) (       \
+         WitProblem * theProblem):                                             \
+d43 4
+a46 4
+      WitProbAssoc                                          (theProblem),      \
+      nonEmptyStacks_ (* new WitObjStack  (WitTl)           (theProblem)),     \
+      savedPairs_     (* new WitPairStack (ObjType, double) (theProblem)),     \
+      savedStacks_    (* new WitObjStack  (WitTl)           (theProblem)),     \
+d53 1
+a53 1
+WitStackSpSched (DomType, ObjType)::~WitStackSpSched (DomType, ObjType) ()     \
+d77 1
+a77 1
+void WitStackSpSched (DomType, ObjType)::allocate1D ()                         \
+d79 1
+a79 1
+   myVec_.resize (myCompMgr ()->nInstances ((DomType *) NULL));                \
+d84 1
+a84 1
+void WitStackSpSched (DomType, ObjType)::allocateRow (DomType * theDomEl)      \
+d100 1
+a100 1
+         (WitTl *) new WitPairStack (ObjType, double) (myProblem ());          \
+d105 2
+a106 2
+void WitStackSpSched (DomType, ObjType)::push (                                \
+      DomType * theDomEl,                                                      \
+d108 1
+a108 1
+      ObjType * theObject,                                                     \
+d111 1
+a111 1
+   asaNonEmptyStack (myTlPtr (theDomEl, thePer)).push (theObject, theVal);     \
+d116 2
+a117 2
+void WitStackSpSched (DomType, ObjType)::slowAppend (                          \
+      DomType * theDomEl,                                                      \
+d119 1
+a119 1
+      ObjType * theObject,                                                     \
+d122 1
+a122 3
+   asaNonEmptyStack (myTlPtr (theDomEl, thePer)).slowAppend (                  \
+      theObject,                                                               \
+      theVal);                                                                 \
+d127 1
+a127 1
+void WitStackSpSched (DomType, ObjType)::clear ()                              \
+d137 1
+a137 1
+void WitStackSpSched (DomType, ObjType)::saveAndClear ()                       \
+d139 3
+a141 3
+   WitTl *   theTlObj;                                                         \
+   ObjType * theObject;                                                        \
+   double    theValue;                                                         \
+d146 2
+a147 2
+   while (nonEmptyStacks_.pop (theTlObj))                                      \
+      while (asaStack (theTlObj).pop (theObject, theValue))                    \
+d149 2
+a150 2
+         savedPairs_ .push (theObject, theValue);                              \
+         savedStacks_.push (theTlObj);                                         \
+d156 1
+a156 1
+void WitStackSpSched (DomType, ObjType)::restore ()                            \
+d158 5
+a162 5
+   WitObjStItr (WitTl)            theStacksItr;                                \
+   WitPairStItr (ObjType, double) thePairsItr;                                 \
+   WitTl *                        theTlObj;                                    \
+   ObjType *                      theObject;                                   \
+   double                         theValue;                                    \
+d169 1
+a169 1
+   while (theStacksItr.advance (theTlObj))                                     \
+d171 2
+a172 2
+      thePairsItr                .advance (theObject, theValue);               \
+      asaNonEmptyStack (theTlObj).push    (theObject, theValue);               \
+d178 3
+a180 3
+const WitPairStack (ObjType, double) &                                         \
+         WitStackSpSched (DomType, ObjType)::operator () (                     \
+      DomType * theDomEl,                                                      \
+d189 2
+a190 2
+WitPairStack (ObjType, double) &                                               \
+      WitStackSpSched (DomType, ObjType)::asaNonEmptyStack (WitTl * theTlObj)  \
+d192 1
+a192 1
+   WitPairStack (ObjType, double) & theStack = asaStack (theTlObj);            \
+d205 4
+a208 6
+implement2 (WitStackSpSched, WitPart,     WitTl)
+implement2 (WitStackSpSched, WitMaterial, WitTl)
+implement2 (WitStackSpSched, WitBomEntry, WitTl)
+implement2 (WitStackSpSched, WitBopEntry, WitTl)
+
+implement2 (WitStackSpSched, WitMaterial, WitFixedPer)
+@
+
+
+1.9
+log
+@Further implementation of coarse selection splitting.
+@
+text
+@d132 1
+a132 1
+   WitTl * theTlPtr;                                                           \
+d134 2
+a135 2
+   while (nonEmptyStacks_.pop (theTlPtr))                                      \
+      asaStack (theTlPtr).clear ();                                            \
+d142 1
+a142 1
+   WitTl *   theTlPtr;                                                         \
+d149 2
+a150 2
+   while (nonEmptyStacks_.pop (theTlPtr))                                      \
+      while (asaStack (theTlPtr).pop (theObject, theValue))                    \
+d153 1
+a153 1
+         savedStacks_.push (theTlPtr);                                         \
+d163 1
+a163 1
+   WitTl *                        theTlPtr;                                    \
+d172 1
+a172 1
+   while (theStacksItr.advance (theTlPtr))                                     \
+d175 1
+a175 1
+      asaNonEmptyStack (theTlPtr).push    (theObject, theValue);               \
+d193 1
+a193 1
+      WitStackSpSched (DomType, ObjType)::asaNonEmptyStack (WitTl * theTlPtr)  \
+d195 1
+a195 1
+   WitPairStack (ObjType, double) & theStack = asaStack (theTlPtr);            \
+d198 1
+a198 1
+      nonEmptyStacks_.push (theTlPtr);                                         \
+@
+
+
+1.8
+log
+@Further implementation of coarse selection splitting.
+@
+text
+@d31 10
+d65 1
+a65 1
+            delete asaStackPtr (theRow[thePer]);                               \
+d100 2
+a101 2
+      asaStackPtr (theRow[thePer]) =                                           \
+         new WitPairStack (ObjType, double) (myProblem ());                    \
+d112 12
+a123 2
+   pushInternal (                                                              \
+      myVec_ (theDomEl->mappingIndex ())[thePer],                              \
+d135 1
+a135 1
+      asaStackPtr (theTlPtr)->clear ();                                        \
+d150 1
+a150 1
+      while (asaStackPtr (theTlPtr)->pop (theObject, theValue))                \
+d174 2
+a175 3
+      thePairsItr.advance    (theObject, theValue);                            \
+                                                                               \
+      pushInternal (theTlPtr, theObject, theValue);                            \
+d187 1
+a187 1
+   return * asaStackPtr (myVec_ (theDomEl->mappingIndex ())[thePer]);          \
+d192 2
+a193 4
+void WitStackSpSched (DomType, ObjType)::pushInternal (                        \
+      WitTl *   theTlPtr,                                                      \
+      ObjType * theObject,                                                     \
+      double    theVal)                                                        \
+d195 3
+a197 1
+   if (asaStackPtr (theTlPtr)->isEmpty ())                                     \
+d200 2
+a201 2
+   asaStackPtr (theTlPtr)->push (theObject, theVal);                           \
+   }
+@
+
+
+1.7
+log
+@Implemented coarse selection splitting for multiple exec periods.
+@
+text
+@d194 1
+a194 1
+implement2 (WitStackSpSched, WitMaterial, WitConstPer)
+@
+
+
+1.6
+log
+@Further development of coarse selection splitting.
+@
+text
+@d190 1
+d192 1
+a192 1
+implement2 (WitStackSpSched, WitMaterial, WitTl)
+@
+
+
+1.5
+log
+@Fixed some bugs in coarse selection splitting.
+@
+text
+@d189 4
+a192 2
+implement2 (WitStackSpSched, WitPart,     WitBopEntry)
+implement2 (WitStackSpSched, WitBomEntry, WitConsEntry)
+@
+
+
+1.4
+log
+@Initial implementation of coarse selection splitting for build-ahead.
+@
+text
+@d96 1
+a96 1
+void WitStackSpSched (DomType, ObjType)::put (                                 \
+d102 4
+a105 8
+   WitTl * theTlPtr;                                                           \
+                                                                               \
+   theTlPtr = myVec_ (theDomEl->mappingIndex ())[thePer];                      \
+                                                                               \
+   if (asaStackPtr (theTlPtr)->isEmpty ())                                     \
+      nonEmptyStacks_.put (theTlPtr);                                          \
+                                                                               \
+   asaStackPtr (theTlPtr)->put (theObject, theVal);                            \
+d114 1
+a114 1
+   while (nonEmptyStacks_.get (theTlPtr))                                      \
+d129 2
+a130 2
+   while (nonEmptyStacks_.get (theTlPtr))                                      \
+      while (asaStackPtr (theTlPtr)->get (theObject, theValue))                \
+d132 2
+a133 2
+         savedPairs_ .put (theObject, theValue);                               \
+         savedStacks_.put (theTlPtr);                                          \
+d154 1
+a154 1
+      thePairsItr.advance         (theObject, theValue);                       \
+d156 1
+a156 1
+      asaStackPtr (theTlPtr)->put (theObject, theValue);                       \
+d170 13
+@
+
+
+1.3
+log
+@Completed a limited implementation of coarse selection splitting for BOP
+entries.
+@
+text
+@d34 5
+a38 2
+      neStackPtrs_ (* new WitObjStack (WitTl)       (theProblem)),             \
+      myVec_       (* new WitPtrVec   (WitTlPtrTVec))                          \
+a39 1
+   myVec_.resize (theProblem->myCompMgr ()->nInstances ((DomType *) NULL));    \
+d46 2
+a47 5
+   WitProblem * theProblem;                                                    \
+   int          theIdx;                                                        \
+   WitPeriod    thePer;                                                        \
+                                                                               \
+   theProblem = neStackPtrs_.myProblem ();                                     \
+d54 1
+a54 1
+         forEachPeriod (thePer, theProblem)                                    \
+d61 3
+a63 1
+   delete & neStackPtrs_;                                                      \
+d68 1
+a68 1
+void WitStackSpSched (DomType, ObjType)::allocate (DomType * theDomEl)         \
+d70 9
+a78 3
+   int          theIdx;                                                        \
+   WitProblem * theProblem;                                                    \
+   WitPeriod    thePer;                                                        \
+d85 1
+a85 3
+   theProblem            = neStackPtrs_.myProblem ();                          \
+                                                                               \
+   myVec_[theIdx]        = new WitTlPtrTVec (theProblem);                      \
+d89 1
+a89 1
+   forEachPeriod (thePer, theProblem)                                          \
+d91 1
+a91 1
+         new WitPairStack (ObjType, double) (theProblem);                      \
+d107 1
+a107 1
+      neStackPtrs_.put (theTlPtr);                                             \
+d118 1
+a118 1
+   while (neStackPtrs_.get (theTlPtr))                                         \
+d124 42
+d182 1
+@
+
+
+1.2
+log
+@Further development of coarse selection splitting.
+@
+text
+@d91 1
+a91 1
+void WitStackSpSched (DomType, ObjType)::push (                                \
+d102 1
+a102 1
+      neStackPtrs_.push (theTlPtr);                                            \
+d104 1
+a104 1
+   asaStackPtr (theTlPtr)->push (theObject, theVal);                           \
+d113 1
+a113 1
+   while (neStackPtrs_.pop (theTlPtr))                                         \
+d129 2
+a130 2
+// Implementations of all specific cases of the generic classes and functions
+// implemented in this file.
+d133 1
+@
+
+
+1.1
+log
+@Further development of coarse selection splitting.
+@
+text
+@d19 2
+a20 1
+#include <Stack.h>
+@
+

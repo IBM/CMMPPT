@@ -1,0 +1,2303 @@
+head	1.4;
+access;
+symbols
+	sce_5_01_20080919:1.4
+	latest_sce_4_20_20060523:1.4.0.6
+	sce_4_20_20060523:1.4
+	latest_sce4_20_OSL:1.4.0.4
+	sce_4_20_OSL:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.4
+	nextGenBranch:1.4.0.2
+	nextGenRoot:1.4
+	sce_3_30_20030627:1.4
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.01.15.23.05.48;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.45;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.16;	author austel;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.51;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.51;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.42.35;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <scenario/src/schFCMRP.h>
+#include <scenario/src/scenCMRP.h>
+#include <scenario/src/schdDeSt.h>
+#include <scenario/src/sortSchd.h>
+#include <scenario/src/partSS.h>
+#include <scenario/src/demVolSS.h>
+#include <scenario/src/prodSS.h>
+#include <scenario/src/backlgSS.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/supplySS.h>
+#include <scenario/src/reqSS.h>
+#include <scenario/src/cumSS.h>
+#include <scenario/src/costSS.h>
+#include <scenario/src/shipSS.h>
+#include <scenario/src/cycleSS.h>
+#include <scenario/src/consSS.h>
+#include <scenario/src/excessSS.h>
+#include <scenario/src/stockSS.h>
+#include <scenario/src/scrapSS.h>
+#include <scenario/src/usageSS.h>
+#include <scenario/src/deltaSS.h>
+#include <scenario/src/fssSS.h>
+#include <scenario/src/offsetSS.h>
+#include <scenario/src/partSchd.h>
+#include <scenario/src/demdSchd.h>
+#include <scenario/src/scCMRPP.h>
+#include <scenario/src/partSchP.h>
+#include <scenario/src/demdSchP.h>
+
+// Create a new sorting part schedule
+LgFrSortingPartScheduleFloatSmartPointer
+LgFrScheduleFactoryForCMRP::newPartScheduleFromScratch 
+  (const LgFrScheduleDescriptor& desc,
+   const bool deepCopy,
+   const bool toPopulate
+   )
+const
+{
+  LgFrPartScheduleStrategy *partSS;
+  LgFrScenarioForCMRPSmartPointer scenario
+    = LgFrScenarioForCMRPSmartPointer(this->scenario());
+  if ( desc == LGFRBudgetAmount ) {
+      partSS = new LgFrSupplyScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+
+//        Schedules for the  "Planner-managed" (constrained) window
+//        ---------------------------------------------------------
+  else if ( desc == LGFRPlannerManagedSupplyVol){
+      partSS = new LgFrSupplyScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedRequiredVol){
+      partSS = new LgFrRequirementScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedConsVol){
+      partSS = new LgFrFullyExplodedMrpConsVolScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedTotalPartDemandVol){
+      LgFrCumDemandsPartScheduleStrategy* totShipSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer dependentSched = 
+	  this->newDemandSchedule(LGFRDemandVolume, deepCopy, toPopulate);
+      totShipSS->insertDemandSchedule(dependentSched);
+      partSS = totShipSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedTotalConsVol){
+      // Sum, for each part, fully exploded consVol and independent demand
+      LgFrSortingPartScheduleFloatSmartPointer independentDemandVol
+        = this->newPartSchedule(LGFRPlannerManagedTotalPartDemandVol, false,
+				true);
+      LgFrSortingPartScheduleFloatSmartPointer fullyExplodedMrpConsVol
+	= this->newPartSchedule(LGFRPlannerManagedConsVol, false,
+				true);
+      LgFrPartScheduleSensitiveScheduleStrategy* sumSS
+	  = new LgFrPartScheduleSensitiveScheduleStrategy(*scenario);
+      sumSS->insertPartSchedule(independentDemandVol);
+      sumSS->insertPartSchedule(fullyExplodedMrpConsVol);
+      sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+      partSS = sumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedCumSupplyVol){
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRPlannerManagedSupplyVol, deepCopy,
+				toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedCumRequiredVol){
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRPlannerManagedRequiredVol, deepCopy,
+				toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if (desc == LGFRPlannerManagedExcessVol)     {
+      partSS = new LgFrExcessScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRPlannerManagedFocussedShortageSchedule ) {
+      partSS = new 
+	LgFrFocussedShortageScheduleScheduleStrategy(*(this->scenario()));
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if (desc == LGFRPlannerManagedStockVol)     {
+      partSS = new LgFrStockScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if (desc == LGFRPlannerManagedScrapVol)     {
+      partSS = new LgFrScrapScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if (desc == LGFRPlannerManagedUsageVol)     {
+      LgFrUsageScheduleStrategy* usageSS
+	  = new LgFrUsageScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSupplySched1 = 
+	  this->newPartSchedule(LGFRPlannerManagedSupplyVol, deepCopy,
+				toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer
+	dependentProdSched2(new LgFrSortingPartScheduleFloat);
+      LgFrSortingPartScheduleFloatSmartPointer dependentStockSched3 = 
+	  this->newPartSchedule(LGFRPlannerManagedStockVol, deepCopy, 
+				toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentScrapSched4 = 
+	  this->newPartSchedule(LGFRPlannerManagedScrapVol, deepCopy, 
+				toPopulate);
+
+      usageSS->insertPartSchedule(dependentSupplySched1);
+      usageSS->insertPartSchedule(dependentProdSched2);
+      usageSS->insertPartSchedule(dependentStockSched3);
+      usageSS->insertPartSchedule(dependentScrapSched4);
+      partSS = usageSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+
+//        Schedules for the "MRP-managed" 
+//        --------------------------------
+  else if ( desc == LGFRMRPManagedSupplyVol){
+      partSS = new LgFrSupplyScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if ( desc == LGFRMRPManagedRequiredVol){
+      partSS = new LgFrCmrpRequirementScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if ( desc == LGFRMRPManagedConsVol){
+      partSS = new LgFrFullyExplodedMrpConsVolScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if ( desc == LGFRMRPManagedTotalPartDemandVol){
+      LgFrCumDemandsPartScheduleStrategy* totShipSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer dependentSched = 
+	  this->newDemandSchedule(LGFRDemandVolume, deepCopy, toPopulate);
+      totShipSS->insertDemandSchedule(dependentSched);
+      partSS = totShipSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+  else if ( desc == LGFRMRPManagedTotalConsVol){
+      // Sum, for each part, fully exploded consVol and independent demand
+      LgFrSortingPartScheduleFloatSmartPointer independentDemandVol
+        = this->newPartSchedule(LGFRMRPManagedTotalPartDemandVol, false,
+				true);
+      LgFrSortingPartScheduleFloatSmartPointer fullyExplodedConsVol
+	= this->newPartSchedule(LGFRMRPManagedConsVol, false,
+				true);
+      LgFrPartScheduleSensitiveScheduleStrategy* sumSS
+	  = new LgFrPartScheduleSensitiveScheduleStrategy(*scenario);
+      sumSS->insertPartSchedule(independentDemandVol);
+      sumSS->insertPartSchedule(fullyExplodedConsVol);
+      sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+      partSS = sumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CONSTRAINED_SET));
+  }
+
+  else if ( desc == LGFRMRPManagedCumSupplyVol){
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRMRPManagedSupplyVol, deepCopy, toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if ( desc == LGFRMRPManagedCumRequiredVol){
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRMRPManagedRequiredVol, deepCopy, toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedExcessVol)     {
+      partSS = new LgFrExcessScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedFocussedShortageSchedule)     {
+      partSS = new LgFrFocussedShortageScheduleScheduleStrategy(*(this->scenario()));
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedStockVol)     {
+      partSS = new LgFrStockScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedScrapVol)     {
+      partSS = new LgFrScrapScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedProductionPlusProcurementVolume)     {
+      partSS = new LgFrProductionScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  else if (desc == LGFRMRPManagedUsageVol)     {
+      LgFrUsageScheduleStrategy* usageSS = new LgFrUsageScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSupplySched1 = 
+	  this->newPartSchedule(LGFRMRPManagedSupplyVol, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentProdSched2 = 
+	  this->newPartSchedule(LGFRMRPManagedProductionPlusProcurementVolume,
+				deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentStockSched3 = 
+	  this->newPartSchedule(LGFRMRPManagedStockVol, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentScrapSched4 = 
+	  this->newPartSchedule(LGFRMRPManagedScrapVol, deepCopy, toPopulate);
+      usageSS->insertPartSchedule(dependentSupplySched1);
+      usageSS->insertPartSchedule(dependentProdSched2);
+      usageSS->insertPartSchedule(dependentStockSched3);
+      usageSS->insertPartSchedule(dependentScrapSched4);
+      partSS = usageSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+#if 0
+  else if ( desc == LGFRProcurementReceiptVol ) {
+      LgFrApplyOffsetScheduleStrategy* offsetSS
+	  = new LgFrApplyOffsetScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer theProcSched = 
+	  this->newPartSchedule(LGFRProcurementVol, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer theCycleTimeSched = 
+	  this->newPartSchedule(LGFRProcurementLeadTime, deepCopy, toPopulate);
+      offsetSS->insertPartSchedule(theProcSched);
+      offsetSS->insertPartSchedule(theCycleTimeSched);
+      partSS = offsetSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PROCUREABLE_SET));
+  }
+#endif
+
+  else if ( desc == LGFRProductionReceiptVol ) {
+      LgFrApplyOffsetScheduleStrategy* offsetSS
+	  = new LgFrApplyOffsetScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer theProdSched = 
+	  this->newPartSchedule(LGFRProductionVolume, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer theCycleTimeSched = 
+	  this->newPartSchedule(LGFRCycleTime, deepCopy, toPopulate);
+      offsetSS->insertPartSchedule(theProdSched);
+      offsetSS->insertPartSchedule(theCycleTimeSched);
+      partSS = offsetSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PRODUCEABLE_SET));
+  }
+
+  else if ( desc == LGFRProductionVolume) {
+      partSS = new LgFrProductionScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PRODUCEABLE_SET));
+  }
+
+  else if ( desc == LGFRTotalShipmentVol) {
+      LgFrCumDemandsPartScheduleStrategy* totShipSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer dependentSched = 
+	  this->newDemandSchedule(LGFRShipmentVolume, deepCopy, toPopulate);
+      totShipSS->insertDemandSchedule(dependentSched);
+      partSS = totShipSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+  else if ( desc == LGFRCMRPTotalCommittedDemandVol) {
+      LgFrCumDemandsPartScheduleStrategy* totCommDemandsSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer dependentSched = 
+	  this->newDemandSchedule(LGFRCMRPCommittedDemandVol, deepCopy, toPopulate);
+      totCommDemandsSS->insertDemandSchedule(dependentSched);
+      partSS = totCommDemandsSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_DEFAULT_SET));
+  }
+
+  else if ( desc == LGFRProcurementVol) {
+      partSS = new LgFrProductionScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PROCUREABLE_SET));
+  }
+  else if ( desc == LGFRProcurementLeadTime) {
+      partSS = new LgFrCycleTimeScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PROCUREABLE_SET));
+  }
+  else if ( desc == LGFRCycleTime) {
+      partSS = new LgFrCycleTimeScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PRODUCEABLE_SET));
+  }
+  else if ( desc == LGFRFrozenZone) {
+      partSS = new LgFrFrozenZoneScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+
+//        Schedules for the "Capacity" window 
+//        -----------------------------------
+  else if ( desc == LGFRCapacitySupplyVol) {
+      partSS = new LgFrSupplyScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityRequiredVol) {
+      partSS = new LgFrRequirementScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityScrapVol) {
+      partSS = new LgFrScrapScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityUsageVol) {
+      // for capacity: prodVol and StockVol always zero ==> use empty sched
+      LgFrUsageScheduleStrategy* usageSS
+	  = new LgFrUsageScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSupplySched1 = 
+	  this->newPartSchedule(LGFRCapacitySupplyVol, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentDummySched23(new LgFrSortingPartScheduleFloat);
+      LgFrSortingPartScheduleFloatSmartPointer dependentScrapSched4 = 
+	  this->newPartSchedule(LGFRCapacityScrapVol, deepCopy, toPopulate);
+      usageSS->insertPartSchedule(dependentSupplySched1);         
+      usageSS->insertPartSchedule(dependentDummySched23);   
+      usageSS->insertPartSchedule(dependentDummySched23);   
+      usageSS->insertPartSchedule(dependentScrapSched4);         
+      partSS = usageSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityExcessVol) {
+      partSS = new LgFrExcessScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityFocussedShortageSchedule) {
+      partSS = new LgFrFocussedShortageScheduleScheduleStrategy(*scenario);
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+  else if ( desc == LGFRCapacityUsagePct) {
+      LgFrPartScheduleSensitiveScheduleStrategy* usagePctSS 
+	  = new LgFrPartScheduleSensitiveScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer usageSched = 
+	  this->newPartSchedule(LGFRCapacityUsageVol, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer supplySched =
+	  this->newPartSchedule(LGFRCapacitySupplyVol, deepCopy, toPopulate);
+      usagePctSS->insertPartSchedule(usageSched);
+      usagePctSS->insertPartSchedule(supplySched);
+      usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+      partSS = usagePctSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_CAPACITY_SET));
+  }
+
+  //   Schedules for the "Procurement Summary" window.
+  //   ----------------------------------------------
+  else if (desc ==  LGFRCMRPTotalMrpProcurementCost) {
+      LgFrPartSummaryScheduleStrategy* PartWiseCumSS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRRequiredVolumeTimesUnitCost, deepCopy, toPopulate);
+      PartWiseCumSS->insertPartSchedule(dependentSched);         
+      partSS = PartWiseCumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPTotalWitProcurementCost) {
+      LgFrPartSummaryScheduleStrategy* PartWiseCumSS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRProcurementVolumeTimesUnitCost, deepCopy, toPopulate);
+      PartWiseCumSS->insertPartSchedule(dependentSched);         
+      partSS = PartWiseCumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPCumTotalMrpProcurementCost) {
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRCMRPTotalMrpProcurementCost, deepCopy, toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPCumTotalWitProcurementCost) {
+      LgFrCumTimeVecPartScheduleStrategy* cumSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRCMRPTotalWitProcurementCost, deepCopy, toPopulate);
+      cumSS->insertPartSchedule(dependentSched);
+      partSS = cumSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPDeltaCumTotalProcurementCost) {
+      LgFrTwoScheduleDeltaPartScheduleStrategy* deltaSS
+	  = new LgFrTwoScheduleDeltaPartScheduleStrategy(*scenario);
+      deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched1 = 
+	  this->newPartSchedule(LGFRCMRPCumTotalMrpProcurementCost, deepCopy, toPopulate);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched2 = 
+	  this->newPartSchedule(LGFRCMRPCumTotalWitProcurementCost, deepCopy, toPopulate);
+      deltaSS->insertPartSchedule(dependentSched1);
+      deltaSS->insertPartSchedule(dependentSched2);
+      partSS = deltaSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCostOfCapitalSavings) {
+      LgFrCompoundInterestScheduleStrategy* ciSS
+	  = new LgFrCompoundInterestScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched1 = 
+	  this->newPartSchedule(LGFRCMRPDeltaCumTotalProcurementCost, deepCopy, toPopulate);
+      ciSS->insertPartSchedule(dependentSched1);
+      partSS = ciSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRProductionVolumeTimesUnitCost) {
+      LgFrPartScheduleTimesUnitCostScheduleStrategy* prodVolTimesUnitCostSS
+	  = new LgFrPartScheduleTimesUnitCostScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRProductionVolume, deepCopy, toPopulate);
+      prodVolTimesUnitCostSS->insertPartSchedule(dependentSched);
+      partSS = prodVolTimesUnitCostSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PRODUCEABLE_SET));
+  }
+  else if (desc ==  LGFRProcurementVolumeTimesUnitCost) {
+      LgFrPartScheduleTimesUnitCostScheduleStrategy* procVolTimesUnitCostSS
+	  = new LgFrPartScheduleTimesUnitCostScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRProcurementVol, deepCopy, toPopulate);
+      procVolTimesUnitCostSS->insertPartSchedule(dependentSched);
+      partSS = procVolTimesUnitCostSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_PROCUREABLE_SET));
+  }
+  else if (desc ==  LGFRRequiredVolumeTimesUnitCost) {
+      LgFrPartScheduleTimesUnitCostScheduleStrategy* reqVolTimesUnitCostSS
+	  = new LgFrPartScheduleTimesUnitCostScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched = 
+	  this->newPartSchedule(LGFRMRPManagedRequiredVol, deepCopy,
+				toPopulate);
+      reqVolTimesUnitCostSS->insertPartSchedule(dependentSched);
+      partSS = reqVolTimesUnitCostSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_MRP_PLANNED_SET));
+  }
+
+  //   Schedules for the "Demand Summary" information.
+  //   These are part schedules because the demand attribute values
+  //   for a particular demanded part are summed and attributed to
+  //   the part.
+  //   ----------------------------------------------
+  else if (desc ==  LGFRCMRPSumDemandVolToPart) {
+      LgFrCumDemandsPartScheduleStrategy* sumDemandsToPartSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer independentSched =
+	  this->newDemandSchedule(LGFRDemandVolume, deepCopy, toPopulate);
+      sumDemandsToPartSS->insertDemandSchedule(independentSched);
+      partSS = sumDemandsToPartSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPCumSumDemandVolToPart) {
+      LgFrCumTimeVecPartScheduleStrategy* cumTimeVecSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(LGFRCMRPSumDemandVolToPart, 
+				deepCopy, toPopulate);
+      cumTimeVecSS->insertPartSchedule(independentSched);
+      partSS = cumTimeVecSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPSummaryOfCumDemandVol) {
+      LgFrPartSummaryScheduleStrategy* summarySS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(LGFRCMRPCumSumDemandVolToPart,
+				deepCopy, toPopulate);
+      summarySS->insertPartSchedule(independentSched);
+      partSS = summarySS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPCumSumDemandVolToPartTimesUnitCost) {
+      LgFrPartScheduleTimesUnitCostScheduleStrategy* timesUnitCostSS
+	  = new LgFrPartScheduleTimesUnitCostScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched =
+	  this->newPartSchedule(LGFRCMRPCumSumDemandVolToPart, 
+				deepCopy, toPopulate);
+      timesUnitCostSS->insertPartSchedule(dependentSched);
+      partSS = timesUnitCostSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPSummaryOfCumDemandVolTimesUnitCost) {
+      LgFrPartSummaryScheduleStrategy* summarySS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(LGFRCMRPCumSumDemandVolToPartTimesUnitCost,
+				deepCopy, toPopulate);
+      summarySS->insertPartSchedule(independentSched);
+      partSS = summarySS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+
+  else if (desc ==  LGFRCMRPSumShipmentVolToPart) {
+      LgFrCumDemandsPartScheduleStrategy* sumDemandsToPartSS
+	  = new LgFrCumDemandsPartScheduleStrategy(*scenario);
+      LgFrSortingDemandScheduleFloatSmartPointer independentSched =
+	  this->newDemandSchedule(LGFRShipmentVolume, deepCopy, toPopulate);
+      sumDemandsToPartSS->insertDemandSchedule(independentSched);
+      partSS = sumDemandsToPartSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPCumSumShipmentVolToPart) {
+      LgFrCumTimeVecPartScheduleStrategy* cumTimeVecSS
+	  = new LgFrCumTimeVecPartScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(LGFRCMRPSumShipmentVolToPart, 
+				deepCopy, toPopulate);
+      cumTimeVecSS->insertPartSchedule(independentSched);
+      partSS = cumTimeVecSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPSummaryOfCumShipmentVol) {
+      LgFrPartSummaryScheduleStrategy* summarySS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(LGFRCMRPCumSumShipmentVolToPart,
+				deepCopy, toPopulate);
+      summarySS->insertPartSchedule(independentSched);
+      partSS = summarySS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+  else if (desc ==  LGFRCMRPCumSumShipmentVolToPartTimesUnitCost) {
+      LgFrPartScheduleTimesUnitCostScheduleStrategy* timesUnitCostSS
+	  = new LgFrPartScheduleTimesUnitCostScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer dependentSched =
+	  this->newPartSchedule(LGFRCMRPCumSumShipmentVolToPart, 
+				deepCopy, toPopulate);
+      timesUnitCostSS->insertPartSchedule(dependentSched);
+      partSS = timesUnitCostSS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_UNIVERSAL_SET));
+  }
+  else if (desc ==  LGFRCMRPSummaryOfCumShipmentVolTimesUnitCost) {
+      LgFrPartSummaryScheduleStrategy* summarySS
+	  = new LgFrPartSummaryScheduleStrategy(*scenario);
+      LgFrSortingPartScheduleFloatSmartPointer independentSched =
+	  this->newPartSchedule(
+	     LGFRCMRPCumSumShipmentVolToPartTimesUnitCost,
+		deepCopy, toPopulate );
+      summarySS->insertPartSchedule(independentSched);
+      partSS = summarySS;
+      partSS->setOfParts(scenario->constSetOfParts(LGFR_BUDGET_SET));
+  }
+
+
+  else return LgFrScheduleFactory::newPartScheduleFromScratch(desc, 
+							      deepCopy, 
+							      toPopulate);
+
+  LgFrSortingPartScheduleFloatSmartPointer spsf = createPartSched(*partSS);
+  if ( toPopulate ) 
+      if ( this->scheduleType(desc,*partSS) == INPUT )
+	  spsf->populate();
+      else {
+	  LgFrLastProblemSolved& lps = this->lastProblemSolved();
+	  if ( lps.imploded() ) spsf->populate();
+      }
+  delete partSS;
+
+  return spsf;
+}
+
+// Create a new sorting demand schedule
+LgFrSortingDemandScheduleFloatSmartPointer
+LgFrScheduleFactoryForCMRP::newDemandScheduleFromScratch
+  (const LgFrScheduleDescriptor& desc,
+   const bool deepCopy,
+   const bool toPopulate
+   )
+const
+{
+  LgFrDemandScheduleStrategy *demandSS;
+  LgFrScenarioForCMRPSmartPointer scenario 
+    = LgFrScenarioForCMRPSmartPointer(this->scenario());
+  if ( desc == LGFRDefaultDemandVolume ) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands());
+  }
+
+//        Schedules for the "Master Production Schedule" (demand) window 
+//        -----------------------------------------------------
+  else if ( desc == LGFRCMRPDemandVol) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPShipmentVol) {
+      demandSS = new LgFrShipmentScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPBacklogVol) {
+      demandSS = new LgFrBacklogScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPCommittedDemandVol) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario
+			     ->constSetOfDemands(LGFR_COMMITTED_DEMAND_SET));
+  }
+
+  else 
+    return LgFrScheduleFactory::newDemandScheduleFromScratch(desc, deepCopy, 
+							     toPopulate);
+
+  LgFrSortingDemandScheduleFloatSmartPointer sdsf 
+    = createDemandSched(*demandSS);
+  if ( toPopulate )
+      if ( this->scheduleType(desc,*demandSS) == INPUT )
+	  sdsf->populate();
+      else {
+	  LgFrLastProblemSolved& lps = this->lastProblemSolved();
+	  if ( lps.imploded() ) sdsf->populate();
+      }
+  delete demandSS;
+
+  return sdsf;
+}
+
+// ---------------------------------------------------------------------
+// Return the schedule type: INPUT or OUTPUT of implosion run.
+// ---------------------------------------------------------------------
+schdType
+LgFrScheduleFactoryForCMRP::scheduleType(
+    const LgFrScheduleDescriptor & desc,
+    const LgFrAttributeScheduleStrategy & ass)
+     const
+{
+  if ( desc == LGFRSupplyVolume ) return INPUT;	// Doing it this way (instead
+  if ( desc == LGFRDemandVolume ) return INPUT; // of using ||) allows
+						// inlining
+  if ( desc == LGFRMRPManagedSupplyVol ) return INPUT;
+
+  // These are input schedules.  They are output of explosion.
+  // Listing them here as input causes them to be displayed in CMRP
+  // if the user explodes and then displays component availability.
+  if ( desc == LGFRMRPManagedRequiredVol )        return INPUT;
+  if ( desc == LGFRMRPManagedCumRequiredVol )     return INPUT;
+  if ( desc == LGFRMRPManagedConsVol )            return INPUT;
+  if ( desc == LGFRMRPManagedTotalConsVol )       return INPUT;
+  if ( desc == LGFRPlannerManagedRequiredVol )    return INPUT;
+  if ( desc == LGFRPlannerManagedCumRequiredVol ) return INPUT;
+  if ( desc == LGFRPlannerManagedConsVol )        return INPUT;
+  if ( desc == LGFRPlannerManagedTotalConsVol )   return INPUT;
+  if ( desc == LGFRRequiredVolumeTimesUnitCost)   return INPUT;
+
+  if ( desc == LGFRMRPManagedCumSupplyVol ) return INPUT;
+  if ( desc == LGFRCycleTime )   return INPUT;
+  if ( desc == LGFRFrozenZone )   return INPUT;
+  if ( desc == LGFRProcurementLeadTime ) return INPUT;
+  if ( desc == LGFRPlannerManagedSupplyVol ) return INPUT;
+  if ( desc == LGFRPlannerManagedCumSupplyVol ) return INPUT;
+  if ( desc == LGFRCapacitySupplyVol ) return INPUT;
+  if ( desc == LGFRCapacityRequiredVol ) return INPUT;
+  if ( desc == LGFRBudgetAmount ) return INPUT;
+
+  if ( desc == LGFRCMRPDemandVol ) return INPUT;
+  if ( desc == LGFRCMRPCommittedDemandVol ) return INPUT;
+  if ( desc == LGFRCMRPTotalCommittedDemandVol ) return INPUT;
+
+  if ( desc == LGFRCMRPTotalMrpProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPTotalWitProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPCumTotalMrpProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPCumTotalWitProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPDeltaCumTotalProcurementCost) return INPUT;
+  if ( desc == LGFRProductionVolumeTimesUnitCost) return INPUT;
+  if ( desc == LGFRProcurementVolumeTimesUnitCost) return INPUT;
+
+  if ( desc == LGFRCMRPSumDemandVolToPart ) return INPUT;
+  if ( desc == LGFRCMRPCumSumDemandVolToPart ) return INPUT;
+  if ( desc == LGFRCMRPSummaryOfCumDemandVol ) return INPUT;
+  if ( desc == LGFRCMRPCumSumDemandVolToPartTimesUnitCost ) return INPUT;
+  if ( desc == LGFRCMRPSummaryOfCumDemandVolTimesUnitCost ) return INPUT;
+
+
+  return this->LgFrScheduleFactory::scheduleType(desc,ass);
+}
+
+    
+// ---------------------------------------------------------------------
+// Return list of schedule descriptors which can be used by factory to
+// create schedules.     
+// ---------------------------------------------------------------------
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::demandScheduleDescriptors()
+const
+{
+  LgFrScheduleDescriptorVector retVal = 
+    LgFrScheduleFactoryForCMRP::demandScheduleDescriptors_;
+    
+  LgFrScheduleDescriptorVector baseSD = 
+    LgFrScheduleFactory::demandScheduleDescriptors();
+
+  // If base class scheduleDescriptor is not in retVal, then insert it
+  int i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<baseSD.size(); i++ ) 
+  {
+      int j = 0;
+      for( j = 0; j < retVal.size(); j++ )
+          if( retVal[j] == baseSD[i] )
+              break;
+      if( j == retVal.size() ) // if not found
+          retVal.push_back( baseSD[i] );
+  }
+
+  return retVal;
+  
+}
+
+
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::partScheduleDescriptors()
+const
+{
+  LgFrScheduleDescriptorVector retVal = 
+    LgFrScheduleFactoryForCMRP::partScheduleDescriptors_;
+    
+  LgFrScheduleDescriptorVector baseSD = 
+    LgFrScheduleFactory::partScheduleDescriptors();
+
+  // If base class scheduleDescriptor is not in retVal, then insert it
+  int i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<baseSD.size(); i++ ) 
+  {
+      int j = 0;
+      for( j = 0; j < retVal.size(); j++ )
+          if( retVal[j] == baseSD[i] )
+              break;
+      if( j == retVal.size() ) // if not found
+          retVal.push_back( baseSD[i] );
+  }
+  return retVal;
+  
+}
+
+
+// Initialize static class data
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::demandScheduleDescriptors_
+            = LgFrScheduleFactoryForCMRP::initializeDemandScheduleDescriptors();
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::partScheduleDescriptors_
+            = LgFrScheduleFactoryForCMRP::initializePartScheduleDescriptors();
+
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::initializeDemandScheduleDescriptors()
+{
+  LgFrScheduleDescriptorVector retVal;
+  retVal.push_back(LGFRDefaultDemandVolume); 
+//        Schedules for the "Master Production Schedule" (demand) window 
+//        ----------------------------------------------------- 
+  retVal.push_back(LGFRCMRPDemandVol);  
+  retVal.push_back(LGFRCMRPShipmentVol);  
+  retVal.push_back(LGFRCMRPBacklogVol);
+  retVal.push_back(LGFRCMRPCommittedDemandVol);
+  return retVal;
+}
+
+LgFrScheduleDescriptorVector
+LgFrScheduleFactoryForCMRP::initializePartScheduleDescriptors()
+{
+  LgFrScheduleDescriptorVector retVal;
+
+  retVal.push_back( LGFRBudgetAmount);
+//        Schedules for the  "Planner-managed" (constrained) window
+//        ---------------------------------------------------------
+  retVal.push_back( LGFRPlannerManagedSupplyVol);
+  retVal.push_back( LGFRPlannerManagedRequiredVol);
+  retVal.push_back( LGFRPlannerManagedConsVol);
+  retVal.push_back( LGFRPlannerManagedTotalPartDemandVol);
+  retVal.push_back( LGFRPlannerManagedTotalConsVol);
+  retVal.push_back( LGFRPlannerManagedCumSupplyVol);
+  retVal.push_back( LGFRPlannerManagedCumRequiredVol);
+  retVal.push_back( LGFRPlannerManagedExcessVol)     ;
+  retVal.push_back( LGFRPlannerManagedFocussedShortageSchedule); 
+  retVal.push_back( LGFRPlannerManagedStockVol);
+  retVal.push_back( LGFRPlannerManagedScrapVol);    
+  retVal.push_back( LGFRPlannerManagedUsageVol);     
+//        Schedules for the "MRP-managed" 
+//        --------------------------------
+  retVal.push_back( LGFRMRPManagedSupplyVol);
+  retVal.push_back( LGFRMRPManagedRequiredVol);
+  retVal.push_back( LGFRMRPManagedConsVol);
+  retVal.push_back( LGFRMRPManagedTotalPartDemandVol);
+  retVal.push_back( LGFRMRPManagedTotalConsVol);
+  retVal.push_back( LGFRMRPManagedCumSupplyVol);
+  retVal.push_back( LGFRMRPManagedCumRequiredVol);
+  retVal.push_back( LGFRMRPManagedExcessVol);   
+  retVal.push_back( LGFRMRPManagedFocussedShortageSchedule);     
+  retVal.push_back( LGFRMRPManagedStockVol);     
+  retVal.push_back( LGFRMRPManagedScrapVol);
+  retVal.push_back( LGFRMRPManagedProductionPlusProcurementVolume);     
+  retVal.push_back( LGFRMRPManagedUsageVol);  
+  retVal.push_back( LGFRProductionReceiptVol ) ;
+  retVal.push_back( LGFRProductionVolume); 
+  retVal.push_back( LGFRTotalShipmentVol); 
+  retVal.push_back( LGFRCMRPTotalCommittedDemandVol); 
+  retVal.push_back( LGFRProcurementVol); 
+  retVal.push_back( LGFRProcurementLeadTime); 
+  retVal.push_back( LGFRCycleTime); 
+  retVal.push_back( LGFRFrozenZone); 
+//        Schedules for the "Capacity" window 
+//        -----------------------------------
+  retVal.push_back( LGFRCapacitySupplyVol); 
+  retVal.push_back( LGFRCapacityRequiredVol); 
+  retVal.push_back( LGFRCapacityScrapVol); 
+  retVal.push_back( LGFRCapacityUsageVol); 
+  retVal.push_back( LGFRCapacityExcessVol); 
+  retVal.push_back( LGFRCapacityFocussedShortageSchedule); 
+  retVal.push_back( LGFRCapacityUsagePct); 
+  //   Schedules for the "Procurement Summary" window.
+  //   ----------------------------------------------
+  retVal.push_back(  LGFRCMRPTotalMrpProcurementCost); 
+  retVal.push_back(  LGFRCMRPTotalWitProcurementCost); 
+  retVal.push_back(  LGFRCMRPCumTotalMrpProcurementCost); 
+  retVal.push_back(  LGFRCMRPCumTotalWitProcurementCost); 
+  retVal.push_back(  LGFRCMRPDeltaCumTotalProcurementCost);
+  retVal.push_back(  LGFRCostOfCapitalSavings);
+  retVal.push_back(  LGFRProductionVolumeTimesUnitCost);
+  retVal.push_back(  LGFRProcurementVolumeTimesUnitCost);
+  retVal.push_back(  LGFRRequiredVolumeTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSumDemandVolToPart);
+  retVal.push_back(  LGFRCMRPCumSumDemandVolToPart);
+  retVal.push_back(  LGFRCMRPSummaryOfCumDemandVol);
+  retVal.push_back(  LGFRCMRPCumSumDemandVolToPartTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSummaryOfCumDemandVolTimesUnitCost); 
+  retVal.push_back(  LGFRCMRPSumShipmentVolToPart);
+  retVal.push_back(  LGFRCMRPCumSumShipmentVolToPart);
+  retVal.push_back(  LGFRCMRPSummaryOfCumShipmentVol); 
+  retVal.push_back(  LGFRCMRPCumSumShipmentVolToPartTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSummaryOfCumShipmentVolTimesUnitCost);
+  return retVal;
+}
+
+// Constructor
+LgFrScheduleFactoryForCMRP::LgFrScheduleFactoryForCMRP (
+    LgFrScenarioSmartPointer s)
+:   LgFrScheduleFactory(s)
+{
+  // Nothing to do in here
+}
+
+// Clone method
+// Create a copy of the *this on the heap and return a pointer to it
+// Even thought this returns a LgFrScheduleFactory*, the pointer
+// must point to a LgFrScheduleFactoryForCMRP.
+LgFrScheduleFactory*
+LgFrScheduleFactoryForCMRP::clone (LgFrScenarioSmartPointer newScenario)
+     const
+{
+  return  new LgFrScheduleFactoryForCMRP (newScenario);
+}
+
+// Destructor
+LgFrScheduleFactoryForCMRP::~LgFrScheduleFactoryForCMRP()
+{
+  // Nothing to do in here
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test this class
+void LgFrScheduleFactoryForCMRP::test()
+{
+}
+
+
+void
+LgFrScheduleFactoryForCMRP::contextTest(const LgFrScheduleFactory & f)
+{
+
+    // Test abbreviation function
+  assert (f.abbreviationOf (LGFRSupplyVolume)
+          != LGFRScrapVolume.abbrev()            );
+  assert (f.abbreviationOf (LGFRSupplyVolume)
+          == LGFRSupplyVolume.abbrev()           );
+  assert (f.abbreviationOf (LGFRDemandVolume)
+          == LGFRDemandVolume.abbrev()           );
+  assert (f.abbreviationOf (LGFRMRPManagedSupplyVol)
+          == LGFRMRPManagedSupplyVol.abbrev()	         );
+
+  // test smart schedule stuff
+  LgFrSortingDemandScheduleFloatSmartPointer shipSchedule =
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+  LgFrSortingDemandScheduleFloatSmartPointer shipSchedule2 =
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+  assert(shipSchedule == shipSchedule2);
+
+
+  LgFrSortingPartScheduleFloatSmartPointer excessSchedule =
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+  LgFrSortingPartScheduleFloatSmartPointer excessSchedule2 =
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+  assert(excessSchedule == excessSchedule2);
+
+
+  // test scheduleDescriptor methods
+  {
+    LgFrScheduleDescriptorVector sd = f.demandScheduleDescriptors();
+    // Test that each demand schedule can be created by this factory
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i = 0; i<sd.size(); i++ ) {
+      LgFrSortingDemandScheduleFloatSmartPointer schedSP =
+         f.newDemandSchedule( sd[i]); 
+      assert( !schedSP.null() );
+    }
+  }
+  {
+    LgFrScheduleDescriptorVector sd = f.partScheduleDescriptors();
+    // Test that each part  schedule can be created by this factory
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i = 0; i<sd.size(); i++ ) {
+
+      // There is a problem creating LGFRCriticalPartSupplyVolume schedule.
+      // This needs to be investigated and fixed.
+      // UnitTest will fail if this schedule is created.
+      if ( sd[i] == LGFRCriticalPartSupplyVolume ) continue;
+      
+      LgFrSortingPartScheduleFloatSmartPointer schedSP =
+         f.newPartSchedule( sd[i]); 
+      assert( !schedSP.null() );
+    }
+  }
+}
+
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d1 2
+d36 2
+a37 2
+   const RWBoolean deepCopy,
+   const RWBoolean toPopulate
+d75 2
+a76 2
+        = this->newPartSchedule(LGFRPlannerManagedTotalPartDemandVol, FALSE,
+				TRUE);
+d78 2
+a79 2
+	= this->newPartSchedule(LGFRPlannerManagedConsVol, FALSE,
+				TRUE);
+d177 2
+a178 2
+        = this->newPartSchedule(LGFRMRPManagedTotalPartDemandVol, FALSE,
+				TRUE);
+d180 2
+a181 2
+	= this->newPartSchedule(LGFRMRPManagedConsVol, FALSE,
+				TRUE);
+d594 2
+a595 2
+   const RWBoolean deepCopy,
+   const RWBoolean toPopulate
+d706 1
+a706 1
+LgFrOrderedVectorScheduleDescriptor
+d710 1
+a710 1
+  LgFrOrderedVectorScheduleDescriptor retVal = 
+d713 1
+a713 1
+  LgFrOrderedVectorScheduleDescriptor baseSD = 
+d717 9
+a725 3
+  for ( int i = 0; i<baseSD.entries(); i++ ) {
+    if ( retVal.index( baseSD[i] ) == RW_NPOS )
+      retVal.insert( baseSD[i] );
+d733 1
+a733 1
+LgFrOrderedVectorScheduleDescriptor
+d737 1
+a737 1
+  LgFrOrderedVectorScheduleDescriptor retVal = 
+d740 1
+a740 1
+  LgFrOrderedVectorScheduleDescriptor baseSD = 
+d744 9
+a752 3
+  for ( int i = 0; i<baseSD.entries(); i++ ) {
+    if ( retVal.index( baseSD[i] ) == RW_NPOS )
+      retVal.insert( baseSD[i] );
+a753 1
+
+d760 1
+a760 1
+LgFrOrderedVectorScheduleDescriptor
+d763 1
+a763 1
+LgFrOrderedVectorScheduleDescriptor
+d767 1
+a767 1
+LgFrOrderedVectorScheduleDescriptor
+d770 2
+a771 2
+  LgFrOrderedVectorScheduleDescriptor retVal;
+  retVal.insert(LGFRDefaultDemandVolume); 
+d774 4
+a777 4
+  retVal.insert(LGFRCMRPDemandVol);  
+  retVal.insert(LGFRCMRPShipmentVol);  
+  retVal.insert(LGFRCMRPBacklogVol);
+  retVal.insert(LGFRCMRPCommittedDemandVol);
+d781 1
+a781 1
+LgFrOrderedVectorScheduleDescriptor
+d784 1
+a784 1
+  LgFrOrderedVectorScheduleDescriptor retVal;
+d786 1
+a786 1
+  retVal.insert( LGFRBudgetAmount);
+d789 12
+a800 12
+  retVal.insert( LGFRPlannerManagedSupplyVol);
+  retVal.insert( LGFRPlannerManagedRequiredVol);
+  retVal.insert( LGFRPlannerManagedConsVol);
+  retVal.insert( LGFRPlannerManagedTotalPartDemandVol);
+  retVal.insert( LGFRPlannerManagedTotalConsVol);
+  retVal.insert( LGFRPlannerManagedCumSupplyVol);
+  retVal.insert( LGFRPlannerManagedCumRequiredVol);
+  retVal.insert( LGFRPlannerManagedExcessVol)     ;
+  retVal.insert( LGFRPlannerManagedFocussedShortageSchedule); 
+  retVal.insert( LGFRPlannerManagedStockVol);
+  retVal.insert( LGFRPlannerManagedScrapVol);    
+  retVal.insert( LGFRPlannerManagedUsageVol);     
+d803 21
+a823 21
+  retVal.insert( LGFRMRPManagedSupplyVol);
+  retVal.insert( LGFRMRPManagedRequiredVol);
+  retVal.insert( LGFRMRPManagedConsVol);
+  retVal.insert( LGFRMRPManagedTotalPartDemandVol);
+  retVal.insert( LGFRMRPManagedTotalConsVol);
+  retVal.insert( LGFRMRPManagedCumSupplyVol);
+  retVal.insert( LGFRMRPManagedCumRequiredVol);
+  retVal.insert( LGFRMRPManagedExcessVol);   
+  retVal.insert( LGFRMRPManagedFocussedShortageSchedule);     
+  retVal.insert( LGFRMRPManagedStockVol);     
+  retVal.insert( LGFRMRPManagedScrapVol);
+  retVal.insert( LGFRMRPManagedProductionPlusProcurementVolume);     
+  retVal.insert( LGFRMRPManagedUsageVol);  
+  retVal.insert( LGFRProductionReceiptVol ) ;
+  retVal.insert( LGFRProductionVolume); 
+  retVal.insert( LGFRTotalShipmentVol); 
+  retVal.insert( LGFRCMRPTotalCommittedDemandVol); 
+  retVal.insert( LGFRProcurementVol); 
+  retVal.insert( LGFRProcurementLeadTime); 
+  retVal.insert( LGFRCycleTime); 
+  retVal.insert( LGFRFrozenZone); 
+d826 7
+a832 7
+  retVal.insert( LGFRCapacitySupplyVol); 
+  retVal.insert( LGFRCapacityRequiredVol); 
+  retVal.insert( LGFRCapacityScrapVol); 
+  retVal.insert( LGFRCapacityUsageVol); 
+  retVal.insert( LGFRCapacityExcessVol); 
+  retVal.insert( LGFRCapacityFocussedShortageSchedule); 
+  retVal.insert( LGFRCapacityUsagePct); 
+d835 19
+a853 19
+  retVal.insert(  LGFRCMRPTotalMrpProcurementCost); 
+  retVal.insert(  LGFRCMRPTotalWitProcurementCost); 
+  retVal.insert(  LGFRCMRPCumTotalMrpProcurementCost); 
+  retVal.insert(  LGFRCMRPCumTotalWitProcurementCost); 
+  retVal.insert(  LGFRCMRPDeltaCumTotalProcurementCost);
+  retVal.insert(  LGFRCostOfCapitalSavings);
+  retVal.insert(  LGFRProductionVolumeTimesUnitCost);
+  retVal.insert(  LGFRProcurementVolumeTimesUnitCost);
+  retVal.insert(  LGFRRequiredVolumeTimesUnitCost);
+  retVal.insert(  LGFRCMRPSumDemandVolToPart);
+  retVal.insert(  LGFRCMRPCumSumDemandVolToPart);
+  retVal.insert(  LGFRCMRPSummaryOfCumDemandVol);
+  retVal.insert(  LGFRCMRPCumSumDemandVolToPartTimesUnitCost);
+  retVal.insert(  LGFRCMRPSummaryOfCumDemandVolTimesUnitCost); 
+  retVal.insert(  LGFRCMRPSumShipmentVolToPart);
+  retVal.insert(  LGFRCMRPCumSumShipmentVolToPart);
+  retVal.insert(  LGFRCMRPSummaryOfCumShipmentVol); 
+  retVal.insert(  LGFRCMRPCumSumShipmentVolToPartTimesUnitCost);
+  retVal.insert(  LGFRCMRPSummaryOfCumShipmentVolTimesUnitCost);
+a881 5
+void
+LgFrScheduleFactoryForCMRP::initHashTable ()
+{
+}
+
+d908 1
+a908 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, FALSE);
+d910 1
+a910 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, FALSE);
+d915 1
+a915 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, FALSE);
+d917 1
+a917 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, FALSE);
+d923 1
+a923 1
+    LgFrOrderedVectorScheduleDescriptor sd = f.demandScheduleDescriptors();
+d925 2
+a926 1
+    for ( int i = 0; i<sd.entries(); i++ ) {
+d933 1
+a933 1
+    LgFrOrderedVectorScheduleDescriptor sd = f.partScheduleDescriptors();
+d935 2
+a936 1
+    for ( int i = 0; i<sd.entries(); i++ ) {
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@a0 2
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+d34 2
+a35 2
+   const bool deepCopy,
+   const bool toPopulate
+d73 2
+a74 2
+        = this->newPartSchedule(LGFRPlannerManagedTotalPartDemandVol, false,
+				true);
+d76 2
+a77 2
+	= this->newPartSchedule(LGFRPlannerManagedConsVol, false,
+				true);
+d175 2
+a176 2
+        = this->newPartSchedule(LGFRMRPManagedTotalPartDemandVol, false,
+				true);
+d178 2
+a179 2
+	= this->newPartSchedule(LGFRMRPManagedConsVol, false,
+				true);
+d592 2
+a593 2
+   const bool deepCopy,
+   const bool toPopulate
+d704 1
+a704 1
+LgFrScheduleDescriptorVector
+d708 1
+a708 1
+  LgFrScheduleDescriptorVector retVal = 
+d711 1
+a711 1
+  LgFrScheduleDescriptorVector baseSD = 
+d715 3
+a717 9
+  int i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<baseSD.size(); i++ ) 
+  {
+      int j = 0;
+      for( j = 0; j < retVal.size(); j++ )
+          if( retVal[j] == baseSD[i] )
+              break;
+      if( j == retVal.size() ) // if not found
+          retVal.push_back( baseSD[i] );
+d725 1
+a725 1
+LgFrScheduleDescriptorVector
+d729 1
+a729 1
+  LgFrScheduleDescriptorVector retVal = 
+d732 1
+a732 1
+  LgFrScheduleDescriptorVector baseSD = 
+d736 3
+a738 9
+  int i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i<baseSD.size(); i++ ) 
+  {
+      int j = 0;
+      for( j = 0; j < retVal.size(); j++ )
+          if( retVal[j] == baseSD[i] )
+              break;
+      if( j == retVal.size() ) // if not found
+          retVal.push_back( baseSD[i] );
+d740 1
+d747 1
+a747 1
+LgFrScheduleDescriptorVector
+d750 1
+a750 1
+LgFrScheduleDescriptorVector
+d754 1
+a754 1
+LgFrScheduleDescriptorVector
+d757 2
+a758 2
+  LgFrScheduleDescriptorVector retVal;
+  retVal.push_back(LGFRDefaultDemandVolume); 
+d761 4
+a764 4
+  retVal.push_back(LGFRCMRPDemandVol);  
+  retVal.push_back(LGFRCMRPShipmentVol);  
+  retVal.push_back(LGFRCMRPBacklogVol);
+  retVal.push_back(LGFRCMRPCommittedDemandVol);
+d768 1
+a768 1
+LgFrScheduleDescriptorVector
+d771 1
+a771 1
+  LgFrScheduleDescriptorVector retVal;
+d773 1
+a773 1
+  retVal.push_back( LGFRBudgetAmount);
+d776 12
+a787 12
+  retVal.push_back( LGFRPlannerManagedSupplyVol);
+  retVal.push_back( LGFRPlannerManagedRequiredVol);
+  retVal.push_back( LGFRPlannerManagedConsVol);
+  retVal.push_back( LGFRPlannerManagedTotalPartDemandVol);
+  retVal.push_back( LGFRPlannerManagedTotalConsVol);
+  retVal.push_back( LGFRPlannerManagedCumSupplyVol);
+  retVal.push_back( LGFRPlannerManagedCumRequiredVol);
+  retVal.push_back( LGFRPlannerManagedExcessVol)     ;
+  retVal.push_back( LGFRPlannerManagedFocussedShortageSchedule); 
+  retVal.push_back( LGFRPlannerManagedStockVol);
+  retVal.push_back( LGFRPlannerManagedScrapVol);    
+  retVal.push_back( LGFRPlannerManagedUsageVol);     
+d790 21
+a810 21
+  retVal.push_back( LGFRMRPManagedSupplyVol);
+  retVal.push_back( LGFRMRPManagedRequiredVol);
+  retVal.push_back( LGFRMRPManagedConsVol);
+  retVal.push_back( LGFRMRPManagedTotalPartDemandVol);
+  retVal.push_back( LGFRMRPManagedTotalConsVol);
+  retVal.push_back( LGFRMRPManagedCumSupplyVol);
+  retVal.push_back( LGFRMRPManagedCumRequiredVol);
+  retVal.push_back( LGFRMRPManagedExcessVol);   
+  retVal.push_back( LGFRMRPManagedFocussedShortageSchedule);     
+  retVal.push_back( LGFRMRPManagedStockVol);     
+  retVal.push_back( LGFRMRPManagedScrapVol);
+  retVal.push_back( LGFRMRPManagedProductionPlusProcurementVolume);     
+  retVal.push_back( LGFRMRPManagedUsageVol);  
+  retVal.push_back( LGFRProductionReceiptVol ) ;
+  retVal.push_back( LGFRProductionVolume); 
+  retVal.push_back( LGFRTotalShipmentVol); 
+  retVal.push_back( LGFRCMRPTotalCommittedDemandVol); 
+  retVal.push_back( LGFRProcurementVol); 
+  retVal.push_back( LGFRProcurementLeadTime); 
+  retVal.push_back( LGFRCycleTime); 
+  retVal.push_back( LGFRFrozenZone); 
+d813 7
+a819 7
+  retVal.push_back( LGFRCapacitySupplyVol); 
+  retVal.push_back( LGFRCapacityRequiredVol); 
+  retVal.push_back( LGFRCapacityScrapVol); 
+  retVal.push_back( LGFRCapacityUsageVol); 
+  retVal.push_back( LGFRCapacityExcessVol); 
+  retVal.push_back( LGFRCapacityFocussedShortageSchedule); 
+  retVal.push_back( LGFRCapacityUsagePct); 
+d822 19
+a840 19
+  retVal.push_back(  LGFRCMRPTotalMrpProcurementCost); 
+  retVal.push_back(  LGFRCMRPTotalWitProcurementCost); 
+  retVal.push_back(  LGFRCMRPCumTotalMrpProcurementCost); 
+  retVal.push_back(  LGFRCMRPCumTotalWitProcurementCost); 
+  retVal.push_back(  LGFRCMRPDeltaCumTotalProcurementCost);
+  retVal.push_back(  LGFRCostOfCapitalSavings);
+  retVal.push_back(  LGFRProductionVolumeTimesUnitCost);
+  retVal.push_back(  LGFRProcurementVolumeTimesUnitCost);
+  retVal.push_back(  LGFRRequiredVolumeTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSumDemandVolToPart);
+  retVal.push_back(  LGFRCMRPCumSumDemandVolToPart);
+  retVal.push_back(  LGFRCMRPSummaryOfCumDemandVol);
+  retVal.push_back(  LGFRCMRPCumSumDemandVolToPartTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSummaryOfCumDemandVolTimesUnitCost); 
+  retVal.push_back(  LGFRCMRPSumShipmentVolToPart);
+  retVal.push_back(  LGFRCMRPCumSumShipmentVolToPart);
+  retVal.push_back(  LGFRCMRPSummaryOfCumShipmentVol); 
+  retVal.push_back(  LGFRCMRPCumSumShipmentVolToPartTimesUnitCost);
+  retVal.push_back(  LGFRCMRPSummaryOfCumShipmentVolTimesUnitCost);
+d869 5
+d900 1
+a900 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+d902 1
+a902 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+d907 1
+a907 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+d909 1
+a909 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+d915 1
+a915 1
+    LgFrScheduleDescriptorVector sd = f.demandScheduleDescriptors();
+d917 1
+a917 2
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i = 0; i<sd.size(); i++ ) {
+d924 1
+a924 1
+    LgFrScheduleDescriptorVector sd = f.partScheduleDescriptors();
+d926 1
+a926 2
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i = 0; i<sd.size(); i++ ) {
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d82 1
+a82 1
+      sumSS->combiningFunction (LgFrTimeVecFloat::add);
+d184 1
+a184 1
+      sumSS->combiningFunction (LgFrTimeVecFloat::add);
+d370 1
+a370 1
+      usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+d416 1
+a416 1
+      deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

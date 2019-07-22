@@ -1,0 +1,202 @@
+head	1.3;
+access;
+symbols
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	rwToStl:1.2.0.4
+	latest_sce_3_10_20010924:1.2.0.2
+	sce_3_10_20010924:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.03.03.23.26.55;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2001.08.22.20.41.49;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.07.12.19.58.25;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.2
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@@
+
+
+1.1
+log
+@Refactoring.
+@
+text
+@a0 146
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef MrMgr_TIH
+#define MrMgr_TIH
+
+//------------------------------------------------------------------------------
+// Header file: "MrMgr_TI.h"
+//
+// Contains the implementation of class template MrMgr <MrArgs>.
+//------------------------------------------------------------------------------
+
+#include <MrSelSite.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class template MrMgr <MrArgs>.
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrMgr <MrArgs>::WitMrMgr (WitSelector * theSelector):
+         WitSelMgr       (theSelector),
+
+         myMrSelSiteFor_ (myProblem ())
+   {
+   buildMrSelSites ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      CandComp * WitMrMgr <MrArgs>::selCandComp (
+         SelComp * theSelComp, 
+         WitPeriod thePer)
+   {
+   return myMrSelSiteFor_ (theSelComp)->selCandComp (thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::modifyRouting (
+         WitPairStack <CandComp, WitPeriod> & theCandCompPers)
+   {
+   CandComp *              theCandComp;
+   WitPeriod               thePer;
+   WitMrSelSite <MrArgs> * theMrSelSite;
+
+   while (theCandCompPers.pop (theCandComp, thePer))
+      {
+      theMrSelSite = myMrSelSiteFor_ (theSelCompFor (theCandComp));
+
+      theMrSelSite->myMrSelPt ()[thePer]->select (theCandComp);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::findCandComps (
+         SelComp *                theSelComp, 
+         WitPeriod                thePer,
+         WitObjStack <CandComp> & theCandComps)
+   {
+   myMrSelSiteFor_ (theSelComp)->findCandComps (thePer, theCandComps);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::selIsSplit (
+         SelComp * theSelComp, 
+         WitPeriod thePer)
+   {
+   WitMrSelSite <MrArgs> * theMrSelSite;
+
+   if (! selSplit ())
+      return witFALSE;
+
+   theMrSelSite = myMrSelSiteFor_ (theSelComp);
+      
+   if (! theMrSelSite->multiChoice ())
+      return witFALSE;
+
+   return theMrSelSite->myMrSelPt ()[thePer]->isSplit ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::startSplitExp (
+         SelComp * theSelComp, 
+         WitPeriod thePer,
+         double    expVol)
+   {
+   WitMrSelPt <MrArgs> * theMrSelPt;
+
+   witAssert (selIsSplit (theSelComp, thePer));
+
+   theMrSelPt = myMrSelSiteFor_ (theSelComp)->myMrSelPt ()[thePer];
+
+   startSplitExpAbs (theMrSelPt, expVol);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::selSplitNeeded ()
+   {
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::postSplitCommit ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitSelPt * WitMrMgr <MrArgs>::mySelPt (
+         CandComp *   theCandComp,
+         WitPeriod    thePer,
+         WitBoolean & resFound)
+   {
+   WitMrSelPt <MrArgs> * theMrSelPt;
+
+   theMrSelPt = 
+      myMrSelSiteFor (theSelCompFor (theCandComp))->myMrSelPtWithAlt (thePer);
+
+   resFound   =
+      (theMrSelPt != NULL)?
+         theMrSelPt->hasResAlt ():
+         witFALSE;
+
+   return theMrSelPt;
+   }
+
+#endif
+@
+

@@ -1,0 +1,516 @@
+head	1.3;
+access;
+symbols
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2000.03.14.22.38.37;	author bobw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2000.03.07.16.57.10;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.13.53.32;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.13.53.32;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Replaced WitPart.[Ch] with Part.[Ch].
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef WitPartH
+#define WitPartH
+
+//------------------------------------------------------------------------------
+// Header file: "WitPart.h"
+//
+// Contains the declaration of the following classes:
+//
+//    Part
+//------------------------------------------------------------------------------
+
+#include <Opn.h>
+
+//------------------------------------------------------------------------------
+// Class Part.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    Component
+//       DelComp
+//          Node
+//             Part
+//                Material
+//                Capacity
+//------------------------------------------------------------------------------
+
+class WitPart: public WitNode
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Public member functions.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitPart (const char * theName, WitCompMgr * theCompMgr);
+         //
+         // Node <<< theName.
+         // Node <<< theCompMgr.
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitPart ();
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (const WitList (WitDemand) &,    myDemands)
+      accessFunc (const WitList (WitBomEntry) &,  consumingBomEntries)
+      accessFunc (const WitList (WitSubEntry) &,  consumingSubEntries)
+      accessFunc (const WitList (WitBopEntry) &,  producingBopEntries)
+      accessFunc (const WitFlexVec (float) &,     supplyVol)
+      accessFunc (float,                          unitCost)
+      accessFunc (const WitFlexVec (float) &,     obj1ScrapCost)
+      accessFunc (const WitDenseList (WitPart) &, belowList)
+      accessFunc (WitBoolean,                     isCoproduced)
+      accessFunc (const WitFlexVec (float) &,     consVol)
+      accessFunc (const WitFlexVec (float) &,     prodVol)
+      accessFunc (const WitFlexVec (float) &,     scrapVol)
+      accessFunc (const WitFlexVec (float) &,     mrpConsVol)
+      accessFunc (const WitFlexVec (float) &,     mrpResidualVol)
+      accessFunc (const WitFlexVec (float) &,     reqVol)
+      accessFunc (const WitFlexVec (float) &,     focShortageVol)
+
+      decMappingIndex (WitPart)
+
+      inline const WitString & partName ()
+         {
+         return nodeName ();
+         }
+
+      inline WitBopEntry * expBopEntry (WitPeriod thePer)
+         {
+         witAssert (explodeable (thePer));
+
+         return (WitBopEntry *) expBopEntryTl_[thePer];
+         }
+
+      //------------------------------------------------------------------------
+      // Default value functions.
+      //------------------------------------------------------------------------
+
+      defaultValue (float defSupplyVol,     0.0)
+      defaultValue (float defUnitCost,      1.0)
+      defaultValue (float defObj1ScrapCost, 0.0)
+
+      //------------------------------------------------------------------------
+      // "Set" functions.
+      //------------------------------------------------------------------------
+
+      void setSupplyVol     (const float *);
+      void setUnitCost      (float);
+      void setObj1ScrapCost (const float *);
+
+      //------------------------------------------------------------------------
+      // Conditional reference access functions.
+      //------------------------------------------------------------------------
+
+      conditionalRef (WitList (WitBopEntry),  producingBopEntries,
+                                                             preprocAcc ())
+      conditionalRef (WitDenseList (WitPart), belowList,     preprocAcc ())
+      conditionalRef (WitBoolean,             isCoproduced,  preprocAcc ())
+      conditionalRef (WitTVec (WitTypelessPtr),
+                                              expBopEntryTl, preprocAcc ())
+      conditionalRef (WitFlexVec (float),     scrapVol,       optImpAcc () ||
+                                                            postprocAcc ())
+      conditionalRef (WitBoolean,             expPerGaps,    preprocAcc ())
+      conditionalRef (WitFlexVec (float),     consVol,      postprocAcc ())
+      conditionalRef (WitFlexVec (float),     prodVol,      postprocAcc ())
+      conditionalRef (WitFlexVec (float),     focShortageVol,    fssAcc ())
+      conditionalRef (WitFlexVec (float),     reqVol,            mrpAcc ())
+      conditionalRef (WitFlexVec (float),     mrpConsVol,        mrpAcc ())
+      conditionalRef (WitFlexVec (float),     mrpResidualVol,    mrpAcc ())
+
+      //------------------------------------------------------------------------
+      // Insert functions.
+      // Each of these functions does an appendUniquely on the argument for the
+      // appropriate List.
+      //------------------------------------------------------------------------
+
+      void insert (WitBomEntry *);
+      void insert (WitSubEntry *);
+      void insert (WitBopEntry *);
+      void insert (WitDemand *);
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      virtual WitBoolean inserted ();
+         //
+         // Override from class Component.
+
+      virtual WitMsgFragID classFragID ();
+         //
+         // Override from class Component.
+
+      virtual void identifyInstance ();
+         //
+         // Override from class Component.
+
+      virtual WitMsgFragID categoryFragID () = 0;
+         //
+         // Base class function.
+         // Returns a message fragment ID indicating category of this Part.
+
+      virtual WitAttr apiCategory () = 0;
+         //
+         // Base class function.
+         // Returns the category of this Part in api terms.
+
+      virtual WitBoolean canStock (WitPeriod thePer) = 0;
+         //
+         // Base class function.
+         // Returns TRUE iff part this Part can be stocked in period thePer.
+
+      virtual int nodeIndex () const;
+         //
+         // Override from class Node.
+
+      virtual WitBoolean isaMaterial (WitMaterial * & theMat);
+         //
+         // If this Part is a Material, sets theMat to it and returns TRUE.
+         // Otherwise sets theMat to NULL and returns FALSE.
+         // The base class implementation does the FALSE case.
+
+      virtual WitBoolean isaCapacity (WitCapacity * & theCap);
+         //
+         // Same as isaMaterial, but for Capacity.
+
+      virtual void display ();
+         //
+         // Base class function.
+         // Displays the input and preprocessing data for this Part.
+
+      virtual WitBoolean isaPart ();
+         //
+         // Override from class Node.
+
+      inline static WitPart * key (WitListItr & theItr)
+         {
+         return (WitPart *) theItr.key ();
+         }
+         //
+         // Used by forEach<object> macros.
+
+      inline WitPeriod explosionPeriod (WitPeriod fillPer)
+         {
+         return 
+            expPerGaps_?
+               findExplosionPeriod (fillPer):
+               fillPer;
+         }
+         //
+         // Returns the Period in which to explode this Part for filling
+         // requirements in fillPer. 
+         
+      inline WitBoolean explodeable (WitPeriod thePer)
+            //
+            // Returns TRUE iff this Part can be exploded in period thePer.
+            // Note that this implies that the relevent effProdRate is 
+            // significantly positive.
+         {
+         return expBopEntryTl_.isAllocated () && expBopEntryTl_[thePer] != NULL;
+         }
+
+      double net (
+            WitPeriod          reqPer,
+            double             reqQty,
+            WitTVec (double) & supply);
+         //
+         // Net the supply vector by reqQty and return 0 if reqQty is filled
+         // or the amount remaining if the supply is exhausted.
+
+      virtual const WitFlexVec (float) & residualVol () = 0;
+         //
+         // After postprocessing, residualVol ()[t] is the amount by which
+         // consumption of this Part could be increased in period t, without
+         // making the current implosion solution infeasible.
+
+      void writeSoln ();
+         //
+         // Prints the comprehensive implosion solution for this Part.
+
+      void writeMrpSoln ();
+         //
+         // Prints the comprehensive MRP solution for this Part.
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Protected member functions.
+      //------------------------------------------------------------------------
+
+      virtual const char * categoryKeyWord () = 0;
+         //
+         // Base class function.
+         // Returns the key word for this Part's category for the input file
+         // format.
+
+      virtual void writeDataAttrs ();
+         //
+         // Override from class Component.
+
+      void copyAttrsFrom (WitPart * thePart);
+         //
+         // Copies the input attributes of thePart into this Part.
+
+      void setPartIndex ();
+         //
+         // Sets mappingIndex_;
+
+      virtual WitPeriod findExplosionPeriod (WitPeriod fillPer) = 0;
+         //
+         // Base class function.
+         // Computes and returns the Period in which to explode this Part for
+         // filling requirements in fillPer. 
+         
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      copyCtorAndAssignment (WitPart);
+         //
+         // Prevents unintentional copying and assignment.
+
+      virtual void writeDataID ();
+         //
+         // Override from class Component.
+
+      virtual void purgeCompListsSpec ();
+         //
+         // Override from class Component.
+
+      virtual void clearDepListsSpec ();
+         //
+         // Override from class Component.
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      //------------------------------------------------------------------------
+      // Data maintained by myCompMgr ().
+      //------------------------------------------------------------------------
+
+      int mappingIndex_;
+         //
+         // Mapping index: see Mapping.h.
+         // == # Parts constructed before this Part.
+
+      WitList (WitDemand) myDemands_;
+         //
+         // The list of demands for this Part.
+
+      WitList (WitBomEntry) consumingBomEntries_;
+         //
+         // A list of all BomEntries, theBomEnt, such that
+         // theBomEnt->myPart_ == this Part.
+
+      WitList (WitSubEntry) consumingSubEntries_;
+         //
+         // A list of all SubEntries,
+         // theSub, such that theSub->myPart_ == this Part.
+
+      WitList (WitBopEntry) producingBopEntries_;
+         //
+         // A list of all BopEntries, theBopEnt, such that
+         // theBopEnt->myPart_ == this Material.
+         // When myProblem () is preprocessed, this list is sorted in order of
+         // of increasing expAversion.
+
+      //------------------------------------------------------------------------
+      // Input data.
+      //------------------------------------------------------------------------
+
+      WitFlexVec (float) supplyVol_;
+         //
+         // Non-cumulative external supply volume in each period.
+         // Range: [0.0, +inf).
+
+      float unitCost_;
+         //
+         // The standard unit cost of the part.
+         // Range: [0.0, +inf).
+
+      WitFlexVec (float) obj1ScrapCost_;
+         //
+         // If objective #1 is being used, then thePart->obj1ScrapCost ()[t] is
+         // the user-specified cost coef. on the scrap variable for thePart in
+         // period t.
+         // Range: (-inf, +inf).
+
+      //------------------------------------------------------------------------
+      // Data set by preprocessing.
+      //------------------------------------------------------------------------
+
+      WitTVec (WitTypelessPtr) expBopEntryTl_;
+         //
+         // (BopEntry *) expBopEntryTl_[t] is the preferred BopEntry to be used
+         // for explosions in order to produce this Part in period t.
+         // expBopEntryTl_[t] != NULL iff this Part can be exploded in period t.
+
+      WitDenseList (WitPart) belowList_;
+         //
+         // The list of all parts in the multilevel BOM extending downward from
+         // this Part, including this Part itself. The list is in
+         // downward order, so this Part is always its first element.
+         // Considers all BopEntries that produce this Part for which expAllowed
+         // is TRUE.
+         // For each SubEntry for each Operation that produces this Part:
+         //    If multiRoute is TRUE and the Sub's expAllowed is TRUE,
+         //       belowList_ includes the below list of the consumed Part.
+         //    else if the Sub's netAllowed is TRUE,
+         //       belowList_ includes only the consumed Part itself.
+         //    else
+         //       belowList_ includes nothing for the Sub.
+         // This data is tailor made for heuristic implosion/allocation.
+
+      WitBoolean isCoproduced_;
+         //
+         // TRUE, iff this Part is coproduced.
+         // A Part is considered to be a broad product of an Operation, iff:
+         //    It is a BopEntry  for the Operation with a positive  prodRate, or
+         //    It is a ConsEntry for the Operation with a negative usageRate.
+         // Thus when the Operation is executed, the Part is (in a broad sense)
+         //    "produced".
+         // A Operation is considered to be coproducing, iff it has more than 1
+         //    broad product.
+         // A Part is considered to be coproduced, iff it is a broad product
+         //    of at least one coproducing Operation.
+         // The significance of this is that, if a Part is coproduced, then
+         // it may get (broadly) produced by an Operation that is being
+         // executed in order to produce a different Part. If it is not
+         // coproduced, this can't happen.
+
+      //------------------------------------------------------------------------
+      // Data set by postprocessing.
+      //------------------------------------------------------------------------
+
+      WitFlexVec (float) consVol_;
+         //
+         // consVol[t] is the volume of this Part that was consumed in period t
+
+      WitFlexVec (float) prodVol_;
+         //
+         // prodVol[t] is total volume of this Part that is produced in
+         // period t by all Operations.
+
+      WitFlexVec (float) scrapVol_;
+         //
+         // scrapVol_[t] is the volume of this part that was scrapped in period
+         // t.
+
+      WitBoolean expPerGaps_;
+         //
+         // TRUE, iff there is at least one period, fillPer, such that:
+         // * this Part is not explodeable in fillPer, and
+         // * there is an earlier period, expPer in which this Part is 
+         //   explodeable and the result can be stock thru fillPer.
+         // explosionPeriod () will search for an earlier explosion period iff
+         // expPerGaps_ is TRUE.
+
+      //------------------------------------------------------------------------
+      // Data set by MRP.
+      //------------------------------------------------------------------------
+
+      WitFlexVec (float) reqVol_;
+         //
+         // reqVol[t] is the required volume of the part in period t.
+         // This field is the main output of mrp.
+
+      WitFlexVec (float) mrpConsVol_;
+         //
+         // Same as consVol, but for MRP.
+
+      WitFlexVec (float) mrpResidualVol_;
+         //
+         // Same as residualVol, but for MRP.
+
+      //------------------------------------------------------------------------
+      // Data set by FSS.
+      //------------------------------------------------------------------------
+
+      WitFlexVec (float) focShortageVol_;
+         //
+         // The Focussed Shortage Volume for this Part.
+   };
+
+#endif
+@
+
+
+1.2
+log
+@Updating wit/src in /u/wit/devbase to be in synch with /u/implode/devbase
+@
+text
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+@
+
+
+1.1.1.1
+log
+@Import wit
+@
+text
+@@

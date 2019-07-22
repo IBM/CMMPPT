@@ -1,0 +1,4023 @@
+head	1.6;
+access;
+symbols
+	sce_5_01_20080919:1.6
+	latest_sce_4_20_20060523:1.6.0.4
+	sce_4_20_20060523:1.6
+	latest_sce4_20_OSL:1.6.0.2
+	sce_4_20_OSL:1.6
+	sce_4_05_20040511:1.5
+	sce_4_00_20040201:1.5
+	nextGenBranch:1.5.0.2
+	nextGenRoot:1.5
+	sce_3_30_20030627:1.5
+	EndRw-branch:1.3.0.2
+	Root-of-EndRw:1.3
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2005.09.12.20.01.57;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.01.15.23.05.46;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.01.15.19.36.32;	author rwToStl;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.12.05.00.35.03;	author fasano;	state Exp;
+branches
+	1.3.2.1;
+next	1.2;
+
+1.2
+date	2002.12.02.17.42.23;	author austel;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.39;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.39;	author wit;	state Exp;
+branches;
+next	;
+
+1.3.2.1
+date	2003.01.08.17.42.27;	author rwToStl;	state Exp;
+branches;
+next	1.3.2.2;
+
+1.3.2.2
+date	2003.01.09.13.54.42;	author rwToStl;	state Exp;
+branches;
+next	1.3.2.3;
+
+1.3.2.3
+date	2003.01.14.19.05.41;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Removed all calls to variable-argument-list WIT API functions,
+except those in source files that still use RogueWave.
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <fstream>
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+
+
+#include <math.h>
+//#include <iostream.h>
+//#include <fstream.h>
+
+
+#include <scenario/src/difCmrpF.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/idnumber.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/collflt.h>
+#include <scenario/src/difEssSc.h>
+
+
+// -----------------------------------------------------------------------
+//  Create a LgFrDataInterfaceImplementationFromCmrpFiles
+// -----------------------------------------------------------------------
+
+LgFrDataInterfaceImplementation * 
+createCmrpFilesDifImp(const std::string& filename)
+{
+   return new LgFrDataInterfaceImplementationFromCmrpFiles(filename);
+} 
+
+//----------------------------------------------------------------------------
+// To register all global functions for this class
+// The following functions are registered by using difWitR globle function: 
+// unitCost, procCost, obj1ScrapCost,obj1StockCost, supplyVol, yield, 
+// cycleTime, obj1ProdCost, obj1ProdCos, grossRev, demandVol, 
+// obj1CumShipReward, obj1ShipReward   
+// Register difCmrpF's own global functions for raw parts: constrained and procLeadTime, 
+//----------------------------------------------------------------------------
+void
+registerCmrpFilesDifImpFunctions(LgFrDataInterfaceImplementation *dImpCMRP)
+{
+// Globle function for raw parts
+// Register difWitRun global functions for
+//   unitcost, procCost, obj1ScrapCost, obj1StockCost, and supplyVol.
+// Register difCmrpF's own global functions for constrained and procLeadTime, 
+
+dImpCMRP->registerFunction("rawUnitCost", material, part,
+                            vectorFloat, difWitRunGetPartUnitCost);
+dImpCMRP->registerFunction("rawProcCost", material, part,
+                            vectorFloat, difWitRunGetPartProcCost);
+dImpCMRP->registerFunction("rawConstrained", material, part,
+                            vectorInt, difCmrpFGetRawConstrained);
+dImpCMRP->registerFunction("rawProcLeadTime", material, part,
+                            timeVecFloat, difCmrpFGetRawProcLeadTime);
+dImpCMRP->registerFunction("rawObj1ScrapCost", material, part,
+                            timeVecFloat, difWitRunGetPartObj1ScrapCost);
+dImpCMRP->registerFunction("rawObj1StockCost", material, part,
+                            timeVecFloat, difWitRunGetPartObj1StockCost);
+dImpCMRP->registerFunction("rawSupplyVol", material, part,
+                            timeVecFloat, difWitRunGetPartSupplyVol);
+
+
+// Global functions for product parts.
+// Register difWitRun global functions for
+//   unitcost, procCost, constrained, yiels, procLeadTime, cycleTime, 
+//   obj1ProdCost, obj1ScrapCost, obj1StockCost, supplyVol, minLotSize,
+//   incLotSize. 
+
+dImpCMRP->registerFunction("productUnitCost", material, part,
+                            vectorFloat, difWitRunGetPartUnitCost);
+dImpCMRP->registerFunction("productProcCost", material, part,
+                            vectorFloat, difWitRunGetPartProcCost);
+dImpCMRP->registerFunction("productConstrained", material, part,
+                            vectorInt, difWitRunGetPartConstrained);
+dImpCMRP->registerFunction("productYield", material, part,
+                            vectorInt, difWitRunGetProductYield);
+dImpCMRP->registerFunction("productYieldFloat", material, part,
+                            vectorInt, difWitRunGetProductYieldFloat);
+dImpCMRP->registerFunction("productProcLeadTime", material, part,
+                            timeVecFloat, difWitRunGetPartProcLeadTime);
+dImpCMRP->registerFunction("productCycleTime", material, part,
+                           timeVecFloat , difWitRunGetProductCycleTime);
+dImpCMRP->registerFunction("productObj1ProdCost", material, part,
+                            timeVecFloat, difWitRunGetProductObj1ProdCost);
+dImpCMRP->registerFunction("productObj1ScrapCost", material, part,
+                            timeVecFloat, difWitRunGetPartObj1ScrapCost);
+dImpCMRP->registerFunction("productObj1StockCost", material, part,
+                            timeVecFloat, difWitRunGetPartObj1StockCost);
+dImpCMRP->registerFunction("productSupplyVol", material, part,
+                            timeVecFloat, difWitRunGetPartSupplyVol);
+dImpCMRP->registerFunction("productMinLotSize", material, part,
+                            timeVecFloat, difWitRunGetProductMinLotSize);
+dImpCMRP->registerFunction("productIncLotSize", material, part,
+                            timeVecFloat, difWitRunGetProductIncLotSize);
+
+
+// Global functions for capacity parts.
+// Register difWitRun global functions for
+//   unitcost, constrained, obj1ScrapCost, and supplyVol 
+
+dImpCMRP->registerFunction("capacityUnitCost", material, part,
+                            vectorFloat, difWitRunGetPartUnitCost);
+dImpCMRP->registerFunction("capacityConstrained", material, part,
+                            vectorInt, difWitRunGetPartConstrained);
+dImpCMRP->registerFunction("capacityObj1ScrapCost", material, part,
+                            timeVecFloat, difWitRunGetPartObj1ScrapCost);
+dImpCMRP->registerFunction("capacitySupplyVol", material, part,
+                            timeVecFloat, difWitRunGetPartSupplyVol);
+
+
+// Global functions for demands
+// Register difWitRun global functions for
+//  grossRev, demandVol, Obj1CumShipReward, priority, and obj1ShipReward.
+
+dImpCMRP->registerFunction("demandGrossRev", demandType, demand,
+                            vectorFloat, difWitRunGetDemandGrossRev);
+dImpCMRP->registerFunction("demandVol", demandType, demand,
+                            timeVecFloat, difWitRunGetDemandVol);
+dImpCMRP->registerFunction("demandObj1CumShipReward", demandType, demand,
+                            timeVecFloat, difWitRunGetDemandObj1CumShipReward);
+dImpCMRP->registerFunction("demandObj1ShipReward", demandType, demand,
+                            timeVecFloat, difWitRunGetDemandObj1ShipReward);
+dImpCMRP->registerFunction("demandPriority", demandType, demand,
+                            timeVecFloat,difWitRunGetDemandPriority );
+
+
+// Parts table, register globle functions from difWitR, 7/19/95 DW 
+dImpCMRP->registerFunction("rawParts", material, part,
+			   orderedVecPart, difWitRunGetRawParts);
+dImpCMRP->registerFunction("productParts", material, part,
+			   orderedVecPart, difWitRunGetProductParts);
+dImpCMRP->registerFunction("capacityParts", material, part,
+			   orderedVecPart, difWitRunGetCapacityParts);
+
+// using globle function from difWitR, 7/19/95 DW
+dImpCMRP->registerFunction("committedDemands",demandType , demand,
+			   orderedVecDemand, difWitRunGetCommittedDemands);
+dImpCMRP->registerFunction("newOpportunityDemands", demandType, demand,
+			   orderedVecDemand, difWitRunGetNewOpportunityDemands);
+dImpCMRP->registerFunction("firmForecastDemands", demandType, demand,
+			   orderedVecDemand, difWitRunGetFirmForecastDemands);
+dImpCMRP->registerFunction("riskForecastDemands", demandType, demand,
+			   orderedVecDemand, difWitRunGetRiskForecastDemands);
+// Register define bom globle function
+dImpCMRP->registerFunction("defineBom", material, part,
+                            timeVecFloat, difWitRunDefineBom);
+
+
+}
+
+
+//--------------------------------------------------------------------
+//
+//   Global functions to obtain raw part attributes
+//
+//-------------------------------------------------------------------
+
+// difWitRunGetRawConstrained global function (registered in the attribute table).
+// It returns a LgFrIntVector object
+void *
+difCmrpFGetRawConstrained(
+    const LgFrDataInterfaceImplementation * difImp,
+    const LgFrItemPtrVector* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr)
+{
+  assert( difImp->GetDIIType() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+  witAttr partCategory;
+  LgFrItemPtrVector pv = *itemPtrOrdVecPtr;
+  LgFrIntVector& retVal = *(new LgFrIntVector);
+  retVal.reserve( pv.size() );
+  std::string  partName;
+
+  // make a local version of this that's
+  // not a pointer-to-const, Scott Meyers item 21 p 77.
+  LgFrDataInterfaceImplementationFromCmrpFiles * const dImpCMRP =
+     ( LgFrDataInterfaceImplementationFromCmrpFiles * const ) difImp;
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < pv.size(); i++ ) 
+  {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(), &partCategory);
+    if ( partCategory == WitRAW ) 
+	{
+		partName = pv[i]->name();
+		retVal.push_back( (*dImpCMRP->constrainedDict_.find( partName )).second );
+    }
+    else if ((partCategory == WitPRODUCT) || (partCategory == WitCAPACITY))
+	{
+		retVal.push_back( true );
+    }
+  }
+  return &retVal;
+}
+
+// difWitRunGetRawProcLeadTime global function (registered in the attribute table).
+// It returns a LgFrTimeVecFloatVector object.
+void *
+difCmrpFGetRawProcLeadTime(
+    const LgFrDataInterfaceImplementation * difImp,
+    const LgFrItemPtrVector* itemPtrOrdVecPtr,
+    LgFrError & status,
+    const LgFrDataInterfaceEssentials * difEssenPtr)
+{
+  assert( difImp->GetDIIType() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+  float * cycleTime;
+  witAttr partCategory;
+  LgFrItemPtrVector pv = *itemPtrOrdVecPtr;
+  LgFrTimeVecFloatVector& retVal = *(new LgFrTimeVecFloatVector);
+  retVal.reserve( pv.size() );
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int calNP(calendar.nPeriods());  // # periods in scenario calendar
+  int witNP;                       // # periods in wit data file
+
+  std::string  partName;
+  float procLT;
+
+
+  LgFrDataInterfaceImplementationFromCmrpFiles * dImpCMRP
+      = (LgFrDataInterfaceImplementationFromCmrpFiles * ) difImp;
+
+  witGetNPeriods( dImpCMRP->constWitRun(difEssenPtr), &witNP);
+  LgFrTimeVecFloat tv(calNP);
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < pv.size(); i++ ) {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(), &partCategory);
+    if ( partCategory == WitRAW ) {
+      partName = pv[i]->name();
+      procLT = (*dImpCMRP->procLeadTimeDict_.find( partName ) ).second;
+    retVal.push_back( LgFrTimeVecFloat(calNP, procLT ) );
+    }
+    else if (partCategory == WitPRODUCT) {
+      witGetPartCycleTime(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(),
+                              &cycleTime);
+      size_t j = 0; // Pulled out of the for below by RW2STL
+      for(j = 0; j < size_tMin(calNP, witNP); j++ ){
+        tv[j] = cycleTime[j];
+          }
+      retVal.push_back( tv );
+      portableFree(cycleTime);
+      }
+  }
+  return &retVal;
+}
+
+
+//--------------------------------------------------------------------
+//  
+//   Define the Wit Run
+//
+//-------------------------------------------------------------------
+
+
+void
+  LgFrDataInterfaceImplementationFromCmrpFiles::defineWitRun(
+      const LgFrDataInterfaceEssentials * difEssenPtr)
+const
+{
+  assert( !validWitRun() );
+  // make a local version of this that's
+  // not a pointer-to-const, Scott Meyers item 21 p 77.
+  LgFrDataInterfaceImplementationFromCmrpFiles * const localThis =
+                  ( LgFrDataInterfaceImplementationFromCmrpFiles * const ) this;
+  WitRun * wr = localThis->LgFrDataInterfaceImplementationFromWitRun::mutableWitRun();
+  witSetMesgTimesPrint(wr, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+  witInitialize( wr );
+
+  witSetMesgTimesPrint( wr, WitTRUE, 538, 0 );
+  witSetWit34Compatible( wr, WitTRUE );
+
+  const LgFrCalendar& calendar = difEssenPtr->calendar();
+  int calNp(calendar.nPeriods());  // # periods in scenario calendar
+  witSetNPeriods( wr, calNp );
+  witSetTitle( wr, baseFileName_.c_str() );
+  witSetObjChoice( wr, 1 );
+
+
+      // Now read CMRP data files and populate the wit run
+      std::string line;
+      bool result;
+      
+      // Read Raw Parts File
+      {
+        // Open file
+		std::string fname( baseFileName_ + ".raw" );
+		std::ifstream rawF( fname.c_str() );
+        if ( !rawF ) 
+        {
+          std::cerr <<"LgFrERROR: File open failed: " << fname << std::endl;
+          exit( EXIT_FAILURE );
+        }
+        readFirstRecord( rawF, ".raw" );
+
+        // Read remaining records until eof encountered
+        long lineCount = 1; 
+        for (;;)
+        {
+          lineCount++;
+          std::getline( rawF, line );
+          if (rawF.eof() ) break;
+          if ( !rawF )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                sce::stringFrom( lineCount ) << std::endl;
+            exit( EXIT_FAILURE );
+          }
+
+          // Set Part Name
+          SCETokenizer next(line);
+          std::string partName = next();
+          witAddPart( wr, partName.c_str(), WitRAW );
+
+          // Unit Cost
+          double unitCostDbl;
+          result = sce::fromString( next(), unitCostDbl ); // RWLocale::global().stringToNum( next().c_str(), &unitCostDbl);
+          if ( !result ) 
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 2 (unitCost)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          float unitCost = (float)unitCostDbl;
+          witSetPartUnitCost( wr, partName.c_str(), unitCost );
+
+          // Constrainted flag
+          std::string constrainedString = next();
+		  sce::toLower( constrainedString );
+          if ( constrainedString != "constrained" &&
+               constrainedString != "unconstrained" ) 
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 3 (constrained)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          bool constrained = (constrainedString == "constrained");
+          localThis->constrainedDict_.insert( ConstrainedDictPair( partName, constrained ) );
+
+          // Procurement Lead time
+          double procLTDbl;
+          result = sce::fromString( next(), procLTDbl ); // RWLocale::global().stringToNum( next().c_str(), &procLTDbl);
+          if ( !result ) 
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 4 (procurement lead time)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          float procLT = (float)procLTDbl;
+          localThis->procLeadTimeDict_.insert( ProcLeadTimePair( partName, procLT) );
+
+          // Supply Volume
+          std::string supplyVol = next();
+          //std::string supplyVol;
+          //RWCSubString token = next();
+          //supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName.c_str(), 
+               LgFrTimeVecFloat( calNp, supplyVol ).data() );
+
+        } // end of for loop reading records
+      }  // Finished reading .raw file
+
+
+      // Read Product Parts File
+      {
+        // Open file
+		  std::ifstream prdF( std::string( baseFileName_ + ".prd" ).c_str() );
+        if ( !prdF ) 
+        {
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".prd" << std::endl;
+          exit( EXIT_FAILURE );
+        }
+        readFirstRecord( prdF, ".prd" );
+
+        // Read remaining records until eof encountered
+        long lineCount = 1;
+        for (;;)
+        {
+          lineCount++;
+          std::getline( prdF, line );
+          if (prdF.eof() ) break;
+          if ( !prdF )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+            exit( EXIT_FAILURE );
+          }
+
+          // Set Part Name
+          SCETokenizer next(line);
+          std::string partName = next();
+          witAddPart( wr, partName.c_str(), WitPRODUCT );
+
+          // Unit Cost
+          double unitCostDbl;
+          result = sce::fromString( next(), unitCostDbl ); // RWLocale::global().stringToNum( next().c_str(), &unitCostDbl );
+          if ( !result )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 2 (unitCost)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          float unitCost = (float)unitCostDbl;
+          witSetPartUnitCost( wr, partName.c_str(), unitCost );
+
+          // Cycle Time
+          double cycleTimeDbl;
+          result = sce::fromString( next(), cycleTimeDbl ); // RWLocale::global().stringToNum( next().c_str(), &cycleTimeDbl );
+          if ( !result )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 3 (cycleTime)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          float cycleTime = (float)cycleTimeDbl;
+          witSetPartCycleTime( wr, partName.c_str(), 
+                   LgFrTimeVecFloat( calNp, cycleTime ).data() );
+
+          // Supply Volume
+          std::string supplyVol = next();
+          //std::string supplyVol;
+          //RWCSubString token = next();
+          //supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName.c_str(),
+               LgFrTimeVecFloat( calNp, supplyVol ).data() );
+	  int supPerNo = 0; // Pulled out of the for below by RW2STL
+	  for (supPerNo = 1; // token is already at first supply volume
+	       supPerNo < calNp; ++supPerNo)
+	      next();
+
+        } // end of for loop reading records
+
+      }  // Finished reading .prd file
+
+
+
+      // Read Capacity File
+      {
+        // Open file
+		  std::ifstream capF( std::string( baseFileName_ + ".cap" ).c_str() );
+        if ( !capF )
+        {
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".cap" << std::endl;
+          exit( EXIT_FAILURE );
+        }
+        readFirstRecord( capF, ".cap" );
+
+        // Read remaining records until eof encountered
+        long lineCount = 1;
+        int dupCapPart = 0;
+        for (;;)
+        {
+          lineCount++;
+          std::getline( capF, line );
+          if (capF.eof() ) break;
+          if ( !capF )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".cap. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+            exit( EXIT_FAILURE );
+          }
+
+          // Set Capacity Name
+          SCETokenizer next(line);
+          std::string partName = next();
+
+          witBoolean exists;
+          witGetPartExists( wr, partName.c_str(), &exists );
+          if ( !exists )
+             witAddPart( wr, partName.c_str(), WitCAPACITY );
+          else {
+             dupCapPart++;
+             std::cout <<"LgFrWARNING: duplicate capacity part: " <<partName << std::endl;
+             continue;
+          }
+
+          // Supply Volume
+          std::string supplyVol = next( "\n" );
+          witSetPartSupplyVol( wr, partName.c_str(),
+               LgFrTimeVecFloat( calNp, supplyVol ).data() );
+
+        } // end of for loop reading records
+
+
+        std::cout <<"LgFrINFO: duplicate capacity part count " <<dupCapPart << std::endl;
+
+      }  // Finished reading .cap file
+
+
+
+
+      // Read Demand File
+      {
+        // Open file
+		  std::ifstream demF( std::string( baseFileName_ + ".dem" ).c_str() );
+        if ( !demF )
+        {
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".dem" << std::endl;
+          exit( EXIT_FAILURE );
+        }
+        readFirstRecord( demF, ".dem" );
+
+        // Read remaining records until eof encountered
+        long lineCount = 1;
+        int undefDemandedPart = 0;
+        int demandOnCap = 0;
+        for (;;)
+        {
+          lineCount++;
+          std::getline( demF, line );
+          if (demF.eof() ) break;
+          if ( !demF )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".dem. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+            exit( EXIT_FAILURE );
+          }
+
+          // Set Demand Name
+          SCETokenizer next(line);
+          std::string demandName = next();
+          std::string partName = next();
+
+          witBoolean exists;
+          witGetPartExists( wr, partName.c_str(), &exists );
+          if ( exists ) {
+             witAttr cat;
+             witGetPartCategory( wr, partName.c_str(), &cat );
+             if ( cat != WitCAPACITY )
+                witAddDemand( wr, partName.c_str(), demandName.c_str() );
+             else {
+                demandOnCap++;
+                std::cout <<"LgFrWARNING: demand on capacity part: " <<partName << std::endl;
+                continue;
+             }
+          }
+          else {
+             undefDemandedPart++;
+                std::cout <<"LgFrWARNING: undefined demanded part " <<partName << std::endl;
+             continue;
+          }
+
+          // Priority flag
+          //RWCSubString priorityString = next();
+          long priorityLong;
+          bool result = sce::fromString( next(), priorityLong );
+//          bool result = RWLocale::global().stringToNum(
+//                  priorityString, &priorityLong);
+          if ( !result )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 3 (priority)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          int * priority = new int[ calNp ];
+          int p = 0; // Pulled out of the for below by RW2STL
+          for ( p=0; p<calNp; p++ ) 
+             priority[p]=priorityLong;
+          witSetDemandPriority( wr, partName.c_str(), demandName.c_str(), priority );
+          delete [] priority; 
+
+          // Demand Volume
+          std::string demandVol = next();
+          //RWCSubString token = next();
+          //demandVol = line(token.start(), line.length() - token.start() );
+          witSetDemandDemandVol( wr, partName.c_str(), demandName.c_str(),
+               LgFrTimeVecFloat( calNp, demandVol ).data() );
+
+        } // end of for loop reading records
+
+        std::cout <<"LgFrINFO: undefined demanded part count "
+             <<undefDemandedPart << std::endl;
+        std::cout <<"LgFrINFO: demand on capacity part count "
+             <<demandOnCap << std::endl;
+
+      }  // Finished reading .dem file
+
+
+
+
+      // Read BOM File
+      {
+        // Open file
+		  std::ifstream bomF( std::string( baseFileName_ + ".bom" ).c_str() );
+        if ( !bomF )
+        {
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".bom" << std::endl;
+          exit( EXIT_FAILURE );
+        }
+        readFirstRecord( bomF, ".bom" );
+
+        // Read remaining records until eof encountered
+        long lineCount = 1;
+        int undefProdPart = 0;
+        int undefConsPart = 0;
+        int prodCapPart = 0;
+        int prodRawPart = 0;
+        for (;;)
+        {
+          lineCount++;
+          std::getline( bomF, line );
+          if (bomF.eof() ) break;
+          if ( !bomF )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+            exit( EXIT_FAILURE );
+          }
+
+          // Get produced and consumed parts
+          SCETokenizer next(line);
+          std::string producedPartName = next();
+          std::string consumedPartName = next();
+
+          // Get usage rate
+          double usageRateDbl;
+          bool result = sce::fromString( next(), usageRateDbl );
+//          result = RWLocale::global().stringToNum(
+//                   std::string(next()), &usageRateDbl);
+          if ( !result )
+          {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 3 (usageRate)" << std::endl;
+            exit( EXIT_FAILURE );
+          }
+          float usageRate = (float)usageRateDbl;
+
+          witBoolean prodPartExists, consPartExists;
+          witGetPartExists( wr, producedPartName.c_str(), &prodPartExists );
+          witGetPartExists( wr, consumedPartName.c_str(), &consPartExists );
+          if ( !prodPartExists ) {
+             undefProdPart++;
+             std::cout <<"LgFrWARNING: undefined produced part: "
+                  <<producedPartName << std::endl;
+          }
+          if ( !consPartExists ) {
+             undefConsPart++;
+             std::cout <<"LgFrWARNING undefined consumed part: "
+                  <<consumedPartName << std::endl;
+          }
+
+          if ( prodPartExists && consPartExists ) {
+             witAttr cat;
+             witGetPartCategory( wr, producedPartName.c_str(), &cat );
+             if ( cat == WitPRODUCT )
+                {
+                int bomEntIdx;
+
+                witGetOperationNBomEntries (
+                     wr,
+                     producedPartName.c_str (),
+                   & bomEntIdx);
+
+                witAddBomEntry (
+                   wr, 
+                   producedPartName.c_str (),
+                   consumedPartName.c_str ());
+
+                witSetBomEntryUsageRate (
+                   wr,
+                   producedPartName.c_str (),
+                   bomEntIdx,
+                   usageRate);
+                }
+             else if ( cat == WitCAPACITY ) {
+                prodCapPart++;
+                std::cout <<"LgFrWARNING: produced capacity: "
+                     <<producedPartName << std::endl;
+             }
+             else {
+                assert( cat == WitRAW );
+                prodRawPart++;
+                std::cout <<"LgFrWARNING: produced raw part: "
+                     <<producedPartName << std::endl;
+             }
+          }
+
+        } // end of for loop reading records
+        std::cout <<"LgFrINFO: undefined produced parts " <<undefProdPart << std::endl;
+        std::cout <<"LgFrINFO: undefined consumed parts " <<undefConsPart << std::endl;
+        std::cout <<"LgFrINFO: produced capacities " <<prodCapPart << std::endl;
+        std::cout <<"LgFrINFO: produced raw parts " <<prodRawPart << std::endl;
+
+      }  // Finished reading .bom file
+
+
+      // Read optional revenue File
+      {
+        // Open file
+		std::ifstream revF( std::string( baseFileName_ + ".rev" ).c_str() );
+        if ( !revF 	)
+        {
+          std::cerr <<"LgFrINFO: File " + baseFileName_ + ".rev " 
+               <<"was not found. Using default revenue values" << std::endl;
+        }
+        else 
+        {
+          readFirstRecord( revF, ".rev" );
+
+          // Read remaining records until eof encountered
+          long lineCount = 1;
+          for (;;)
+          {
+            lineCount++;
+            std::getline( revF, line );
+            if (revF.eof() ) break;
+            if ( !revF )
+            {
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+                      sce::stringFrom( lineCount ) << std::endl;
+              exit( EXIT_FAILURE );
+            }
+
+            // Set Demand Name
+            SCETokenizer next(line);
+            std::string demandName = next();
+            std::string partName = next();
+
+#ifdef DEBUG
+            witBoolean exists;
+            witGetPartExists( wr, partName.c_str(), &exists );
+	    if ( ! exists ) {
+	       std::cerr << "LgFrERROR:Error while reading revenue file, "
+                    << "part does not exit: " << partName
+	            <<  std::endl;
+	    }
+            assert ( exists );
+#endif
+
+            // revenue value 
+            double revDbl;
+			bool result = sce::fromString( next(), revDbl );
+//            result = RWLocale::global().stringToNum(
+//                     std::string(next()), &revDbl);
+            if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+                    sce::stringFrom( lineCount ) +
+                   " Token 3 (revenue)" << std::endl;
+              exit( EXIT_FAILURE );
+            }
+            LgFrTimeVecFloat obj1ShipReward(calNp,(float)revDbl);
+            witSetDemandObj1ShipReward( wr, partName.c_str(), demandName.c_str(), 
+                                        obj1ShipReward.data() );
+
+          } // end of for loop reading records
+        } // if (!refF) ... else { }
+      }  // Finished reading .rev File
+
+
+
+
+
+      // Read optional minLotSize File
+      readOperationAttribute( witSetOperationMinLotSize,
+                              ".mls",
+                              "minLotSize",
+                              difEssenPtr );
+      
+      // Read optional incLotSize File
+      readOperationAttribute( witSetOperationIncLotSize,
+                              ".ils",
+                              "incLotSize",
+                              difEssenPtr );
+      
+      // Read optional Yield File
+      readOperationAttribute( witSetOperationYield,
+                              ".yld",
+                              "yield",
+                              difEssenPtr );
+
+
+  assert (validWitRun() );
+}
+
+// ---------------------------------------
+// Read Float* Operation attributes      
+// ---------------------------------------
+void
+ LgFrDataInterfaceImplementationFromCmrpFiles::readOperationAttribute(
+   apiFuncsetOperationFloatVecAttribute witSetOperation,
+   std::string fileExtension,
+   std::string attributeName,
+   const LgFrDataInterfaceEssentials * difEssenPtr )
+const
+{
+ // Get the witRun 
+ LgFrDataInterfaceImplementationFromCmrpFiles * const localThis =
+                  ( LgFrDataInterfaceImplementationFromCmrpFiles * const ) this;
+ WitRun * wr = localThis->
+   LgFrDataInterfaceImplementationFromWitRun::mutableWitRun();
+
+ // Get number of periods in calendar
+ const LgFrCalendar& calendar = difEssenPtr->calendar();
+ int calNp(calendar.nPeriods());
+ 
+ // Open file
+ std::ifstream file( std::string( baseFileName_ + fileExtension ).c_str() );
+ if ( !file )
+   {
+	 std::cerr <<"LgFrINFO: File " << baseFileName_ << fileExtension
+          <<"was not found. Using default " + attributeName + " values"
+          << std::endl;
+   }
+   else
+   {
+     readFirstRecord( file, fileExtension );
+
+     // Read remaining records until eof encountered
+     long lineCount = 1;
+     std::string line;
+     for (;;)
+       {
+         lineCount++;
+         std::getline( file, line );
+         if (file.eof() ) break;
+         if ( !file )
+           {
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+				  fileExtension << ". Line " << lineCount << std::endl;
+              exit( EXIT_FAILURE );
+           }
+
+           // Get operation name
+           SCETokenizer next(line);
+           std::string operationName = next();
+
+#ifdef DEBUG
+            witBoolean exists;
+            witGetOperationExists( wr, operationName.c_str(), &exists );
+	    if ( ! exists ) {
+	       std::cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+                    << "operation does not exit: " 
+		    << operationName <<  std::endl;
+	    }
+            assert ( exists );
+#endif
+
+            // Get attribute value
+            double attrValDbl;
+            
+			bool result = sce::fromString( next(), attrValDbl );
+//            bool result = RWLocale::global().stringToNum(
+//                                         std::string(next()), &attrValDbl);
+            if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                   fileExtension << " Line " << lineCount <<
+                   " Token 2 (" << attributeName << ")" << std::endl;
+              exit( EXIT_FAILURE );
+            }
+            LgFrTimeVecFloat attrValTv(calNp,(float)attrValDbl);
+            witSetOperation( wr, operationName.c_str(), 
+                             attrValTv.data() );
+
+      } // end of for loop reading records
+   } // if (!file) ... else { }
+} 
+
+
+// ---------------------------------------
+// Read int* Operation attributes      
+// ---------------------------------------
+void
+ LgFrDataInterfaceImplementationFromCmrpFiles::readOperationAttribute(
+   apiFuncsetOperationIntVecAttribute witSetOperation,
+   std::string fileExtension,
+   std::string attributeName,
+   const LgFrDataInterfaceEssentials * difEssenPtr )
+const
+{
+ // Get the witRun 
+ LgFrDataInterfaceImplementationFromCmrpFiles * const localThis =
+                  ( LgFrDataInterfaceImplementationFromCmrpFiles * const ) this;
+ WitRun * wr = localThis->
+   LgFrDataInterfaceImplementationFromWitRun::mutableWitRun();
+
+ // Get number of periods in calendar
+ const LgFrCalendar& calendar = difEssenPtr->calendar();
+ int calNp(calendar.nPeriods());
+ 
+ // Open file
+ std::ifstream file( std::string( baseFileName_ + fileExtension ).c_str() );
+ if ( !file )
+   {
+     std::cerr <<"LgFrINFO: File " + baseFileName_ + fileExtension
+          <<"was not found. Using default " + attributeName + " values"
+          << std::endl;
+   }
+   else
+   {
+     readFirstRecord( file, fileExtension );
+
+     // Read remaining records until eof encountered
+     long lineCount = 1;
+     std::string line;
+     for (;;)
+       {
+         lineCount++;
+         std::getline( file, line );
+         if (file.eof() ) break;
+         if ( !file )
+           {
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                     fileExtension << ". Line " << lineCount << std::endl;
+              exit( EXIT_FAILURE );
+           }
+
+           // Get operation name
+           SCETokenizer next(line);
+           std::string operationName = next();
+
+#ifdef DEBUG
+            witBoolean exists;
+            witGetOperationExists( wr, operationName.c_str(), &exists );
+	    if ( ! exists ) {
+	       std::cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+                    << "operation does not exit: " 
+		    << operationName <<  std::endl;
+	    }
+            assert ( exists );
+#endif
+
+            // Get attribute value
+            double attrValDbl;
+            
+			bool result = sce::fromString( next(), attrValDbl );
+//            bool result = RWLocale::global().stringToNum(
+//                                         std::string(next()), &attrValDbl);
+            if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                   fileExtension << " Line " << lineCount <<
+                   " Token 2 (" << attributeName << ")" << std::endl;
+              exit( EXIT_FAILURE );
+            }
+            LgFrTimeVecFloat attrValTv(calNp,(float)attrValDbl);
+
+            witSetOperation( wr, operationName.c_str(), 
+                                 attrValTv.intData() );
+
+      } // end of for loop reading records
+      
+   } // if (!file) ... else { }
+}
+
+
+WitRun * 
+  LgFrDataInterfaceImplementationFromCmrpFiles::mutableWitRun(
+      const LgFrDataInterfaceEssentials * difEssenPtr)
+{
+  if( !validWitRun() ) defineWitRun(difEssenPtr);
+  return LgFrDataInterfaceImplementationFromWitRun::mutableWitRun();
+}
+
+WitRun * 
+  LgFrDataInterfaceImplementationFromCmrpFiles::constWitRun(
+      const LgFrDataInterfaceEssentials * difEssenPtr)
+const
+{
+  if( !validWitRun() ) defineWitRun(difEssenPtr);
+  return LgFrDataInterfaceImplementationFromWitRun::constWitRun();
+}
+
+void
+LgFrDataInterfaceImplementationFromCmrpFiles::readFirstRecord(
+  std::ifstream & inputFile,
+  const std::string& fileSuffix )
+const
+{
+  std::string line;
+
+  // Read first line and do sanity check
+  std::getline( inputFile, line );
+
+  //inputFile >> line;
+  assert( !inputFile.eof() && std::string( "LgFrERROR: Read failed:" + baseFileName_ + fileSuffix + ". Line 1" ).c_str() );
+  SCETokenizer next(line);
+  //RWCSubString token = next();
+  long nPeriods;
+  bool result = sce::fromString( next(), nPeriods );
+  //bool result = RWLocale::global().stringToNum(token, &nPeriods);
+  if ( !result )
+  {
+    std::cerr <<"LgFrERROR: Read failed: " + baseFileName_ + fileSuffix +
+           ". Line 1, token 1"
+         << std::endl;
+    exit( EXIT_FAILURE );
+  }
+//  assert( nPeriods == numberOfPeriods() );
+}
+
+LgFrCalendar
+LgFrDataInterfaceImplementationFromCmrpFiles::calendar (
+    const std::string& fileNameWithoutSuffix
+)
+{
+  LgFrCalendar retVal;
+  LgFrTimeUnit periodSize = LgFrWeek;
+  long nPeriods = 0;
+  LgFrDatetime startDate;
+  {
+    std::string fileName = fileNameWithoutSuffix + ".raw";
+
+    // Open file
+    std::ifstream rawF( fileName.c_str() );
+    if ( !rawF )
+    {
+      std::cerr <<"LgFrERROR: File open failed: " + fileName << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Read first line
+    std::string line;
+    std::getline( rawF, line );
+    if ( !rawF )
+    {
+      std::cerr <<"LgFrERROR: Read failed:" << fileName << ". Line 1" << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Get number of periods
+    SCETokenizer next(line);
+    //RWCSubString token = next();
+    //bool result = RWLocale::global().stringToNum(token, &nPeriods);
+    bool result = sce::fromString( next(), nPeriods );
+    if ( !result )
+    {
+      std::cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 1"
+	   << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Get starting day
+    //RWCSubString token2 = next();
+    long day = 0;
+    //result = RWLocale::global().stringToNum(token2, &day);
+    result = sce::fromString( next(), day );
+    if ( !result )
+    {
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 2"
+	   << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Get starting month
+    //RWCSubString token3 = next();
+    long month = 0;
+    //result = RWLocale::global().stringToNum(token3, &month);
+    result = sce::fromString( next(), month );
+    if ( !result )
+    {
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 3"
+	   << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Get starting year
+    //RWCSubString token4 = next();
+    long year = 0;
+    //result = RWLocale::global().stringToNum(token4, &year);
+    result = sce::fromString( next(), year );
+    if ( !result )
+    {
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 4"
+	   << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Get period size 
+    std::string periodSizeString = next();
+	sce::toLower( periodSizeString );
+    if      ( periodSizeString == "hour"  ) periodSize = LgFrHour;
+    else if ( periodSizeString == "day"   ) periodSize = LgFrDay;
+    else if ( periodSizeString == "week"  ) periodSize = LgFrWeek;
+    else if ( periodSizeString == "month" ) periodSize = LgFrMonth;
+    else
+    {
+      std::cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 5"
+	   << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    // Create first period start date
+    startDate.setDate( month, day, year );
+    if ( !startDate.isValid() )
+    {
+      std::cerr <<"LgFrERROR: Read failed: " + fileName +
+             ". Line 1, tokens 2 through 4"
+	   << std::endl
+	   <<"Invalid starting date specified." << std::endl;
+      exit( EXIT_FAILURE );
+    }
+
+    retVal = LgFrCalendar(nPeriods, startDate, periodSize );
+  }
+
+  {
+    // Check to see if a *.cal file exists
+    std::string calFileName = fileNameWithoutSuffix + ".cal";
+
+    // Open file
+    std::ifstream calF( calFileName.c_str() );
+    if ( calF )
+      {
+        LgFrDatetimeVector periodStartVec(nPeriods+1);
+        std::string line;
+        // Loop once reading each line of file
+        int i = 0; // Pulled out of the for below by RW2STL
+        for ( i = 0; i<=nPeriods; i++ ) {
+            std::getline( calF, line );
+           if ( !calF )
+             {
+             std::cerr <<"LgFrERROR: Read failed:" << calFileName << ". Line " <<i+1 << std::endl;
+             exit( EXIT_FAILURE );
+             }
+
+           // Get period number
+           SCETokenizer next(line);
+           //RWCSubString token = next();
+           long period;
+           //bool result = RWLocale::global().stringToNum(token, &period);
+           bool result = sce::fromString( next(), period);
+           if ( !result )
+             {
+             std::cerr <<"LgFrERROR: Read failed:" << calFileName <<
+                    ". Line " << i+1 <<", token 1." << std::endl;
+             exit( EXIT_FAILURE );
+             }
+           if ( period != i )
+             {
+             std::cerr <<"LgFrERROR: Data problem in file:" << calFileName <<
+                    ". Line " <<i+1 <<", token 1." << std::endl
+                  <<"           Period read was " <<period << std::endl
+                  <<"           Expected a value of " <<i << std::endl;
+             exit( EXIT_FAILURE );
+             }
+
+          // Get starting day
+          //RWCSubString token2 = next();
+          long day = 0;
+          result = sce::fromString( next(), day); // RWLocale::global().stringToNum(token2, &day);
+          if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 2." << std::endl;
+            exit( EXIT_FAILURE );
+            }
+
+          // Get starting month
+          //RWCSubString token3 = next();
+          long month = 0;
+          result = result = sce::fromString( next(), month); // RWLocale::global().stringToNum(token3, &month);
+          if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 3." << std::endl;
+            exit( EXIT_FAILURE );
+            }
+
+          // Get starting year
+          //RWCSubString token4 = next();
+          long year = 0;
+          result = result = sce::fromString( next(), year); // RWLocale::global().stringToNum(token4, &year);
+          if ( !result )
+            {
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 4." << std::endl;
+            exit( EXIT_FAILURE );
+            }
+          
+         // Create period start time
+         LgFrDatetime periodStartTime;
+         periodStartTime.setDate( month, day, year );
+         if ( !periodStartTime.isValid() )
+           {
+           std::cerr <<"LgFrERROR: Read failed: " << calFileName << ". Line " <<i+1
+                <<", tokens 2 through 4"
+	        << std::endl
+	        <<"Invalid date specified." << std::endl;
+                exit( EXIT_FAILURE );
+           }
+
+         periodStartVec[i] = periodStartTime;
+
+       }  // end of for loop
+       retVal =  LgFrCalendar(nPeriods, periodStartVec, periodSize );
+        
+      } // end of reading *.cal file
+  }
+  return retVal;
+}
+
+
+void
+LgFrDataInterfaceImplementationFromCmrpFiles::deleteExtraResources()
+{
+  deleteWitRun();
+  freeDictKeysAndValues();
+}
+
+
+
+// Free private dictionary keys and values.
+void
+LgFrDataInterfaceImplementationFromCmrpFiles::freeDictKeysAndValues()
+{
+    // Nothing to do with stl map<>
+    /*
+  size_t d = 0; // Pulled out of the for below by RW2STL
+  for ( d=0; dictPtrVec_[d]!=0; d++ )
+  {
+    RWHashDictionaryIterator iter(*(dictPtrVec_[d]));
+    for ( ;; )
+    {
+      if ( iter() == 0 ) break;
+      delete iter.key();
+      delete iter.value();
+    }
+    dictPtrVec_[d]->clear();
+  }*/
+}
+
+
+// Deep copy private dictionary keys and values.
+void
+LgFrDataInterfaceImplementationFromCmrpFiles::deepCopyDictKeysAndValues(
+   const LgFrDataInterfaceImplementationFromCmrpFiles& source)
+{
+  size_t d = 0; // Pulled out of the for below by RW2STL
+
+  constrainedDict_.clear();
+  for( ConstrainedDictionary::const_iterator itc = source.constrainedDict_.begin();
+        itc != source.constrainedDict_.end();
+        itc++ )
+  {
+    constrainedDict_.insert( *itc );
+  }
+
+  procLeadTimeDict_.clear();
+  for( ProcLeadTimeDictionary::const_iterator itp = source.procLeadTimeDict_.begin();
+        itp != source.procLeadTimeDict_.end();
+        itp++ )
+  {
+    procLeadTimeDict_.insert( *itp );
+  }
+
+/* for ( d=0; dictPtrVec_[d]!=0; d++ )
+  {
+    dictPtrVec_[d]->clear();
+    RWHashDictionaryIterator iter(*(source.dictPtrVec_[d]));
+    for ( ;; )
+    {
+      if ( iter() == 0 ) break;
+      assert( iter.key()->is A() == __RWCOLLECTABLESTRING );
+      assert( iter.value()->is A() == __RWCOLLECTABLEINT ||
+              iter.value()->is A() == __LGFRCOLLECTABLEFLOAT );
+      key = new std::string( *((std::string*)(iter.key())) );
+      if ( iter.value()->is A() == __RWCOLLECTABLEINT )
+         value = new RWCollectableInt( *((RWCollectableInt*)(iter.value())) );
+      else
+         value = new LgFrCollectableFloat(
+                        *((LgFrCollectableFloat*)(iter.value())) );
+      dictPtrVec_[d]->insertKeyAndValue( key, value );
+    }
+  } */
+}
+
+
+// Make clone copy of object
+LgFrDataInterfaceImplementation *
+LgFrDataInterfaceImplementationFromCmrpFiles::clone()
+const
+{
+  LgFrDataInterfaceImplementationFromCmrpFiles* newInst =
+      new LgFrDataInterfaceImplementationFromCmrpFiles(*this);
+  return (newInst);
+}
+
+// Destructor
+LgFrDataInterfaceImplementationFromCmrpFiles::~LgFrDataInterfaceImplementationFromCmrpFiles()
+{
+  // free key and values in dictionaries
+  freeDictKeysAndValues();
+}
+
+// Assignment operator.
+LgFrDataInterfaceImplementationFromCmrpFiles&
+LgFrDataInterfaceImplementationFromCmrpFiles::operator=(
+  const LgFrDataInterfaceImplementationFromCmrpFiles& rhs)
+{
+  if (this != &rhs) {           // Check for assignment to self
+     (this->LgFrDataInterfaceImplementationFromWitRun::operator= ) (rhs);
+     
+     
+     baseFileName_ = rhs.baseFileName_;
+     freeDictKeysAndValues();
+     deepCopyDictKeysAndValues(rhs);
+
+  }
+  return *this;
+}
+
+// Copy constructor
+LgFrDataInterfaceImplementationFromCmrpFiles::LgFrDataInterfaceImplementationFromCmrpFiles(
+  const LgFrDataInterfaceImplementationFromCmrpFiles& source)
+:
+   LgFrDataInterfaceImplementationFromWitRun(source),
+   baseFileName_( source.baseFileName_ ),
+   constrainedDict_(),
+   procLeadTimeDict_()
+{
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+   deepCopyDictKeysAndValues(source);
+}
+
+
+
+// Preferred Constructor
+LgFrDataInterfaceImplementationFromCmrpFiles::LgFrDataInterfaceImplementationFromCmrpFiles(
+   std::string  baseFileName)
+:
+   LgFrDataInterfaceImplementationFromWitRun(),
+   baseFileName_( baseFileName ),
+   constrainedDict_(),
+   procLeadTimeDict_()
+{
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+}
+
+// Default Constructor
+// This is a private method
+LgFrDataInterfaceImplementationFromCmrpFiles::LgFrDataInterfaceImplementationFromCmrpFiles()
+:
+   LgFrDataInterfaceImplementationFromWitRun(),
+   baseFileName_(""),
+   constrainedDict_(),
+   procLeadTimeDict_()
+{
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+}     
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// Tests this class.  Only returns if all tests passed
+// Expects data in testScenario1 to have come from
+// /u/implode/wit/data/examples/diner12/wit.data, and expects
+// testScenario2 to have been made by copying testScenario1
+// testSc.
+// Right now, the only scenario that works correctly with a 
+// LgFrTestDataInterface is LgFrScenarioforCMRP.  Although the above 
+// comment says that data should have come from a file, it is probably
+// misleading (WCD, 9/15/94).  The data from the file (which has already
+// been put into WIT) is probably ignored.  This should be changed
+// to take LgFrScenarioforCMRP's for the 1st and 6th arguments.
+void
+LgFrDataInterfaceImplementationFromCmrpFiles::contextTest
+  (
+   LgFrDataInterface    	* tdif1Ptr,	// testScenario1's
+   LgFrLastProblemSolved        & lps,          // testScenario1's
+   LgFrDataInterface    	* ts1dupDifPtr,	// testScenario1dup's
+   LgFrDataInterface    	* tdif2Ptr,	// testScenario2
+   const LgFrScenario           * scenPtr)
+{
+  const float fltEps = .0001f;
+
+  LgFrDataInterface& tdif1 = *tdif1Ptr;
+  LgFrDataInterface& ts1dupDif = *ts1dupDifPtr;
+  LgFrDataInterface& tdif2 = *tdif2Ptr;
+  LgFrDataInterfaceImplementation* dimp
+      = tdif1.dataInterfaceImplementation();
+  LgFrDataInterfaceImplementation* dimp2
+      = tdif2.dataInterfaceImplementation();
+  LgFrDataInterfaceImplementation* dimptsi
+      = ts1dupDif.dataInterfaceImplementation();
+
+  
+  // Register all functions
+  registerCmrpFilesDifImpFunctions(dimp);
+  registerCmrpFilesDifImpFunctions(dimp2);
+
+  // Test title method
+  assert( tdif1.title() == CMRP_DATA_PATH "difTest" );
+  assert( ts1dupDif.title() == CMRP_DATA_PATH "difTest" );
+  assert( tdif2.title() == CMRP_DATA_PATH "difTest" );
+  assert( dimp->title() == CMRP_DATA_PATH "difTest" );
+  assert( dimptsi->title() == CMRP_DATA_PATH "difTest" );
+  assert( dimp2->title() == CMRP_DATA_PATH "difTest" );
+
+  // Test calendar method
+  {
+      
+      std::string title = tdif1.title();
+      LgFrCalendar c = LgFrDataInterfaceImplementationFromCmrpFiles::
+	                     calendar( title );
+      assert (c.nPeriods() == 3);
+      assert (c.periodStart(0) == LgFrDatetime( "4/10/95"));
+      assert (c.periodStart(1) == LgFrDatetime( "4/18/95"));
+      assert (c.periodStart(2) == LgFrDatetime( "4/24/95"));
+      assert (c.timeUnitType() == LgFrDay);
+      assert (c.intervalUnitMultiplier() == 1);
+      
+  }
+
+  LgFrDataInterfaceImplementationFromCmrpFiles & tdifCmrp1 =
+     *( ( LgFrDataInterfaceImplementationFromCmrpFiles * ) dimp);
+  LgFrDataInterfaceImplementationFromCmrpFiles & tdifCmrp2 =
+     *( ( LgFrDataInterfaceImplementationFromCmrpFiles * ) dimp2);
+
+
+#ifdef COPY_CONSTRUCTOR_WORKING
+  LgFrDataInterfaceImplementationFromCmrpFiles  tdifCmrp1Copy(tdifCmrp1);
+#endif
+  LgFrDataInterfaceImplementationFromCmrpFiles  tdifCmrp1Assign;
+  tdifCmrp1Assign = tdifCmrp1;
+
+  // Test number Of Periods using LgFrDataInterfaceEssentialsFromScenario method
+  LgFrDataInterfaceEssentialsFromScenario difEssen(scenPtr);
+  const LgFrCalendar& calendar = difEssen.calendar();
+  int calNp(calendar.nPeriods());
+  assert( calNp == 3 );
+
+  // Test title method
+  assert(  dimp->title(&difEssen) == tdifCmrp1.baseFileName_ );
+
+
+  // Test Get Part Methods
+  LgFrPartVector partpv;
+  std::string itemSubTypeStr = "material";
+  LgFrPartVector* rawPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+        partpv, itemSubTypeStr, "rawParts" , &difEssen);
+  LgFrPartVector raw = *rawPartsPtr;
+  size_t t = 0; // Pulled out of the for below by RW2STL
+  for(t = 0 ; t < raw.size() ; t++)
+    witAddPart( lps.witRun(), raw[t].name().c_str(), WitRAW);
+  assert( raw.size() == 2 );
+  assert( raw[0].name() == "raw1" );
+  assert( raw[1].name() == "raw2" );
+
+  LgFrPartVector* productPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+        partpv, itemSubTypeStr, "productParts", &difEssen );
+  LgFrPartVector product = * productPartsPtr;
+  for( t = 0 ; t < product.size() ; t++)
+    witAddPart( lps.witRun(), product[t].name().c_str(), WitPRODUCT);
+  assert( product.size() == 2 );
+  assert( product[0].name() == "prod1" );
+  assert( product[1].name() == "sub1" );
+
+  LgFrPartVector* capacityPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+        partpv, itemSubTypeStr, "capacityParts", &difEssen );
+  LgFrPartVector capacity = * capacityPartsPtr;
+  for( t = 0 ; t < capacity.size() ; t++)
+    witAddPart( lps.witRun(), capacity[t].name().c_str(), WitCAPACITY);
+  assert( capacity.size() == 1 );
+  assert( capacity[0].name() == "cap1" );
+
+
+  // Test get raw partAttribute methods
+  {
+  LgFrFloatVector* unitCostVectPtr
+    = (LgFrFloatVector*) tdif2.partAttribute(
+	raw,itemSubTypeStr,"rawUnitCost", &difEssen);
+  assert( unitCostVectPtr->size() == 2 );
+  assert ( fabs((*unitCostVectPtr)[0] - 1.0) < fltEps );
+  assert ( fabs((*unitCostVectPtr)[1] - 2.0) < fltEps );
+
+  delete unitCostVectPtr;
+
+  LgFrIntVector* constrainedVectPtr
+   = (LgFrIntVector*) tdif2.partAttribute(
+       raw,itemSubTypeStr,"rawConstrained", &difEssen);
+  assert( constrainedVectPtr->size() == 2 );
+  assert(  (*constrainedVectPtr)[0] );
+  assert( !(*constrainedVectPtr)[1] );
+
+  delete constrainedVectPtr;
+#ifdef COPY_CONSTRUCTOR_WORKING
+  constrained = tdifCmrp1Copy.partAttribute(raw,rawInstance,LgFrConstrained());
+  assert( constrained.length() == 2 );
+  assert(  constrained[0] );
+  assert( !constrained[1] );
+  constrained = tdifCmrp1Assign.partAttribute(
+                    raw,rawInstance,LgFrConstrained());
+  assert( constrained.length() == 2 );
+  assert(  constrained[0] );
+  assert( !constrained[1] );
+#endif
+
+  LgFrTimeVecFloatVector* procLeadTimeVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       raw,itemSubTypeStr,"rawProcLeadTime", &difEssen);
+  assert( procLeadTimeVectPtr->size() == 2 );
+  assert( (*procLeadTimeVectPtr)[0] == LgFrTimeVecFloat(3,.5) );
+  assert( (*procLeadTimeVectPtr)[1] == LgFrTimeVecFloat(3,1.) );
+
+  delete procLeadTimeVectPtr;
+
+#ifdef COPY_CONSTRUCTOR_WORKING
+  procLT = tdifCmrp1Copy.partAttribute(raw,rawInstance,LgFrProcLeadTime());
+  assert( procLT.size() == 2 );
+  assert( procLT[0] == LgFrTimeVecFloat(3,.5) );
+  assert( procLT[1] == LgFrTimeVecFloat(3,1.) );
+  procLT = tdifCmrp1Assign.partAttribute(raw,rawInstance,LgFrProcLeadTime());
+  assert( procLT.size() == 2 );
+  assert( procLT[0] == LgFrTimeVecFloat(3,.5) );
+  assert( procLT[1] == LgFrTimeVecFloat(3,1.) );
+#endif
+  
+  LgFrTimeVecFloatVector* supplyVolVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       raw,itemSubTypeStr,"rawSupplyVol", &difEssen);
+  assert( supplyVolVectPtr->size() == 2 );
+  assert( (*supplyVolVectPtr)[0] == LgFrTimeVecFloat(3," 2 4.0 5") );
+  assert( (*supplyVolVectPtr)[1] == LgFrTimeVecFloat(3," 2 2 2") );
+
+  delete supplyVolVectPtr;
+  delete rawPartsPtr;
+  }
+
+  // Test get product partAttribute methods
+  {
+  LgFrTimeVecFloatVector* cycleTimeVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productCycleTime", &difEssen);
+  assert( cycleTimeVectPtr->size() == 2 );
+  assert( (*cycleTimeVectPtr)[0] == LgFrTimeVecFloat(3,.5) );
+  assert( (*cycleTimeVectPtr)[1] == LgFrTimeVecFloat(3,.25) );
+ 
+  delete cycleTimeVectPtr;
+
+  LgFrFloatVector* unitCostVectPtr2
+    = (LgFrFloatVector*) tdif2.partAttribute(
+        product,itemSubTypeStr,"productUnitCost", &difEssen);
+  assert( unitCostVectPtr2->size() == 2 );
+  assert ( fabs((*unitCostVectPtr2)[0] - 1.3) < fltEps );
+  assert ( fabs((*unitCostVectPtr2)[1] - 2.3) < fltEps );
+
+  delete unitCostVectPtr2;
+  
+  LgFrIntVector* constrainedVectPtr2
+   = (LgFrIntVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productConstrained", &difEssen);
+  assert( constrainedVectPtr2->size() == 2 );
+  for (unsigned int i=0; i<constrainedVectPtr2->size(); i++) 
+      assert( (*constrainedVectPtr2)[i] );
+
+  delete constrainedVectPtr2;
+
+  LgFrTimeVecFloatVector* supplyVolVectPtr2
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productSupplyVol", &difEssen);
+  assert( supplyVolVectPtr2->size() == 2 );
+  assert( (*supplyVolVectPtr2)[0] == LgFrTimeVecFloat(3,"  2.0  0.0  0.0 ") );
+  assert( (*supplyVolVectPtr2)[1] == LgFrTimeVecFloat(3,"  2.0  0.0  0.0 ") );
+
+  delete supplyVolVectPtr2;
+
+  }
+
+  // Test minLotSize
+  {
+  LgFrTimeVecFloatVector* minLotSizePtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productMinLotSize", &difEssen);
+  LgFrTimeVecFloatVector minLotSize = *minLotSizePtr;
+  assert( minLotSize.size() == 2 );
+  assert( minLotSize[0] == LgFrTimeVecFloat(3,1.5) );
+  assert( minLotSize[1] == LgFrTimeVecFloat(3,.5) );
+
+  delete minLotSizePtr;
+
+  }
+
+  // Test incLotSize
+  {
+  LgFrTimeVecFloatVector* incLotSizePtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productIncLotSize", &difEssen);
+  LgFrTimeVecFloatVector incLotSize = *incLotSizePtr;
+  assert( incLotSize.size() == 2 );
+  assert( incLotSize[0] == LgFrTimeVecFloat(3, 0.5) );
+  assert( incLotSize[1] == LgFrTimeVecFloat(3, 1.0) );
+  delete incLotSizePtr;
+  }
+
+  
+  // Test yield
+  {
+  LgFrTimeVecFloatVector* yieldPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       product,itemSubTypeStr,"productYieldFloat", &difEssen);
+  LgFrTimeVecFloatVector yield = *yieldPtr;
+  assert( yield.size() == 2 );
+  assert( yield[0] == LgFrTimeVecFloat(3,89.) );
+  assert( yield[1] == LgFrTimeVecFloat(3,95.) );
+  delete yieldPtr;
+  }
+ 
+  
+  delete productPartsPtr;
+  // Test get capacity partAttribute methods
+  {
+  LgFrIntVector* constrainedVectPtr
+   = (LgFrIntVector*) tdif2.partAttribute(
+       capacity,itemSubTypeStr,"capacityConstrained", &difEssen);
+  assert( constrainedVectPtr->size() == 1 );
+  assert( (*constrainedVectPtr)[0] );
+
+  delete constrainedVectPtr;
+
+  LgFrTimeVecFloatVector* supplyVolVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+       capacity,itemSubTypeStr,"capacitySupplyVol", &difEssen);
+  assert( supplyVolVectPtr->size() == 1 );
+  assert( (*supplyVolVectPtr)[0] == LgFrTimeVecFloat(3," 8 8  16") );
+  
+  delete supplyVolVectPtr;
+
+  }
+
+  delete capacityPartsPtr;
+
+// Test Get Demands Methods
+  LgFrDemandVector demandpv;
+
+  LgFrDemandVector* committedDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+        demandpv, "committedDemands", &difEssen );
+  LgFrDemandVector committed = * committedDemandPtr;
+  assert( committed.size() == 2 ); 
+
+  LgFrDemandVector* newOpportunityDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+        demandpv, "newOpportunityDemands", &difEssen );
+  LgFrDemandVector newOpportunity = * newOpportunityDemandPtr;
+  assert( newOpportunity.size() == 0 );
+
+  LgFrDemandVector* firmForecastDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+        demandpv, "firmForecastDemands", &difEssen );
+  LgFrDemandVector firmForecast = * firmForecastDemandPtr;
+  assert( firmForecast.size() == 0 );
+
+
+  LgFrDemandVector* riskForecastDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+        demandpv, "riskForecastDemands", &difEssen );
+  LgFrDemandVector riskForecast = * riskForecastDemandPtr;
+  assert( riskForecast.size() == 0 );
+
+
+  // Test get demand Attribute methods
+  LgFrTimeVecFloatVector * demandVolVectPtr = (LgFrTimeVecFloatVector *)
+      tdif2.demandAttribute(committed, "demandVol", &difEssen);
+  assert(demandVolVectPtr->size() == 2 );
+  assert( (*demandVolVectPtr)[0] == LgFrTimeVecFloat(3," 2 1 2") );
+  assert( (*demandVolVectPtr)[1] == LgFrTimeVecFloat(3," 1 1 1") );
+
+  delete demandVolVectPtr;
+
+  LgFrTimeVecFloatVector * demandVolVectPtr2 = (LgFrTimeVecFloatVector *)
+      tdif2.demandAttribute(newOpportunity, "demandVol", &difEssen);
+  assert(demandVolVectPtr2->size() == 0 );
+
+  delete demandVolVectPtr2;
+  delete newOpportunityDemandPtr;
+
+  LgFrTimeVecFloatVector * demandVolVectPtr3 = (LgFrTimeVecFloatVector *)
+      tdif2.demandAttribute(firmForecast, "demandVol", &difEssen);
+  assert(demandVolVectPtr3->size() == 0 );
+
+  delete demandVolVectPtr3; 
+  delete firmForecastDemandPtr;
+
+  LgFrTimeVecFloatVector * demandVolVectPtr4 = (LgFrTimeVecFloatVector *)
+      tdif2.demandAttribute(riskForecast, "demandVol", &difEssen);
+  assert(demandVolVectPtr4->size() == 0 );
+
+  delete demandVolVectPtr4;
+  delete riskForecastDemandPtr;
+
+  LgFrTimeVecFloatVector* priorityPtr
+    = (LgFrTimeVecFloatVector*) tdif2.demandAttribute(committed,
+                                            "demandPriority", &difEssen);
+  assert(priorityPtr->size() == 2 );
+  assert( (*priorityPtr)[0] == LgFrTimeVecFloat(3," 5 5 5") );
+  assert( (*priorityPtr)[1] == LgFrTimeVecFloat(3," 4 4 4") );
+
+  delete priorityPtr;
+
+  LgFrTimeVecFloatVector* obj1ShipRewardPtr
+    = (LgFrTimeVecFloatVector*) 
+        tdif2.demandAttribute(committed,
+				  "demandObj1ShipReward", &difEssen);
+  LgFrTimeVecFloatVector obj1ShipReward = *obj1ShipRewardPtr;
+  assert(obj1ShipReward.size() == 2 );
+  assert( obj1ShipReward[0] == LgFrTimeVecFloat(3,35.0) );
+  assert( obj1ShipReward[1] == LgFrTimeVecFloat(3,40.0) );
+
+
+
+  delete obj1ShipRewardPtr;
+  delete committedDemandPtr;
+
+
+  // Test BOM
+  tdif1.partAttribute(
+        partpv, itemSubTypeStr, "defineBom", &difEssen );
+  int nBomEntries;
+  float retFloat;
+  char * consumedPartName; 
+  witGetPartNBomEntries( lps.witRun(), "prod1", &nBomEntries);
+  assert( nBomEntries == 3);
+  witGetBomEntryConsumedPart(lps.witRun(), "prod1", 0,
+                             &consumedPartName);
+  assert ( std::string (consumedPartName) == std::string ("sub1"));
+  portableFree (consumedPartName);
+  witGetBomEntryUsageRate( lps.witRun(), "prod1", 0,
+                           &retFloat);
+  assert ( fabs(retFloat - 1.0) < fltEps );
+  witGetBomEntryConsumedPart(lps.witRun(), "prod1", 2,
+                             &consumedPartName);
+  assert ( std::string (consumedPartName) == std::string ("cap1"));
+  portableFree (consumedPartName);
+  witGetBomEntryUsageRate(lps.witRun(), "prod1", 2,
+                               &retFloat);
+  assert ( fabs(retFloat - .25) < fltEps );
+
+  witGetPartNBomEntries( lps.witRun(), "sub1", &nBomEntries);
+  assert( nBomEntries == 1);
+  witGetBomEntryConsumedPart(lps.witRun(), "sub1", 0,
+                             &consumedPartName);
+  assert ( std::string (consumedPartName) == std::string ("raw1"));
+  portableFree (consumedPartName);
+  witGetBomEntryUsageRate( lps.witRun(), "sub1", 0,
+                           &retFloat);
+  assert ( fabs(retFloat - 3.0) < fltEps );
+}
+@
+
+
+1.5
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@d657 19
+a675 4
+                witAddBomEntryVa( wr, 
+                                  producedPartName.c_str(), consumedPartName.c_str(),
+                                  WitNusageRate, usageRate,
+                                  0 );
+@
+
+
+1.4
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.3
+log
+@Modified to get sce to link on windows.
+Code was changed to conditionally include implement statements
+@
+text
+@d1 7
+d9 2
+a10 2
+#include <iostream.h>
+#include <fstream.h>
+a11 5
+#include <rw/rstream.h>
+#include <rw/cstring.h>
+#include <rw/ctoken.h>
+#include <rw/hashdict.h>
+#include <rw/collint.h>
+a20 5
+#ifndef WIN32
+// added for vacpp - vra
+implement (RWGVector, int)
+#endif
+
+d26 1
+a26 1
+createCmrpFilesDifImp(const RWCString filename)
+d159 1
+a159 1
+// It returns a LgFrVectorInt object
+d163 1
+a163 1
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+d167 1
+a167 1
+  assert( difImp->isA() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+d169 4
+a172 3
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorInt& retVal = *(new LgFrVectorInt( pv.entries() ));
+  RWCollectableString  partName;
+d179 8
+a186 6
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name(), &partCategory);
+    if ( partCategory == WitRAW ) {
+    partName = pv[i]->name();
+    retVal[i] = ( (RWCollectableInt *) dImpCMRP->constrainedDict_.findValue( 
+                   &partName ) )->value();
+d188 3
+a190 2
+    else if ((partCategory == WitPRODUCT) || (partCategory == WitCAPACITY)){
+    retVal[i] =  TRUE;
+d197 1
+a197 1
+// It returns a LgFrVectorTimeVecFloat object.
+d201 1
+a201 1
+    const LgFrOrderedVectorItemPtr* itemPtrOrdVecPtr,
+d205 1
+a205 1
+  assert( difImp->isA() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+d208 3
+a210 3
+  LgFrOrderedVectorItemPtr pv = *itemPtrOrdVecPtr;
+  LgFrVectorTimeVecFloat& retVal =
+      *(new LgFrVectorTimeVecFloat( pv.entries() ));
+d215 1
+a215 1
+  RWCollectableString  partName;
+d225 3
+a227 2
+  for ( size_t i = 0; i < pv.entries(); i++ ) {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name(), &partCategory);
+d230 2
+a231 4
+      procLT = ( (LgFrCollectableFloat *) dImpCMRP->
+                   procLeadTimeDict_.findValue( 
+                   &partName ) )->value();
+    retVal[i] = LgFrTimeVecFloat(calNP, procLT );
+d234 1
+a234 1
+      witGetPartCycleTime(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name(),
+d236 2
+a237 1
+      for(size_t j = 0; j < size_tMin(calNP, witNP); j++ ){
+d240 1
+a240 1
+      retVal[i] =  tv;
+d275 1
+a275 1
+  witSetTitle( wr, baseFileName_ );
+d280 2
+a281 2
+      RWCString line;
+      RWBoolean result;
+d286 2
+a287 1
+        ifstream rawF( baseFileName_ + ".raw" );
+d290 1
+a290 1
+          cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".raw" <<endl;
+d300 1
+a300 1
+          line.readLine(rawF);
+d304 2
+a305 2
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".raw. Line " +
+                    RWLocale::global().asString( lineCount ) <<endl;
+d310 3
+a312 3
+          RWCTokenizer next(line);
+          RWCString partName = next();
+          witAddPart( wr, partName, WitRAW );
+d316 1
+a316 2
+          result = RWLocale::global().stringToNum(
+                   RWCString(next()), &unitCostDbl);
+d319 3
+a321 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".raw. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 2 (unitCost)" <<endl;
+d325 1
+a325 1
+          witSetPartUnitCost( wr, partName, unitCost );
+d328 2
+a329 2
+          RWCString constrainedString = next();
+          constrainedString.toLower();
+d333 3
+a335 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".raw. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 3 (constrained)" <<endl;
+d338 2
+a339 4
+          RWBoolean constrained = (constrainedString == "constrained");
+          localThis->constrainedDict_.insertKeyAndValue( 
+              new RWCollectableString(partName),
+              new RWCollectableInt( constrained) );
+d343 1
+a343 2
+          result = RWLocale::global().stringToNum(
+                   RWCString(next()), &procLTDbl);
+d346 3
+a348 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".raw. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 4 (procurement lead time)" <<endl;
+d352 1
+a352 3
+          localThis->procLeadTimeDict_.insertKeyAndValue( 
+              new RWCollectableString(partName),
+              new LgFrCollectableFloat( procLT) );
+d355 5
+a359 4
+          RWCString supplyVol;
+          RWCSubString token = next();
+          supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName, 
+d369 1
+a369 1
+        ifstream prdF( baseFileName_ + ".prd" );
+d372 1
+a372 1
+          cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".prd" <<endl;
+d382 1
+a382 1
+          line.readLine(prdF);
+d386 2
+a387 2
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".prd. Line " +
+                    RWLocale::global().asString( lineCount ) <<endl;
+d392 3
+a394 3
+          RWCTokenizer next(line);
+          RWCString partName = next();
+          witAddPart( wr, partName, WitPRODUCT );
+d398 1
+a398 2
+          result = RWLocale::global().stringToNum(
+                   RWCString(next()), &unitCostDbl);
+d401 3
+a403 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".prd. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 2 (unitCost)" <<endl;
+d407 1
+a407 1
+          witSetPartUnitCost( wr, partName, unitCost );
+d411 1
+a411 2
+          result = RWLocale::global().stringToNum(
+                   RWCString(next()), &cycleTimeDbl);
+d414 3
+a416 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".prd. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 3 (cycleTime)" <<endl;
+d420 1
+a420 1
+          witSetPartCycleTime( wr, partName, 
+d424 5
+a428 4
+          RWCString supplyVol;
+          RWCSubString token = next();
+          supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName,
+d430 2
+a431 1
+	  for (int supPerNo = 1; // token is already at first supply volume
+d444 1
+a444 1
+        ifstream capF( baseFileName_ + ".cap" );
+d447 1
+a447 1
+          cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".cap" <<endl;
+d458 1
+a458 1
+          line.readLine(capF);
+d462 2
+a463 2
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".cap. Line " +
+                    RWLocale::global().asString( lineCount ) <<endl;
+d468 2
+a469 2
+          RWCTokenizer next(line);
+          RWCString partName = next();
+d471 2
+a472 2
+          RWBoolean exists;
+          witGetPartExists( wr, partName, &exists );
+d474 1
+a474 1
+             witAddPart( wr, partName, WitCAPACITY );
+d477 1
+a477 1
+             cout <<"LgFrWARNING: duplicate capacity part: " <<partName <<endl;
+d482 2
+a483 4
+          RWCString supplyVol;
+          RWCSubString token = next();
+          supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName,
+d489 1
+a489 1
+        cout <<"LgFrINFO: duplicate capacity part count " <<dupCapPart <<endl;
+d499 1
+a499 1
+        ifstream demF( baseFileName_ + ".dem" );
+d502 1
+a502 1
+          cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".dem" <<endl;
+d514 1
+a514 1
+          line.readLine(demF);
+d518 2
+a519 2
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".dem. Line " +
+                    RWLocale::global().asString( lineCount ) <<endl;
+d524 3
+a526 3
+          RWCTokenizer next(line);
+          RWCString demandName = next();
+          RWCString partName = next();
+d529 1
+a529 1
+          witGetPartExists( wr, partName, &exists );
+d532 1
+a532 1
+             witGetPartCategory( wr, partName, &cat );
+d534 1
+a534 1
+                witAddDemand( wr, partName, demandName );
+d537 1
+a537 1
+                cout <<"LgFrWARNING: demand on capacity part: " <<partName <<endl;
+d543 1
+a543 1
+                cout <<"LgFrWARNING: undefined demanded part " <<partName <<endl;
+d548 1
+a548 1
+          RWCSubString priorityString = next();
+d550 3
+a552 2
+          RWBoolean result = RWLocale::global().stringToNum(
+                  priorityString, &priorityLong);
+d555 3
+a557 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".bom. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 3 (priority)" <<endl;
+d561 2
+a562 1
+          for ( int p=0; p<calNp; p++ ) 
+d564 1
+a564 1
+          witSetDemandPriority( wr, partName, demandName, priority );
+d568 4
+a571 4
+          RWCString demandVol;
+          RWCSubString token = next();
+          demandVol = line(token.start(), line.length() - token.start() );
+          witSetDemandDemandVol( wr, partName, demandName,
+d576 4
+a579 4
+        cout <<"LgFrINFO: undefined demanded part count "
+             <<undefDemandedPart <<endl;
+        cout <<"LgFrINFO: demand on capacity part count "
+             <<demandOnCap <<endl;
+d589 1
+a589 1
+        ifstream bomF( baseFileName_ + ".bom" );
+d592 1
+a592 1
+          cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".bom" <<endl;
+d606 1
+a606 1
+          line.readLine(bomF);
+d610 2
+a611 2
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".bom. Line " +
+                    RWLocale::global().asString( lineCount ) <<endl;
+d616 3
+a618 3
+          RWCTokenizer next(line);
+          RWCString producedPartName = next();
+          RWCString consumedPartName = next();
+d622 3
+a624 2
+          result = RWLocale::global().stringToNum(
+                   RWCString(next()), &usageRateDbl);
+d627 3
+a629 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".bom. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 3 (usageRate)" <<endl;
+d635 2
+a636 2
+          witGetPartExists( wr, producedPartName, &prodPartExists );
+          witGetPartExists( wr, consumedPartName, &consPartExists );
+d639 2
+a640 2
+             cout <<"LgFrWARNING: undefined produced part: "
+                  <<producedPartName <<endl;
+d644 2
+a645 2
+             cout <<"LgFrWARNING undefined consumed part: "
+                  <<consumedPartName <<endl;
+d650 1
+a650 1
+             witGetPartCategory( wr, producedPartName, &cat );
+d653 1
+a653 1
+                                  producedPartName, consumedPartName,
+d655 1
+a655 1
+                                  NULL );
+d658 2
+a659 2
+                cout <<"LgFrWARNING: produced capacity: "
+                     <<producedPartName <<endl;
+d664 2
+a665 2
+                cout <<"LgFrWARNING: produced raw part: "
+                     <<producedPartName <<endl;
+d670 4
+a673 4
+        cout <<"LgFrINFO: undefined produced parts " <<undefProdPart <<endl;
+        cout <<"LgFrINFO: undefined consumed parts " <<undefConsPart <<endl;
+        cout <<"LgFrINFO: produced capacities " <<prodCapPart <<endl;
+        cout <<"LgFrINFO: produced raw parts " <<prodRawPart <<endl;
+d681 1
+a681 1
+        ifstream revF( baseFileName_ + ".rev" , ios::nocreate);
+d684 2
+a685 2
+          cerr <<"LgFrINFO: File " + baseFileName_ + ".rev " 
+               <<"was not found. Using default revenue values" <<endl;
+d696 1
+a696 1
+            line.readLine(revF);
+d700 2
+a701 2
+              cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".rev. Line " +
+                      RWLocale::global().asString( lineCount ) <<endl;
+d706 3
+a708 3
+            RWCTokenizer next(line);
+            RWCString demandName = next();
+            RWCString partName = next();
+d712 1
+a712 1
+            witGetPartExists( wr, partName, &exists );
+d714 1
+a714 1
+	       cerr << "LgFrERROR:Error while reading revenue file, "
+d716 1
+a716 1
+	            << endl;
+d723 3
+a725 2
+            result = RWLocale::global().stringToNum(
+                     RWCString(next()), &revDbl);
+d728 3
+a730 3
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ + ".rev. Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 3 (revenue)" <<endl;
+d734 1
+a734 1
+            witSetDemandObj1ShipReward( wr, partName, demandName, 
+d773 2
+a774 2
+   RWCString fileExtension,
+   RWCString attributeName,
+d789 1
+a789 1
+ ifstream file( baseFileName_ + fileExtension, ios::nocreate);
+d792 1
+a792 1
+     cerr <<"LgFrINFO: File " + baseFileName_ + fileExtension
+d794 1
+a794 1
+          <<endl;
+d802 1
+a802 1
+     RWCString line;
+d806 1
+a806 1
+         line.readLine(file);
+d810 2
+a811 3
+              cerr <<"LgFrERROR: Read failed: " + baseFileName_ +
+                     fileExtension + ". Line " +
+                     RWLocale::global().asString( lineCount ) <<endl;
+d816 2
+a817 2
+           RWCTokenizer next(line);
+           RWCString operationName = next();
+d821 1
+a821 1
+            witGetOperationExists( wr, operationName, &exists );
+d823 1
+a823 1
+	       cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+d825 1
+a825 1
+		    << operationName << endl;
+d833 3
+a835 2
+            RWBoolean result = RWLocale::global().stringToNum(
+                                         RWCString(next()), &attrValDbl);
+d838 3
+a840 4
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ +
+                   fileExtension + " Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 2 (" + attributeName + ")" <<endl;
+d844 1
+a844 1
+            witSetOperation( wr, operationName, 
+d858 2
+a859 2
+   RWCString fileExtension,
+   RWCString attributeName,
+d874 1
+a874 1
+ ifstream file( baseFileName_ + fileExtension, ios::nocreate);
+d877 1
+a877 1
+     cerr <<"LgFrINFO: File " + baseFileName_ + fileExtension
+d879 1
+a879 1
+          <<endl;
+d887 1
+a887 1
+     RWCString line;
+d891 1
+a891 1
+         line.readLine(file);
+d895 2
+a896 3
+              cerr <<"LgFrERROR: Read failed: " + baseFileName_ +
+                     fileExtension + ". Line " +
+                     RWLocale::global().asString( lineCount ) <<endl;
+d901 2
+a902 2
+           RWCTokenizer next(line);
+           RWCString operationName = next();
+d906 1
+a906 1
+            witGetOperationExists( wr, operationName, &exists );
+d908 1
+a908 1
+	       cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+d910 1
+a910 1
+		    << operationName << endl;
+d918 3
+a920 2
+            RWBoolean result = RWLocale::global().stringToNum(
+                                         RWCString(next()), &attrValDbl);
+d923 3
+a925 4
+            cerr <<"LgFrERROR: Read failed: " + baseFileName_ +
+                   fileExtension + " Line " +
+                    RWLocale::global().asString( lineCount ) +
+                   " Token 2 (" + attributeName + ")" <<endl;
+d930 1
+a930 1
+            witSetOperation( wr, operationName, 
+d958 2
+a959 2
+  ifstream & inputFile,
+  const RWCString fileSuffix )
+d962 1
+a962 1
+  RWCString line;
+d965 6
+a970 5
+  line.readLine(inputFile);
+  assert( inputFile &&
+          "LgFrERROR: Read failed:" + baseFileName_ + fileSuffix + ". Line 1");
+  RWCTokenizer next(line);
+  RWCSubString token = next();
+d972 2
+a973 1
+  RWBoolean result = RWLocale::global().stringToNum(token, &nPeriods);
+d976 1
+a976 1
+    cerr <<"LgFrERROR: Read failed: " + baseFileName_ + fileSuffix +
+d978 1
+a978 1
+         <<endl;
+d986 1
+a986 1
+    const RWCString fileNameWithoutSuffix
+d992 1
+a992 1
+  RWTime startDate;
+d994 1
+a994 1
+    RWCString fileName = fileNameWithoutSuffix + ".raw";
+d997 1
+a997 1
+    ifstream rawF( fileName );
+d1000 1
+a1000 1
+      cerr <<"LgFrERROR: File open failed: " + fileName <<endl;
+d1005 2
+a1006 2
+    RWCString line;
+    line.readLine(rawF);
+d1009 1
+a1009 1
+      cerr <<"LgFrERROR: Read failed:" + fileName + ". Line 1" <<endl;
+d1014 4
+a1017 3
+    RWCTokenizer next(line);
+    RWCSubString token = next();
+    RWBoolean result = RWLocale::global().stringToNum(token, &nPeriods);
+d1020 2
+a1021 2
+      cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 1"
+	   <<endl;
+d1026 1
+a1026 1
+    RWCSubString token2 = next();
+d1028 2
+a1029 1
+    result = RWLocale::global().stringToNum(token2, &day);
+d1032 2
+a1033 2
+      cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 2"
+	   <<endl;
+d1038 1
+a1038 1
+    RWCSubString token3 = next();
+d1040 2
+a1041 1
+    result = RWLocale::global().stringToNum(token3, &month);
+d1044 2
+a1045 2
+      cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 3"
+	   <<endl;
+d1050 1
+a1050 1
+    RWCSubString token4 = next();
+d1052 2
+a1053 1
+    result = RWLocale::global().stringToNum(token4, &year);
+d1056 2
+a1057 2
+      cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 4"
+	   <<endl;
+d1062 2
+a1063 2
+    RWCString periodSizeString = next();
+    periodSizeString.toLower();
+d1070 2
+a1071 2
+      cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 5"
+	   <<endl;
+d1076 1
+a1076 1
+    startDate = RWDate( day, month, year );
+d1079 1
+a1079 1
+      cerr <<"LgFrERROR: Read failed: " + fileName +
+d1081 2
+a1082 2
+	   <<endl
+	   <<"Invalid starting date specified." <<endl;
+d1091 1
+a1091 1
+    RWCString calFileName = fileNameWithoutSuffix + ".cal";
+d1094 1
+a1094 1
+    ifstream calF( calFileName );
+d1097 2
+a1098 2
+        LgFrVectorRWTime periodStartVec(nPeriods+1);
+        RWCString line;
+d1100 3
+a1102 2
+        for ( int i = 0; i<=nPeriods; i++ ) {
+           line.readLine(calF);
+d1105 1
+a1105 2
+             cerr <<"LgFrERROR: Read failed:" + calFileName +
+                    ". Line " <<i+1 <<endl;
+d1110 2
+a1111 2
+           RWCTokenizer next(line);
+           RWCSubString token = next();
+d1113 2
+a1114 1
+           RWBoolean result = RWLocale::global().stringToNum(token, &period);
+d1117 2
+a1118 2
+             cerr <<"LgFrERROR: Read failed:" + calFileName +
+                    ". Line " <<i+1 <<", token 1." <<endl;
+d1123 4
+a1126 4
+             cerr <<"LgFrERROR: Data problem in file:" + calFileName +
+                    ". Line " <<i+1 <<", token 1." <<endl
+                  <<"           Period read was " <<period <<endl
+                  <<"           Expected a value of " <<i <<endl;
+d1131 1
+a1131 1
+          RWCSubString token2 = next();
+d1133 1
+a1133 1
+          result = RWLocale::global().stringToNum(token2, &day);
+d1136 2
+a1137 2
+            cerr <<"LgFrERROR: Read failed: " + calFileName +
+                   ". Line " <<i+1 <<", token 2." <<endl;
+d1142 1
+a1142 1
+          RWCSubString token3 = next();
+d1144 1
+a1144 1
+          result = RWLocale::global().stringToNum(token3, &month);
+d1147 2
+a1148 2
+            cerr <<"LgFrERROR: Read failed: " + calFileName +
+                   ". Line " <<i+1 <<", token 3." <<endl;
+d1153 1
+a1153 1
+          RWCSubString token4 = next();
+d1155 1
+a1155 1
+          result = RWLocale::global().stringToNum(token4, &year);
+d1158 2
+a1159 2
+            cerr <<"LgFrERROR: Read failed: " + calFileName +
+                   ". Line " <<i+1 <<", token 4." <<endl;
+d1164 2
+a1165 1
+         RWTime periodStartTime(RWDate( day, month, year ) );
+d1168 1
+a1168 1
+           cerr <<"LgFrERROR: Read failed: " + calFileName + ". Line " <<i+1
+d1170 2
+a1171 2
+	        <<endl
+	        <<"Invalid date specified." <<endl;
+d1199 4
+a1202 1
+  for ( size_t d=0; dictPtrVec_[d]!=NULL; d++ )
+d1207 1
+a1207 1
+      if ( iter() == NULL ) break;
+d1212 1
+a1212 1
+  }
+d1221 19
+a1239 3
+  RWCollectableString * key;
+  RWCollectable * value;
+  for ( size_t d=0; dictPtrVec_[d]!=NULL; d++ )
+d1245 6
+a1250 6
+      if ( iter() == NULL ) break;
+      assert( iter.key()->isA() == __RWCOLLECTABLESTRING );
+      assert( iter.value()->isA() == __RWCOLLECTABLEINT ||
+              iter.value()->isA() == __LGFRCOLLECTABLEFLOAT );
+      key = new RWCollectableString( *((RWCollectableString*)(iter.key())) );
+      if ( iter.value()->isA() == __RWCOLLECTABLEINT )
+d1257 1
+a1257 10
+  }
+}
+
+
+// Return type identifier
+isAReturnType
+LgFrDataInterfaceImplementationFromCmrpFiles::isA()
+const
+{
+  return __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES;
+d1304 3
+a1306 3
+   dictPtrVec_[0] = &constrainedDict_;
+   dictPtrVec_[1] = &procLeadTimeDict_;
+   dictPtrVec_[2] = NULL;
+d1314 1
+a1314 1
+   RWCString  baseFileName)
+d1321 3
+a1323 3
+   dictPtrVec_[0] = &constrainedDict_;
+   dictPtrVec_[1] = &procLeadTimeDict_;
+   dictPtrVec_[2] = NULL;
+d1335 3
+a1337 3
+   dictPtrVec_[0] = &constrainedDict_;
+   dictPtrVec_[1] = &procLeadTimeDict_;
+   dictPtrVec_[2] = NULL;
+d1391 1
+a1391 1
+      RWCString title = tdif1.title();
+d1395 3
+a1397 3
+      assert (c.periodStart(0) == RWTime(RWDate("4/10/95")));
+      assert (c.periodStart(1) == RWTime(RWDate("4/18/95")));
+      assert (c.periodStart(2) == RWTime(RWDate("4/24/95")));
+a1402 6
+  // Test isA method
+  assert (dimp->isA() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+  assert (dimptsi->isA() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+  assert (dimp2->isA() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+
+
+d1426 4
+a1429 4
+  LgFrOrderedVectorPart partpv;
+  RWCString itemSubTypeStr = "material";
+  LgFrOrderedVectorPart* rawPartsPtr
+    = (LgFrOrderedVectorPart*) tdif2.partAttribute(
+d1431 5
+a1435 4
+  LgFrOrderedVectorPart raw = *rawPartsPtr;
+  for(size_t t = 0 ; t < raw.entries() ; t++)
+    witAddPart( lps.witRun(), raw[t].name(), WitRAW);
+  assert( raw.entries() == 2 );
+d1439 2
+a1440 2
+  LgFrOrderedVectorPart* productPartsPtr
+    = (LgFrOrderedVectorPart*) tdif2.partAttribute(
+d1442 4
+a1445 4
+  LgFrOrderedVectorPart product = * productPartsPtr;
+  for( t = 0 ; t < product.entries() ; t++)
+    witAddPart( lps.witRun(), product[t].name(), WitPRODUCT);
+  assert( product.entries() == 2 );
+d1449 2
+a1450 2
+  LgFrOrderedVectorPart* capacityPartsPtr
+    = (LgFrOrderedVectorPart*) tdif2.partAttribute(
+d1452 4
+a1455 4
+  LgFrOrderedVectorPart capacity = * capacityPartsPtr;
+  for( t = 0 ; t < capacity.entries() ; t++)
+    witAddPart( lps.witRun(), capacity[t].name(), WitCAPACITY);
+  assert( capacity.entries() == 1 );
+d1461 2
+a1462 2
+  LgFrVectorFloat* unitCostVectPtr
+    = (LgFrVectorFloat*) tdif2.partAttribute(
+d1464 1
+a1464 1
+  assert( unitCostVectPtr->length() == 2 );
+d1470 2
+a1471 2
+  LgFrVectorInt* constrainedVectPtr
+   = (LgFrVectorInt*) tdif2.partAttribute(
+d1473 1
+a1473 1
+  assert( constrainedVectPtr->length() == 2 );
+d1490 2
+a1491 2
+  LgFrVectorTimeVecFloat* procLeadTimeVectPtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1493 1
+a1493 1
+  assert( procLeadTimeVectPtr->length() == 2 );
+d1501 1
+a1501 1
+  assert( procLT.length() == 2 );
+d1505 1
+a1505 1
+  assert( procLT.length() == 2 );
+d1510 2
+a1511 2
+  LgFrVectorTimeVecFloat* supplyVolVectPtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1513 1
+a1513 1
+  assert( supplyVolVectPtr->length() == 2 );
+d1523 2
+a1524 2
+  LgFrVectorTimeVecFloat* cycleTimeVectPtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1526 1
+a1526 1
+  assert( cycleTimeVectPtr->length() == 2 );
+d1532 2
+a1533 2
+  LgFrVectorFloat* unitCostVectPtr2
+    = (LgFrVectorFloat*) tdif2.partAttribute(
+d1535 1
+a1535 1
+  assert( unitCostVectPtr2->length() == 2 );
+d1541 2
+a1542 2
+  LgFrVectorInt* constrainedVectPtr2
+   = (LgFrVectorInt*) tdif2.partAttribute(
+d1544 2
+a1545 2
+  assert( constrainedVectPtr2->length() == 2 );
+  for (unsigned int i=0; i<constrainedVectPtr2->length(); i++) 
+d1550 2
+a1551 2
+  LgFrVectorTimeVecFloat* supplyVolVectPtr2
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1553 1
+a1553 1
+  assert( supplyVolVectPtr2->length() == 2 );
+d1563 2
+a1564 2
+  LgFrVectorTimeVecFloat* minLotSizePtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1566 2
+a1567 2
+  LgFrVectorTimeVecFloat minLotSize = *minLotSizePtr;
+  assert( minLotSize.length() == 2 );
+d1577 2
+a1578 2
+  LgFrVectorTimeVecFloat* incLotSizePtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1580 2
+a1581 2
+  LgFrVectorTimeVecFloat incLotSize = *incLotSizePtr;
+  assert( incLotSize.length() == 2 );
+d1590 2
+a1591 2
+  LgFrVectorTimeVecFloat* yieldPtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1593 2
+a1594 2
+  LgFrVectorTimeVecFloat yield = *yieldPtr;
+  assert( yield.length() == 2 );
+d1604 2
+a1605 2
+  LgFrVectorInt* constrainedVectPtr
+   = (LgFrVectorInt*) tdif2.partAttribute(
+d1607 1
+a1607 1
+  assert( constrainedVectPtr->length() == 1 );
+d1612 2
+a1613 2
+  LgFrVectorTimeVecFloat* supplyVolVectPtr
+   = (LgFrVectorTimeVecFloat*) tdif2.partAttribute(
+d1615 1
+a1615 1
+  assert( supplyVolVectPtr->length() == 1 );
+d1625 1
+a1625 1
+  LgFrOrderedVectorDemand demandpv;
+d1627 2
+a1628 2
+  LgFrOrderedVectorDemand* committedDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif2.demandAttribute(
+d1630 2
+a1631 2
+  LgFrOrderedVectorDemand committed = * committedDemandPtr;
+  assert( committed.entries() == 2 ); 
+d1633 2
+a1634 2
+  LgFrOrderedVectorDemand* newOpportunityDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif2.demandAttribute(
+d1636 2
+a1637 2
+  LgFrOrderedVectorDemand newOpportunity = * newOpportunityDemandPtr;
+  assert( newOpportunity.entries() == 0 );
+d1639 2
+a1640 2
+  LgFrOrderedVectorDemand* firmForecastDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif2.demandAttribute(
+d1642 2
+a1643 2
+  LgFrOrderedVectorDemand firmForecast = * firmForecastDemandPtr;
+  assert( firmForecast.entries() == 0 );
+d1646 2
+a1647 2
+  LgFrOrderedVectorDemand* riskForecastDemandPtr
+    = (LgFrOrderedVectorDemand*) tdif2.demandAttribute(
+d1649 2
+a1650 2
+  LgFrOrderedVectorDemand riskForecast = * riskForecastDemandPtr;
+  assert( riskForecast.entries() == 0 );
+d1654 1
+a1654 1
+  LgFrVectorTimeVecFloat * demandVolVectPtr = (LgFrVectorTimeVecFloat *)
+d1656 1
+a1656 1
+  assert(demandVolVectPtr->length() == 2 );
+d1662 1
+a1662 1
+  LgFrVectorTimeVecFloat * demandVolVectPtr2 = (LgFrVectorTimeVecFloat *)
+d1664 1
+a1664 1
+  assert(demandVolVectPtr2->length() == 0 );
+d1669 1
+a1669 1
+  LgFrVectorTimeVecFloat * demandVolVectPtr3 = (LgFrVectorTimeVecFloat *)
+d1671 1
+a1671 1
+  assert(demandVolVectPtr3->length() == 0 );
+d1676 1
+a1676 1
+  LgFrVectorTimeVecFloat * demandVolVectPtr4 = (LgFrVectorTimeVecFloat *)
+d1678 1
+a1678 1
+  assert(demandVolVectPtr4->length() == 0 );
+d1683 2
+a1684 2
+  LgFrVectorTimeVecFloat* priorityPtr
+    = (LgFrVectorTimeVecFloat*) tdif2.demandAttribute(committed,
+d1686 1
+a1686 1
+  assert(priorityPtr->length() == 2 );
+d1692 2
+a1693 2
+  LgFrVectorTimeVecFloat* obj1ShipRewardPtr
+    = (LgFrVectorTimeVecFloat*) 
+d1696 2
+a1697 2
+  LgFrVectorTimeVecFloat obj1ShipReward = *obj1ShipRewardPtr;
+  assert(obj1ShipReward.length() == 2 );
+d1717 1
+a1717 1
+  assert ( RWCString (consumedPartName) == RWCString ("sub1"));
+d1724 1
+a1724 1
+  assert ( RWCString (consumedPartName) == RWCString ("cap1"));
+d1734 1
+a1734 1
+  assert ( RWCString (consumedPartName) == RWCString ("raw1"));
+@
+
+
+1.3.2.1
+log
+@Roguewave is gone
+@
+text
+@a0 7
+// RW2STL -- inserted:
+#include <fstream>
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+
+
+d2 2
+a3 2
+//#include <iostream.h>
+//#include <fstream.h>
+d5 5
+d19 5
+d29 1
+a29 1
+createCmrpFilesDifImp(const std::string& filename)
+d162 1
+a162 1
+// It returns a LgFrIntVector object
+d166 1
+a166 1
+    const LgFrItemPtrVector* itemPtrOrdVecPtr,
+d170 1
+a170 1
+  assert( difImp->GetDIIType() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+d172 3
+a174 4
+  LgFrItemPtrVector pv = *itemPtrOrdVecPtr;
+  LgFrIntVector& retVal = *(new LgFrIntVector);
+  retVal.reserve( pv.size() );
+  std::string  partName;
+d181 6
+a186 8
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < pv.size(); i++ ) 
+  {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(), &partCategory);
+    if ( partCategory == WitRAW ) 
+	{
+		partName = pv[i]->name();
+		retVal.push_back( (*dImpCMRP->constrainedDict_.find( partName )).second );
+d188 2
+a189 3
+    else if ((partCategory == WitPRODUCT) || (partCategory == WitCAPACITY))
+	{
+		retVal.push_back( true );
+d196 1
+a196 1
+// It returns a LgFrTimeVecFloatVector object.
+d200 1
+a200 1
+    const LgFrItemPtrVector* itemPtrOrdVecPtr,
+d204 1
+a204 1
+  assert( difImp->GetDIIType() == __LGFRDATAINTERFACEIMPLEMENTATIONFROMCMRPFILES);
+d207 3
+a209 3
+  LgFrItemPtrVector pv = *itemPtrOrdVecPtr;
+  LgFrTimeVecFloatVector& retVal = *(new LgFrTimeVecFloatVector);
+  retVal.reserve( pv.size() );
+d214 1
+a214 1
+  std::string  partName;
+d224 2
+a225 3
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < pv.size(); i++ ) {
+    witGetPartCategory(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(), &partCategory);
+d228 4
+a231 2
+      procLT = (*dImpCMRP->procLeadTimeDict_.find( partName ) ).second;
+    retVal.push_back( LgFrTimeVecFloat(calNP, procLT ) );
+d234 1
+a234 1
+      witGetPartCycleTime(dImpCMRP->constWitRun(difEssenPtr), pv[i]->name().c_str(),
+d236 1
+a236 2
+      size_t j = 0; // Pulled out of the for below by RW2STL
+      for(j = 0; j < size_tMin(calNP, witNP); j++ ){
+d239 1
+a239 1
+      retVal.push_back( tv );
+d274 1
+a274 1
+  witSetTitle( wr, baseFileName_.c_str() );
+d279 2
+a280 2
+      std::string line;
+      bool result;
+d285 1
+a285 2
+		std::string fname( baseFileName_ + ".raw" );
+		std::ifstream rawF( fname.c_str() );
+d288 1
+a288 1
+          cerr <<"LgFrERROR: File open failed: " << fname <<endl;
+d298 1
+a298 1
+          std::getline( rawF, line );
+d302 2
+a303 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                sce::stringFrom( lineCount ) <<endl;
+d308 3
+a310 3
+          SCETokenizer next(line);
+          std::string partName = next();
+          witAddPart( wr, partName.c_str(), WitRAW );
+d314 2
+a315 1
+          result = sce::fromString( next(), unitCostDbl ); // RWLocale::global().stringToNum( next().c_str(), &unitCostDbl);
+d318 2
+a319 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+d324 1
+a324 1
+          witSetPartUnitCost( wr, partName.c_str(), unitCost );
+d327 2
+a328 2
+          std::string constrainedString = next();
+		  sce::toLower( constrainedString );
+d332 2
+a333 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+d337 4
+a340 2
+          bool constrained = (constrainedString == "constrained");
+          localThis->constrainedDict_.insert( ConstrainedDictPair( partName, constrained ) );
+d344 2
+a345 1
+          result = sce::fromString( next(), procLTDbl ); // RWLocale::global().stringToNum( next().c_str(), &procLTDbl);
+d348 2
+a349 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                    sce::stringFrom( lineCount ) +
+d354 3
+a356 1
+          localThis->procLeadTimeDict_.insert( ProcLeadTimePair( partName, procLT) );
+d359 4
+a362 5
+          std::string supplyVol = next();
+          //std::string supplyVol;
+          //RWCSubString token = next();
+          //supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName.c_str(), 
+d372 1
+a372 1
+		  std::ifstream prdF( std::string( baseFileName_ + ".prd" ).c_str() );
+d385 1
+a385 1
+          std::getline( prdF, line );
+d389 2
+a390 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) <<endl;
+d395 3
+a397 3
+          SCETokenizer next(line);
+          std::string partName = next();
+          witAddPart( wr, partName.c_str(), WitPRODUCT );
+d401 2
+a402 1
+          result = sce::fromString( next(), unitCostDbl ); // RWLocale::global().stringToNum( next().c_str(), &unitCostDbl );
+d405 2
+a406 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) +
+d411 1
+a411 1
+          witSetPartUnitCost( wr, partName.c_str(), unitCost );
+d415 2
+a416 1
+          result = sce::fromString( next(), cycleTimeDbl ); // RWLocale::global().stringToNum( next().c_str(), &cycleTimeDbl );
+d419 2
+a420 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) +
+d425 1
+a425 1
+          witSetPartCycleTime( wr, partName.c_str(), 
+d429 4
+a432 5
+          std::string supplyVol = next();
+          //std::string supplyVol;
+          //RWCSubString token = next();
+          //supplyVol = line(token.start(), line.length() - token.start() );
+          witSetPartSupplyVol( wr, partName.c_str(),
+d434 1
+a434 2
+	  int supPerNo = 0; // Pulled out of the for below by RW2STL
+	  for (supPerNo = 1; // token is already at first supply volume
+d447 1
+a447 1
+		  std::ifstream capF( std::string( baseFileName_ + ".cap" ).c_str() );
+d461 1
+a461 1
+          std::getline( capF, line );
+d465 2
+a466 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".cap. Line " +
+                    sce::stringFrom( lineCount ) <<endl;
+d471 2
+a472 2
+          SCETokenizer next(line);
+          std::string partName = next();
+d474 2
+a475 2
+          witBoolean exists;
+          witGetPartExists( wr, partName.c_str(), &exists );
+d477 1
+a477 1
+             witAddPart( wr, partName.c_str(), WitCAPACITY );
+d485 4
+a488 2
+          std::string supplyVol = next( "\n" );
+          witSetPartSupplyVol( wr, partName.c_str(),
+d504 1
+a504 1
+		  std::ifstream demF( std::string( baseFileName_ + ".dem" ).c_str() );
+d519 1
+a519 1
+          std::getline( demF, line );
+d523 2
+a524 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".dem. Line " +
+                    sce::stringFrom( lineCount ) <<endl;
+d529 3
+a531 3
+          SCETokenizer next(line);
+          std::string demandName = next();
+          std::string partName = next();
+d534 1
+a534 1
+          witGetPartExists( wr, partName.c_str(), &exists );
+d537 1
+a537 1
+             witGetPartCategory( wr, partName.c_str(), &cat );
+d539 1
+a539 1
+                witAddDemand( wr, partName.c_str(), demandName.c_str() );
+d553 1
+a553 1
+          //RWCSubString priorityString = next();
+d555 2
+a556 3
+          bool result = sce::fromString( next(), priorityLong );
+//          bool result = RWLocale::global().stringToNum(
+//                  priorityString, &priorityLong);
+d559 2
+a560 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) +
+d565 1
+a565 2
+          int p = 0; // Pulled out of the for below by RW2STL
+          for ( p=0; p<calNp; p++ ) 
+d567 1
+a567 1
+          witSetDemandPriority( wr, partName.c_str(), demandName.c_str(), priority );
+d571 4
+a574 4
+          std::string demandVol = next();
+          //RWCSubString token = next();
+          //demandVol = line(token.start(), line.length() - token.start() );
+          witSetDemandDemandVol( wr, partName.c_str(), demandName.c_str(),
+d592 1
+a592 1
+		  std::ifstream bomF( std::string( baseFileName_ + ".bom" ).c_str() );
+d609 1
+a609 1
+          std::getline( bomF, line );
+d613 2
+a614 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) <<endl;
+d619 3
+a621 3
+          SCETokenizer next(line);
+          std::string producedPartName = next();
+          std::string consumedPartName = next();
+d625 2
+a626 3
+          bool result = sce::fromString( next(), usageRateDbl );
+//          result = RWLocale::global().stringToNum(
+//                   std::string(next()), &usageRateDbl);
+d629 2
+a630 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) +
+d637 2
+a638 2
+          witGetPartExists( wr, producedPartName.c_str(), &prodPartExists );
+          witGetPartExists( wr, consumedPartName.c_str(), &consPartExists );
+d652 1
+a652 1
+             witGetPartCategory( wr, producedPartName.c_str(), &cat );
+d655 1
+a655 1
+                                  producedPartName.c_str(), consumedPartName.c_str(),
+d657 1
+a657 1
+                                  0 );
+d683 1
+a683 1
+		std::ifstream revF( std::string( baseFileName_ + ".rev" ).c_str() );
+d698 1
+a698 1
+            std::getline( revF, line );
+d702 2
+a703 2
+              cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+                      sce::stringFrom( lineCount ) <<endl;
+d708 3
+a710 3
+            SCETokenizer next(line);
+            std::string demandName = next();
+            std::string partName = next();
+d714 1
+a714 1
+            witGetPartExists( wr, partName.c_str(), &exists );
+d725 2
+a726 3
+			bool result = sce::fromString( next(), revDbl );
+//            result = RWLocale::global().stringToNum(
+//                     std::string(next()), &revDbl);
+d729 2
+a730 2
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+                    sce::stringFrom( lineCount ) +
+d735 1
+a735 1
+            witSetDemandObj1ShipReward( wr, partName.c_str(), demandName.c_str(), 
+d774 2
+a775 2
+   std::string fileExtension,
+   std::string attributeName,
+d790 1
+a790 1
+ std::ifstream file( std::string( baseFileName_ + fileExtension ).c_str() );
+d793 1
+a793 1
+	 cerr <<"LgFrINFO: File " << baseFileName_ << fileExtension
+d803 1
+a803 1
+     std::string line;
+d807 1
+a807 1
+         std::getline( file, line );
+d811 3
+a813 2
+              cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+				  fileExtension << ". Line " << lineCount <<endl;
+d818 2
+a819 2
+           SCETokenizer next(line);
+           std::string operationName = next();
+d823 1
+a823 1
+            witGetOperationExists( wr, operationName.c_str(), &exists );
+d835 2
+a836 3
+			bool result = sce::fromString( next(), attrValDbl );
+//            bool result = RWLocale::global().stringToNum(
+//                                         std::string(next()), &attrValDbl);
+d839 4
+a842 3
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                   fileExtension << " Line " << lineCount <<
+                   " Token 2 (" << attributeName << ")" <<endl;
+d846 1
+a846 1
+            witSetOperation( wr, operationName.c_str(), 
+d860 2
+a861 2
+   std::string fileExtension,
+   std::string attributeName,
+d876 1
+a876 1
+ std::ifstream file( std::string( baseFileName_ + fileExtension ).c_str() );
+d889 1
+a889 1
+     std::string line;
+d893 1
+a893 1
+         std::getline( file, line );
+d897 3
+a899 2
+              cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                     fileExtension << ". Line " << lineCount <<endl;
+d904 2
+a905 2
+           SCETokenizer next(line);
+           std::string operationName = next();
+d909 1
+a909 1
+            witGetOperationExists( wr, operationName.c_str(), &exists );
+d921 2
+a922 3
+			bool result = sce::fromString( next(), attrValDbl );
+//            bool result = RWLocale::global().stringToNum(
+//                                         std::string(next()), &attrValDbl);
+d925 4
+a928 3
+            cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                   fileExtension << " Line " << lineCount <<
+                   " Token 2 (" << attributeName << ")" <<endl;
+d933 1
+a933 1
+            witSetOperation( wr, operationName.c_str(), 
+d961 2
+a962 2
+  std::ifstream & inputFile,
+  const std::string& fileSuffix )
+d965 1
+a965 1
+  std::string line;
+d968 5
+a972 6
+  std::getline( inputFile, line );
+
+  //inputFile >> line;
+  assert( !inputFile.eof() && std::string( "LgFrERROR: Read failed:" + baseFileName_ + fileSuffix + ". Line 1" ).c_str() );
+  SCETokenizer next(line);
+  //RWCSubString token = next();
+d974 1
+a974 2
+  bool result = sce::fromString( next(), nPeriods );
+  //bool result = RWLocale::global().stringToNum(token, &nPeriods);
+d987 1
+a987 1
+    const std::string& fileNameWithoutSuffix
+d993 1
+a993 1
+  SCETime startDate;
+d995 1
+a995 1
+    std::string fileName = fileNameWithoutSuffix + ".raw";
+d998 1
+a998 1
+    std::ifstream rawF( fileName.c_str() );
+d1006 2
+a1007 2
+    std::string line;
+    std::getline( rawF, line );
+d1010 1
+a1010 1
+      cerr <<"LgFrERROR: Read failed:" << fileName << ". Line 1" <<endl;
+d1015 3
+a1017 4
+    SCETokenizer next(line);
+    //RWCSubString token = next();
+    //bool result = RWLocale::global().stringToNum(token, &nPeriods);
+    bool result = sce::fromString( next(), nPeriods );
+d1026 1
+a1026 1
+    //RWCSubString token2 = next();
+d1028 1
+a1028 2
+    //result = RWLocale::global().stringToNum(token2, &day);
+    result = sce::fromString( next(), day );
+d1031 1
+a1031 1
+      cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 2"
+d1037 1
+a1037 1
+    //RWCSubString token3 = next();
+d1039 1
+a1039 2
+    //result = RWLocale::global().stringToNum(token3, &month);
+    result = sce::fromString( next(), month );
+d1042 1
+a1042 1
+      cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 3"
+d1048 1
+a1048 1
+    //RWCSubString token4 = next();
+d1050 1
+a1050 2
+    //result = RWLocale::global().stringToNum(token4, &year);
+    result = sce::fromString( next(), year );
+d1053 1
+a1053 1
+      cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 4"
+d1059 2
+a1060 2
+    std::string periodSizeString = next();
+	sce::toLower( periodSizeString );
+d1073 1
+a1073 1
+    startDate = SCEDate( day, month, year );
+d1088 1
+a1088 1
+    std::string calFileName = fileNameWithoutSuffix + ".cal";
+d1091 1
+a1091 1
+    std::ifstream calF( calFileName.c_str() );
+d1094 2
+a1095 2
+        LgFrTimeVector periodStartVec(nPeriods+1);
+        std::string line;
+d1097 2
+a1098 3
+        int i = 0; // Pulled out of the for below by RW2STL
+        for ( i = 0; i<=nPeriods; i++ ) {
+            std::getline( calF, line );
+d1101 2
+a1102 1
+             cerr <<"LgFrERROR: Read failed:" << calFileName << ". Line " <<i+1 <<endl;
+d1107 2
+a1108 2
+           SCETokenizer next(line);
+           //RWCSubString token = next();
+d1110 1
+a1110 2
+           //bool result = RWLocale::global().stringToNum(token, &period);
+           bool result = sce::fromString( next(), period);
+d1113 2
+a1114 2
+             cerr <<"LgFrERROR: Read failed:" << calFileName <<
+                    ". Line " << i+1 <<", token 1." <<endl;
+d1119 1
+a1119 1
+             cerr <<"LgFrERROR: Data problem in file:" << calFileName <<
+d1127 1
+a1127 1
+          //RWCSubString token2 = next();
+d1129 1
+a1129 1
+          result = sce::fromString( next(), day); // RWLocale::global().stringToNum(token2, &day);
+d1132 1
+a1132 1
+            cerr <<"LgFrERROR: Read failed: " << calFileName <<
+d1138 1
+a1138 1
+          //RWCSubString token3 = next();
+d1140 1
+a1140 1
+          result = result = sce::fromString( next(), month); // RWLocale::global().stringToNum(token3, &month);
+d1143 1
+a1143 1
+            cerr <<"LgFrERROR: Read failed: " << calFileName <<
+d1149 1
+a1149 1
+          //RWCSubString token4 = next();
+d1151 1
+a1151 1
+          result = result = sce::fromString( next(), year); // RWLocale::global().stringToNum(token4, &year);
+d1154 1
+a1154 1
+            cerr <<"LgFrERROR: Read failed: " << calFileName <<
+d1160 1
+a1160 1
+         SCETime periodStartTime(SCEDate( day, month, year ) );
+d1163 1
+a1163 1
+           cerr <<"LgFrERROR: Read failed: " << calFileName << ". Line " <<i+1
+d1194 1
+a1194 4
+    // Nothing to do with stl map<>
+    /*
+  size_t d = 0; // Pulled out of the for below by RW2STL
+  for ( d=0; dictPtrVec_[d]!=0; d++ )
+d1199 1
+a1199 1
+      if ( iter() == 0 ) break;
+d1204 1
+a1204 1
+  }*/
+d1213 3
+a1215 19
+  size_t d = 0; // Pulled out of the for below by RW2STL
+
+  constrainedDict_.clear();
+  for( ConstrainedDictionary::const_iterator itc = source.constrainedDict_.begin();
+        itc != source.constrainedDict_.end();
+        itc++ )
+  {
+    constrainedDict_.insert( *itc );
+  }
+
+  procLeadTimeDict_.clear();
+  for( ProcLeadTimeDictionary::const_iterator itp = source.procLeadTimeDict_.begin();
+        itp != source.procLeadTimeDict_.end();
+        itp++ )
+  {
+    procLeadTimeDict_.insert( *itp );
+  }
+
+/* for ( d=0; dictPtrVec_[d]!=0; d++ )
+d1221 6
+a1226 6
+      if ( iter() == 0 ) break;
+      assert( iter.key()->is A() == __RWCOLLECTABLESTRING );
+      assert( iter.value()->is A() == __RWCOLLECTABLEINT ||
+              iter.value()->is A() == __LGFRCOLLECTABLEFLOAT );
+      key = new std::string( *((std::string*)(iter.key())) );
+      if ( iter.value()->is A() == __RWCOLLECTABLEINT )
+d1233 10
+a1242 1
+  } */
+d1289 3
+a1291 3
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+d1299 1
+a1299 1
+   std::string  baseFileName)
+d1306 3
+a1308 3
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+d1320 3
+a1322 3
+   //dictPtrVec_[0] = &constrainedDict_;
+   //dictPtrVec_[1] = &procLeadTimeDict_;
+   //dictPtrVec_[2] = 0;
+d1376 1
+a1376 1
+      std::string title = tdif1.title();
+d1380 3
+a1382 3
+      assert (c.periodStart(0) == SCETime(SCEDate("4/10/95")));
+      assert (c.periodStart(1) == SCETime(SCEDate("4/18/95")));
+      assert (c.periodStart(2) == SCETime(SCEDate("4/24/95")));
+d1388 6
+d1417 4
+a1420 4
+  LgFrPartVector partpv;
+  std::string itemSubTypeStr = "material";
+  LgFrPartVector* rawPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+d1422 4
+a1425 5
+  LgFrPartVector raw = *rawPartsPtr;
+  size_t t = 0; // Pulled out of the for below by RW2STL
+  for(t = 0 ; t < raw.size() ; t++)
+    witAddPart( lps.witRun(), raw[t].name().c_str(), WitRAW);
+  assert( raw.size() == 2 );
+d1429 2
+a1430 2
+  LgFrPartVector* productPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+d1432 4
+a1435 4
+  LgFrPartVector product = * productPartsPtr;
+  for( t = 0 ; t < product.size() ; t++)
+    witAddPart( lps.witRun(), product[t].name().c_str(), WitPRODUCT);
+  assert( product.size() == 2 );
+d1439 2
+a1440 2
+  LgFrPartVector* capacityPartsPtr
+    = (LgFrPartVector*) tdif2.partAttribute(
+d1442 4
+a1445 4
+  LgFrPartVector capacity = * capacityPartsPtr;
+  for( t = 0 ; t < capacity.size() ; t++)
+    witAddPart( lps.witRun(), capacity[t].name().c_str(), WitCAPACITY);
+  assert( capacity.size() == 1 );
+d1451 2
+a1452 2
+  LgFrFloatVector* unitCostVectPtr
+    = (LgFrFloatVector*) tdif2.partAttribute(
+d1454 1
+a1454 1
+  assert( unitCostVectPtr->size() == 2 );
+d1460 2
+a1461 2
+  LgFrIntVector* constrainedVectPtr
+   = (LgFrIntVector*) tdif2.partAttribute(
+d1463 1
+a1463 1
+  assert( constrainedVectPtr->size() == 2 );
+d1480 2
+a1481 2
+  LgFrTimeVecFloatVector* procLeadTimeVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1483 1
+a1483 1
+  assert( procLeadTimeVectPtr->size() == 2 );
+d1491 1
+a1491 1
+  assert( procLT.size() == 2 );
+d1495 1
+a1495 1
+  assert( procLT.size() == 2 );
+d1500 2
+a1501 2
+  LgFrTimeVecFloatVector* supplyVolVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1503 1
+a1503 1
+  assert( supplyVolVectPtr->size() == 2 );
+d1513 2
+a1514 2
+  LgFrTimeVecFloatVector* cycleTimeVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1516 1
+a1516 1
+  assert( cycleTimeVectPtr->size() == 2 );
+d1522 2
+a1523 2
+  LgFrFloatVector* unitCostVectPtr2
+    = (LgFrFloatVector*) tdif2.partAttribute(
+d1525 1
+a1525 1
+  assert( unitCostVectPtr2->size() == 2 );
+d1531 2
+a1532 2
+  LgFrIntVector* constrainedVectPtr2
+   = (LgFrIntVector*) tdif2.partAttribute(
+d1534 2
+a1535 2
+  assert( constrainedVectPtr2->size() == 2 );
+  for (unsigned int i=0; i<constrainedVectPtr2->size(); i++) 
+d1540 2
+a1541 2
+  LgFrTimeVecFloatVector* supplyVolVectPtr2
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1543 1
+a1543 1
+  assert( supplyVolVectPtr2->size() == 2 );
+d1553 2
+a1554 2
+  LgFrTimeVecFloatVector* minLotSizePtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1556 2
+a1557 2
+  LgFrTimeVecFloatVector minLotSize = *minLotSizePtr;
+  assert( minLotSize.size() == 2 );
+d1567 2
+a1568 2
+  LgFrTimeVecFloatVector* incLotSizePtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1570 2
+a1571 2
+  LgFrTimeVecFloatVector incLotSize = *incLotSizePtr;
+  assert( incLotSize.size() == 2 );
+d1580 2
+a1581 2
+  LgFrTimeVecFloatVector* yieldPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1583 2
+a1584 2
+  LgFrTimeVecFloatVector yield = *yieldPtr;
+  assert( yield.size() == 2 );
+d1594 2
+a1595 2
+  LgFrIntVector* constrainedVectPtr
+   = (LgFrIntVector*) tdif2.partAttribute(
+d1597 1
+a1597 1
+  assert( constrainedVectPtr->size() == 1 );
+d1602 2
+a1603 2
+  LgFrTimeVecFloatVector* supplyVolVectPtr
+   = (LgFrTimeVecFloatVector*) tdif2.partAttribute(
+d1605 1
+a1605 1
+  assert( supplyVolVectPtr->size() == 1 );
+d1615 1
+a1615 1
+  LgFrDemandVector demandpv;
+d1617 2
+a1618 2
+  LgFrDemandVector* committedDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+d1620 2
+a1621 2
+  LgFrDemandVector committed = * committedDemandPtr;
+  assert( committed.size() == 2 ); 
+d1623 2
+a1624 2
+  LgFrDemandVector* newOpportunityDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+d1626 2
+a1627 2
+  LgFrDemandVector newOpportunity = * newOpportunityDemandPtr;
+  assert( newOpportunity.size() == 0 );
+d1629 2
+a1630 2
+  LgFrDemandVector* firmForecastDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+d1632 2
+a1633 2
+  LgFrDemandVector firmForecast = * firmForecastDemandPtr;
+  assert( firmForecast.size() == 0 );
+d1636 2
+a1637 2
+  LgFrDemandVector* riskForecastDemandPtr
+    = (LgFrDemandVector*) tdif2.demandAttribute(
+d1639 2
+a1640 2
+  LgFrDemandVector riskForecast = * riskForecastDemandPtr;
+  assert( riskForecast.size() == 0 );
+d1644 1
+a1644 1
+  LgFrTimeVecFloatVector * demandVolVectPtr = (LgFrTimeVecFloatVector *)
+d1646 1
+a1646 1
+  assert(demandVolVectPtr->size() == 2 );
+d1652 1
+a1652 1
+  LgFrTimeVecFloatVector * demandVolVectPtr2 = (LgFrTimeVecFloatVector *)
+d1654 1
+a1654 1
+  assert(demandVolVectPtr2->size() == 0 );
+d1659 1
+a1659 1
+  LgFrTimeVecFloatVector * demandVolVectPtr3 = (LgFrTimeVecFloatVector *)
+d1661 1
+a1661 1
+  assert(demandVolVectPtr3->size() == 0 );
+d1666 1
+a1666 1
+  LgFrTimeVecFloatVector * demandVolVectPtr4 = (LgFrTimeVecFloatVector *)
+d1668 1
+a1668 1
+  assert(demandVolVectPtr4->size() == 0 );
+d1673 2
+a1674 2
+  LgFrTimeVecFloatVector* priorityPtr
+    = (LgFrTimeVecFloatVector*) tdif2.demandAttribute(committed,
+d1676 1
+a1676 1
+  assert(priorityPtr->size() == 2 );
+d1682 2
+a1683 2
+  LgFrTimeVecFloatVector* obj1ShipRewardPtr
+    = (LgFrTimeVecFloatVector*) 
+d1686 2
+a1687 2
+  LgFrTimeVecFloatVector obj1ShipReward = *obj1ShipRewardPtr;
+  assert(obj1ShipReward.size() == 2 );
+d1707 1
+a1707 1
+  assert ( std::string (consumedPartName) == std::string ("sub1"));
+d1714 1
+a1714 1
+  assert ( std::string (consumedPartName) == std::string ("cap1"));
+d1724 1
+a1724 1
+  assert ( std::string (consumedPartName) == std::string ("raw1"));
+@
+
+
+1.3.2.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d290 1
+a290 1
+          std::cerr <<"LgFrERROR: File open failed: " << fname << std::endl;
+d304 2
+a305 2
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+                sce::stringFrom( lineCount ) << std::endl;
+d319 1
+a319 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+d321 1
+a321 1
+                   " Token 2 (unitCost)" << std::endl;
+d333 1
+a333 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+d335 1
+a335 1
+                   " Token 3 (constrained)" << std::endl;
+d346 1
+a346 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".raw. Line " +
+d348 1
+a348 1
+                   " Token 4 (procurement lead time)" << std::endl;
+d372 1
+a372 1
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".prd" << std::endl;
+d386 2
+a387 2
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+d401 1
+a401 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+d403 1
+a403 1
+                   " Token 2 (unitCost)" << std::endl;
+d414 1
+a414 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".prd. Line " +
+d416 1
+a416 1
+                   " Token 3 (cycleTime)" << std::endl;
+d447 1
+a447 1
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".cap" << std::endl;
+d462 2
+a463 2
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".cap. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+d477 1
+a477 1
+             std::cout <<"LgFrWARNING: duplicate capacity part: " <<partName << std::endl;
+d489 1
+a489 1
+        std::cout <<"LgFrINFO: duplicate capacity part count " <<dupCapPart << std::endl;
+d502 1
+a502 1
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".dem" << std::endl;
+d518 2
+a519 2
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".dem. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+d537 1
+a537 1
+                std::cout <<"LgFrWARNING: demand on capacity part: " <<partName << std::endl;
+d543 1
+a543 1
+                std::cout <<"LgFrWARNING: undefined demanded part " <<partName << std::endl;
+d555 1
+a555 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+d557 1
+a557 1
+                   " Token 3 (priority)" << std::endl;
+d576 4
+a579 4
+        std::cout <<"LgFrINFO: undefined demanded part count "
+             <<undefDemandedPart << std::endl;
+        std::cout <<"LgFrINFO: demand on capacity part count "
+             <<demandOnCap << std::endl;
+d592 1
+a592 1
+          std::cerr <<"LgFrERROR: File open failed: " + baseFileName_ + ".bom" << std::endl;
+d610 2
+a611 2
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+                    sce::stringFrom( lineCount ) << std::endl;
+d627 1
+a627 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".bom. Line " +
+d629 1
+a629 1
+                   " Token 3 (usageRate)" << std::endl;
+d639 2
+a640 2
+             std::cout <<"LgFrWARNING: undefined produced part: "
+                  <<producedPartName << std::endl;
+d644 2
+a645 2
+             std::cout <<"LgFrWARNING undefined consumed part: "
+                  <<consumedPartName << std::endl;
+d658 2
+a659 2
+                std::cout <<"LgFrWARNING: produced capacity: "
+                     <<producedPartName << std::endl;
+d664 2
+a665 2
+                std::cout <<"LgFrWARNING: produced raw part: "
+                     <<producedPartName << std::endl;
+d670 4
+a673 4
+        std::cout <<"LgFrINFO: undefined produced parts " <<undefProdPart << std::endl;
+        std::cout <<"LgFrINFO: undefined consumed parts " <<undefConsPart << std::endl;
+        std::cout <<"LgFrINFO: produced capacities " <<prodCapPart << std::endl;
+        std::cout <<"LgFrINFO: produced raw parts " <<prodRawPart << std::endl;
+d684 2
+a685 2
+          std::cerr <<"LgFrINFO: File " + baseFileName_ + ".rev " 
+               <<"was not found. Using default revenue values" << std::endl;
+d700 2
+a701 2
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+                      sce::stringFrom( lineCount ) << std::endl;
+d714 1
+a714 1
+	       std::cerr << "LgFrERROR:Error while reading revenue file, "
+d716 1
+a716 1
+	            <<  std::endl;
+d728 1
+a728 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ << ".rev. Line " +
+d730 1
+a730 1
+                   " Token 3 (revenue)" << std::endl;
+d792 1
+a792 1
+	 std::cerr <<"LgFrINFO: File " << baseFileName_ << fileExtension
+d794 1
+a794 1
+          << std::endl;
+d810 2
+a811 2
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+				  fileExtension << ". Line " << lineCount << std::endl;
+d823 1
+a823 1
+	       std::cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+d825 1
+a825 1
+		    << operationName <<  std::endl;
+d838 1
+a838 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+d840 1
+a840 1
+                   " Token 2 (" << attributeName << ")" << std::endl;
+d877 1
+a877 1
+     std::cerr <<"LgFrINFO: File " + baseFileName_ + fileExtension
+d879 1
+a879 1
+          << std::endl;
+d895 2
+a896 2
+              std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+                     fileExtension << ". Line " << lineCount << std::endl;
+d908 1
+a908 1
+	       std::cerr << "LgFrERROR: Error while reading" + attributeName + " file, "
+d910 1
+a910 1
+		    << operationName <<  std::endl;
+d923 1
+a923 1
+            std::cerr <<"LgFrERROR: Read failed: " << baseFileName_ <<
+d925 1
+a925 1
+                   " Token 2 (" << attributeName << ")" << std::endl;
+d976 1
+a976 1
+    std::cerr <<"LgFrERROR: Read failed: " + baseFileName_ + fileSuffix +
+d978 1
+a978 1
+         << std::endl;
+d1000 1
+a1000 1
+      std::cerr <<"LgFrERROR: File open failed: " + fileName << std::endl;
+d1009 1
+a1009 1
+      std::cerr <<"LgFrERROR: Read failed:" << fileName << ". Line 1" << std::endl;
+d1020 2
+a1021 2
+      std::cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 1"
+	   << std::endl;
+d1032 2
+a1033 2
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 2"
+	   << std::endl;
+d1044 2
+a1045 2
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 3"
+	   << std::endl;
+d1056 2
+a1057 2
+      std::cerr <<"LgFrERROR: Read failed: " << fileName << ". Line 1, token 4"
+	   << std::endl;
+d1070 2
+a1071 2
+      std::cerr <<"LgFrERROR: Read failed: " + fileName + ". Line 1, token 5"
+	   << std::endl;
+d1079 1
+a1079 1
+      std::cerr <<"LgFrERROR: Read failed: " + fileName +
+d1081 2
+a1082 2
+	   << std::endl
+	   <<"Invalid starting date specified." << std::endl;
+d1105 1
+a1105 1
+             std::cerr <<"LgFrERROR: Read failed:" << calFileName << ". Line " <<i+1 << std::endl;
+d1117 2
+a1118 2
+             std::cerr <<"LgFrERROR: Read failed:" << calFileName <<
+                    ". Line " << i+1 <<", token 1." << std::endl;
+d1123 4
+a1126 4
+             std::cerr <<"LgFrERROR: Data problem in file:" << calFileName <<
+                    ". Line " <<i+1 <<", token 1." << std::endl
+                  <<"           Period read was " <<period << std::endl
+                  <<"           Expected a value of " <<i << std::endl;
+d1136 2
+a1137 2
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 2." << std::endl;
+d1147 2
+a1148 2
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 3." << std::endl;
+d1158 2
+a1159 2
+            std::cerr <<"LgFrERROR: Read failed: " << calFileName <<
+                   ". Line " <<i+1 <<", token 4." << std::endl;
+d1167 1
+a1167 1
+           std::cerr <<"LgFrERROR: Read failed: " << calFileName << ". Line " <<i+1
+d1169 2
+a1170 2
+	        << std::endl
+	        <<"Invalid date specified." << std::endl;
+@
+
+
+1.3.2.3
+log
+@New LgFrDatetime class
+@
+text
+@d992 1
+a992 1
+  LgFrDatetime startDate;
+d1076 1
+a1076 1
+    startDate.setDate( month, day, year );
+d1097 1
+a1097 1
+        LgFrDatetimeVector periodStartVec(nPeriods+1);
+d1164 1
+a1164 2
+         LgFrDatetime periodStartTime;
+         periodStartTime.setDate( month, day, year );
+d1394 3
+a1396 3
+      assert (c.periodStart(0) == LgFrDatetime( "4/10/95"));
+      assert (c.periodStart(1) == LgFrDatetime( "4/18/95"));
+      assert (c.periodStart(2) == LgFrDatetime( "4/24/95"));
+@
+
+
+1.2
+log
+@Added implement (RWGVector, XXX) to satisfy vacpp linker.
+@
+text
+@d19 1
+d22 1
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d19 3
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

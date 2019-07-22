@@ -1,0 +1,924 @@
+head	1.16;
+access;
+symbols
+	latest_sce_3_10_20010924:1.6.0.2
+	sce_3_10_20010924:1.6
+	latest_sce_3_00_20010601:1.5.0.4
+	sce_3_00_20010601:1.5
+	latest_sce_2_31_20010308:1.5.0.2
+	sce_2_31_20010308:1.5
+	latest_sce_2_31_20001003:1.3.0.2
+	sce_2_31_20001003:1.3
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.16
+date	2002.08.23.21.00.34;	author rjw;	state dead;
+branches;
+next	1.15;
+
+1.15
+date	2002.08.20.19.07.24;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2002.08.15.20.03.44;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2002.08.09.14.20.44;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2002.08.08.17.33.32;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2002.08.07.20.12.54;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2002.08.02.17.03.34;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.05.03.19.58.27;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.05.02.20.53.12;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.05.01.14.25.56;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.06.21.18.24.31;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2000.12.06.19.58.38;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2000.11.22.23.11.41;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.04.24.19.55.23;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.03.07.16.56.01;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.13.53.23;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.13.53.23;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.16
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef LpModelH
+#define LpModelH
+
+//------------------------------------------------------------------------------
+// Header file: "LpModel.h"
+//
+// Contains the declaration of class LpModel.
+//------------------------------------------------------------------------------
+
+#include <ModelEl.h>
+#include <PtrVec.h>
+
+//------------------------------------------------------------------------------
+// class LpModel.
+// A generic linear programming model.
+//------------------------------------------------------------------------------
+
+class WitLpModel: public WitUtil
+   {
+   public:
+
+      //-----------------------------------------------------------------------
+      // Constructor functions.
+      //-----------------------------------------------------------------------
+
+      WitLpModel (WitOptImploder * theOptImploder);
+         //
+         // myOptImploder <-- theOptImploder.
+
+      //-----------------------------------------------------------------------
+      // Destructor function.
+      //-----------------------------------------------------------------------
+
+      virtual ~WitLpModel ();
+
+      //-----------------------------------------------------------------------
+      // Public pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual WitBoolean needDual () = 0;
+         //
+         // Returns TRUE, iff a dual solution is needed.
+
+      virtual void reportInfeasible () = 0;
+         //
+         // Does any special error reporting for an infeasible solution,
+         // (over and above what is automatically done by myOslMgr_).
+
+      virtual void reportUnbounded () = 0;
+         //
+         // Does any special error reporting for an unbounded solution,
+         // (over and above what is automatically done by myOslMgr_).
+
+      //-----------------------------------------------------------------------
+      // Data access functions.
+      //-----------------------------------------------------------------------
+
+      accessFunc (WitOptImploder *,           myOptImploder)
+      accessFunc (WitProblem *,               myProblem)
+      accessFunc (WitMsgFacility &,           myMsgFac)
+      accessFunc (const WitList <WitLpVar> &, myLpVars)
+      accessFunc (const WitList <WitLpCon> &, myLpCons)
+      accessFunc (int,                        nCoeffs)
+      accessFunc (WitLpObj *,                 mainObj)
+
+      inline static FILE * modelFile ()
+         {
+         return modelFile_;
+         }
+
+      inline int nLpVars ()
+         {
+         return myLpVars ().nElements ();
+         }
+
+      inline int nLpCons ()
+         {
+         return myLpCons ().nElements ();
+         }
+
+      inline int nLpObjs ()
+         {
+         return myLpObjs_.nElements ();
+         }
+
+      //-----------------------------------------------------------------------
+      // Other public member functions.
+      //-----------------------------------------------------------------------
+
+      void store (WitLpVar * theVar);
+         //
+         // theVar is a new LpVar created for this LpModel.
+         // This function stores theVar.
+
+      void store (WitLpCon * theCon);
+         //
+         // theCon is a new LpCon created for this LpModel.
+         // This function stores theCon.
+
+      void store (WitLpObj * theObj);
+         //
+         // theObj is a new LpObj created for this LpModel.
+         // This function stores theObj.
+
+      void generateFixed ();
+         //
+         // Generates the fixed aspects of this LpModel (the aspects that do
+         // not change in accelerated mode).
+
+      void incCoeff (WitLpVar * theVar, float delta);
+         //
+         // Adds delta to the Coeff of theVar in curCon_, constructing it,
+         // if neccesary.  No-op, if delta is (nearly) 0.0.
+
+      void generateFlexible ();
+         //
+         // Generates the flexible aspects of this LpModel (the aspects that
+         // may change in accelerated mode).
+
+      inline const WitBoundPair & preScreenBounds (const WitLpVar * theVar);
+         //
+         // Returns the value that theVar->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      inline const WitBoundPair & preScreenBounds (const WitLpCon * theCon);
+         //
+         // Returns the value that theCon->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      void calcInitSoln ();
+         //
+         // Calculates an initial solution.
+
+      void generateOslVectors (
+            WitVector <int> &    indexRow,
+            WitVector <int> &    startOfEachColumn,
+            WitVector <double> & elements);
+         //
+         // Generates 3 vectors to be passed to ekk_addColmunElementBlock.
+
+      void print (WitBoolean printOslVecs);
+         //
+         // Prints this LpModel.
+         // Also prints the Osl Vectors if printOslVecs is TRUE.
+
+      void getConLBs (WitVector <double> & theConLBvec);
+         //
+         // Loads theConLBvec with the lower bound on each constraint.
+
+      void getConUBs (WitVector <double> & theConUBvec);
+         //
+         // Loads theConUBvec with the upper bound on each constraint.
+
+      void getVarLBs (WitVector <double> & theVarLBvec);
+         //
+         // Loads theVarLBvec with the lower bound on each variable.
+
+      void getVarUBs (WitVector <double> & theVarUBvec);
+         //
+         // Loads theVarUBvec with the upper bound on each variable.
+
+      void getObjCoeffs (WitVector <double> & theObjCoeffVec);
+         //
+         // Loads theObjVec with the objective coefficient on each variable.
+
+      void getInitSoln (double * colsol);
+         //
+         // Copies the initial primal LP solution into colsol.
+
+      void storePrimalSoln (const double * colsol);
+         //
+         // Stores the primal LP solution from colsol to this LpModel.
+
+      void storeDualSoln (const double * rowduals);
+         //
+         // Stores the dual LP solution from rowduals to this LpModel.
+
+      void solve ();
+         //
+         // Solves this LpModel.
+
+   protected:
+
+      //-----------------------------------------------------------------------
+      // Protected pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void generateVariables () = 0;
+         //
+         // Generates all variables.
+
+      virtual void generateConstraints () = 0;
+         //
+         // Generates all LpCons.
+
+      virtual WitLpObj * generateObjectives () = 0;
+         //
+         // Generates all LpObjs.
+         // Returns the main objective.
+
+      virtual void printModelElHeading () = 0;
+         //
+         // Prints a heading for ModelEls to modelFile ().
+
+      //-----------------------------------------------------------------------
+      // Protected non-pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void displayDerived ();
+         //
+         // Display any model-specific message in pre-release mode.
+         // This default version is a no-op.
+
+      virtual void printDerived ();
+         //
+         // Prints model-specific aspects of this LpModel.
+         // This default version is a no-op.
+
+      virtual void initDepVars ();
+         //
+         // Initializes the dependent variables, i.e., those variables whose
+         // initial value depends on the initial value of other variables.
+
+      //-----------------------------------------------------------------------
+      // Other protected member functions.
+      //-----------------------------------------------------------------------
+
+      void saveBounds ();
+         //
+         // Copies bounds for each LpVar and LpCon into varPreScreenBounds_ and
+         // conPreScreenBounds_.
+
+      int screen (const WitLpCon * theCon);
+         //
+         // Performs generic screening on theCon and the variables it
+         // intersects.
+         // Returns # LpVars fixed.
+         // No-op, if theCon is NULL.
+
+   private:
+
+      //-----------------------------------------------------------------------
+      // Private member functions.
+      //-----------------------------------------------------------------------
+
+      noCopyCtorAssign (WitLpModel);
+
+      void generateCoeffs ();
+         //
+         // Generates all Coeffs for all LpCons and stores them in the
+         // ModelEl myCoeffs_ vectors.
+
+      void buildCoeffs ();
+         //
+         // Generates all Coeffs for all LpCons.
+
+      void allocVarCoeffs ();
+         //
+         // Invokes allocMyCoeffs for each LpVar in this LpModel.
+
+      void storeCoeffs ();
+         //
+         // Stores all Coeffs in each ModelEl, in LpCon order for LpVars and
+         // LpVar order for LpCons.
+
+      WitCoeff * & varLastCoeff (const WitLpVar * theVar)
+         {
+         return varLastCoeff_[theVar->index ()];
+         }
+
+      void generateMainObjCoeffs ();
+         //
+         // For each LpVar, theVar, computes theVar->mainObjCoeffVal.
+
+      void generateBounds (const WitList <WitModelEl> & theModelEls);
+         //
+         // Generates the bounds for each ModelEl in theModelEls.
+
+      void printVars ();
+         //
+         // Prints all LpVars in this LpModel.
+
+      void printCons ();
+         //
+         // Prints all LpCons in this LpModel.
+
+      void printObjs ();
+         //
+         // Prints all LpObjs in this LpModel.
+
+      void printOslVectors ();
+         //
+         // Temporarly generates the vectors to be passed to
+         // ekk_addColumnElementBlock and prints them.
+
+      void reconstructDual ();
+         //
+         // Assuming the model was screened and an optimal dual solution to the
+         // screened model has been obtained, this function modifies the dual
+         // solution, in order to make it optimal and feasible for the dual of
+         // the unscreened model.
+
+      //-----------------------------------------------------------------------
+      // Static private member data.
+      //-----------------------------------------------------------------------
+
+      static FILE * modelFile_;
+         //
+         // LP model output file.
+
+      //-----------------------------------------------------------------------
+      // Other private member data.
+      //-----------------------------------------------------------------------
+
+      WitOptImploder * const myOptImploder_;
+         //
+         // The OptImploder under which this LpModel is operating.
+
+      WitProblem * const myProblem_;
+         //
+         // The Problem to wich this LpModel belongs.
+
+      WitMsgFacility & myMsgFac_;
+         //
+         // The MsgFacility for this LpModel.
+
+      WitOslMgr * myOslMgr_;
+         //
+         // The OslMgr owned by this LpModel.
+
+      WitList <WitLpVar> myLpVars_;
+         //
+         // The list of all LpVars in this LpModel.
+
+      WitList <WitLpCon> myLpCons_;
+         //
+         // The list of all LpCons in this LpModel.
+
+      WitList <WitLpObj> myLpObjs_;
+         //
+         // List of all LpObjs in this LpModel.
+
+      int nCoeffs_;
+         //
+         // # Coeffs in model.
+
+      WitLpCon * curCon_;
+         //
+         // The LpCon whose Coeffs are currently being generated.
+
+      WitDenseList <WitCoeff> curConCoeffs_;
+         //
+         // The Coeffs for curCon_;
+         // Allocated only during buildCoeffs.
+
+      WitPtrVec <WitCoeff> varLastCoeff_;
+         //
+         // varLastCoeff_[theVar->index ()] is the most recently
+         // generated Coeff whose LpVar is theVar, or NULL is none exists.
+         // Allocated only during buildCoeffs.
+
+      WitLpObj * mainObj_;
+         //
+         // The main objective function.
+
+      WitPtrVec <WitBoundPair> varPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (LpVar *).
+
+      WitPtrVec <WitBoundPair> conPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (LpCon *).
+
+      WitList <WitCoeff> screenedCoeffs_;
+         //
+         // For each Coeff in screenedCoeffs_, theCoeff:
+         //    theCoeff->myVar () is a variable that was screened out.
+         //    theCoeff->myCon () is the constraint that enabled the
+         //    variable to be screened out.
+         // The Coeffs are stored in reverse of the order in which the
+         // screening was performed.
+         // Valid iff needDual () is TRUE.
+   };
+
+//------------------------------------------------------------------------------
+// Implementations of inline member functions for class LpModel.
+//------------------------------------------------------------------------------
+
+inline const WitBoundPair & WitLpModel::preScreenBounds (
+      const WitLpVar * theVar)
+   {
+   return varPreScreenBounds_ (theVar->index ());
+   }
+
+//------------------------------------------------------------------------------
+
+inline const WitBoundPair & WitLpModel::preScreenBounds (
+      const WitLpCon * theCon)
+   {
+   return conPreScreenBounds_ (theCon->index ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementations of inline member functions for clients of class LpModel.
+//------------------------------------------------------------------------------
+
+inline WitOptImploder * WitLpObj::myOptImploder () const
+   {
+   return myLpModel_->myOptImploder ();
+   }
+
+//------------------------------------------------------------------------------
+
+inline WitOptImploder * WitModelEl::myOptImploder () const
+   {
+   return myLpModel ()->myOptImploder ();
+   }
+
+#endif
+@
+
+
+1.15
+log
+@Continued implementation of opt implosion with OSL V3.
+@
+text
+@@
+
+
+1.14
+log
+@Continued implementation of opt implosion with OSL V3.
+@
+text
+@d49 1
+a49 1
+      virtual WitBoolean needDual () const = 0;
+d53 1
+a53 1
+      virtual void reportInfeasible () const = 0;
+d58 1
+a58 1
+      virtual void reportUnbounded () const = 0;
+d80 1
+a80 1
+      inline int nLpVars () const
+d85 1
+a85 1
+      inline int nLpCons () const
+d90 1
+a90 1
+      inline int nLpObjs () const
+d129 1
+a129 3
+      inline const WitBoundPair & preScreenBounds (
+            const WitLpVar * theVar)
+            const;
+d134 1
+a134 3
+      inline const WitBoundPair & preScreenBounds (
+            const WitLpCon * theCon)
+            const;
+a143 12
+            WitVector <long> &   oslMrow,
+            WitVector <long> &   oslMcol,
+            WitVector <double> & oslDels)
+            const;
+         //
+         // Generates 3 vectors to be passed to ekklmdl. For the meaning of
+         // the arguments, see the entry on ekklmdl in the OSL manual.
+         // For consistency with OSL, these arrays will be indexed by FORTRAN
+         // convention; e.g., the first element of [oslMrow] is [oslMrow[1]].
+         // [oslMrow[0]] is not used.
+
+      void generateOsl3Vectors (
+a149 5
+      void printOslVectors () const;
+         //
+         // Temporarly generates the vectors to be passed to ekklmdl and prints
+         // them.
+
+d155 1
+a155 10
+      void passBounds (
+            double *                     oslLBs,
+            double *                     oslUBs,
+            const WitList <WitModelEl> & theModelEls)
+            const;
+         //
+         // Copies the bounds from theModelEls into the lower & upper bound
+         // vectors from OSL.
+
+      void getOsl3ConLBs (WitVector <double> & theConLBvec);
+d159 1
+a159 1
+      void getOsl3ConUBs (WitVector <double> & theConUBvec);
+d163 1
+a163 1
+      void getOsl3VarLBs (WitVector <double> & theVarLBvec);
+d167 1
+a167 1
+      void getOsl3VarUBs (WitVector <double> & theVarUBvec);
+d171 1
+a171 1
+      void getOsl3ObjCoeffs (WitVector <double> & theObjCoeffVec);
+a174 8
+      void passObj (double * oslObj) const;
+         //
+         // Computes the coefficients for mainObj () & stores them in oslObj.
+
+      void passPrimal (double * primal) const;
+         //
+         // Copies an initial primal LP solution to primal.
+
+d179 1
+a179 5
+      void recordPrimal (const double * primal);
+         //
+         // Copies the primal LP solution from primal to this LpModel.
+
+      void storeOsl3PrimalSoln (const double * colsol);
+d183 1
+a183 5
+      void recordDual (const double * dual);
+         //
+         // Copies the dual LP solution from dual to this LpModel.
+
+      void storeOsl3DualSoln (const double * rowduals);
+d210 1
+a210 1
+      virtual void printModelElHeading () const = 0;
+d218 1
+a218 1
+      virtual void displayDerived () const;
+d223 1
+a223 1
+      virtual void printDerived () const;
+d284 1
+a284 1
+      void generateBounds (const WitList <WitModelEl> & theModelEls) const;
+d288 1
+a288 1
+      void printVars () const;
+d292 1
+a292 1
+      void printCons () const;
+d296 1
+a296 1
+      void printObjs () const;
+d300 5
+d377 1
+a377 1
+         // Stores the return values of preScreenBounds (const LpVar *).
+d381 1
+a381 1
+         // Stores the return values of preScreenBounds (const LpCon *).
+a399 1
+      const
+a407 1
+      const
+@
+
+
+1.13
+log
+@Continued implementation of opt implosion with OSL V3.
+@
+text
+@a67 1
+      accessFunc (WitBoolean,                 isTrivial)
+a142 4
+      void setIsTrivial ();
+         //
+         // Sets isTrivial_
+
+a236 4
+      void closeFilesAtExit ();
+         //
+         // Closes files for an error exit.
+
+a259 4
+      virtual WitBoolean calcIsTrivial () = 0;
+         //
+         // Calculates and returns the value of isTrivial_.
+
+a364 6
+      WitBoolean isTrivial_;
+         //
+         // TRUE, iff this LpModel considered trivial to solve, specifically,
+         // so trivial that ekkprsl would eliminate the whole problem and
+         // give a severe error.
+
+d379 1
+a379 7
+         // If OSL_VERSION == 2, myOslMgr_ is the OslMgr owned by this LpModel;
+         // otherwise NULL.
+
+      WitOsl3Mgr * myOsl3Mgr_;
+         //
+         // If OSL_VERSION == 3, myOsl3Mgr_ is the Osl3Mgr owned by this
+         // LpModel; otherwise NULL.
+@
+
+
+1.12
+log
+@Continued implementation of opt implosion with OSL V3.
+@
+text
+@d218 4
+@
+
+
+1.11
+log
+@Continued implementation of opt implosion with OSL V3.
+@
+text
+@d230 4
+@
+
+
+1.10
+log
+@Began implementation of optimizing implosion with OSL V3.
+@
+text
+@d164 7
+d190 20
+d221 4
+@
+
+
+1.9
+log
+@More preliminary work on single source.
+@
+text
+@d56 1
+a56 1
+         // (over and about what is automatically done by myOslMgr_).
+d61 1
+a61 1
+         // (over and about what is automatically done by myOslMgr_).
+d357 1
+a357 1
+      WitOslMgr * const myOslMgr_;
+d359 7
+a365 1
+         // The OslMgr which will be used to solve this LpModel.
+@
+
+
+1.8
+log
+@Preliminary work on single source.
+@
+text
+@d381 1
+a381 1
+      WitDenseList (WitCoeff) curConCoeffs_;
+@
+
+
+1.7
+log
+@Preliminary work on single source.
+@
+text
+@a24 1
+// This is an ABC.
+d153 3
+a155 3
+            WitVector (long) &   oslMrow,
+            WitVector (long) &   oslMcol,
+            WitVector (double) & oslDels)
+@
+
+
+1.6
+log
+@More templates.
+@
+text
+@d72 2
+a73 2
+      accessFunc (const WitList (WitLpVar) &, myLpVars)
+      accessFunc (const WitList (WitLpCon) &, myLpCons)
+d178 1
+a178 1
+            const WitList (WitModelEl) & theModelEls)
+d305 1
+a305 1
+      void generateBounds (const WitList (WitModelEl) & theModelEls) const;
+d362 1
+a362 1
+      WitList (WitLpVar) myLpVars_;
+d366 1
+a366 1
+      WitList (WitLpCon) myLpCons_;
+d370 1
+a370 1
+      WitList (WitLpObj) myLpObjs_;
+d405 1
+a405 1
+      WitList (WitCoeff) screenedCoeffs_;
+@
+
+
+1.5
+log
+@Some minor changes.
+@
+text
+@d387 1
+a387 1
+      WitPtrVec (WitCoeff) varLastCoeff_;
+d397 1
+a397 1
+      WitPtrVec (WitBoundPair) varPreScreenBounds_;
+d401 1
+a401 1
+      WitPtrVec (WitBoundPair) conPreScreenBounds_;
+@
+
+
+1.4
+log
+@Refactoring for selection splitting.
+@
+text
+@d20 1
+d397 1
+a397 1
+      WitRefVector (WitBoundPair) varPreScreenBounds_;
+d401 1
+a401 1
+      WitRefVector (WitBoundPair) conPreScreenBounds_;
+d424 1
+a424 1
+   return varPreScreenBounds_[theVar->index ()];
+d433 1
+a433 1
+   return conPreScreenBounds_[theCon->index ()];
+@
+
+
+1.3
+log
+@Continued implementation of stock reallocation.
+Added emptyFss development control parameter.
+@
+text
+@d275 1
+a275 3
+      copyCtorAndAssignment (WitLpModel);
+         //
+         // Prevents unintentional copying and assignment.
+d297 1
+a297 1
+         return (WitCoeff * &) varLastCoeffTl_[theVar->index ()];
+d304 1
+a304 1
+      void generateBounds (const WitList (WitModelEl) theModelEls) const;
+d386 1
+a386 1
+      WitVector (WitTypelessPtr) varLastCoeffTl_;
+d388 1
+a388 1
+         // (WitCoeff *) varLastCoeffTl_[theVar->index ()] is the most recently
+@
+
+
+1.2
+log
+@Updating wit/src in /u/wit/devbase to be in synch with /u/implode/devbase
+@
+text
+@d27 1
+a27 1
+class WitLpModel
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+@
+
+
+1.1.1.1
+log
+@Import wit
+@
+text
+@@

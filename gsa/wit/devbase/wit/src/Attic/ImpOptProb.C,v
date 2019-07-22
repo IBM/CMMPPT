@@ -1,0 +1,1588 @@
+head	1.14;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.14
+date	2007.06.22.19.04.03;	author rjw;	state dead;
+branches;
+next	1.13;
+
+1.13
+date	2007.06.07.17.08.58;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2007.05.30.21.02.10;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2007.03.09.17.01.34;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.03.09.15.56.35;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.03.08.17.02.54;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.03.02.22.11.01;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.02.28.22.15.48;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.01.30.22.33.08;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.10.12.18.43.50;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.10.03.15.08.58;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.09.29.18.40.58;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.08.18.22.29.00;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.08.18.18.43.37;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.14
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "ImpOptProb.C"
+//
+// Implementation of the following classes:
+//
+//    ImpOptProb
+//    ExecPerMgr
+//    ExecPerItr
+//------------------------------------------------------------------------------
+
+#include <ImpOptProb.h>
+#include <ExecPerItr.h>
+#include <OptImp.h>
+#include <PerVar.h>
+#include <PerCon.h>
+#include <OptObjs.h>
+#include <OptComp.h>
+#include <Global.h>
+#include <Material.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <BoundSet.h>
+#include <Timing.h>
+#include <Session.h>
+#include <MsgFac.h>
+
+#include <float.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class ImpOptProb.
+//------------------------------------------------------------------------------
+
+const double WitImpOptProb::solnEpsilon = 0.0005;
+
+//------------------------------------------------------------------------------
+
+WitImpOptProb::WitImpOptProb (WitProblem * theProblem):
+
+      WitOptProb    (theProblem),
+
+      myBoundsObj_  (NULL),
+      myPrimaryObj_ (NULL),
+      myObj1Obj_    (NULL),
+      myRevObj_     (NULL),
+      myInvObj_     (NULL),
+      myServObj_    (NULL),
+      mySubObj_     (NULL),
+      myObj2Obj_    (NULL),
+
+      nSlbvVars_    (0),
+      solnFile_     (NULL),
+      myExecPerMgr_ (NULL)
+   {
+   myExecPerMgr_ = new WitExecPerMgr (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitImpOptProb::~WitImpOptProb ()
+   {
+   delete myExecPerMgr_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitImpOptProb::needDual ()
+   {
+   if (myCompMgr ()->myOptComp ()->compPrices ())
+      return true;
+
+   if (myCompMgr ()->myGlobalComp ()->computeCriticalList ())
+      return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::reportInfeasible ()
+   {
+   if (positiveHardLBsExist ())
+      myMsgFac () ("optImpInfeasSmsg");
+
+   if (disallowedScrapExists ())
+      myMsgFac () ("optImpInfeasSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::reportUnbounded ()
+   {
+   if (myCompMgr ()->myOptComp ()->objChoice ()->negativeObj1CostsExist ())
+      myMsgFac () ("unboundedSmsg");
+   }
+
+//------------------------------------------------------------------------------
+// storeDerived functions.
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitScrapVar * theScrapVar)
+   {
+   insertInto (myScrapVar_, theScrapVar->myPart (), theScrapVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitNonSubVar * theNonSubVar)
+   {
+   insertInto (myNonSubVar_, theNonSubVar->myBomEnt (), theNonSubVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitSubVar * theSubVar)
+   {
+   insertInto (mySubVar_, theSubVar->mySub (), theSubVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitShipVar * theShipVar)
+   {
+   insertInto (myShipVar_, theShipVar->myDemand (), theShipVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitSlbvVar * theSlbvVar)
+   {
+   insertInto (mySlbvVar_, theSlbvVar->myBoundSet (), theSlbvVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitExecVar * theExecVar)
+   {
+   insertInto (myExecVar_, theExecVar->myOperation (), theExecVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitStockVar * theStockVar)
+   {
+   insertInto (myStockVar_, theStockVar->myMaterial (), theStockVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitCumShipVar * theCumShipVar)
+   {
+   insertInto (myCumShipVar_, theCumShipVar->myDemand (), theCumShipVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitResourceCon * theResourceCon)
+   {
+   insertInto (myResourceCon_, theResourceCon->myPart (), theResourceCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitSubCon * theSubCon)
+   {
+   insertInto (mySubCon_, theSubCon->myBomEnt (), theSubCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitShipCon * theShipCon)
+   {
+   insertInto (myShipCon_, theShipCon->myDemand (), theShipCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeDerived (WitSlbCon * theSlbCon)
+   {
+   insertInto (mySlbCon_, theSlbCon->myBoundSet (), theSlbCon);
+   }
+
+//------------------------------------------------------------------------------
+// OptProbEl look-up functions.
+//------------------------------------------------------------------------------
+
+WitScrapVar * WitImpOptProb::myScrapVar (WitPart * thePart, WitPeriod thePer)
+   {
+   return lookUp (myScrapVar_, thePart, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitNonSubVar * WitImpOptProb::myNonSubVar (
+      WitBomEntry * theBomEnt,
+      WitPeriod     thePer)
+   {
+   return lookUp (myNonSubVar_, theBomEnt, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSubVar * WitImpOptProb::mySubVar (WitSubEntry * theSub, WitPeriod thePer)
+   {
+   return lookUp (mySubVar_, theSub, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitShipVar * WitImpOptProb::myShipVar (WitDemand * theDemand, WitPeriod thePer)
+   {
+   return lookUp (myShipVar_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitExecVar * WitImpOptProb::myExecVar (WitOperation * theOpn, WitPeriod thePer)
+   {
+   return lookUp (myExecVar_, theOpn, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStockVar * WitImpOptProb::myStockVar (WitMaterial * theMat, WitPeriod thePer)
+   {
+   return lookUp (myStockVar_, theMat, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitCumShipVar * WitImpOptProb::myCumShipVar (
+      WitDemand * theDemand,
+      WitPeriod   thePer)
+   {
+   return lookUp (myCumShipVar_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitResourceCon * WitImpOptProb::myResourceCon (WitPart * thePart, WitPeriod thePer)
+   {
+   return lookUp (myResourceCon_, thePart, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSubCon * WitImpOptProb::mySubCon (WitBomEntry * theBomEnt, WitPeriod thePer)
+   {
+   return lookUp (mySubCon_, theBomEnt, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitShipCon * WitImpOptProb::myShipCon (WitDemand * theDemand, WitPeriod thePer)
+   {
+   return lookUp (myShipCon_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbvVar * WitImpOptProb::mySlbvVar (const WitBoundedVar * theBoundedVar)
+   {
+   return
+      lookUp (
+         mySlbvVar_,
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbCon * WitImpOptProb::mySlbCon (const WitBoundedVar * theBoundedVar)
+   {
+   return
+      lookUp (
+         mySlbCon_,
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printItem (WitNode * theNode)
+   {
+   fprintf (
+      optProbFile (),
+      itemFormat (),
+      theNode->nodeName ().myCstring (),
+      "",
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printItem (WitBomEntry * theBomEnt)
+   {
+   fprintf (optProbFile (), itemFormat (),
+      theBomEnt->myOperationName ().myCstring (),
+      theBomEnt->myPartName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printItem (WitSubEntry * theSub)
+   {
+   fprintf (optProbFile (), itemFormat (),
+      theSub->myOperationName ().myCstring (),
+      theSub->myBomEnt ()->myPartName ().myCstring (),
+      theSub->myPartName ().myCstring ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printItem (WitDemand * theDemand)
+   {
+   fprintf (optProbFile (), itemFormat (),
+      theDemand->demandedPartName ().myCstring (),
+      theDemand->demandName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printItem (const WitBoundedVar * theBoundedVar)
+   {
+   fprintf (optProbFile (),
+      " Var #%-7d BS #%-8d %-12s",
+      theBoundedVar->index (),
+      theBoundedVar->myBoundSet ()->mappingIndex (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::storeBoundedVar (WitBoundedVar * theBoundedVar)
+   {
+   myBoundedVars_.append (theBoundedVar);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitImpOptProb::slbvVarsExist ()
+   {
+   return (nSlbvVars_ > 0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printPeriod (WitPeriod t)
+   {
+   fprintf (optProbFile (), periodDFormat (), t);
+   }
+
+//------------------------------------------------------------------------------
+// writeSoln prints out the primal solution from wit data structures.
+// Optionally prints the dual solution for resource allocation constraints.
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writeSoln (const WitString & fName)
+   {
+   WitTimer::enterSection ("extra");
+
+   myMsgFac () ("writeOptSolnMsg");
+
+   solnFile_ = openFile (fName.myCstring (), "w");
+
+   myProblem ()->mySession ()->writeHeading (solnFile ());
+
+   writePartSoln       ();
+   writeOperationSoln  ();
+   writeSubEntrySoln   ();
+   writeDemandSoln     ();
+   writeBoundedVarSoln ();
+
+   fclose (solnFile ());
+
+   solnFile_ = NULL;
+
+   WitTimer::leaveSection ("extra");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::generateVariables ()
+   {
+   WitPart *       thePart;
+   WitMaterial *   theMat;
+   WitOperation *  theOpn;
+   WitBomEntry *   theBomEnt;
+   WitSubEntry *   theSub;
+   WitDemand *     theDemand;
+   WitBoundedVar * theBoundedVar;
+   WitPeriod       thePer;
+
+   forEachMaterial (theMat, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theMat->canStock (thePer))
+            new WitStockVar (theMat, thePer, this);
+
+   forEachPart (thePart, myProblem ())
+      if (thePart->scrapAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitScrapVar (thePart, thePer, this);
+
+   forEachOperation (theOpn, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theOpn->executable ()[thePer])
+            new WitExecVar (theOpn, thePer, this);
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theBomEnt->hasSubsInEffect ()[thePer])
+            new WitNonSubVar (theBomEnt, thePer, this);
+
+   forEachSubEntry (theSub, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theSub->inEffect (thePer))
+            new WitSubVar (theSub, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         new WitShipVar (theDemand, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitCumShipVar (theDemand, thePer, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (theBoundedVar->needsAnSlbvVar ())
+         {
+         new WitSlbvVar (theBoundedVar, this);
+
+         ++ nSlbvVars_;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::generateConstraints ()
+   {
+   WitPart *       thePart;
+   WitBomEntry *   theBomEnt;
+   WitDemand *     theDemand;
+   WitPeriod       thePer;
+   WitBoundedVar * theBoundedVar;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         new WitResourceCon (thePart, thePer, this);
+
+   if (myCompMgr ()->hasSubEntries ())
+      forEachBomEntry (theBomEnt, myProblem ())
+         forEachPeriod (thePer, myProblem ())
+            if (theBomEnt->hasSubsInEffect ()[thePer])
+               new WitSubCon (theBomEnt, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitShipCon (theDemand, thePer, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (mySlbvVar (theBoundedVar) != NULL)
+         new WitSlbCon (theBoundedVar, this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptObj * WitImpOptProb::generateObjectives ()
+   {
+   if (slbvVarsExist ())
+      myBoundsObj_ = new WitBoundsObj (this);
+
+   if (myCompMgr ()->myOptComp ()->myObjFunc1 ()->isChosen ())
+      {
+      myPrimaryObj_ = new WitPrimaryObj (this);
+         myObj1Obj_ = new    WitObj1Obj (this);
+
+      return myObj1Obj ();
+      }
+
+   if (myCompMgr ()->myOptComp ()->myObjFunc2 ()->isChosen ())
+      {
+       myRevObj_ = new  WitRevObj (this);
+       myInvObj_ = new  WitInvObj (this);
+      myServObj_ = new WitServObj (this);
+       mySubObj_ = new  WitSubObj (this);
+      myObj2Obj_ = new WitObj2Obj (this);
+
+      return myObj2Obj ();
+      }
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::postGenFixed ()
+   {
+   delete myExecPerMgr_;
+
+   myExecPerMgr_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printOptProbElHeading ()
+   {
+   fprintf (optProbFile (), "Index    Class       ");
+
+   fprintf (optProbFile (), itemFormat (),   "Item", "Item", "Item");
+   fprintf (optProbFile (), periodSFormat (), "Per");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::displayDerived ()
+   {
+   int nBSSpec;
+
+   nBSSpec = myCompMgr ()->nBoundSetsSpecified ();
+
+   if (nBSSpec > 0)
+      myMsgFac () ("boundCountsMsg",
+         nBSSpec,
+         myBoundedVars_.nElements (),
+         nSlbvVars_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printDerived ()
+   {
+   printBoundedVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::initDepVars ()
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+   double          newPrimalVal;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbvVar = mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         newPrimalVal = 
+            positivePart (
+               theBoundedVar->softLB () - theBoundedVar->primalValue ());
+
+         theSlbvVar->setPrimalValue (newPrimalVal);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::doScreening ()
+   {
+   if (myOptComp ()->printOptProb ())
+      saveBounds ();
+
+   screenImpCons ();
+
+   relaxCumShipNonNeg ();
+
+   screenSlbOptProbEls ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writePeSoln (const WitOptProbEl * theOptProbEl)
+   {
+   double valJ;
+
+   valJ =
+      (theOptProbEl == NULL)?
+         0.0:
+         theOptProbEl->solnValue ();
+
+   if (fabs (valJ) > solnEpsilon)
+      fprintf (solnFile (), "%13.3f  ", valJ);
+   else
+      fprintf (solnFile (), "               ");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writePartSoln ()
+   {
+   WitPart *     thePart;
+   WitMaterial * theMat;
+   WitPeriod     t;
+
+   forEachPart (thePart, myProblem ())
+      {
+      fprintf (
+         solnFile (),
+         "\nPart %s:\n",
+         thePart->partName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period      Inventory          Scrap");
+
+      if (needDual ())
+         fprintf (solnFile (), "   Shadow Price");
+
+      fprintf (solnFile (), "\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         theMat = thePart->thisMat ();
+
+         writePeSoln (
+            (theMat != NULL)?
+               myStockVar (theMat, t):
+               NULL);
+
+         writePeSoln (myScrapVar (thePart, t));
+
+         if (needDual ())
+            writePeSoln (myResourceCon (thePart, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writeOperationSoln ()
+   {
+   WitOperation * theOpn;
+   WitPeriod      thePer;
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nOperation %s:\n",
+         theOpn->operationName ().myCstring ());
+
+      fprintf (solnFile (), "Period      Execution\n");
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", thePer);
+
+         writePeSoln (myExecVar (theOpn, thePer));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writeSubEntrySoln ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitPeriod t;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      if (not theBomEnt->mySubEntries ().isEmpty ())
+         {
+         fprintf (solnFile (),
+            "\n"
+            "Consuming Operation: %s,  Part Replaced: %s,  BOM Entry #%d:\n"
+            "\n",
+            theBomEnt->myOperationName ().myCstring (),
+            theBomEnt->myPartName ().myCstring (),
+            theBomEnt->localIndex ());
+
+         fprintf (solnFile (), "Period        Non-Sub\n");
+
+         forEachPeriod (t, myProblem ())
+            if (theBomEnt->inEffect (t))
+               {
+               fprintf (solnFile (), "   %3d  ", t);
+
+               writePeSoln (myNonSubVar (theBomEnt, t));
+
+               fprintf (solnFile (), "\n");
+               }
+
+         fprintf (solnFile (),
+            "\n"
+            "Period  Substitute       Sub #   Substitution\n");
+
+         forEachPeriod (t, myProblem ())
+            forEachEl (theSub, theBomEnt->mySubEntries ())
+               if (theSub->inEffect (t))
+                  {
+                  fprintf (solnFile (),
+                     "   %3d  %-12s  %8d  ",
+                     t,
+                     theSub->myPartName ().myCstring (),
+                     theSub->localIndex ());
+
+                  writePeSoln (mySubVar (theSub, t));
+
+                  fprintf (solnFile (), "\n");
+                  }
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writeDemandSoln ()
+   {
+   WitDemand * theDemand;
+   WitPeriod t;
+
+   forEachDemand (theDemand, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nPart %s,  Demand %s:\n",
+         theDemand->demandedPartName ().myCstring (),
+         theDemand->demandName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period       Shipment       Cum Ship\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         writePeSoln (myShipVar    (theDemand, t));
+         writePeSoln (myCumShipVar (theDemand, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::writeBoundedVarSoln ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (solnFile (),
+      "\n\nVar Index"
+      "   Hard LB"
+      "   Soft LB"
+      " Violation"
+      "     Value"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Item, typename DerOptProbEl>
+      void WitImpOptProb::insertInto (
+         WitPtrSched <Item, DerOptProbEl> & thePtrSched,
+         const Item *                       theItem,
+         DerOptProbEl *                     theDerOptProbEl)
+   {
+   if (thePtrSched.domainSize () == 0)
+      thePtrSched.allocate1D (myProblem ());
+
+   if (thePtrSched.myPtrTVecAt (theItem).length () == 0)
+       thePtrSched.myPtrTVecAt (theItem).allocate (myProblem ());
+
+   witAssert (
+      thePtrSched.myPtrAt (theItem, theDerOptProbEl->myPeriod ()) == NULL);
+
+   thePtrSched.myPtrAt (theItem, theDerOptProbEl->myPeriod ()) =
+      theDerOptProbEl;
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Item, typename DerOptProbEl>
+      DerOptProbEl * WitImpOptProb::lookUp (
+         WitPtrSched <Item, DerOptProbEl> & thePtrSched,
+         const Item *                       theItem,
+         WitPeriod                          thePer)
+   {
+   if (thePtrSched.domainSize () == 0)
+      return NULL;
+
+   if (thePtrSched.myPtrTVecAt (theItem).length () == 0)
+      return NULL;
+
+   return thePtrSched.myPtrAt (theItem, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::screenImpCons ()
+   {
+   WitPart * thePart;
+   WitDemand * theDemand;
+   WitPeriod t;
+   int nVarsFixed = 0; // # variables fixed.
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myResourceCon (thePart, t));
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myShipCon (theDemand, t));
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nVarsFixedMsg", nVarsFixed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::relaxCumShipNonNeg ()
+   {
+   WitDemand *     theDemand;
+   WitPeriod       thePer;
+   WitCumShipVar * theCumShipVar;
+   int             nRelaxed;
+
+   nRelaxed = 0;
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            {
+            theCumShipVar = myCumShipVar (theDemand, thePer);
+
+            if (theCumShipVar->bounds ().upper () > 0.0)
+               if (theCumShipVar->bounds ().lower () == 0.0)
+                  {
+                  theCumShipVar->bounds ().lower () = - DBL_MAX;
+
+                  ++ nRelaxed;
+                  }
+            }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nCshipRelaxedMsg", nRelaxed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::screenSlbOptProbEls ()
+   {
+   WitBoundedVar * theBoundedVar;
+   WitSlbCon *     theSlbCon;
+   int             nScreened = 0;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbCon = mySlbCon (theBoundedVar);
+
+      if (theSlbCon != NULL)
+         if (theBoundedVar->softLB () <=
+             theBoundedVar->hardLB () + FLOAT_EPSILON)
+            {
+            theSlbCon->bounds ().lower () = - DBL_MAX;
+
+            mySlbvVar (theBoundedVar)->bounds ().upper () = 0.0;
+
+            ++ nScreened;
+            }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nSlbScreenedMsg", nScreened);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitImpOptProb::positiveHardLBsExist ()
+   {
+   WitMaterial *  theMat;
+   WitDemand *    theDemand;
+   WitOperation * theOpn;
+
+   forEachMaterial (theMat, myProblem ())
+      if (theMat->stockBounds ()->hasPositiveHardLB ())
+         return true;
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->cumShipBounds ()->hasPositiveHardLB ())
+         return true;
+
+   forEachOperation (theOpn, myProblem ())
+      if (theOpn->execBounds ()->hasPositiveHardLB ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitImpOptProb::disallowedScrapExists ()
+   {
+   WitPart * thePart;
+
+   forEachPart (thePart, myProblem ())
+      if (not thePart->scrapAllowed ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitImpOptProb::printBoundedVars ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (optProbFile (),
+      "\n\n"
+      "Bound Data\n"
+      "===== ====\n\n\n");
+
+   fprintf (optProbFile (),
+      "# Bounded Variables: %8d\n",   myBoundedVars_.nElements ());
+
+   fprintf (optProbFile (), "# Slbv Variables:    %8d\n\n", nSlbvVars_);
+
+   fprintf (optProbFile (),
+        "Variable"
+      "   Hard LB"
+      "   Soft LB"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printBoundInfo ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ExecPerMgr.
+//------------------------------------------------------------------------------
+
+WitExecPerMgr::WitExecPerMgr (WitProblem * theProblem):
+
+      WitProbAssoc      (theProblem),
+      firstEPIndex_     (theProblem),
+      execPeriod_       (theProblem),
+      tempNExecPeriods_ (theProblem, 0),
+      tempExecPeriod_   (theProblem)
+   {
+   WitPeriod     thePer;
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitBopEntry * theBopEnt;
+
+   forEachPeriod (thePer, myProblem ())
+      tempExecPeriod_[thePer] = new WitVector <WitPeriod> (nPeriods (), 0);
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      compExecPeriod (theBomEnt);
+
+   forEachSubEntry (theSub, myProblem ())
+      compExecPeriod (theSub);
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      compExecPeriod (theBopEnt);
+
+   forEachPeriod (thePer, myProblem ())
+      delete tempExecPeriod_[thePer];
+
+   tempExecPeriod_  .clear ();
+   tempNExecPeriods_.clear ();
+
+   if (myOptComp ()->printOptProb ())
+      print ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitExecPerMgr::~WitExecPerMgr ()
+   {
+   WitBopEntry * theBopEnt;
+   WitSubEntry * theSub;
+   WitBomEntry * theBomEnt;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      delete & execPeriod_   (theBopEnt);
+      delete & firstEPIndex_ (theBopEnt);
+      }
+
+   forEachSubEntry (theSub, myProblem ())
+      {
+      delete & execPeriod_   (theSub);
+      delete & firstEPIndex_ (theSub);
+      }
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      delete & execPeriod_   (theBomEnt);
+      delete & firstEPIndex_ (theBomEnt);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitExecPerMgr::hasNextExecPer (
+      WitBillEntry * theBillEnt,
+      WitPeriod      impactPer,
+      int &          theIndex,
+      WitPeriod &    execPer)
+   {
+   bool execPerFound;
+
+   if (theIndex < 0)
+      theIndex = firstEPIndex_ (theBillEnt)[impactPer];
+   else
+      theIndex ++;
+
+   execPerFound = (theIndex < firstEPIndex_ (theBillEnt)[impactPer + 1]);
+
+   execPer = 
+      execPerFound?
+         execPeriod_ (theBillEnt)[theIndex]:
+         -1;
+
+   return execPerFound;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitExecPerMgr::compExecPeriod (WitBillEntry * theBillEnt)
+   {
+   WitPeriod execPer;
+   WitPeriod impactPer;
+   int       localIdx;
+   int       theEPIndex;
+   int       totNExecPeriods;
+
+   totNExecPeriods   = 0;
+   tempNExecPeriods_ = 0;
+
+   for (execPer = lastPeriod (); execPer >= 0; execPer --)
+      if (theBillEnt->inEffect (execPer))
+         {
+         impactPer = theBillEnt->impactPeriod ()[execPer];
+
+         totNExecPeriods ++;
+
+         localIdx = tempNExecPeriods_[impactPer] ++;
+
+         tempExecPeriod_ (impactPer)[localIdx] = execPer;
+         }
+
+   firstEPIndex_.setMapFor (theBillEnt, * new WitVector <int>);
+   execPeriod_  .setMapFor (theBillEnt, * new WitVector <WitPeriod>);
+
+   firstEPIndex_ (theBillEnt).resize (nPeriods () + 1, 0);
+   execPeriod_   (theBillEnt).resize (totNExecPeriods, 0);
+
+   theEPIndex = 0;
+
+   forEachPeriod (impactPer, myProblem ())
+      {
+      firstEPIndex_ (theBillEnt)[impactPer] = theEPIndex;
+
+      for ( localIdx = 0; 
+            localIdx < tempNExecPeriods_[impactPer]; 
+            localIdx ++)
+         {
+         execPeriod_ (theBillEnt)[theEPIndex ++] = 
+            tempExecPeriod_ (impactPer)[localIdx];
+         }
+      }
+
+   firstEPIndex_ (theBillEnt)[nPeriods ()] = theEPIndex;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitExecPerMgr::print ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitBopEntry * theBopEnt;
+
+   fprintf (msgFile (),
+      "\n"
+      "Execution Periods:\n");
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "Operation %s, BOM Entry #%d:\n",
+         theBomEnt->myOperationName ().myCstring (),
+         theBomEnt->localIndex ());
+
+      print (theBomEnt);
+      }
+
+   forEachSubEntry (theSub, myProblem ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "Operation %s, BOM Entry #%d, Substitute #%d:\n",
+         theSub->myOperationName ().myCstring (),
+         theSub->myBomEntIndex (),
+         theSub->localIndex ());
+
+      print (theSub);
+      }
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      fprintf (msgFile (),
+         "\n"
+         "Operation %s, BOP Entry #%d:\n",
+         theBopEnt->myOperationName ().myCstring (),
+         theBopEnt->localIndex ());
+
+      print (theBopEnt);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitExecPerMgr::print (WitBillEntry * theBillEntry)
+   {
+   WitPeriod     impactPer;
+   WitExecPerItr theExecPerItr (this);
+
+   fprintf (msgFile (),
+      "   Impact  Execution\n"
+      "   Period     Period\n");
+
+   forEachPeriod (impactPer, myProblem ())
+      for (theExecPerItr (theBillEntry, impactPer); ++ theExecPerItr;)
+         {
+         fprintf (msgFile (),
+            " %8d   %8d\n",
+            impactPer,
+            theExecPerItr ());
+         }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ExecPerItr.
+//------------------------------------------------------------------------------
+
+WitExecPerItr::WitExecPerItr (WitExecPerMgr * theExecPerMgr):
+
+      myExecPerMgr_ (theExecPerMgr),
+      myBillEntry_  (NULL),
+      impactPeriod_ (-1),
+      myIndex_      (-1),
+      execPeriod_   (-1)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitExecPerItr::~WitExecPerItr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitExecPerItr::operator () (WitBillEntry * theBillEnt, WitPeriod impactPer)
+   {
+   myBillEntry_  = theBillEnt;
+   impactPeriod_ = impactPer;
+   myIndex_      = -1;
+   execPeriod_   = -1;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitExecPerItr::operator ++ ()
+   {
+   witAssert (myBillEntry_ != NULL);
+
+   return 
+      myExecPerMgr_->
+         hasNextExecPer (
+            myBillEntry_,
+            impactPeriod_,
+            myIndex_,
+            execPeriod_);
+   }
+@
+
+
+1.13
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.12
+log
+@Stochastic Implosion
+@
+text
+@d45 2
+a47 4
+// Definitions of static data members.
+//------------------------------------------------------------------------------
+
+const double WitImpOptProb::solnEpsilon = 0.0005;
+d49 1
+a49 1
+WitImpOptProb::WitImpOptProb (WitOptImploder * theOptImploder):
+d51 1
+a51 1
+      WitOptProb    (theOptImploder),
+@
+
+
+1.11
+log
+@[disallowing scrap]
+@
+text
+@d13 5
+a17 1
+// Implementation of class ImpOptProb.
+d21 1
+d42 4
+d65 2
+a66 1
+      solnFile_     (NULL)
+d68 1
+d75 1
+d513 9
+d955 253
+@
+
+
+1.10
+log
+@[disallowed scrap]
+@
+text
+@d84 4
+a87 1
+      myMsgFac () ("infeasBoundsSmsg");
+d897 13
+@
+
+
+1.9
+log
+@[disallowed backlog]
+@
+text
+@d400 3
+a402 2
+      forEachPeriod (thePer, myProblem ())
+         new WitScrapVar (thePart, thePer, this);
+d569 3
+a571 1
+   const double valJ =
+@
+
+
+1.8
+log
+@[disallowed backlog]
+@
+text
+@d423 1
+a423 1
+      if (theDemand->backlogAllowed ())
+d457 1
+a457 1
+      if (theDemand->backlogAllowed ())
+d820 1
+a820 1
+      if (theDemand->backlogAllowed ())
+@
+
+
+1.7
+log
+@[disallowed backlog]
+@
+text
+@d423 1
+a423 1
+      if (not theDemand->disallowBacklog ())
+d457 1
+a457 1
+      if (not theDemand->disallowBacklog ())
+d820 1
+a820 1
+      if (not theDemand->disallowBacklog ())
+@
+
+
+1.6
+log
+@[backlog avoidance]
+@
+text
+@d423 1
+a423 1
+      if (theDemand->backlogAllowed ())
+d457 1
+a457 1
+      if (theDemand->backlogAllowed ())
+d820 1
+a820 1
+      if (theDemand->backlogAllowed ())
+@
+
+
+1.5
+log
+@External opt implosion.
+@
+text
+@d423 3
+a425 2
+      forEachPeriod (thePer, myProblem ())
+         new WitCumShipVar (theDemand, thePer, this);
+d457 3
+a459 2
+      forEachPeriod (thePer, myProblem ())
+         new WitShipCon (theDemand, thePer, this);
+d812 2
+a813 2
+   WitDemand * theDemand;
+   WitPeriod t;
+d815 3
+a817 1
+   int nRelaxed = 0;
+d820 4
+a823 3
+      forEachPeriod (t, myProblem ())
+         {
+         theCumShipVar = myCumShipVar (theDemand, t);
+d825 4
+a828 4
+         if (theCumShipVar->bounds ().upper () > 0.0)
+            if (theCumShipVar->bounds ().lower () == 0.0)
+               {
+               theCumShipVar->bounds ().lower () = - DBL_MAX;
+d830 3
+a832 3
+               ++ nRelaxed;
+               }
+         }
+@
+
+
+1.4
+log
+@App controlled opt implosion.
+@
+text
+@a340 14
+void WitImpOptProb::doScreening ()
+   {
+   if (myOptComp ()->printOptProb ())
+      saveBounds ();
+
+   screenImpCons ();
+
+   relaxCumShipNonNeg ();
+
+   screenSlbOptProbEls ();
+   }
+
+//------------------------------------------------------------------------------
+
+d550 14
+@
+
+
+1.3
+log
+@App controlled opt implosion.
+@
+text
+@d284 1
+a284 1
+      modelFile (),
+d295 1
+a295 1
+   fprintf (modelFile (), itemFormat (),
+d305 1
+a305 1
+   fprintf (modelFile (), itemFormat (),
+d315 1
+a315 1
+   fprintf (modelFile (), itemFormat (),
+d325 1
+a325 1
+   fprintf (modelFile (),
+d364 1
+a364 1
+   fprintf (modelFile (), periodDFormat (), t);
+d511 1
+a511 1
+   fprintf (modelFile (), "Index    Class       ");
+d513 2
+a514 2
+   fprintf (modelFile (), itemFormat (),   "Item", "Item", "Item");
+   fprintf (modelFile (), periodSFormat (), "Per");
+d564 1
+a564 1
+void WitImpOptProb::writeMeSoln (const WitOptProbEl * theOptProbEl)
+d606 1
+a606 1
+         writeMeSoln (
+d611 1
+a611 1
+         writeMeSoln (myScrapVar (thePart, t));
+d614 1
+a614 1
+            writeMeSoln (myResourceCon (thePart, t));
+d640 1
+a640 1
+         writeMeSoln (myExecVar (theOpn, thePer));
+d673 1
+a673 1
+               writeMeSoln (myNonSubVar (theBomEnt, t));
+d692 1
+a692 1
+                  writeMeSoln (mySubVar (theSub, t));
+d720 2
+a721 2
+         writeMeSoln (myShipVar    (theDemand, t));
+         writeMeSoln (myCumShipVar (theDemand, t));
+d890 1
+a890 1
+   fprintf (modelFile (),
+d895 1
+a895 1
+   fprintf (modelFile (),
+d898 1
+a898 1
+   fprintf (modelFile (), "# Slbv Variables:    %8d\n\n", nSlbvVars_);
+d900 1
+a900 1
+   fprintf (modelFile (),
+@
+
+
+1.2
+log
+@App controlled opt implode.
+@
+text
+@d341 1
+a341 1
+void WitImpOptProb::screenModel ()
+d343 1
+a343 1
+   if (myOptImploder ()->printOptProb ())
+@
+
+
+1.1
+log
+@App controlled opt implosion.
+@
+text
+@a15 6
+//------------------------------------------------------------------------------
+// Please note: the following #includes are placed outside the
+// #ifdef OPT_IMPLODE part of the file, because otherwise, make depend sometimes
+// ignores them in OPT_IMPLODE mode.
+//------------------------------------------------------------------------------
+
+a35 2
+#ifdef OPT_IMPLODE
+
+a909 2
+
+#endif
+@
+

@@ -1,0 +1,486 @@
+head	1.4;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_20_20051222:1.3
+	sce_4_10_30050426:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.2
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2009.12.08.13.58.36;	author ervolina;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.58;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.26.14.25.34;	author fasano;	state Exp;
+branches
+	1.2.2.1;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.54;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.54;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.2.1
+date	2003.01.08.17.43.19;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@more fixes for 6.1
+@
+text
+@#include <mcl/src/mcl.h>
+#include <sce/src/schFSce.h>
+#include <sce/src/scenSceP.h>
+#include <scenario/src/schdDeSt.h>
+#include <sce/src/scDeSce.h>
+#include <scenario/src/sortSchd.h>
+#include <sce/src/scenSce.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/supplySS.h>
+#include <scenario/src/partSchd.h>
+#include <scenario/src/demdSchd.h>
+#include <scenario/src/partSchP.h>
+#include <scenario/src/demdSchP.h>
+#include <scenario/src/zeroTvFS.h>
+
+
+// Create a new sorting part schedule
+LgFrSortingPartScheduleFloatSmartPointer
+  LgFrScheduleFactoryForSce::newPartScheduleFromScratch (const LgFrScheduleDescriptor& desc,
+					       const bool deepCopy,
+					       const bool toPopulate
+					       )
+     const
+{
+  LgFrPartScheduleStrategy *partSS;
+  LgFrFilterStrategy * filterStrategyPtr = 0;
+  LgFrPairCompareFloat * pairComparePtr = 0;
+  bool ascending = true;
+  LgFrScenarioForSceSmartPointer scenario = LgFrScenarioForSceSmartPointer(this->scenario());
+
+//summary schedules for the default set of parts for Sce
+  if ( desc == LGFRInterPlantSupplyVolume ) {
+    partSS = new LgFrSupplyScheduleStrategy (*scenario);
+    partSS->setOfParts(scenario->constSetOfParts(LGFR_INTERPLANT_SET) );
+  }
+  else
+    return LgFrScheduleFactory::newPartScheduleFromScratch(desc, deepCopy, toPopulate);
+
+  LgFrSortingPartScheduleFloatSmartPointer spsf = createPartSched(
+								  *partSS,
+								  filterStrategyPtr,
+								  pairComparePtr,
+								  ascending );
+  if ( toPopulate ) 
+      if ( this->scheduleType(desc,*partSS) == INPUT )
+	  spsf->populate();
+      else {
+	  LgFrLastProblemSolved& lps = this->lastProblemSolved();
+	  if ( lps.imploded() ) spsf->populate();
+      }
+  delete partSS;
+  delete filterStrategyPtr;
+  delete pairComparePtr;
+
+  return spsf;
+}
+
+// Create a new sorting demand schedule
+LgFrSortingDemandScheduleFloatSmartPointer
+  LgFrScheduleFactoryForSce::newDemandScheduleFromScratch(const LgFrScheduleDescriptor& desc,
+						const bool deepCopy,
+						const bool toPopulate
+					       )
+     const
+{
+  LgFrDemandScheduleStrategy *demandSS;
+  LgFrScenarioForSceSmartPointer scenario = LgFrScenarioForSceSmartPointer(this->scenario());
+
+    return LgFrScheduleFactory::newDemandScheduleFromScratch(desc, deepCopy, toPopulate);
+
+}
+
+// ---------------------------------------------------------------------
+// Return the schedule type: INPUT or OUTPUT of implosion run.
+// ---------------------------------------------------------------------
+schdType
+LgFrScheduleFactoryForSce::scheduleType(
+    const LgFrScheduleDescriptor & desc,
+    const LgFrAttributeScheduleStrategy & ass)
+     const
+{
+//A schedule is an input schedule if it can be built prior to implosion.
+//It doesn't matter if you don't have a schedule in here even if it is
+//an input schedule. JP says that the demand volume schedules are actually
+//an output schedule, but since there is no way to tell from wit whether or
+//not an implosion has been done, these are put in here anyway.
+  if ( desc == LGFRSupplyVolume ) return INPUT;	// Doing it this way (instead
+  if ( desc == LGFRDemandVolume ) return INPUT; // of using ||) allows
+						// inlining
+  if ( desc == LGFRMRPManagedSupplyVol ) return INPUT;
+  if ( desc == LGFRMRPManagedRequiredVol ) return INPUT;
+  if ( desc == LGFRMRPManagedCumSupplyVol ) return INPUT;
+  if ( desc == LGFRMRPManagedCumRequiredVol ) return INPUT;
+  if ( desc == LGFRCycleTime )   return INPUT;
+  if ( desc == LGFRFrozenZone )   return INPUT;
+  if ( desc == LGFRProcurementLeadTime ) return INPUT;
+  if ( desc == LGFRPlannerManagedSupplyVol ) return INPUT;
+  if ( desc == LGFRPlannerManagedRequiredVol ) return INPUT;
+  if ( desc == LGFRPlannerManagedCumSupplyVol ) return INPUT;
+  if ( desc == LGFRPlannerManagedCumRequiredVol ) return INPUT;
+  if ( desc == LGFRCapacitySupplyVol ) return INPUT;
+  if ( desc == LGFRCapacityRequiredVol ) return INPUT;
+  if ( desc == LGFRBudgetAmount ) return INPUT;
+
+  if ( desc == LGFRCMRPDemandVol ) return INPUT;
+  if ( desc == LGFRCMRPCommittedDemandVol ) return INPUT;
+  if ( desc == LGFRCMRPTotalCommittedDemandVol ) return INPUT;
+
+  if ( desc == LGFRCMRPTotalMrpProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPTotalWitProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPCumTotalMrpProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPCumTotalWitProcurementCost) return INPUT;
+  if ( desc == LGFRCMRPDeltaCumTotalProcurementCost) return INPUT;
+  if ( desc == LGFRProductionVolumeTimesUnitCost) return INPUT;
+  if ( desc == LGFRProcurementVolumeTimesUnitCost) return INPUT;
+  if ( desc == LGFRRequiredVolumeTimesUnitCost) return INPUT;
+
+  return this->LgFrScheduleFactory::scheduleType(desc,ass);
+}
+
+// Constructor
+LgFrScheduleFactoryForSce::LgFrScheduleFactoryForSce (
+    LgFrScenarioSmartPointer s)
+:   LgFrScheduleFactory(s)
+{
+  // Nothing to do in here
+}
+
+// Clone method
+// Create a copy of the *this on the heap and return a pointer to it
+// Even thought this returns a LgFrScheduleFactory*, the pointer
+// must point to a LgFrScheduleFactoryForSce.
+LgFrScheduleFactory*
+LgFrScheduleFactoryForSce::clone (LgFrScenarioSmartPointer newScenario)
+     const
+{
+  return  new LgFrScheduleFactoryForSce (newScenario);
+}
+
+// Destructor
+LgFrScheduleFactoryForSce::~LgFrScheduleFactoryForSce()
+{
+  // Nothing to do in here
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test this class
+void LgFrScheduleFactoryForSce::test()
+{
+}
+
+
+void
+LgFrScheduleFactoryForSce::contextTest(const LgFrScheduleFactory & f)
+{
+}
+
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@a7 4
+//#include <scenario/src/partSS.h>
+//#include <scenario/src/demVolSS.h>
+//#include <scenario/src/prodSS.h>
+//#include <scenario/src/backlgSS.h>
+a9 12
+//#include <scenario/src/reqSS.h>
+//#include <scenario/src/cumSS.h>
+//#include <scenario/src/costSS.h>
+//#include <scenario/src/shipSS.h>
+//#include <scenario/src/cycleSS.h>
+//#include <scenario/src/excessSS.h>
+//#include <scenario/src/stockSS.h>
+//#include <scenario/src/scrapSS.h>
+//#include <scenario/src/usageSS.h>
+//#include <scenario/src/deltaSS.h>
+//#include <scenario/src/fssSS.h>
+//#include <scenario/src/offsetSS.h>
+a13 5
+//#include <iman/src/onhandSS.h>
+//#include <iman/src/ucostSS.h>
+//#include <iman/src/cumDolSS.h>
+//#include <iman/src/dollarSS.h>
+//#include <scenario/src/tvElemPC.h>
+d15 1
+a15 1
+//#include <sce/src/ptvecPC.h>
+a68 35
+#if 0
+  if ( desc == LGFRDefaultDemandVolume ) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands());
+  }
+
+//        Schedules for the "Master Production Schedule" (demand) window 
+//        -----------------------------------------------------
+  else if ( desc == LGFRCMRPDemandVol) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPShipmentVol) {
+      demandSS = new LgFrShipmentScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPBacklogVol) {
+      demandSS = new LgFrBacklogScheduleStrategy(*scenario);
+  }
+  else if ( desc == LGFRCMRPCommittedDemandVol) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands(LGFR_COMMITTED_DEMAND_SET));
+  }
+  else if ( desc == LGFRNewOpportunityDemandVolume) {
+      demandSS = new LgFrDemandVolumeScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands( LGFR_NEW_OPPORTUNITY_DEMAND_SET ));
+  }
+  else if ( desc == LGFRNewOpportunityShipmentVolume) {
+      demandSS = new LgFrShipmentScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands(LGFR_NEW_OPPORTUNITY_DEMAND_SET));
+  }
+  else if ( desc == LGFRNewOpportunityBacklog) {
+      demandSS = new LgFrBacklogScheduleStrategy(*scenario);
+      demandSS->setOfDemands(scenario->constSetOfDemands(LGFR_NEW_OPPORTUNITY_DEMAND_SET));
+  }
+  else
+#endif
+a70 13
+#if 0
+  LgFrSortingDemandScheduleFloatSmartPointer sdsf = createDemandSched(*demandSS);
+  if ( toPopulate )
+      if ( this->scheduleType(desc,*demandSS) == INPUT )
+	  sdsf->populate();
+      else {
+	  LgFrLastProblemSolved& lps = this->lastProblemSolved();
+	  if ( lps.imploded() ) sdsf->populate();
+      }
+  delete demandSS;
+
+  return sdsf;
+#endif
+a117 34
+#if 0
+  // added for Iman
+  if ( desc == LGFRG1Supply) return INPUT;
+  if ( desc == LGFRG1SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG1SupplyCostSum) return INPUT;
+  if ( desc == LGFRG2Supply) return INPUT;
+  if ( desc == LGFRG2SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG2SupplyCostSum) return INPUT;
+  if ( desc == LGFRG3Supply) return INPUT;
+  if ( desc == LGFRG3SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG3SupplyCostSum) return INPUT;
+  if ( desc == LGFRG4Supply) return INPUT;
+  if ( desc == LGFRG4SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG4SupplyCostSum) return INPUT;
+  if ( desc == LGFRG5Supply) return INPUT;
+  if ( desc == LGFRG5SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG5SupplyCostSum) return INPUT;
+  if ( desc == LGFRG6Supply) return INPUT;
+  if ( desc == LGFRG6SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG6SupplyCostSum) return INPUT;
+  if ( desc == LGFRG7Supply) return INPUT;
+  if ( desc == LGFRG7SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG7SupplyCostSum) return INPUT;
+  if ( desc == LGFRG8Supply) return INPUT;
+  if ( desc == LGFRG8SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG8SupplyCostSum) return INPUT;
+  if ( desc == LGFRG9Supply) return INPUT;
+  if ( desc == LGFRG9SupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRG9SupplyCostSum) return INPUT;
+  if ( desc == LGFRGASupply) return INPUT;
+  if ( desc == LGFRGASupplyTimesUnitCost) return INPUT;
+  if ( desc == LGFRGASupplyCostSum) return INPUT;
+  if ( desc == LGFRDefaultSupplyCostSum) return INPUT;
+#endif
+a158 25
+
+    // Test abbreviation function
+  assert (f.abbreviationOf (LGFRSupplyVolume)
+          != LGFRScrapVolume.abbrev()            );
+  assert (f.abbreviationOf (LGFRSupplyVolume)
+          == LGFRSupplyVolume.abbrev()           );
+  assert (f.abbreviationOf (LGFRDemandVolume)
+          == LGFRDemandVolume.abbrev()           );
+  assert (f.abbreviationOf (LGFRMRPManagedSupplyVol)
+          == LGFRMRPManagedSupplyVol.abbrev()	         );
+
+  // test smart schedule stuff
+  LgFrSortingDemandScheduleFloatSmartPointer shipSchedule =
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+  LgFrSortingDemandScheduleFloatSmartPointer shipSchedule2 =
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+  assert(shipSchedule == shipSchedule2);
+
+
+  LgFrSortingPartScheduleFloatSmartPointer excessSchedule =
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+  LgFrSortingPartScheduleFloatSmartPointer excessSchedule2 =
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+  assert(excessSchedule == excessSchedule2);
+
+@
+
+
+1.2
+log
+@Added include of mcl/src/mcl.h near top of include list to avoid
+compile time problems on AIX which did not occur on Windows.
+
+added
+  implement(RWGVector, float)
+  implement(RWGVector, int)
+to ipSce.C to avoid unresolved symbols at link time
+@
+text
+@d34 1
+a34 1
+#include <scenario/src/tvElemPC.h>
+d41 2
+a42 2
+					       const RWBoolean deepCopy,
+					       const RWBoolean toPopulate
+d47 3
+a49 3
+  LgFrFilterStrategy * filterStrategyPtr = NULL;
+  LgFrPairCompareFloat * pairComparePtr = NULL;
+  RWBoolean ascending = TRUE;
+d82 2
+a83 2
+						const RWBoolean deepCopy,
+						const RWBoolean toPopulate
+a248 5
+void
+LgFrScheduleFactoryForSce::initHashTable ()
+{
+}
+
+d275 1
+a275 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, FALSE);
+d277 1
+a277 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, FALSE);
+d282 1
+a282 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, FALSE);
+d284 1
+a284 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, FALSE);
+@
+
+
+1.2.2.1
+log
+@Roguewave is gone
+@
+text
+@d34 1
+a34 1
+//#include <scenario/src/tvElemPC.h>
+d41 2
+a42 2
+					       const bool deepCopy,
+					       const bool toPopulate
+d47 3
+a49 3
+  LgFrFilterStrategy * filterStrategyPtr = 0;
+  LgFrPairCompareFloat * pairComparePtr = 0;
+  bool ascending = true;
+d82 2
+a83 2
+						const bool deepCopy,
+						const bool toPopulate
+d249 5
+d280 1
+a280 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+d282 1
+a282 1
+      f.newDemandSchedule(LGFRCMRPShipmentVol, false);
+d287 1
+a287 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+d289 1
+a289 1
+      f.newPartSchedule(LGFRPlannerManagedExcessVol, false);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 1
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@

@@ -1,0 +1,1517 @@
+head	1.17;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.17
+date	2011.09.28.23.49.11;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.09.24.00.27.28;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.08.30.20.17.22;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.02.07.15.45.52;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.02.03.00.22.55;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.02.02.00.37.03;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.01.26.23.47.29;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.01.26.21.25.34;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.01.26.00.22.55;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.01.25.21.49.38;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.01.21.00.34.34;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.01.20.21.38.09;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.01.20.00.26.43;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.01.18.23.27.14;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.01.14.00.35.17;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.01.13.00.38.41;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.01.12.23.09.22;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.17
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "CpxParSpec.C"
+//
+// Contains the implementation of the following classes: 
+//
+//    CpxParSpecMgr
+//    CpxParSpec
+//------------------------------------------------------------------------------
+
+#include <CpxParSpecMgr.h>
+#include <CpxParSpec.h>
+#include <DataWrit.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class CpxParSpecMgr.
+//------------------------------------------------------------------------------
+
+WitCpxParSpecMgr::WitCpxParSpecMgr (WitProblem * theProblem):
+
+      WitProbAssoc        (theProblem),
+      myCpxParSpecs_      (),
+      cplexParSpecName_   (defCplexParSpecName   ()),
+      cplexParSpecIntVal_ (defCplexParSpecIntVal ()),
+      cplexParSpecDblVal_ (defCplexParSpecDblVal ()),
+      addingSpecsByVal_   (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParSpecMgr::~WitCpxParSpecMgr ()
+   {
+   clearCpxParSpecs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::setCplexParSpecName (const char * theValue)
+   {
+   witAssert (theValue != NULL);
+
+   myProblem ()->prepSetNonUnpostAttr ();
+
+   cplexParSpecName_ = theValue;
+
+   addingSpecsByVal_ = (cplexParSpecName_ != "NO_PARAM");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::setCplexParSpecIntVal (int theValue)
+   {
+   myProblem ()->prepSetNonUnpostAttr ();
+
+   cplexParSpecIntVal_ = theValue;
+
+   if (addingSpecsByVal_)
+      addIntCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::setCplexParSpecDblVal (double theValue)
+   {
+   myProblem ()->prepSetNonUnpostAttr ();
+
+   cplexParSpecDblVal_ = theValue;
+
+   if (addingSpecsByVal_)
+      addDblCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::addIntCpxParSpec (const char * theName, int theValue)
+   {
+   WitCpxParSpec * theSpec;
+
+   witAssert (not equalCstrings (theName, "NO_PARAM"));
+
+   deleteMatchingCpxParSpec (theName);
+
+   theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+
+   myCpxParSpecs_.append (theSpec);
+
+   myMsgFac () ("addIntCpxParSpecMsg", theName, theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::addDblCpxParSpec (const char * theName, double theValue)
+   {
+   WitCpxParSpec * theSpec;
+
+   witAssert (not equalCstrings (theName, "NO_PARAM"));
+
+   deleteMatchingCpxParSpec (theName);
+
+   theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+
+   myCpxParSpecs_.append (theSpec);
+
+   myMsgFac () ("addDblCpxParSpecMsg", theName, theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParSpec * WitCpxParSpecMgr::findCpxParSpec (const char * theName)
+   {
+   WitCpxParSpec * theSpec;
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      if (theSpec->myName () == theName)
+         return theSpec;
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::clearCpxParSpecs ()
+   {
+   while (not myCpxParSpecs_.isEmpty ())
+      {
+      delete myCpxParSpecs_.get ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::display ()
+   {
+   WitCpxParSpec * theSpec;
+
+   myMsgFac () ("cpxParSpecAttsDdMsg",
+      cplexParSpecName_,
+      cplexParSpecIntVal_,
+      cplexParSpecDblVal_);
+
+   if (myCpxParSpecs_.isEmpty ())
+      return;
+
+   myMsgFac () ("cpxParSpecsHeadDdMsg");
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      theSpec->display ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::copyAttrsFrom (WitCpxParSpecMgr * theCpxParSpecMgr)
+   {
+   WitCpxParSpec * theSpec;
+   WitCpxParSpec * dupSpec;
+
+   cplexParSpecName_   = theCpxParSpecMgr->cplexParSpecName_;
+   cplexParSpecIntVal_ = theCpxParSpecMgr->cplexParSpecIntVal_;
+   cplexParSpecDblVal_ = theCpxParSpecMgr->cplexParSpecDblVal_;
+
+   clearCpxParSpecs ();
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      {
+      dupSpec = new WitCpxParSpec (myProblem (), theSpec);
+
+      myCpxParSpecs_.append (dupSpec);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::writeData ()
+   {
+   WitCpxParSpec * theSpec;
+   WitString       noParam;
+
+   if (myCpxParSpecs_.isEmpty ())
+      if       (cplexParSpecName_   == defCplexParSpecName   ())
+         if    (cplexParSpecIntVal_ == defCplexParSpecIntVal ())
+            if (cplexParSpecDblVal_ == defCplexParSpecDblVal ())
+               return;
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      theSpec->writeData ();
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("problem");
+
+   noParam = "NO_PARAM";
+
+   myDataWriter ()->writeString ("cplexParSpecName",   noParam);
+   myDataWriter ()->writeInt    ("cplexParSpecIntVal", cplexParSpecIntVal_);
+   myDataWriter ()->writeDouble ("cplexParSpecDblVal", cplexParSpecDblVal_);
+
+   myDataWriter ()->writeString ("cplexParSpecName",   cplexParSpecName_,
+                                                       "NO_PARAM");
+
+   myDataWriter ()->writeEndCommand ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpecMgr::deleteMatchingCpxParSpec (const char * theName)
+   {
+   WitCpxParSpec *         matchSpec;
+   WitCpxParSpec *         theSpec;
+   WitList <WitCpxParSpec> unmatchSpecs;
+
+   matchSpec = findCpxParSpec (theName);
+
+   if (matchSpec == NULL)
+      return;
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      if (theSpec != matchSpec)
+         {
+         unmatchSpecs.append (theSpec);
+         }
+
+   myCpxParSpecs_ = unmatchSpecs;
+
+   delete matchSpec;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class CpxParSpec.
+//------------------------------------------------------------------------------
+
+WitCpxParSpec::WitCpxParSpec (
+         WitProblem * theProblem,
+         const char * theName,
+         int          theIntVal):
+
+      WitProbAssoc  (theProblem),
+      myName_       (theName),
+      valTypeIsInt_ (true),
+      myIntVal_     (theIntVal),
+      myDblVal_     (0.0)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParSpec::WitCpxParSpec (
+         WitProblem * theProblem,
+         const char * theName,
+         double       theDblVal):
+
+      WitProbAssoc  (theProblem),
+      myName_       (theName),
+      valTypeIsInt_ (false),
+      myIntVal_     (0),
+      myDblVal_     (theDblVal)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParSpec::WitCpxParSpec (
+      WitProblem *    theProblem,
+      WitCpxParSpec * theSpec):
+
+      WitProbAssoc  (theProblem),
+      myName_       (theSpec->myName_),
+      valTypeIsInt_ (theSpec->valTypeIsInt_),
+      myIntVal_     (theSpec->myIntVal_),
+      myDblVal_     (theSpec->myDblVal_)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParSpec::~WitCpxParSpec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+int WitCpxParSpec::myIntVal () const
+   {
+   witAssert (valTypeIsInt_);
+
+   return myIntVal_;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitCpxParSpec::myDblVal () const
+   {
+   witAssert (not valTypeIsInt_);
+
+   return myDblVal_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpec::display ()
+   {
+   if (valTypeIsInt_)
+      myMsgFac () ("intCpxParSpecDdMsg", myName_, myIntVal_);
+   else
+      myMsgFac () ("dblCpxParSpecDdMsg", myName_, myDblVal_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParSpec::writeData ()
+   {
+   myDataWriter    ()->writeFirstKeyWord ("set");
+   myDataWriter    ()->writeKeyWord      ("problem");
+
+   myDataWriter    ()->writeString       ("cplexParSpecName", myName_);
+
+   if (valTypeIsInt_)
+      myDataWriter ()->writeInt          ("cplexParSpecIntVal", myIntVal_);
+   else
+      myDataWriter ()->writeDouble       ("cplexParSpecDblVal", myDblVal_);
+
+   myDataWriter    ()->writeEndCommand   ();
+   }
+@
+
+
+1.16
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.15
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d13 1
+a13 1
+// Contains the implementation of the following classes:
+d30 8
+a37 8
+WitProbAssoc        (theProblem),
+myCpxParSpecs_      (),
+cplexParSpecName_   (defCplexParSpecName   ()),
+cplexParSpecIntVal_ (defCplexParSpecIntVal ()),
+cplexParSpecDblVal_ (defCplexParSpecDblVal ()),
+addingSpecsByVal_   (false)
+{
+}
+d42 3
+a44 3
+{
+clearCpxParSpecs ();
+}
+d49 2
+a50 2
+{
+witAssert (theValue != NULL);
+d52 1
+a52 1
+myProblem ()->prepSetNonUnpostAttr ();
+d54 1
+a54 1
+cplexParSpecName_ = theValue;
+d56 2
+a57 2
+addingSpecsByVal_ = (cplexParSpecName_ != "NO_PARAM");
+}
+d62 2
+a63 2
+{
+myProblem ()->prepSetNonUnpostAttr ();
+d65 1
+a65 1
+cplexParSpecIntVal_ = theValue;
+d67 3
+a69 3
+if (addingSpecsByVal_)
+addIntCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+}
+d74 2
+a75 2
+{
+myProblem ()->prepSetNonUnpostAttr ();
+d77 1
+a77 1
+cplexParSpecDblVal_ = theValue;
+d79 3
+a81 3
+if (addingSpecsByVal_)
+addDblCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+}
+d86 2
+a87 2
+{
+WitCpxParSpec * theSpec;
+d89 1
+a89 1
+witAssert (not equalCstrings (theName, "NO_PARAM"));
+d91 1
+a91 1
+deleteMatchingCpxParSpec (theName);
+d93 1
+a93 1
+theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+d95 1
+a95 1
+myCpxParSpecs_.append (theSpec);
+d97 2
+a98 2
+myMsgFac () ("addIntCpxParSpecMsg", theName, theValue);
+}
+d103 2
+a104 2
+{
+WitCpxParSpec * theSpec;
+d106 1
+a106 1
+witAssert (not equalCstrings (theName, "NO_PARAM"));
+d108 1
+a108 1
+deleteMatchingCpxParSpec (theName);
+d110 1
+a110 1
+theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+d112 1
+a112 1
+myCpxParSpecs_.append (theSpec);
+d114 2
+a115 2
+myMsgFac () ("addDblCpxParSpecMsg", theName, theValue);
+}
+d120 2
+a121 2
+{
+WitCpxParSpec * theSpec;
+d123 3
+a125 3
+forEachEl (theSpec, myCpxParSpecs_)
+if (theSpec->myName () == theName)
+return theSpec;
+d127 2
+a128 2
+return NULL;
+}
+d133 6
+a138 6
+{
+while (not myCpxParSpecs_.isEmpty ())
+{
+delete myCpxParSpecs_.get ();
+}
+}
+d143 2
+a144 2
+{
+WitCpxParSpec * theSpec;
+d146 13
+a158 13
+myMsgFac () ("cpxParSpecAttsDdMsg",
+cplexParSpecName_,
+cplexParSpecIntVal_,
+cplexParSpecDblVal_);
+
+if (myCpxParSpecs_.isEmpty ())
+return;
+
+myMsgFac () ("cpxParSpecsHeadDdMsg");
+
+forEachEl (theSpec, myCpxParSpecs_)
+theSpec->display ();
+}
+d163 17
+a179 17
+{
+WitCpxParSpec * theSpec;
+WitCpxParSpec * dupSpec;
+
+cplexParSpecName_   = theCpxParSpecMgr->cplexParSpecName_;
+cplexParSpecIntVal_ = theCpxParSpecMgr->cplexParSpecIntVal_;
+cplexParSpecDblVal_ = theCpxParSpecMgr->cplexParSpecDblVal_;
+
+clearCpxParSpecs ();
+
+forEachEl (theSpec, myCpxParSpecs_)
+{
+dupSpec = new WitCpxParSpec (myProblem (), theSpec);
+
+myCpxParSpecs_.append (dupSpec);
+}
+}
+d184 3
+a186 3
+{
+WitCpxParSpec * theSpec;
+WitString       noParam;
+d188 5
+a192 5
+if (myCpxParSpecs_.isEmpty ())
+if       (cplexParSpecName_   == defCplexParSpecName   ())
+if    (cplexParSpecIntVal_ == defCplexParSpecIntVal ())
+if (cplexParSpecDblVal_ == defCplexParSpecDblVal ())
+return;
+d194 2
+a195 2
+forEachEl (theSpec, myCpxParSpecs_)
+theSpec->writeData ();
+d197 2
+a198 2
+myDataWriter ()->writeFirstKeyWord ("set");
+myDataWriter ()->writeKeyWord      ("problem");
+d200 1
+a200 1
+noParam = "NO_PARAM";
+d202 3
+a204 3
+myDataWriter ()->writeString ("cplexParSpecName",   noParam);
+myDataWriter ()->writeInt    ("cplexParSpecIntVal", cplexParSpecIntVal_);
+myDataWriter ()->writeDouble ("cplexParSpecDblVal", cplexParSpecDblVal_);
+d206 2
+a207 2
+myDataWriter ()->writeString ("cplexParSpecName",   cplexParSpecName_,
+"NO_PARAM");
+d209 2
+a210 2
+myDataWriter ()->writeEndCommand ();
+}
+d215 15
+a229 15
+{
+WitCpxParSpec *         matchSpec;
+WitCpxParSpec *         theSpec;
+WitList <WitCpxParSpec> unmatchSpecs;
+
+matchSpec = findCpxParSpec (theName);
+
+if (matchSpec == NULL)
+return;
+
+forEachEl (theSpec, myCpxParSpecs_)
+if (theSpec != matchSpec)
+{
+unmatchSpecs.append (theSpec);
+}
+d231 1
+a231 1
+myCpxParSpecs_ = unmatchSpecs;
+d233 2
+a234 2
+delete matchSpec;
+}
+d241 11
+a251 11
+WitProblem * theProblem,
+const char * theName,
+int          theIntVal):
+
+WitProbAssoc  (theProblem),
+myName_       (theName),
+valTypeIsInt_ (true),
+myIntVal_     (theIntVal),
+myDblVal_     (0.0)
+{
+}
+d256 11
+a266 11
+WitProblem * theProblem,
+const char * theName,
+double       theDblVal):
+
+WitProbAssoc  (theProblem),
+myName_       (theName),
+valTypeIsInt_ (false),
+myIntVal_     (0),
+myDblVal_     (theDblVal)
+{
+}
+d271 2
+a272 2
+WitProblem *    theProblem,
+WitCpxParSpec * theSpec):
+d274 7
+a280 7
+WitProbAssoc  (theProblem),
+myName_       (theSpec->myName_),
+valTypeIsInt_ (theSpec->valTypeIsInt_),
+myIntVal_     (theSpec->myIntVal_),
+myDblVal_     (theSpec->myDblVal_)
+{
+}
+d285 2
+a286 2
+{
+}
+d291 2
+a292 2
+{
+witAssert (valTypeIsInt_);
+d294 2
+a295 2
+return myIntVal_;
+}
+d300 2
+a301 2
+{
+witAssert (not valTypeIsInt_);
+d303 2
+a304 2
+return myDblVal_;
+}
+d309 6
+a314 6
+{
+if (valTypeIsInt_)
+myMsgFac () ("intCpxParSpecDdMsg", myName_, myIntVal_);
+else
+myMsgFac () ("dblCpxParSpecDdMsg", myName_, myDblVal_);
+}
+d319 10
+a328 10
+{
+myDataWriter    ()->writeFirstKeyWord ("set");
+myDataWriter    ()->writeKeyWord      ("problem");
+
+myDataWriter    ()->writeString       ("cplexParSpecName", myName_);
+
+if (valTypeIsInt_)
+myDataWriter ()->writeInt          ("cplexParSpecIntVal", myIntVal_);
+else
+myDataWriter ()->writeDouble       ("cplexParSpecDblVal", myDblVal_);
+d330 2
+a331 2
+myDataWriter    ()->writeEndCommand   ();
+}
+@
+
+
+1.14
+log
+@CPLEX Parameters
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d13 1
+a13 1
+// Contains the implementation of the following classes: 
+d30 8
+a37 8
+      WitProbAssoc        (theProblem),
+      myCpxParSpecs_      (),
+      cplexParSpecName_   (defCplexParSpecName   ()),
+      cplexParSpecIntVal_ (defCplexParSpecIntVal ()),
+      cplexParSpecDblVal_ (defCplexParSpecDblVal ()),
+      addingSpecsByVal_   (false)
+   {
+   }
+d42 3
+a44 3
+   {
+   clearCpxParSpecs ();
+   }
+d49 2
+a50 2
+   {
+   witAssert (theValue != NULL);
+d52 1
+a52 1
+   myProblem ()->prepSetNonUnpostAttr ();
+d54 1
+a54 1
+   cplexParSpecName_ = theValue;
+d56 2
+a57 2
+   addingSpecsByVal_ = (cplexParSpecName_ != "NO_PARAM");
+   }
+d62 2
+a63 2
+   {
+   myProblem ()->prepSetNonUnpostAttr ();
+d65 1
+a65 1
+   cplexParSpecIntVal_ = theValue;
+d67 3
+a69 3
+   if (addingSpecsByVal_)
+      addIntCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+   }
+d74 2
+a75 2
+   {
+   myProblem ()->prepSetNonUnpostAttr ();
+d77 1
+a77 1
+   cplexParSpecDblVal_ = theValue;
+d79 3
+a81 3
+   if (addingSpecsByVal_)
+      addDblCpxParSpec (cplexParSpecName_.myCstring (), theValue);
+   }
+d86 2
+a87 2
+   {
+   WitCpxParSpec * theSpec;
+d89 1
+a89 1
+   witAssert (not equalCstrings (theName, "NO_PARAM"));
+d91 1
+a91 1
+   deleteMatchingCpxParSpec (theName);
+d93 1
+a93 1
+   theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+d95 1
+a95 1
+   myCpxParSpecs_.append (theSpec);
+d97 2
+a98 2
+   myMsgFac () ("addIntCpxParSpecMsg", theName, theValue);
+   }
+d103 2
+a104 2
+   {
+   WitCpxParSpec * theSpec;
+d106 1
+a106 1
+   witAssert (not equalCstrings (theName, "NO_PARAM"));
+d108 1
+a108 1
+   deleteMatchingCpxParSpec (theName);
+d110 1
+a110 1
+   theSpec = new WitCpxParSpec (myProblem (), theName, theValue);
+d112 1
+a112 1
+   myCpxParSpecs_.append (theSpec);
+d114 2
+a115 2
+   myMsgFac () ("addDblCpxParSpecMsg", theName, theValue);
+   }
+d120 2
+a121 2
+   {
+   WitCpxParSpec * theSpec;
+d123 3
+a125 3
+   forEachEl (theSpec, myCpxParSpecs_)
+      if (theSpec->myName () == theName)
+         return theSpec;
+d127 2
+a128 2
+   return NULL;
+   }
+d133 6
+a138 6
+   {
+   while (not myCpxParSpecs_.isEmpty ())
+      {
+      delete myCpxParSpecs_.get ();
+      }
+   }
+d143 2
+a144 2
+   {
+   WitCpxParSpec * theSpec;
+d146 13
+a158 13
+   myMsgFac () ("cpxParSpecAttsDdMsg",
+      cplexParSpecName_,
+      cplexParSpecIntVal_,
+      cplexParSpecDblVal_);
+
+   if (myCpxParSpecs_.isEmpty ())
+      return;
+
+   myMsgFac () ("cpxParSpecsHeadDdMsg");
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      theSpec->display ();
+   }
+d163 17
+a179 17
+   {
+   WitCpxParSpec * theSpec;
+   WitCpxParSpec * dupSpec;
+
+   cplexParSpecName_   = theCpxParSpecMgr->cplexParSpecName_;
+   cplexParSpecIntVal_ = theCpxParSpecMgr->cplexParSpecIntVal_;
+   cplexParSpecDblVal_ = theCpxParSpecMgr->cplexParSpecDblVal_;
+
+   clearCpxParSpecs ();
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      {
+      dupSpec = new WitCpxParSpec (myProblem (), theSpec);
+
+      myCpxParSpecs_.append (dupSpec);
+      }
+   }
+d184 3
+a186 3
+   {
+   WitCpxParSpec * theSpec;
+   WitString       noParam;
+d188 5
+a192 5
+   if (myCpxParSpecs_.isEmpty ())
+      if       (cplexParSpecName_   == defCplexParSpecName   ())
+         if    (cplexParSpecIntVal_ == defCplexParSpecIntVal ())
+            if (cplexParSpecDblVal_ == defCplexParSpecDblVal ())
+               return;
+d194 2
+a195 2
+   forEachEl (theSpec, myCpxParSpecs_)
+      theSpec->writeData ();
+d197 2
+a198 2
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("problem");
+d200 1
+a200 1
+   noParam = "NO_PARAM";
+d202 3
+a204 3
+   myDataWriter ()->writeString ("cplexParSpecName",   noParam);
+   myDataWriter ()->writeInt    ("cplexParSpecIntVal", cplexParSpecIntVal_);
+   myDataWriter ()->writeDouble ("cplexParSpecDblVal", cplexParSpecDblVal_);
+d206 2
+a207 2
+   myDataWriter ()->writeString ("cplexParSpecName",   cplexParSpecName_,
+                                                       "NO_PARAM");
+d209 2
+a210 2
+   myDataWriter ()->writeEndCommand ();
+   }
+d215 15
+a229 15
+   {
+   WitCpxParSpec *         matchSpec;
+   WitCpxParSpec *         theSpec;
+   WitList <WitCpxParSpec> unmatchSpecs;
+
+   matchSpec = findCpxParSpec (theName);
+
+   if (matchSpec == NULL)
+      return;
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      if (theSpec != matchSpec)
+         {
+         unmatchSpecs.append (theSpec);
+         }
+d231 1
+a231 1
+   myCpxParSpecs_ = unmatchSpecs;
+d233 2
+a234 2
+   delete matchSpec;
+   }
+d241 11
+a251 11
+         WitProblem * theProblem,
+         const char * theName,
+         int          theIntVal):
+
+      WitProbAssoc  (theProblem),
+      myName_       (theName),
+      valTypeIsInt_ (true),
+      myIntVal_     (theIntVal),
+      myDblVal_     (0.0)
+   {
+   }
+d256 11
+a266 11
+         WitProblem * theProblem,
+         const char * theName,
+         double       theDblVal):
+
+      WitProbAssoc  (theProblem),
+      myName_       (theName),
+      valTypeIsInt_ (false),
+      myIntVal_     (0),
+      myDblVal_     (theDblVal)
+   {
+   }
+d271 2
+a272 2
+      WitProblem *    theProblem,
+      WitCpxParSpec * theSpec):
+d274 7
+a280 7
+      WitProbAssoc  (theProblem),
+      myName_       (theSpec->myName_),
+      valTypeIsInt_ (theSpec->valTypeIsInt_),
+      myIntVal_     (theSpec->myIntVal_),
+      myDblVal_     (theSpec->myDblVal_)
+   {
+   }
+d285 2
+a286 2
+   {
+   }
+d291 2
+a292 2
+   {
+   witAssert (valTypeIsInt_);
+d294 2
+a295 2
+   return myIntVal_;
+   }
+d300 2
+a301 2
+   {
+   witAssert (not valTypeIsInt_);
+d303 2
+a304 2
+   return myDblVal_;
+   }
+d309 6
+a314 6
+   {
+   if (valTypeIsInt_)
+      myMsgFac () ("intCpxParSpecDdMsg", myName_, myIntVal_);
+   else
+      myMsgFac () ("dblCpxParSpecDdMsg", myName_, myDblVal_);
+   }
+d319 10
+a328 10
+   {
+   myDataWriter    ()->writeFirstKeyWord ("set");
+   myDataWriter    ()->writeKeyWord      ("problem");
+
+   myDataWriter    ()->writeString       ("cplexParSpecName", myName_);
+
+   if (valTypeIsInt_)
+      myDataWriter ()->writeInt          ("cplexParSpecIntVal", myIntVal_);
+   else
+      myDataWriter ()->writeDouble       ("cplexParSpecDblVal", myDblVal_);
+d330 2
+a331 2
+   myDataWriter    ()->writeEndCommand   ();
+   }
+@
+
+
+1.13
+log
+@CPLEX Parameters
+@
+text
+@d30 6
+a35 6
+      WitProbAssoc      (theProblem),
+      myCpxParSpecs_    (),
+      cpxParSpecName_   (defCpxParSpecName   ()),
+      cpxParSpecIntVal_ (defCpxParSpecIntVal ()),
+      cpxParSpecDblVal_ (defCpxParSpecDblVal ()),
+      addingSpecsByVal_ (false)
+d48 1
+a48 1
+void WitCpxParSpecMgr::setCpxParSpecName (const char * theValue)
+d54 1
+a54 1
+   cpxParSpecName_   = theValue;
+d56 1
+a56 1
+   addingSpecsByVal_ = (cpxParSpecName_ != "NO_PARAM");
+d61 1
+a61 1
+void WitCpxParSpecMgr::setCpxParSpecIntVal (int theValue)
+d65 1
+a65 1
+   cpxParSpecIntVal_ = theValue;
+d68 1
+a68 1
+      addIntCpxParSpec (cpxParSpecName_.myCstring (), theValue);
+d73 1
+a73 1
+void WitCpxParSpecMgr::setCpxParSpecDblVal (double theValue)
+d77 1
+a77 1
+   cpxParSpecDblVal_ = theValue;
+d80 1
+a80 1
+      addDblCpxParSpec (cpxParSpecName_.myCstring (), theValue);
+d147 3
+a149 3
+      cpxParSpecName_,
+      cpxParSpecIntVal_,
+      cpxParSpecDblVal_);
+d167 3
+a169 3
+   cpxParSpecName_   = theCpxParSpecMgr->cpxParSpecName_;
+   cpxParSpecIntVal_ = theCpxParSpecMgr->cpxParSpecIntVal_;
+   cpxParSpecDblVal_ = theCpxParSpecMgr->cpxParSpecDblVal_;
+d189 3
+a191 3
+      if       (cpxParSpecName_   == defCpxParSpecName   ())
+         if    (cpxParSpecIntVal_ == defCpxParSpecIntVal ())
+            if (cpxParSpecDblVal_ == defCpxParSpecDblVal ())
+d202 3
+a204 3
+   myDataWriter ()->writeString ("cpxParSpecName",   noParam);
+   myDataWriter ()->writeInt    ("cpxParSpecIntVal", cpxParSpecIntVal_);
+   myDataWriter ()->writeDouble ("cpxParSpecDblVal", cpxParSpecDblVal_);
+d206 2
+a207 1
+   myDataWriter ()->writeString ("cpxParSpecName", cpxParSpecName_, "NO_PARAM");
+d323 1
+a323 1
+   myDataWriter    ()->writeString       ("cpxParSpecName",   myName_);
+d326 1
+a326 1
+      myDataWriter ()->writeInt          ("cpxParSpecIntVal", myIntVal_);
+d328 1
+a328 1
+      myDataWriter ()->writeDouble       ("cpxParSpecDblVal", myDblVal_);
+@
+
+
+1.12
+log
+@CPLEX Parameters
+@
+text
+@d85 1
+a85 1
+void WitCpxParSpecMgr::addIntCpxParSpec (const char * theName, int theVal)
+d93 1
+a93 1
+   theSpec = new WitCpxParSpec (myProblem (), theName, theVal);
+d97 1
+a97 1
+   myMsgFac () ("addIntCpxParSpecMsg", theName, theVal);
+d102 1
+a102 1
+void WitCpxParSpecMgr::addDblCpxParSpec (const char * theName, double theVal)
+d110 1
+a110 1
+   theSpec = new WitCpxParSpec (myProblem (), theName, theVal);
+d114 1
+a114 1
+   myMsgFac () ("addDblCpxParSpecMsg", theName, theVal);
+@
+
+
+1.11
+log
+@CPLEX Parameters
+@
+text
+@d32 3
+a34 3
+      specCpxParName_   (defSpecCpxParName   ()),
+      specCpxParIntVal_ (defSpecCpxParIntVal ()),
+      specCpxParDblVal_ (defSpecCpxParDblVal ()),
+d48 1
+a48 1
+void WitCpxParSpecMgr::setSpecCpxParName (const char * theValue)
+d54 1
+a54 1
+   specCpxParName_   = theValue;
+d56 1
+a56 1
+   addingSpecsByVal_ = (specCpxParName_ != "NO_PARAM");
+d61 1
+a61 1
+void WitCpxParSpecMgr::setSpecCpxParIntVal (int theValue)
+d65 1
+a65 1
+   specCpxParIntVal_ = theValue;
+d68 1
+a68 1
+      addIntCpxParSpec (specCpxParName_.myCstring (), theValue);
+d73 1
+a73 1
+void WitCpxParSpecMgr::setSpecCpxParDblVal (double theValue)
+d77 1
+a77 1
+   specCpxParDblVal_ = theValue;
+d80 1
+a80 1
+      addDblCpxParSpec (specCpxParName_.myCstring (), theValue);
+d146 4
+a149 4
+   myMsgFac () ("specCpxParAttsDdMsg",
+      specCpxParName_,
+      specCpxParIntVal_,
+      specCpxParDblVal_);
+d167 3
+a169 3
+   specCpxParName_   = theCpxParSpecMgr->specCpxParName_;
+   specCpxParIntVal_ = theCpxParSpecMgr->specCpxParIntVal_;
+   specCpxParDblVal_ = theCpxParSpecMgr->specCpxParDblVal_;
+d189 3
+a191 3
+      if       (specCpxParName_   == defSpecCpxParName   ())
+         if    (specCpxParIntVal_ == defSpecCpxParIntVal ())
+            if (specCpxParDblVal_ == defSpecCpxParDblVal ())
+d202 3
+a204 3
+   myDataWriter ()->writeString ("specCpxParName",   noParam);
+   myDataWriter ()->writeInt    ("specCpxParIntVal", specCpxParIntVal_);
+   myDataWriter ()->writeDouble ("specCpxParDblVal", specCpxParDblVal_);
+d206 1
+a206 1
+   myDataWriter ()->writeString ("specCpxParName", specCpxParName_, "NO_PARAM");
+d322 1
+a322 1
+   myDataWriter    ()->writeString       ("specCpxParName",   myName_);
+d325 1
+a325 1
+      myDataWriter ()->writeInt          ("specCpxParIntVal", myIntVal_);
+d327 1
+a327 1
+      myDataWriter ()->writeDouble       ("specCpxParDblVal", myDblVal_);
+@
+
+
+1.10
+log
+@CPLEX Parameters
+@
+text
+@d119 13
+d219 1
+a219 9
+   matchSpec = NULL;
+
+   forEachEl (theSpec, myCpxParSpecs_)
+      if (theSpec->myName () == theName)
+         {
+         witAssert (matchSpec == NULL);
+
+         matchSpec = theSpec;
+         }
+@
+
+
+1.9
+log
+@CPLEX Parameters
+@
+text
+@d96 2
+d113 2
+@
+
+
+1.8
+log
+@CPLEX Parameters
+@
+text
+@d56 1
+a56 1
+   addingSpecsByVal_ = (specCpxParName_ != defSpecCpxParName ());
+d89 1
+a89 1
+   witAssert (not equalCstrings (theName, defSpecCpxParName ()));
+d104 1
+a104 1
+   witAssert (not equalCstrings (theName, defSpecCpxParName ()));
+d147 3
+d153 9
+a161 1
+   myCpxParSpecs_    = theCpxParSpecMgr->myCpxParSpecs_;
+d169 1
+a169 1
+   WitString       defSpecName;
+d183 1
+a183 1
+   defSpecName = defSpecCpxParName ();
+d185 1
+a185 1
+   myDataWriter ()->writeString ("specCpxParName",   defSpecName);
+d189 1
+a189 3
+   myDataWriter ()->writeString ("specCpxParName",
+                                  specCpxParName_,
+                               defSpecCpxParName ());
+d260 14
+@
+
+
+1.7
+log
+@CPLEX Parameters
+@
+text
+@d87 1
+a87 1
+   WitCpxParSpec * theCpxParSpec;
+d91 1
+a91 1
+   theCpxParSpec = new WitCpxParSpec (myProblem (), theName, theVal);
+d93 3
+a95 1
+   myCpxParSpecs_.append (theCpxParSpec);
+d102 1
+a102 1
+   WitCpxParSpec * theCpxParSpec;
+d106 3
+a108 1
+   theCpxParSpec = new WitCpxParSpec (myProblem (), theName, theVal);
+d110 1
+a110 1
+   myCpxParSpecs_.append (theCpxParSpec);
+a116 2
+   WitCpxParSpec * theCpxParSpec;
+
+d127 1
+a127 1
+   WitCpxParSpec * theCpxParSpec;
+d139 2
+a140 2
+   forEachEl (theCpxParSpec, myCpxParSpecs_)
+      theCpxParSpec->display ();
+d157 2
+a158 2
+   WitCpxParSpec * theCpxParSpec;
+   WitString       theCpxParName;
+d166 2
+a167 2
+   forEachEl (theCpxParSpec, myCpxParSpecs_)
+      theCpxParSpec->writeData ();
+d172 1
+a172 1
+   theCpxParName = defSpecCpxParName ();
+d174 3
+a176 3
+   myDataWriter ()->writeString ("specCpxParName",     theCpxParName);
+   myDataWriter ()->writeInt    ("specCpxParIntVal",  specCpxParIntVal_);
+   myDataWriter ()->writeDouble ("specCpxParDblVal",  specCpxParDblVal_);
+d186 32
+@
+
+
+1.6
+log
+@CPLEX Parameters
+@
+text
+@d89 2
+d102 2
+@
+
+
+1.5
+log
+@CPLEX Parameters
+@
+text
+@d34 2
+a35 1
+      specCpxParDblVal_ (defSpecCpxParDblVal ())
+d54 3
+a56 1
+   specCpxParName_ = theValue;
+d67 2
+a68 1
+   addIntCpxParSpec (specCpxParName_.myCstring (), theValue);
+d79 2
+a80 1
+   addDblCpxParSpec (specCpxParName_.myCstring (), theValue);
+d152 1
+d166 9
+a174 3
+   myDataWriter ()->writeString ("specCpxParName",   specCpxParName_);
+   myDataWriter ()->writeInt    ("specCpxParIntVal", specCpxParIntVal_);
+   myDataWriter ()->writeDouble ("specCpxParDblVal", specCpxParDblVal_);
+@
+
+
+1.4
+log
+@CPLEX Parameters
+@
+text
+@d144 1
+a144 1
+void WitCpxParSpecMgr::writeDataAttrs ()
+d146 19
+a164 14
+   myDataWriter ()->writeString (
+        "specCpxParName",
+         specCpxParName_,
+      defSpecCpxParName ());
+
+   myDataWriter ()->writeInt (
+        "specCpxParIntVal",
+         specCpxParIntVal_,
+      defSpecCpxParIntVal ());
+
+   myDataWriter ()->writeDouble (
+        "specCpxParDblVal",
+         specCpxParDblVal_,
+      defSpecCpxParDblVal ());
+d232 17
+@
+
+
+1.3
+log
+@CPLEX Param Specs
+@
+text
+@d63 2
+d74 2
+d80 1
+a80 1
+void WitCpxParSpecMgr::setIntCpxPar (const char * theName, int theVal)
+d84 1
+a84 1
+   theCpxParSpec = new WitCpxParSpec (theName, theVal);
+d91 1
+a91 1
+void WitCpxParSpecMgr::setDblCpxPar (const char * theName, double theVal)
+d95 1
+a95 1
+   theCpxParSpec = new WitCpxParSpec (theName, theVal);
+d116 2
+d122 8
+d139 1
+d166 4
+a169 1
+WitCpxParSpec::WitCpxParSpec (const char * theName, int theIntVal):
+d171 1
+d181 4
+a184 1
+WitCpxParSpec::WitCpxParSpec (const char * theName, double theDblVal):
+d186 1
+d188 1
+a188 1
+      valTypeIsInt_ (true),
+d217 10
+@
+
+
+1.2
+log
+@CPLEX Param Specs.
+@
+text
+@d33 2
+a34 1
+      specCpxParIntVal_ (defSpecCpxParIntVal ())
+d67 9
+d114 2
+a115 1
+      specCpxParIntVal_);
+d124 1
+d140 5
+@
+
+
+1.1
+log
+@CPX Param Specs
+@
+text
+@d30 4
+a33 3
+      WitProbAssoc    (theProblem),
+      myCpxParSpecs_  (),
+      specCpxParName_ (defSpecCpxParName ())
+d57 9
+d102 3
+a104 2
+   myMsgFac () ("specCpxParNameDdMsg",
+      specCpxParName_);
+d111 2
+a112 1
+   specCpxParName_ = theCpxParSpecMgr->specCpxParName_;
+d123 5
+@
+

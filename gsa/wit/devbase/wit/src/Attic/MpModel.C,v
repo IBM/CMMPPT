@@ -1,0 +1,785 @@
+head	1.4;
+access;
+symbols
+	EndRw-branch:1.3.0.4
+	Root-of-EndRw:1.3
+	rwToStl:1.3.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.03.03.23.26.52;	author rjw;	state dead;
+branches;
+next	1.3;
+
+1.3
+date	2002.08.26.22.49.02;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.08.26.20.16.07;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.08.23.21.00.36;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.3
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@@
+
+
+1.2
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@a0 682
+//----------------------------------------------------------------------------
+// 
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//----------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------
+// Source file: "MpModel.C"
+//
+// Implementation of class MpModel.
+//----------------------------------------------------------------------------
+
+int compiledMpModel = 1;
+   //
+   // WATCOM's strict compatibility mode requires every file to
+   // have at least one external definition.
+
+#include <Session.h>
+#include <MpModel.h>
+#include <OptImp.h>
+#include <OslMgr.h>
+#include <Timing.h>
+#include <MsgFac.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+
+FILE * WitMpModel::modelFile_ = NULL;
+
+//------------------------------------------------------------------------------
+
+WitMpModel::WitMpModel (WitOptImploder * theOptImploder):
+
+      myOptImploder_ (theOptImploder),
+      myProblem_     (theOptImploder->myProblem ()),
+      myMsgFac_      (theOptImploder->myMsgFac ()),
+      nCoeffs_       (0),
+      curCon_        (NULL),
+      mainObj_       (NULL)
+   {
+   myOslMgr_ = new WitOslMgr (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitMpModel::~WitMpModel ()
+   {
+   int idx;
+
+   delete myOslMgr_;
+
+   while (!  myMpObjs_.isEmpty ())
+      delete myMpObjs_.get ();
+
+   while (!  myMpObjs_.isEmpty ())
+      delete myMpObjs_.get ();
+
+   while (!  myMpVars_.isEmpty ())
+      delete myMpVars_.get ();
+
+   for (idx = 0; idx < conPreScreenBounds_.length (); idx ++)
+      delete conPreScreenBounds_[idx];
+
+   for (idx = 0; idx < varPreScreenBounds_.length (); idx ++)
+      delete varPreScreenBounds_[idx];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::store (WitMpVar * theVar)
+   {
+   myMpVars_.append (theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::store (WitMpCon * theCon)
+   {
+   myMpCons_.append (theCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::store (WitMpObj * theObj)
+   {
+   myMpObjs_.append (theObj);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateFixed ()
+   {
+   generateVariables ();
+
+   countIntVars ();
+
+   generateConstraints ();
+
+   mainObj_ = generateObjectives ();
+
+   generateCoeffs ();
+
+   if (DEVELOPMENT)
+      {
+      if (isaMIP ())
+         myMsgFac () ("mipDimMsg", nMpVars (), nIntVars_);
+      else
+         myMsgFac () ("lpDimMsg", nMpVars ());
+
+      myMsgFac () ("mpDimMsg", nMpCons (), nMpObjs (), nCoeffs ());
+
+      displayDerived ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::countIntVars ()
+   {
+   WitMpVar * theVar;
+
+   nIntVars_ = 0;
+
+   forEachEl (theVar, myMpVars_)
+      if (theVar->isAnIntVar ())
+         nIntVars_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::incCoeff (WitMpVar * theVar, float delta)
+   {
+   if (fabs (delta) <= FLOAT_EPSILON)
+      return;
+
+   WitCoeff * theCoeff;
+
+   theCoeff = varLastCoeff (theVar);
+
+   if (theCoeff != NULL)
+      if (theCoeff->myCon () == curCon_)
+         {
+         theCoeff->increment (delta);
+
+         return;
+         }
+
+   theCoeff = new WitCoeff (curCon_, theVar, delta);
+
+   varLastCoeff (theVar) = theCoeff;
+
+   curConCoeffs_.append (theCoeff);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateFlexible ()
+   {
+   generateBounds ((const WitList <WitModelEl> &) myMpVars ());
+
+   generateBounds ((const WitList <WitModelEl> &) myMpCons ());
+
+   generateMainObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+// calcInitSoln calculates an initial solution.
+// First the independent variable are initialized, by calling indepInitValue.
+// Then the dependent variables are initialized with a call to initDepVars.
+//------------------------------------------------------------------------------
+
+void WitMpModel::calcInitSoln ()
+   {
+   WitMpVar * theVar;
+
+   forEachEl (theVar, myMpVars ())
+      theVar->primalValue () = theVar->indepInitValue ();
+
+   initDepVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateOslVectors (
+      WitVector <int> &    indexRow,
+      WitVector <int> &    startOfEachColumn,
+      WitVector <double> & elements)
+   {
+   WitMpVar * theVar;
+   WitCoeff * theCoeff;
+   int        idx;
+
+   WitTimingEvent theEvent ("mp");
+
+   indexRow         .resize (nCoeffs_);
+   startOfEachColumn.resize (nMpVars () + 1);
+   elements         .resize (nCoeffs ());
+
+   idx = 0;
+
+   forEachEl (theVar, myMpVars ())
+      {
+      startOfEachColumn[theVar->index ()] = idx;
+
+      forEachElDense (theCoeff, theVar->myCoeffs ())
+         {
+         indexRow[idx] = theCoeff->myCon ()->index ();
+         elements[idx] = (double) theCoeff->myValue ();
+
+         idx ++;
+         }
+      }
+
+   startOfEachColumn[nMpVars ()] = idx;
+
+   witAssert (idx == nCoeffs ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::print (WitBoolean printOslVecs)
+   {
+   WitTimingEvent theEvent ("extra");
+
+   myMsgFac () ("writeMpModelMsg");
+
+   modelFile_ = openFile (myOptImploder ()->modelOFName (), "w");
+
+   myProblem ()->mySession ()->writeHeading (modelFile ());
+
+   if (isaMIP ())
+      fprintf (modelFile (),
+         "Mixed Integer Programming Model\n"
+         "===== ======= =========== =====\n\n\n");
+   else
+      fprintf (modelFile (),
+         "Linear Programming Model\n"
+         "====== =========== =====\n\n\n");
+
+   fprintf (modelFile (), "# Variables:    %8d\n",   nMpVars ());
+
+   if (isaMIP ())
+      fprintf (modelFile (), 
+                          "# Integer Vars: %8d\n",   nIntVars_);
+
+   fprintf (modelFile (), "# Constraints:  %8d\n",   nMpCons ());
+   fprintf (modelFile (), "# Objectives:   %8d\n",   nMpObjs ());
+   fprintf (modelFile (), "# Coefficients: %8d\n\n", nCoeffs ());
+
+   fprintf (modelFile (), "Objective Function:  %s\n", mainObj ()->myText ());
+
+   printVars ();
+   printCons ();
+   printObjs ();
+   printDerived ();
+
+   if (printOslVecs)
+      printOslVectors ();
+
+   fclose (modelFile ());
+
+   modelFile_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getConLBs (WitVector <double> & theConLBvec)
+   {
+   WitMpCon * theMpCon;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theMpCon, myMpCons_)
+      theConLBvec[theMpCon->index ()] = theMpCon->bounds ().lower ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getConUBs (WitVector <double> & theConUBvec)
+   {
+   WitMpCon * theMpCon;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theMpCon, myMpCons_)
+      theConUBvec[theMpCon->index ()] = theMpCon->bounds ().upper ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getVarLBs (WitVector <double> & theVarLBvec)
+   {
+   WitMpVar * theMpVar;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theMpVar, myMpVars_)
+      theVarLBvec[theMpVar->index ()] = theMpVar->bounds ().lower ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getVarUBs (WitVector <double> & theVarUBvec)
+   {
+   WitMpVar * theMpVar;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theMpVar, myMpVars_)
+      theVarUBvec[theMpVar->index ()] = theMpVar->bounds ().upper ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getObjCoeffs (WitVector <double> & theObjCoeffVec)
+   {
+   WitMpVar * theMpVar;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theMpVar, myMpVars_)
+      theObjCoeffVec[theMpVar->index ()] =
+         (double) theMpVar->mainObjCoeffVal ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::getInitSoln (double * colsol)
+   {
+   WitMpVar * theVar;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theVar, myMpVars ())
+      colsol[theVar->index ()] = theVar->primalValue ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::storePrimalSoln (const double * colsol)
+   {
+   WitMpVar * theVar;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theVar, myMpVars ())
+      theVar->primalValue () = colsol[theVar->index ()];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::storeDualSoln (const double * rowduals)
+   {
+   WitMpCon * theCon;
+
+   WitTimingEvent theEvent ("mp");
+
+   forEachEl (theCon, myMpCons ())
+      theCon->dualValue () = - rowduals[theCon->index ()];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::solve ()
+   {
+   myOslMgr_->solveMP ();
+
+   if (needDual ())
+      reconstructDual ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::displayDerived ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::printDerived ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// initDepVars.
+// Initializes the dependent variables, i.e., those variables whose
+// initial value depends on the initial value of other variables.
+//------------------------------------------------------------------------------
+
+void WitMpModel::initDepVars ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::saveBounds ()
+   {
+   WitMpVar * theVar;
+   WitMpCon * theCon;
+
+   varPreScreenBounds_.resize (nMpVars ());
+   conPreScreenBounds_.resize (nMpCons ());
+
+   forEachEl (theVar, myMpVars ())
+      {
+      varPreScreenBounds_ [theVar->index ()] = new WitBoundPair;
+
+      varPreScreenBounds_ (theVar->index ()).copy (theVar->bounds ());
+      }
+
+   forEachEl (theCon, myMpCons ())
+      {
+      conPreScreenBounds_ [theCon->index ()] = new WitBoundPair;
+
+      conPreScreenBounds_ (theCon->index ()).copy (theCon->bounds ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+int WitMpModel::screen (const WitMpCon * theCon)
+   {
+   int nVarsFixed = 0;
+
+   WitCoeff * theCoeff;
+
+   if (theCon == NULL)
+      return 0;
+
+   if (! theCon->screenable ())
+      return 0;
+
+   forEachElDense (theCoeff, theCon->myCoeffs ())
+      {
+      if (theCoeff->myValue () <= FLOAT_EPSILON)
+         continue;
+
+      if (theCoeff->myVar ()->bounds ().upper () == 0.0)
+         continue;
+
+      theCoeff->myVar ()->bounds ().upper () = 0.0;
+
+      if (needDual ())
+         screenedCoeffs_.prepend (theCoeff);
+
+      ++ nVarsFixed;
+      }
+
+   return nVarsFixed;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateCoeffs ()
+   {
+   buildCoeffs ();
+
+   allocVarCoeffs ();
+
+   storeCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::buildCoeffs ()
+   {
+   WitCoeff * theCoeff;
+
+   nCoeffs_ = 0;
+
+   curConCoeffs_.resize (nMpVars () + 1);
+   varLastCoeff_.resize (nMpVars ());
+                
+   forEachEl (curCon_, myMpCons ())
+      {
+      curConCoeffs_.clear ();
+
+      curCon_->generateCoeffs ();
+
+      nCoeffs_ += curConCoeffs_.nElements ();
+
+      curCon_->allocMyCoeffs (curConCoeffs_.nElements ());
+
+      forEachElDense (theCoeff, curConCoeffs_)
+         curCon_->store (theCoeff);
+      }
+
+   curConCoeffs_.resize (0);
+   varLastCoeff_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::allocVarCoeffs ()
+   {
+   WitMpVar * theVar;
+   WitMpCon * theCon;
+   WitCoeff * theCoeff;
+
+   WitVector <int> nCoeffsForVar (nMpVars (), 0);
+      //
+      // nCoeffsForVar[theVar->index ()] is # Coeffs for theVar.
+
+   forEachEl (theCon, myMpCons ())
+      forEachElDense (theCoeff, theCon->myCoeffs ())
+         ++ nCoeffsForVar[theCoeff->myVar ()->index ()];
+
+   forEachEl (theVar, myMpVars ())
+      theVar->allocMyCoeffs (nCoeffsForVar[theVar->index ()]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::storeCoeffs ()
+   {
+   WitMpCon * theCon;
+   WitMpVar * theVar;
+   WitCoeff * theCoeff;
+
+   forEachEl (theCon, myMpCons ())
+      {
+      forEachElDense (theCoeff, theCon->myCoeffs ())
+         theCoeff->myVar ()->store (theCoeff);
+
+      theCon->clearMyCoeffs ();
+      }
+
+   forEachEl (theVar, myMpVars ())
+      forEachElDense (theCoeff, theVar->myCoeffs ())
+         theCoeff->myCon ()->store (theCoeff);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateMainObjCoeffs ()
+   {
+   WitMpVar * theVar;
+
+   forEachEl (theVar, myMpVars ())
+      theVar->compMainObjCoeffVal ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::generateBounds (const WitList <WitModelEl> & theModelEls)
+   {
+   WitModelEl * theModelEl;
+
+   forEachEl (theModelEl, theModelEls)
+      theModelEl->compBounds ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::printVars ()
+   {
+   WitMpVar * theVar;
+
+   fprintf (modelFile (),
+      "\n\n"
+      "Variables\n"
+      "=========\n");
+
+   fprintf (modelFile (), "Var ");
+
+   printModelElHeading ();
+
+   fprintf (modelFile (), " I Obj Cff Low Bnd  Up Bnd   PS LB   PS UB\n");
+
+   forEachEl (theVar, myMpVars ())
+      theVar->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::printCons ()
+   {
+   WitMpCon * theCon;
+
+   fprintf (modelFile (),
+      "\n\n"
+      "Constraints\n"
+      "===========\n");
+
+   fprintf (modelFile (), "Con ");
+
+   printModelElHeading ();
+
+   fprintf (modelFile (), " Low Bnd  Up Bnd   PS LB   PS UB\n");
+
+   fprintf (modelFile (), "Var ");
+
+   printModelElHeading ();
+
+   fprintf (modelFile (), "   Coeff\n");
+
+   forEachEl (theCon, myMpCons ())
+      theCon->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::printObjs ()
+   {
+   WitMpObj * theObj;
+
+   fprintf (modelFile (),
+      "\n\n"
+      "Objectives\n"
+      "==========\n");
+
+   fprintf (modelFile (), "Var ");
+
+   printModelElHeading ();
+
+   fprintf (modelFile (), "   Coeff\n");
+
+   forEachEl (theObj, myMpObjs_)
+      theObj->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::printOslVectors ()
+   {
+   WitVector <int>    indexRow;
+   WitVector <int>    startOfEachColumn;
+   WitVector <double> elements;
+   int                theIdx;
+
+   generateOslVectors (indexRow, startOfEachColumn, elements);
+
+   fprintf (modelFile (), "\n\n\nOSL Vectors\n"
+                             "=== =======\n\n");
+
+   fprintf (modelFile (), "\nColumn #      Elem #\n");
+
+   for (theIdx = 0; theIdx <= nMpVars (); theIdx ++)
+      fprintf (modelFile (), "%8d  %8d\n", theIdx, startOfEachColumn[theIdx]);
+
+   fprintf (modelFile (), "\n  Elem #     Row #    Coefficient\n");
+
+   for (theIdx = 0; theIdx < nCoeffs (); theIdx ++)
+      fprintf (
+         modelFile (),
+         "%8d  %8d  %13.3f\n",
+         theIdx,
+         indexRow[theIdx],
+         elements[theIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMpModel::reconstructDual ()
+   {
+   WitCoeff * theCoeff;
+   double  redReward;
+   int     nElim = 0;
+
+   while (! screenedCoeffs_.isEmpty ())
+      {
+      theCoeff = screenedCoeffs_.get ();
+
+      redReward = theCoeff->myVar ()->reducedReward ();
+
+      if (redReward > FLOAT_EPSILON)
+         {
+         theCoeff->myCon ()->dualValue () += redReward / theCoeff->myValue ();
+
+         ++ nElim;
+         }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nDualElimMsg", nElim);
+   }
+
+#endif
+@
+
+
+1.1
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@d38 6
+a43 20
+      myOptImploder_      (theOptImploder),
+      myProblem_          (theOptImploder->myProblem ()),
+      myMsgFac_           (theOptImploder->myMsgFac ()),
+
+      myOslMgr_           (NULL),
+      myMpVars_           (),
+      myMpCons_           (),
+      myMpObjs_           (),
+      nCoeffs_            (0),
+
+      curCon_             (NULL),
+      curConCoeffs_       (),
+      varLastCoeff_       (),
+
+      mainObj_            (NULL),
+
+      varPreScreenBounds_ (),
+      conPreScreenBounds_ (),
+
+      screenedCoeffs_     ()
+d99 2
+d109 6
+a114 1
+      myMsgFac () ("mpDimMsg", nMpVars (), nMpCons (), nMpObjs (), nCoeffs ());
+d122 13
+d235 8
+a242 3
+   fprintf (modelFile (),
+      "Linear Programming Model\n"
+      "====== =========== =====\n\n\n");
+d245 5
+d572 1
+a572 1
+   fprintf (modelFile (), " Obj Coeff Low Bnd  Up Bnd   PS LB   PS UB\n");
+@
+

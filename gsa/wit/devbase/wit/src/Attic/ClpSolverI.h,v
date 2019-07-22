@@ -1,0 +1,341 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2003.06.05.19.48.18;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2003.06.04.17.11.06;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.05.30.22.41.03;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.05.30.18.19.10;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.05.28.22.19.27;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Continued implementation of opt with COIN.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef ClpSolverIH
+#define ClpSolverIH
+
+//------------------------------------------------------------------------------
+// Header file: "ClpSolverI.h"
+//
+// Contains the main and dummy implementations of class ClpSolver.
+//
+// This file is included by CoinSolver.C and no other file.
+//------------------------------------------------------------------------------
+
+#include <ClpSolver.h>
+#include <OptModel.h>
+#include <OptImp.h>
+#include <MsgFac.h>
+#include <Timing.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// Main implementation of class ClpSolver.
+//------------------------------------------------------------------------------
+
+#if USE_COIN
+
+#include <coin/OsiClpSolverInterface.hpp>
+
+//------------------------------------------------------------------------------
+
+WitClpSolver::WitClpSolver (WitOptModel * theOptModel):
+
+      WitOsiSolver (theOptModel),
+      myOsiClpSI_  (NULL)
+   {
+   myMsgFac () ("clpNYAvailSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitClpSolver::~WitClpSolver ()
+   {
+   WitTimer::enterSection ("coin");
+
+   delete myOsiClpSI_;
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpSolver::solve ()
+   {
+   WitTimer::enterSection ("coin");
+
+   stronglyAssert (not myOptImploder ()->accelerated ());
+
+   stronglyAssert (not myOptModel ()->isaMIP ());
+
+   myMsgFac () ("solveLpMsg", "CLP");
+
+   myOsiClpSI_ = new OsiClpSolverInterface;
+
+   passFixedModel ();
+
+   passFlexibleModel ();
+
+   writeMps ();
+
+   if (myOptImploder ()->stopOpt () == 2)
+      {
+      WitTimer::leaveSection ("coin");
+
+      return;
+      }
+
+   solveLpUnAcc ();
+
+   myMsgFac () ("optSolnFoundMsg");
+
+   storePrimalSoln ();
+
+   if (myOptModel ()->needDual ())
+      storeDualSoln ();
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpSolver::solveLpUnAcc ()
+   {
+   passInitSoln ();
+
+   myClpSimplex ()->primal (1);
+
+   checkSolnStatus ();
+
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpSolver::checkSolnStatus ()
+   {
+   if (myOsiClpSI_->isProvenOptimal ())
+      return;
+
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myOptModel ()->reportInfeasible ();
+
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myOptModel ()->reportUnbounded ();
+
+   myMsgFac () ("oslOptimalNotFoundFmsg");
+
+   if (myOsiClpSI_->isProvenPrimalInfeasible ())
+      myMsgFac () ("primalInfeasFmsg");
+
+   if (myOsiClpSI_->isProvenDualInfeasible ())
+      myMsgFac () ("dualInfeasFmsg");
+
+   if (myOsiClpSI_->isAbandoned ())
+      myMsgFac () ("abandonedFmsg");
+
+   myMsgFac () ("unknownNonOptReasonFmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+ClpSimplex * WitClpSolver::myClpSimplex ()
+   {
+   witAssert (myOsiClpSI_ != NULL);
+
+   return myOsiClpSI_->getModelPtr ();
+   }
+
+//------------------------------------------------------------------------------
+
+OsiSolverInterface * WitClpSolver::myOsiSI ()
+   {
+   return myOsiClpSI_;
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // USE_COIN
+
+//------------------------------------------------------------------------------
+// Dummy implementation of class ClpSolver.
+//------------------------------------------------------------------------------
+
+#if ! USE_COIN
+
+//------------------------------------------------------------------------------
+
+WitClpSolver::WitClpSolver (WitOptModel * theOptModel):
+
+      WitOsiSolver (theOptModel),
+      myOsiClpSI_  (NULL)
+   {
+   myMsgFac () ("clpNYAvailSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitClpSolver::~WitClpSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitClpSolver::solve ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+OsiSolverInterface * WitClpSolver::myOsiSI ()
+   {
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // Not USE_COIN
+
+//------------------------------------------------------------------------------
+
+#endif // OPT_IMPLODE
+
+#endif
+@
+
+
+1.4
+log
+@Continued implementation of opt with COIN.
+@
+text
+@@
+
+
+1.3
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d42 1
+a42 1
+      myOsiSI_     (NULL)
+d53 1
+a53 1
+   delete myOsiSI_;
+d70 1
+a70 1
+   myOsiSI_ = new OsiClpSolverInterface;
+d103 1
+a103 8
+   myOsiSI_->setHintParam (OsiDoScale);
+
+   myOsiSI_->setHintParam (OsiDoPresolveInInitial);
+
+   if (myOptComp ()->crashOptStarter ()->isChosen ())
+      myOsiSI_->setHintParam (OsiDoCrash);
+
+   myOsiSI_->initialSolve ();
+d114 1
+a114 1
+   if (myOsiSI_->isProvenOptimal ())
+d117 1
+a117 1
+   if (myOsiSI_->isProvenPrimalInfeasible ())
+d120 1
+a120 1
+   if (myOsiSI_->isProvenDualInfeasible ())
+d125 1
+a125 1
+   if (myOsiSI_->isProvenPrimalInfeasible ())
+d128 1
+a128 1
+   if (myOsiSI_->isProvenDualInfeasible ())
+d131 1
+a131 1
+   if (myOsiSI_->isAbandoned ())
+d139 9
+d150 1
+a150 1
+   return myOsiSI_;
+d168 1
+a168 1
+      myOsiSI_     (NULL)
+@
+
+
+1.2
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d74 20
+d99 1
+a99 1
+void WitClpSolver::passFixedModel ()
+d101 39
+a139 1
+   WitOsiSolver::passFixedModel ();
+d141 1
+a141 1
+   stronglyAssert (not myOptModel ()->isaMIP ());
+@
+
+
+1.1
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d22 4
+d35 2
+d41 2
+a42 1
+      WitOptSolver (theOptModel)
+d51 5
+d62 29
+d107 2
+a108 1
+      WitOptSolver (theOptModel)
+d123 7
+@
+

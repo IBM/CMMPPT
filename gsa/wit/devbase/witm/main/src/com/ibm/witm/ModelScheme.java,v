@@ -1,0 +1,858 @@
+head	1.9;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.9
+date	2011.10.05.23.07.34;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.10.04.22.57.14;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.09.13.20.48.07;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.09.08.22.43.39;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.09.07.21.43.37;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.07.22.23.47.22;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.07.21.21.44.47;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.07.20.18.38.44;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.07.19.21.37.04;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.9
+log
+@ban ==> rej
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File ModelScheme.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+
+/*******************************************************************************
+ * A ModelScheme is the central object representing the static structure or
+ * "scheme" of a WIT model, i.e., the data-independent aspects of the model.
+ * <br><br>
+ * 
+ * The factory method for creating instances of this class is
+ * ModelScheme.newModelScheme (theName).
+ *******************************************************************************
+ */
+public final class ModelScheme
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The current ModelScheme that will be used by various WIT-M methods, if any;
+ * otherwise null.
+ *******************************************************************************
+ */
+   private static ModelScheme current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The name of the model.
+ *******************************************************************************
+ */
+   private final String myName;
+   
+/*******************************************************************************
+ * True, iff this ModelScheme is "frozen".
+ *******************************************************************************
+ */
+   private boolean frozen = false;
+
+/*******************************************************************************
+ * The set of the names of all of schematic objects that belong to this
+ * ModelScheme.
+ *******************************************************************************
+ */
+   private final HashSet <String> allNames;
+
+/*******************************************************************************
+ * A list of all Categories that belong to this ModelScheme.
+ *******************************************************************************
+ */
+   private final ArrayList <ItemCategory <?>> myItemCategories;
+
+/*******************************************************************************
+ * The GLOBAL ItemCategory for this ModelScheme.
+ *******************************************************************************
+ */
+   private final PrimitiveCategory myGlobalCategory;
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   private ModelScheme (String theName)
+      {
+      myName           = theName;
+      
+      allNames         = new HashSet <String> ();
+      
+      myItemCategories = new ArrayList <ItemCategory <?>> ();
+      
+      myGlobalCategory = new PrimitiveCategory (this, "GLOBAL");
+      
+      current          = this;
+      
+      storeName (theName);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Verifies that the current ModelScheme is not null.
+ *******************************************************************************
+ */
+   private static void reqCurScheme ()
+      {
+      if (current == null)
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to a method that requires a current ModelScheme when the\n"
+             + "   current ModelScheme is null.\n");
+      }
+
+/*******************************************************************************
+ * Verifies that newTupleCategory (...) was called with at least one
+ * ItemCategory.<br>
+ * To be called by newTupleCategory.
+ *******************************************************************************
+ */
+   private static void reqAtLeast1Cat (
+         String             theName,
+         ItemCategory <?>[] theDimenArr)
+      {
+      if (theDimenArr.length == 0)
+         {
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to ModelScheme.newTupleCategory (theName, theDimens)\n"
+             + "   with no Categories.\n"
+             + "\n"
+             + "      theName: \"" + theName + "\"\n");
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies that the ModelScheme of each ItemCategory in theDimenArr is the
+ * current ModelScheme.<br>
+ * To be called by newTupleCategory.
+ *******************************************************************************
+ */
+   private static void reqSchemesBeCur (
+         String             theName,
+         ItemCategory <?>[] theDimenArr)
+      {
+      for (ItemCategory <?> theItemCat: theDimenArr)
+         {
+         if (theItemCat.getModelScheme () != current)
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to\n"
+                + "   ModelScheme.newTupleCategory (theName, theDimens)\n"
+                + "   with at least one ItemCategory whose ModelScheme is not\n" 
+                + "   the current ModelScheme.\n"
+                + "\n"
+                + "      theName:             " +            theName    + "\n"
+                + "      ItemCategory:        " + theItemCat.getName () + "\n"
+                + "         ModelScheme:      " + theItemCat.getModelScheme ().
+                                                             getName () + "\n"
+                + "      Current ModelScheme: " + current.   getName () + "\n");
+         }
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Verifies that this ModelScheme is not frozen.
+ *******************************************************************************
+ */
+   private void rejFrozen ()
+      {
+      if (frozen)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to setCurrentModelScheme (theScheme) with a frozen\n"
+             + "   ModelScheme.\n"
+             + "\n"
+             + "      ModelScheme: " + myName + "\n");
+      }
+
+/*******************************************************************************
+ * Verifies that this ModelScheme is frozen.
+ *******************************************************************************
+ */
+   private void reqFrozen (String theName)
+      {
+      if (! frozen)
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to ModelScheme.newModelInstance (theName), when the\n"
+             + "   ModelScheme was not frozen:\n"
+             + "\n"
+             + "      ModelScheme: " + myName  + "\n"
+             + "      theName:     " + theName + "\n");
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Verifies that theName does not duplicate the name of an existing schematic
+ * object in this ModelScheme.
+ *******************************************************************************
+ */
+   void rejDupName (String theName, String signature)
+      {
+      if (allNames.contains (theName))
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to " + signature + "\n"
+             + "   with a name that duplicates the name of an existing\n"
+             + "   schematic object in the ModelScheme.\n"
+             + "\n"
+             + "      Duplicate Name: \"" + theName + "\"\n");
+      }
+
+/*******************************************************************************
+ * Stores theName as the name of a schematic object that belongs to this
+ * ModelScheme.
+ *******************************************************************************
+ */
+   void storeName (String theName)
+      {
+      allNames.add (theName);
+      }
+
+/*******************************************************************************
+ * Stores theItemCat (a newly constructed ItemCategory) in this ModelScheme.
+ *******************************************************************************
+ */
+   void store (ItemCategory <?> theItemCat)
+      {
+      myItemCategories.add (theItemCat);
+      }
+
+/*******************************************************************************
+ * @@return An unmodifiable view of a list of all Categories that belong to this
+ *         ModelScheme.
+ *******************************************************************************
+ */
+   List <ItemCategory <?>> getItemCategories ()
+      {
+      return Collections.unmodifiableList (myItemCategories);
+      }
+
+/*******************************************************************************
+ * @@return The GLOBAL ItemCategory for this ModelScheme.<br>
+ * (Internal Version)
+ *******************************************************************************
+ */
+   PrimitiveCategory getGlobalCat ()
+      {
+      return myGlobalCategory;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Sets the current ModelScheme.
+ * 
+ * @@param theScheme The ModelScheme which is to become current.
+ *        (Null is allowed.)
+ * 
+ * @@throws IllegalArgumentException If theScheme is frozen
+ *******************************************************************************
+ */
+   public static void setCurrentModelScheme (ModelScheme theScheme)
+      {
+      if (theScheme != null)
+         theScheme.rejFrozen ();
+
+      current = theScheme;
+      }
+
+/*******************************************************************************
+ * @@return The current ModelScheme, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static ModelScheme getCurrentModelScheme ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * Puts the current ModelScheme into a frozen state.<br>
+ * When a ModelScheme is frozen, its state and the state of the Categories and
+ * Properties that belong to it cannot be changed.<br>
+ * This method also sets the current ModelScheme reference to null.<br>
+ * In general, a frozen ModelScheme is never allowed to be the current
+ * ModelScheme.
+ * 
+ * @@throws IllegalStateException If the current ModelScheme is null
+ *******************************************************************************
+ */
+   public static void freezeCurrentModelScheme ()
+      {
+      ModelScheme theScheme;
+      
+      reqCurScheme ();
+      
+      theScheme = current;
+      current   = null;
+      
+      for (ItemCategory <?> theItemCat: theScheme.myItemCategories)
+         theItemCat.freeze ();
+      
+      theScheme.frozen = true;
+      }
+
+/*******************************************************************************
+ * Returns the GLOBAL ItemCategory ("GLOBAL") for the current ModelScheme.<br>
+ * It is recommended that a reference to this ItemCategory be stored in the
+ * application program as a static field called GLOBAL.
+ * 
+ * @@return The GLOBAL ItemCategory for the current ModelScheme.
+ * 
+ * @@throws IllegalStateException If the current ModelScheme is null
+ *******************************************************************************
+ */
+   public static PrimitiveCategory getGlobalCategory ()
+      {
+      reqCurScheme ();
+      
+      return current.myGlobalCategory;
+      }
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new ModelScheme.<br>
+ * Sets the current ModelScheme to the new ModelScheme.<br>
+ *
+ * @@param  theName              The name of the WIT Model
+ * @@return                      The new ModelScheme
+ * @@throws NullPointerException If theName is null
+ *******************************************************************************
+ */
+   public static ModelScheme newModelScheme (String theName)
+      {
+      rejNull (theName, "theName");
+      
+      return new ModelScheme (theName);
+      }
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new PrimitiveCategory that will belong to the current
+ * ModelScheme.
+ * 
+ * @@param theName                   The name of the PrimitiveCategory to be
+ *                                  constructed
+ * @@return                          The new PrimitiveCategory
+ * @@throws NullPointerException     If theName is null
+ * @@throws IllegalStateException    If the current ModelScheme is null
+ * @@throws IllegalArgumentException If theName duplicates the name of an 
+ *                                  existing schematic object in the current
+ *                                  ModelScheme
+ *******************************************************************************
+ */
+   public static PrimitiveCategory newPrimitiveCategory (String theName)
+      {
+      rejNull            (theName, "theName");
+      reqCurScheme       ();
+      current.rejDupName (theName,
+                          "ModelScheme.newPrimitiveCategory (theName)");
+      
+      return new PrimitiveCategory (current, theName);
+      }
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new TupleCategory for the current ModelScheme.
+ * 
+ * @@param  theName                  The name of the TupleCategory to be
+ *                                  constructed
+ * @@param  theDimens                The Categories that are to be the
+ *                                  dimensions of the TupleCategory    
+ * @@return                          The new TupleCategory
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalStateException    If the current ModelScheme is null
+ * @@throws IllegalArgumentException If no Categories are given
+ * @@throws IllegalArgumentException The Categories do not all belong to the
+ *                                  current ModelScheme
+ * @@throws IllegalArgumentException If theName duplicates the name of an 
+ *                                  existing schematic object in the current
+ *                                  ModelScheme
+ *******************************************************************************
+ */
+   public static TupleCategory newTupleCategory (
+         String              theName,
+         ItemCategory <?>... theDimens)
+      {
+      rejNull            (theName,   "theName");
+      rejNullArray       (theDimens, "theDimens");
+      reqCurScheme       ();
+      reqAtLeast1Cat     (theName,   theDimens);
+      reqSchemesBeCur    (theName,   theDimens);
+      current.rejDupName (theName,   "ModelScheme.newTupleCategory (theName)");
+      
+      return new TupleCategory (current, theName, theDimens);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The name of the WIT model
+ *******************************************************************************
+ */
+   public String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * @@return True, iff this ModelScheme is "frozen".<br>
+ * When a ModelScheme is frozen, its state cannot be changed.
+ *******************************************************************************
+ */
+   public boolean isFrozen ()
+      {
+      return frozen;
+      }
+
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */             @@Override
+   public String toString ()
+      {
+      return myName; 
+      }
+   
+/*******************************************************************************
+ * Prints this ModelScheme.
+ * 
+ * @@param theStream the PrintStream to which this ModelScheme is to be printed.
+ *******************************************************************************
+ */
+   public void print (PrintStream theStream)
+      {
+      theStream.printf (
+         "Detailed Print of ModelScheme %s:%n"
+       + "%n"
+       + "Frozen ModelScheme? %s%n",
+         myName,
+         frozen);
+      
+      for (ItemCategory <?> theItemCat: myItemCategories)
+         theItemCat.print (theStream);
+      }
+
+/*******************************************************************************
+ * Factory method: Constructs a new ModelInstance for this ModelScheme.<br>
+ * The current ModelInstance is set to the new ModelInstance.<br>
+ *
+ * @@param  theName               The name of the new ModelInstance
+ * @@return                       The new ModelInstance
+ * @@throws NullPointerException  If any argument is null
+ * @@throws IllegalStateException If this ModelScheme is not frozen
+ *******************************************************************************
+ */
+   public ModelInstance newModelInstance (String theName)
+      {
+      rejNull   (theName, "theName");
+      reqFrozen (theName);
+      
+      return new ModelInstance (this, theName);
+      }
+      
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.8
+log
+@bar ==> ban
+@
+text
+@d169 1
+a169 1
+   private void banFrozen ()
+d207 1
+a207 1
+   void banDupName (String theName, String signature)
+d275 1
+a275 1
+         theScheme.banFrozen ();
+d344 1
+a344 1
+      banNull (theName, "theName");
+d366 1
+a366 1
+      banNull            (theName, "theName");
+d368 1
+a368 1
+      current.banDupName (theName,
+d397 2
+a398 2
+      banNull            (theName,   "theName");
+      banNullArray       (theDimens, "theDimens");
+d402 1
+a402 1
+      current.banDupName (theName,   "ModelScheme.newTupleCategory (theName)");
+d470 1
+a470 1
+      banNull   (theName, "theName");
+@
+
+
+1.7
+log
+@Simplified toString.
+@
+text
+@d169 1
+a169 1
+   private void barFrozen ()
+d207 1
+a207 1
+   void barDupName (String theName, String signature)
+d275 1
+a275 1
+         theScheme.barFrozen ();
+d344 1
+a344 1
+      barNull (theName, "theName");
+d366 1
+a366 1
+      barNull            (theName, "theName");
+d368 1
+a368 1
+      current.barDupName (theName,
+d397 2
+a398 2
+      barNull            (theName,   "theName");
+      barNullArray       (theDimens, "theDimens");
+d402 1
+a402 1
+      current.barDupName (theName,   "ModelScheme.newTupleCategory (theName)");
+d470 1
+a470 1
+      barNull   (theName, "theName");
+@
+
+
+1.6
+log
+@ValueByPeriod
+@
+text
+@d436 1
+a436 1
+      return concatenation ("ModelScheme ", myName); 
+@
+
+
+1.5
+log
+@ValueByPeriod
+@
+text
+@d65 1
+a65 1
+   private final ArrayList <ItemCategory <?>> myCategories;
+d83 1
+a83 1
+      myCategories     = new ArrayList <ItemCategory <?>> ();
+d236 1
+a236 1
+      myCategories.add (theItemCat);
+d244 1
+a244 1
+   List <ItemCategory <?>> getCategories ()
+d246 1
+a246 1
+      return Collections.unmodifiableList (myCategories);
+d309 1
+a309 1
+      for (ItemCategory <?> theItemCat: theScheme.myCategories)
+d433 1
+a433 1
+ */      @@Override
+d454 1
+a454 1
+      for (ItemCategory <?> theItemCat: myCategories)
+@
+
+
+1.4
+log
+@Class PeriodTrait
+@
+text
+@d17 3
+a19 2
+ * A ModelScheme is the central object representing the static structure or "scheme"
+ * of a WIT model, i.e., the data-independent aspects of the model.<br><br>
+@
+
+
+1.3
+log
+@Removed first implementation of the period concept.
+@
+text
+@d358 2
+a359 2
+ * @@throws IllegalArgumentException If theName duplicates the name of an
+ *                                  existing PrimitiveCategory in the current
+d387 2
+a388 2
+ * @@throws IllegalArgumentException If theName duplicates the name of an
+ *                                  existing TupleCategory in the current
+d435 1
+a435 1
+      return concatenation ("ModelScheme \"", myName, "\""); 
+@
+
+
+1.2
+log
+@Some renaming.
+@
+text
+@a71 6
+/*******************************************************************************
+ * The PERIOD ItemCategory for this ModelScheme.
+ *******************************************************************************
+ */
+   private final PrimitiveCategory myPeriodCategory;
+
+a84 1
+      myPeriodCategory = new PrimitiveCategory (this, "PERIOD");
+a257 10
+/*******************************************************************************
+ * @@return The PERIOD ItemCategory for this ModelScheme.<br>
+ * (Internal Version)
+ *******************************************************************************
+ */
+   PrimitiveCategory getPeriodCat ()
+      {
+      return myPeriodCategory;
+      }
+
+a331 17
+ * Returns the PERIOD ItemCategory for the current ModelScheme.<br>
+ * It is recommended that a reference to this ItemCategory be stored in the
+ * application program as a static field called PERIOD.
+ * 
+ * @@return The PERIOD ItemCategory for the current ModelScheme.
+ * 
+ * @@throws IllegalStateException If the current ModelScheme is null
+ *******************************************************************************
+ */
+   public static PrimitiveCategory getPeriodCategory ()
+      {
+      reqCurScheme ();
+      
+      return current.myPeriodCategory;
+      }
+
+/*******************************************************************************
+@
+
+
+1.1
+log
+@Scheme ==> ModelScheme
+@
+text
+@d54 2
+a55 1
+ * The set of the names of all of schematic objects that belong to this ModelScheme.
+d106 1
+a106 1
+   private static void requireCurModelScheme ()
+d122 1
+a122 1
+   private static void requireAtLeast1Cat (
+d139 2
+a140 2
+ * Verifies that the ModelScheme of each ItemCategory in theDimenArr is the current
+ * ModelScheme.<br>
+d144 1
+a144 1
+   private static void requireModelSchemesBeCur (
+d156 2
+a157 2
+                + "   with at least one ItemCategory whose ModelScheme is not the\n" 
+                + "   current ModelScheme.\n"
+d159 4
+a162 5
+                + "      theName:        " +            theName    + "\n"
+                + "      ItemCategory:   " + theItemCat.getName () + "\n"
+                + "         ModelScheme:      " + theItemCat.
+                                                getModelScheme ().
+                                                        getName () + "\n"
+d175 1
+a175 1
+   private void prohibitFrozen ()
+d181 2
+a182 1
+             + "   Call to setCurrentModelScheme (theModelScheme) with a frozen ModelScheme.\n"
+d191 1
+a191 1
+   private void requireFrozen (String theName)
+d197 2
+a198 2
+             + "   Call to ModelScheme.newModelInstance (theName), when the ModelScheme\n"
+             + "   was not frozen:\n"
+d200 2
+a201 2
+             + "      ModelScheme:             " + myName  + "\n"
+             + "      ModelInstance Name: " + theName + "\n");
+d213 1
+a213 1
+   void prohibitDupName (String theName, String signature)
+d227 2
+a228 1
+ * Stores theName as the name of a schematic object that belongs to this ModelScheme.
+d282 2
+a283 1
+ * @@param theModelScheme The ModelScheme which is to become current. (Null is allowed.)
+d285 1
+a285 1
+ * @@throws IllegalArgumentException If theModelScheme is frozen
+d288 1
+a288 1
+   public static void setCurrentModelScheme (ModelScheme theModelScheme)
+d290 2
+a291 2
+      if (theModelScheme != null)
+         theModelScheme.prohibitFrozen ();
+d293 1
+a293 1
+      current = theModelScheme;
+d310 2
+a311 1
+ * In general, a frozen ModelScheme is never allowed to be the current ModelScheme.
+d318 1
+a318 1
+      ModelScheme theModelScheme;
+d320 1
+a320 1
+      requireCurModelScheme ();
+d322 1
+a322 1
+      theModelScheme = current;
+d325 1
+a325 1
+      for (ItemCategory <?> theItemCat: theModelScheme.myCategories)
+d328 1
+a328 1
+      theModelScheme.frozen = true;
+d343 1
+a343 1
+      requireCurModelScheme ();
+d360 1
+a360 1
+      requireCurModelScheme ();
+d377 1
+a377 1
+      prohibitNull (theName, "theName");
+d384 2
+a385 1
+ * Constructs a new PrimitiveCategory that will belong to the current ModelScheme.
+d399 4
+a402 4
+      prohibitNull       (theName, "theName");
+      requireCurModelScheme   ();
+      current.
+         prohibitDupName (theName, "ModelScheme.newPrimitiveCategory (theName)");
+d422 2
+a423 1
+ *                                  existing TupleCategory in the current ModelScheme
+d430 6
+a435 6
+      prohibitNull            (theName,   "theName");
+      prohibitNullArray       (theDimens, "theDimens");
+      requireCurModelScheme        ();
+      requireAtLeast1Cat      (theName,   theDimens);
+      requireModelSchemesBeCur     (theName,   theDimens);
+      current.prohibitDupName (theName,   "ModelScheme.newTupleCategory (theName)");
+d503 2
+a504 2
+      prohibitNull  (theName, "theName");
+      requireFrozen (theName);
+@
+

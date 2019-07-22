@@ -1,0 +1,398 @@
+head	1.6;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.6
+date	2011.05.04.20.20.06;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.05.02.22.01.14;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.02.16.38.34;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.02.15.25.03;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.04.28.19.13.02;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.04.19.22.34.51;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Started class Modeler.
+@
+text
+@
+//==============================================================================
+// WIT-MF Source File InputTable.java.
+//==============================================================================
+
+package       com.ibm.witmf;
+
+import static com.ibm.witmf.Utility.*;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+
+/*******************************************************************************
+ * An InputTable represents a table of Strings that was read in from a CSV file.
+ * Immutable class
+ *******************************************************************************
+ */
+public final class InputTable
+{
+//==============================================================================
+// Public Methods
+//==============================================================================
+
+/*******************************************************************************
+ * Factory method: Constructs a new InputTable that stores the data given in a
+ * CSV file.
+ * 
+ * @@param theFileName            The name of the CSV file.
+ * @@return                       The new InputTable
+ * @@throws FileNotFoundException If thrown when reading the file
+ * @@throws IOException           If thrown when reading the file
+ * @@throws RuntimeException      If the file is empty
+ * @@throws RuntimeException      If two or more column headings are identical
+ * @@throws RuntimeException      If a row is read whose length does not match
+ *                               the number of column headings
+ *******************************************************************************
+ */
+   public static InputTable newInstance (String theFileName)
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      return new InputTable (theFileName);
+      }
+
+/*******************************************************************************
+ * Returns an array listing all of the Strings given in a list of Strings that
+ * are not column headings in this InputTable.
+ * 
+ * @@param theHeadings The list of Strings
+ * @@return            (See summary)
+ *******************************************************************************
+ */
+   public String[] findNonHeadings (String... theHeadings)
+      {
+      ArrayList <String> nonHeads;
+
+      nonHeads = new ArrayList <String> (theHeadings.length);
+
+      for (String theHeading: theHeadings)
+         {
+         if (! myColIndexMap.containsKey (theHeading))
+            {
+            nonHeads.add (theHeading);
+            }
+         }
+
+      return nonHeads.toArray (new String[0]);
+      }
+
+/*******************************************************************************
+ * Returns the List of InputRows for this InputTable.
+ * 
+ * @@return The List of InputRows, as an unmodifiable view of an ArrayList
+ *******************************************************************************
+ */
+   public List <InputRow> getRows ()
+      {
+      return Collections.unmodifiableList (myRows);
+      }
+
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+/*******************************************************************************
+ * Returns the index of the column whose heading matches theHeading, if any,
+ * otherwise 0.
+ *******************************************************************************
+ */
+   int getColumnIndex (String theHeading)
+      {
+      Integer colIdx;
+
+      colIdx = myColIndexMap.get (theHeading);
+
+      return (colIdx != null)? colIdx: 0;
+      }
+
+//==============================================================================
+// Private Methods & Constructors
+//==============================================================================
+   
+/*******************************************************************************
+ * Constructor.
+ *******************************************************************************
+ */
+   private InputTable (String theFileName)
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      ArrayList  <String>             theHeadings;
+      LinkedList <ArrayList <String>> theCellRows;
+
+      theHeadings   = new ArrayList  <String>             (0);
+      theCellRows   = new LinkedList <ArrayList <String>> ();
+
+      CsvFileReader.read (theFileName, theHeadings, theCellRows);
+
+      myColIndexMap = buildColIndexMap (theHeadings);
+      myRows        = buildRows        (theCellRows);
+      }
+
+/*******************************************************************************
+ * Builds and returns the Map to be used as myColIndexMap, based on theHeadings.
+ *******************************************************************************
+ */
+   private HashMap <String, Integer> buildColIndexMap (
+         List <String> theHeadings)
+      {
+      HashMap <String, Integer> theColIndexMap;
+      String                    theHeading;
+      int                       colIdx;
+
+      theColIndexMap = new HashMap <String, Integer> (theHeadings.size () * 3);
+
+      for (colIdx = 1; colIdx <= theHeadings.size (); colIdx ++)
+         {
+         theHeading = theHeadings.get (colIdx - 1);
+
+         assert (! theColIndexMap.containsKey (theHeading));
+
+         theColIndexMap.put (theHeading, colIdx);
+         }
+
+      return theColIndexMap;
+      }
+
+/*******************************************************************************
+ * Creates the InputRows for this InputTable from theCellRows, stores them in an
+ * ArrayList, and returns it.
+ *******************************************************************************
+ */
+   private ArrayList <InputRow> buildRows (
+         List <ArrayList <String>> theCellRows)
+      {
+      ArrayList <InputRow> theRows;
+      int                  rowIdx;
+      ArrayList <String>   theCells;
+      InputRow             theRow;
+
+      theRows = new ArrayList <InputRow> (theCellRows.size ());
+
+      for (rowIdx = 1; rowIdx <= theCellRows.size (); rowIdx ++)
+         {
+         theCells = theCellRows.get (rowIdx - 1);
+
+         assert (theCells.size () == myColIndexMap.size ());
+
+         theRow   = new InputRow (this, rowIdx, theCells);
+
+         theRows.add (theRow);
+         }
+
+      return theRows;
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+
+/*******************************************************************************
+ * myColIndexMap.get (theHeading) is the column index for theHeading.
+ *******************************************************************************
+ */
+   private final HashMap <String, Integer> myColIndexMap;
+
+/*******************************************************************************
+ * myRows.get (rowIdx-1) is the InputRow that represents row #rowIdx in this
+ * InputTable.
+ *******************************************************************************
+ */
+   private final ArrayList <InputRow> myRows;
+
+//==============================================================================
+}
+@
+
+
+1.5
+log
+@Added class Utility.
+Revised imports.
+@
+text
+@d106 1
+a106 1
+// Private Methods
+d108 1
+a108 1
+
+@
+
+
+1.4
+log
+@Revised some comments.
+@
+text
+@d6 1
+a6 1
+package com.ibm.witmf;
+d8 9
+a16 2
+import    java.util.*;
+import      java.io.*;
+@
+
+
+1.3
+log
+@Doc comments
+@
+text
+@a3 2
+//
+// Contains the declaration of class InputTable.
+@
+
+
+1.2
+log
+@Added a status quo test.
+@
+text
+@d13 5
+a17 7
+//==============================================================================
+// Class InputTable
+//
+// Represents a table of Strings that was read in from a CSV file.
+// Immutable class
+//==============================================================================
+
+d24 14
+a37 7
+//------------------------------------------------------------------------------
+// newInstance (theFileName)
+//
+// Factory method: Constructs and returns a new InputTable that stores the data
+// given in the CSV file whose name is given by theFileName.
+//------------------------------------------------------------------------------
+
+d46 8
+a53 7
+//------------------------------------------------------------------------------
+// findNonHeadings (theHeadings)
+//
+// Returns an array listing all of the Strings given in theHeadings that are not
+// column headings in this InputTable.
+//------------------------------------------------------------------------------
+
+d71 6
+a76 7
+//------------------------------------------------------------------------------
+// getRows ()
+//
+// Returns the List of InputRows for this InputTable, as an unmodifiable view of
+// an ArrayList.
+//------------------------------------------------------------------------------
+
+d86 5
+a90 7
+//------------------------------------------------------------------------------
+// getColumnIndex (theHeading)
+//
+// Returns the index of the column whose heading matches theHeading, if any,
+// otherwise 0.
+//------------------------------------------------------------------------------
+
+d101 1
+a101 1
+// Private Constructor
+d104 4
+d125 4
+a128 10
+//==============================================================================
+// Private Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// buildColIndexMap (theHeadings)
+//
+// Builds and returns the Map to be used as myColIndexMap, based on theHeadings.
+//------------------------------------------------------------------------------
+
+d150 5
+a154 7
+//------------------------------------------------------------------------------
+// buildRows (theCellRows)
+// 
+// Creates the InputRows for this InputTable from theCellRows, stores them in an
+// ArrayList, and returns it.
+//------------------------------------------------------------------------------
+
+d183 4
+a186 6
+//------------------------------------------------------------------------------
+// myColIndexMap
+//
+// myColIndexMap.get (theHeading) is the column index for theHeading.
+//------------------------------------------------------------------------------
+
+d189 5
+a193 7
+//------------------------------------------------------------------------------
+// myRows
+//
+// myRows.get (rowIdx - 1) is the InputRow that represents row #rowIdx in this
+// InputTable.
+//------------------------------------------------------------------------------
+
+@
+
+
+1.1
+log
+@Initial files for WIT-MF.
+@
+text
+@d101 1
+a101 1
+   InputTable (String theFileName)
+@
+

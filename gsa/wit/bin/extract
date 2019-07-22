@@ -1,0 +1,62 @@
+#!/bin/csh
+
+# Extract desired lines from a CSV file
+# This program expects a CSV file like the ones produced by PRM.  The
+# second field in each row (except title lines) is the attribute name
+# for the row.  This program extracts all of the lines that have the
+# attribute the user selects.
+
+# $Id: extract.sh,v 1.1.1.1 2000/02/23 17:02:56 wit Exp $
+
+if ($#argv != 2) then
+	echo "Format: extract input_file_name output_file_name"
+	echo
+	echo "This program will prompt for the lines to be extracted"
+	exit 1
+endif
+
+set ifn = $argv[1]
+set ofn = $argv[2]
+
+if (! -e $ifn) then
+	echo "Can not find file named \"$ifn\".  Please check spelling"
+	echo "and directory"
+	exit 2
+endif
+if (-e $ofn) then
+	echo "$ofn already exists.  Overwrite it?"
+	echo "Type 'y' for yes and press enter or just press enter for no."
+	set a = "$<"
+	if ($a != y) then
+		exit 3
+	endif
+	unset noclobber  # So shell will overwrite without warnings
+endif
+
+# Set temporary file name
+set tfn = /tmp/extractNames.$$
+
+echo "Finding the field names now"
+# Use sed to extract the first 60 lines;
+# use awk to extract the second field;
+# use grep to filter out lines that don't have fields;
+# use sort to eliminate duplicates
+/bin/sed -n '1,60p' < $ifn | /bin/awk '-F,' '{print $2}' \
+    | /bin/grep '"' | /usr/bin/sort -u > $tfn
+
+echo "Type the number of the field you want in the output file"
+# Print out files with line numbers ahead of them
+/bin/cat -n $tfn
+
+@ lineN = "$<"
+@ max = `/bin/wc -l < $tfn`
+if ($lineN > $max) then
+	echo "Answer has to be a number less than or equal to $max"
+	/bin/rm $tfn
+	exit 4
+else
+	set key = "`/bin/sed -n ${lineN}p < $tfn`"
+	/bin/grep "$key" < $ifn > $ofn
+	/bin/rm $tfn
+endif
+echo Done writing $ofn

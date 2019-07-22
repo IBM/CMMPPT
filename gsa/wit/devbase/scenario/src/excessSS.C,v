@@ -1,0 +1,411 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.47;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.35;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.41;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.41;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.29;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+#include <scenario/src/excessSS.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/machdep.h>
+#include <scenario/src/partSchP.h>
+
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrExcessScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  LgFrPart part;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( part, tv );
+
+  // Loop once for each part
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfParts().size(); i++ ) {
+
+     part = setOfParts()[i];
+
+     // Make itemTimeVec
+     itv.item( part );
+     itv.timeVecFloat(
+           implodePtr_->lastProblemSolved().excessVolume( &part )   );
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+
+     
+  }
+
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrExcessScheduleStrategy::clone()
+const
+{
+  LgFrExcessScheduleStrategy* newInst = 
+      new LgFrExcessScheduleStrategy(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with new Scenario
+LgFrAttributeScheduleStrategy *
+LgFrExcessScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{
+  LgFrExcessScheduleStrategy* newInst = 
+      new LgFrExcessScheduleStrategy(*this, newScenario);
+  return (newInst);
+}
+
+// Assignment operator
+LgFrExcessScheduleStrategy &
+LgFrExcessScheduleStrategy::operator=(
+	  const LgFrExcessScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrPartScheduleStrategy::operator= ) (rhs);
+
+    implodePtr_ = rhs.implodePtr_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrExcessScheduleStrategy::
+   LgFrExcessScheduleStrategy (
+      const LgFrExcessScheduleStrategy & source)
+:  LgFrPartScheduleStrategy( source ), 
+   implodePtr_( source.implodePtr_ ),
+   id_(__LGFREXCESSSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Copy constructor with new Scenario
+LgFrExcessScheduleStrategy::
+   LgFrExcessScheduleStrategy (
+      const LgFrExcessScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrPartScheduleStrategy( 
+         source, 
+         newScenario ),
+   implodePtr_( &(implode(newScenario)) ),
+   id_(__LGFREXCESSSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+
+// Constructor
+LgFrExcessScheduleStrategy::
+   LgFrExcessScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrPartScheduleStrategy( 
+       LgFrAttributeScheduleStrategy::setOfParts(scenario), 
+      &(implode(scenario)) ),
+   implodePtr_( &(implode(scenario)) ),
+   id_(__LGFREXCESSSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrExcessScheduleStrategy::
+   LgFrExcessScheduleStrategy ()
+:  LgFrPartScheduleStrategy( LgFrSetOfPartsWithMovableParts(), 0 ),
+   implodePtr_( 0 ),
+   id_(__LGFREXCESSSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrExcessScheduleStrategy::
+   ~LgFrExcessScheduleStrategy ()
+{
+  // Nothing to do here
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrExcessScheduleStrategy methods.
+void
+LgFrExcessScheduleStrategy::test()
+{
+}
+
+// test LgFrExcessScheduleStrategy methods.
+// Expects the data in testScenario to come from
+// "/u/implode/wit/data/examples/diner12/wit.data"
+void
+LgFrExcessScheduleStrategy::contextTest
+    (LgFrScenario          & testScenario,
+     LgFrLastProblemSolved & lps,		// testScenario's 
+     LgFrSetOfParts        & sop)		// testScenario's
+{
+  int i;
+
+  // Test constructor
+  LgFrExcessScheduleStrategy cs1(testScenario);
+
+  // Test copy constructor
+  LgFrExcessScheduleStrategy cs2(cs1);
+
+  // Test assignment operator
+  LgFrExcessScheduleStrategy cs3;
+  cs3 = cs2;
+
+  {
+    // Test clone method
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+  // Test populate.  Should be populated with zero timeVec because
+  // a Excess schedule does not exist.
+  LgFrSortingPartScheduleFloatSmartPointer schedule;
+  const LgFrSortingPartScheduleFloat & constSchedule = *schedule;
+  cs1.populate( *schedule );
+  for ( i=0; i<sop.size(); i++ ) {
+     assert(  schedule->contains( sop[i] )  );
+     assert( constSchedule[sop[i]].timeVecFloat() == 0.0 );
+  }
+
+  // Test popluate with zeroFilter.  Should produce an empty schedule
+  LgFrZeroTimeVecFilterStrategy zeroFilter;
+  schedule->filterStrategy( zeroFilter );
+  cs1.populate( *schedule );
+  assert( schedule->size()==0 );
+
+  // Test populate, due to new implosion solution.
+  {
+    LgFrFilterStrategy defaultFilter;
+    schedule->filterStrategy( defaultFilter );
+  }
+  schedule->attributeScheduleStrategy( cs1 );
+  testScenario.newImplosionSolution();
+  // cs1.populate( schedule );
+  // cout <<endl <<"LgFrExcessScheduleStrategy" <<endl
+  //      <<schedule->format() <<endl;
+
+  for ( i=0; i<sop.size(); i++ ) {
+     LgFrPart p = sop[i];
+     assert(  schedule->contains( p )  );
+     assert( lps.excessVolume(&p) == 
+                constSchedule[p].timeVecFloat() );
+  }
+
+  // Test populate with filter
+  schedule->filterStrategy( zeroFilter);
+  schedule->attributeScheduleStrategy( cs1 );
+  testScenario.newImplosionSolution();
+
+  cs1.populate( *schedule );
+  // cout <<endl <<"LgFrExcessScheduleStrategy with zero filter" <<endl
+  //      <<schedule->format() <<endl;
+
+  for ( i=0; i<schedule->size(); i++ ) {
+     assert(  !(constSchedule[i].timeVecFloat() == 0.0)  );
+  }
+  
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 4
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+d26 2
+a27 1
+  for ( size_t i=0; i<setOfParts().entries(); i++ ) {
+a67 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrExcessScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a72 1
+  assert( id_ == rhs.id_ );
+d125 2
+a126 2
+:  LgFrPartScheduleStrategy( LgFrSetOfPartsWithMovableParts(), NULL ),
+   implodePtr_( NULL ),
+a162 4
+  assert( cs1.id_ == __LGFREXCESSSCHEDULESTRATEGY );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFREXCESSSCHEDULESTRATEGY );
+a165 1
+  assert( cs2.isA() == __LGFREXCESSSCHEDULESTRATEGY );
+a169 1
+  assert( cs3.isA() == cs2.isA() );
+a173 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d184 1
+a184 1
+  for ( i=0; i<sop.entries(); i++ ) {
+d193 1
+a193 1
+  assert( schedule->entries()==0 );
+d206 1
+a206 1
+  for ( i=0; i<sop.entries(); i++ ) {
+d222 1
+a222 1
+  for ( i=0; i<schedule->entries(); i++ ) {
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d23 1
+a23 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfParts().size(); i++ ) {
+d64 8
+d77 1
+d130 2
+a131 2
+:  LgFrPartScheduleStrategy( LgFrSetOfPartsWithMovableParts(), 0 ),
+   implodePtr_( 0 ),
+d168 4
+d175 1
+d180 1
+d185 1
+d196 1
+a196 1
+  for ( i=0; i<sop.size(); i++ ) {
+d205 1
+a205 1
+  assert( schedule->size()==0 );
+d218 1
+a218 1
+  for ( i=0; i<sop.size(); i++ ) {
+d234 1
+a234 1
+  for ( i=0; i<schedule->size(); i++ ) {
+@
+
