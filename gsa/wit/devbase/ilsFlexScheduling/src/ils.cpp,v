@@ -1,0 +1,594 @@
+head	1.11;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.11
+date	2002.10.18.16.09.37;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2002.09.25.15.38.15;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.09.17.13.25.38;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.09.16.21.35.23;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.09.16.16.33.30;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2002.09.13.19.54.40;	author sanjeebd;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2002.09.13.02.34.02;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.09.11.23.54.59;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.09.11.14.16.06;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.09.10.01.50.53;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.09.07.12.03.08;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@Updated some help messages
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <assert.h>
+#include <iostream.h>
+#include <float.h>
+
+#include "projFile.h"
+#include "resrcFile.h"
+#include "resrcAttrFile.h"
+#include "projResrcLinkFile.h"
+#include "projResrcLinkAttrFile.h"
+#include "contrSubsFile.h"
+#include "globalAttrFile.h"
+#include "ilsProblem.h"
+
+
+
+
+int
+main (int argc, char * argv[])
+{
+  cout <<"ilsFlexScheduling Build date: " <<__DATE__ <<endl;
+  {
+    
+    // Put Parms into a vector
+    std::vector<std::string> args;
+    for (int i=0; i<argc; i++) 
+      args.push_back(argv[i]);
+    
+    {
+      // Check parm passed to program
+      bool parmError = false;
+      
+      if ( args.size()> 1 ) {
+        if (args[1]=="?" ) {
+          parmError = true; // set flag to provide usage info
+        }
+      }
+      
+      if ( ! parmError ) {
+        if ( args.size()!=2 ) {
+          // Wrong number of parms. Write message
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Wrong number of parmeters specified"                      <<endl
+            <<"  Number parameters specified: " <<args.size()-1          <<endl
+            <<"  Expected number of parameters: 1"                       <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }
+      
+      
+      
+      if ( parmError ) {
+        // Write correct usage
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<argv[0] <<" dataDirectory "                                <<endl
+          <<"  where:"                                                 <<endl
+          <<"    dataDirectory:"                                       <<endl
+          <<"      Directory where input files are located and"        <<endl
+          <<"      output files are written."                          <<endl
+          <<"  example usage:"                                         <<endl
+          <<"    " <<argv[0] <<" example3"                             <<endl
+          <<"    " <<argv[0] <<" example2"                             <<endl
+          <<"    " <<argv[0] <<" 02Sep25"                              <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        return 1;
+      }
+    }
+    
+    std::string outputDirectory=args[1];
+    std::string inputDirectory=args[1];
+    ILSproblem ilsProb;
+    int nPeriods;
+    
+    // Read input files
+    {
+      cout <<"Reading input files" <<endl;
+      
+      
+      // Read Global Attributes
+      std::string globalAttrFileName = inputDirectory + "/globalAttr.csv";
+      ILSglobalAttrFile globalAttrFile(globalAttrFileName);
+      {      
+        std::string title=globalAttrFile.fieldAsString("title","attrValue");
+        ilsProb.setTitle(title);
+        
+        nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+        ilsProb.setNPeriods(nPeriods);
+      }
+      
+      
+      // Read resrc, resrcAttr, and contrSubs Files
+      {
+        std::string resrcFileName = inputDirectory + "/resrc.csv";
+        ILSresrcFile resrcFile(resrcFileName);
+        ILSresrcFileIterator resrcFileIter(resrcFile);
+        
+        std::string resrcAttrFileName = inputDirectory + "/resrcAttr.csv";
+        ILSresrcAttrFile resrcAttrFile(resrcAttrFileName);
+        
+        std::string contrSubsFileName = inputDirectory + "/contrSubs.csv";
+        ILScontrSubsFile contrSubsFile(contrSubsFileName);
+        
+        // loop once for each record
+        for ( resrcFileIter(); resrcFileIter()!=NULL; ) {
+          std::string role = resrcFileIter.role();
+          int band = resrcFileIter.bandAsInt();
+          float  ibmCost  = resrcFileIter.ibmCostAsFloat();
+          float contrCost = resrcFileIter.contrCostAsFloat();
+          
+          // Add resource to Model
+          ilsProb.addResource(role,band);
+          
+          ilsProb.setResourceIbmCost(role,band,ibmCost);
+          ilsProb.setResourceContrCost(role,band,contrCost);
+          
+          // Set the supply of ibm resource
+          std::vector<float> svVec;
+          int t;
+          for (t=0; t<nPeriods; t++ ) {
+            std::string key = ILSresrcAttrFile::key(role,band,t);
+            if ( resrcAttrFile.keyExists(key) ) {
+              float svForPeriodT = resrcAttrFile.supplyAsFloat(key);
+              svVec.push_back(svForPeriodT);
+            }
+            else {
+              svVec.push_back(0.0f);
+            }
+          }
+          assert(svVec.size()==nPeriods);
+          ilsProb.setResourceIbmSupplyVol(role,band,svVec);
+
+          // set supply of contractor resource
+          float contrSubPercent = contrSubsFile.subsPerAsFloat(resrcFileIter.band());
+          for (t=0; t<nPeriods; t++ ) {
+            svVec[t]=svVec[t]*contrSubPercent;
+          }
+          ilsProb.setResourceContrSupplyVol(role,band,svVec);
+
+        }  
+      } // Finished reading resrc, resrcAttr, contrSubs files
+      
+      // Read Project File
+      std::string projFileName = inputDirectory + "/proj.csv";
+      ILSprojFile projFile(projFileName);
+      {
+        ILSprojFileIterator projFileIter(projFile);
+        
+        // loop once for each record
+        for ( projFileIter(); projFileIter()!=NULL; ) {
+          std::string proj = projFileIter.proj();
+          float rateScale = projFileIter.rateScaleAsFloat();
+          float revenue = projFileIter.revenueAsFloat();
+          float closeProb = projFileIter.closeProbAsFloat();
+          
+          // Add project to Model
+          ilsProb.addProject(proj);
+          
+          ilsProb.setProjectRateScale(proj,rateScale);
+          ilsProb.setProjectRevenue(proj,revenue);
+          ilsProb.setProjectCloseProb(proj,closeProb);
+        }  
+      }  // Finished with projFileIter  
+      
+      // Read projResrcLink, projResrcLinkAttr
+      {
+        std::string projResrcLinkFileName = inputDirectory + "/projResrcLink.csv";
+        ILSprojResrcLinkFile projResrcLinkFile(projResrcLinkFileName);
+        ILSprojResrcLinkFileIterator projResrcLinkFileIter(projResrcLinkFile);
+        
+        std::string projResrcLinkAttrFileName = inputDirectory + "/projResrcLinkAttr.csv";
+        ILSprojResrcLinkAttrFile projResrcLinkAttrFile(projResrcLinkAttrFileName);
+        
+        // loop once for each record
+        for ( projResrcLinkFileIter(); projResrcLinkFileIter()!=NULL; ) {
+          std::string proj = projResrcLinkFileIter.proj();
+          std::string role = projResrcLinkFileIter.role();
+          int band = projResrcLinkFileIter.bandAsInt();
+
+          // Add link connecting project to consumed resource
+          ilsProb.addProjectResourceLink(proj,role,band);
+
+          // Set the amount of the resource consumed in each period
+          int t;
+          std::vector<float> consRateVec;
+          for (t=0; t<nPeriods; t++ ) consRateVec.push_back(0.0f);
+          int projStartPeriod=projFile.startPeriodAsInt(proj);
+          for (t=0; t<nPeriods; t++ ) {
+            
+            // Was the consRate specified in attribute file?
+            std::string key = ILSprojResrcLinkAttrFile::key(proj,role,band,t);
+            if ( projResrcLinkAttrFile.keyExists(key) ) {
+              assert( t+projStartPeriod <nPeriods );
+              consRateVec[t+projStartPeriod]=projResrcLinkAttrFile.consRateAsFloat(key);
+            }
+          }
+          ilsProb.setProjectResourceLinkConsRate(proj,role,band,consRateVec);
+        }
+      }  // finished reading projResrcLink, projResrcLinkAttr
+      
+    } // Finished Reading Files
+
+    //---------------------------------------------------------
+
+    // Solve
+    {
+      cout <<"Solving." <<endl;
+#if 1
+      std::vector<float> probGrid(3);
+      probGrid[0]=1.0f;
+      probGrid[1]=0.5f;
+      probGrid[2]=0.0f;
+      ilsProb.setProbabilityGrid(probGrid);
+#endif
+      ilsProb.solve();
+    }
+
+    //---------------------------------------------------------
+    // Write Results
+    //---------------------------------------------------------
+    {
+      cout <<"Writing results." <<endl;
+
+      // Open resrcConsVol file and write header.
+      std::string resrcConsVolFileName = outputDirectory+"/resrcConsVolO.csv";
+      FILE * resrcConsVolFilePtr = fopen(resrcConsVolFileName.c_str(),"w");
+      std::string heading;
+      heading="\"role\",\"band\",\"prob\",\"period\",\"ibmConsVol\",\"contrConsVol\""; 
+      fprintf(resrcConsVolFilePtr,"%s\n",heading.c_str());
+      
+      // Open projExecVol file and write header.
+      std::string projExecVolFileName = outputDirectory+"/projExecVolO.csv";
+      FILE * projExecVolFilePtr = fopen(projExecVolFileName.c_str(),"w");
+      heading="\"proj\",\"prob\",\"execVol\""; 
+      fprintf(projExecVolFilePtr,"%s\n",heading.c_str());  
+      
+      std::vector<float> probGrid = ilsProb.getProbabilityGrid();
+
+      // Write projExecVol file
+      bool shortages=false;
+      {
+        std::vector<std::string> projects;
+        ilsProb.getProjects(projects);
+        
+        // loop once for each point on probability grid
+        int g;
+        for ( g=0; g<probGrid.size(); g++ ) {
+          int p;
+          for (p=0;p<projects.size();p++) {
+            std::vector<float> execVol = ilsProb.getProjectExecVol(projects[p]);
+            fprintf(projExecVolFilePtr,
+              "\"%s\",%f,%f\n",
+              projects[p].c_str(),probGrid[g],execVol[g]);
+            if ( execVol[g] < 1.0 && (g+1)==probGrid.size() ) shortages=true;
+          } // finished p loop
+        } // finished g loop
+        fclose(projExecVolFilePtr);
+      } // finished writing projExecVol file
+
+      
+      // Write resrcConsVol file
+      {
+        std::vector<std::string> roles;
+        std::vector<int> bands;
+        ilsProb.getResources(roles,bands);
+        
+        // loop once for each point on probability grid
+        int g;
+        for ( g=0; g<probGrid.size(); g++ ) {
+          int r;
+          for (r=0;r<roles.size();r++) {
+            std::vector< std::vector<float> >ibmConsVol = ilsProb.getResourceIbmConsVol(roles[r],bands[r]);
+            std::vector< std::vector<float> >contrConsVol = ilsProb.getResourceContrConsVol(roles[r],bands[r]);
+            int t;
+            for (t=0;t<nPeriods;t++) {
+              fprintf(resrcConsVolFilePtr,
+                "\"%s\",%d,%f,%d,%f,%f\n",
+                roles[r].c_str(),bands[r],probGrid[g],t,ibmConsVol[g][t],contrConsVol[g][t]);
+            } // finished t loop
+          } // finished r loop
+        } // finished g loop
+        fclose(resrcConsVolFilePtr);
+      } // finished writing resrcConsVol file
+
+#if 0
+      // Get list of shortages and print 
+      if ( shortages )
+      {          
+        std::vector<std::string> resourceDescriptions;
+        std::vector<int> periods;
+        std::vector<float> shortageVols;
+        ilsProb.getResourceShortages(resourceDescriptions,periods,shortageVols );
+        if ( periods.size()>0 )
+          printf("Resource Shortages:");
+        int s;
+        for ( s=0; s<periods.size(); s++ ) {
+          printf("%d, %f, %s\n",periods[s],shortageVols[s],resourceDescriptions[s].c_str());
+        }
+      }
+#endif
+      
+    }  // Finished writing results
+  }
+
+  cout <<"ilsFlexScheduling application is finished." <<endl;
+  return 0;
+}
+@
+
+
+1.10
+log
+@Updated to get fss working
+@
+text
+@d69 2
+d299 2
+@
+
+
+1.9
+log
+@Added so solve does optImplode multiple times.
+The demandVols are set based on probability of project occuring.
+@
+text
+@d68 1
+a68 2
+          <<"    " <<argv[0] <<" ../testData"                          <<endl
+          <<"    " <<argv[0] <<" /u/fasano/ilsData "                   <<endl
+d258 1
+a258 1
+            if ( execVol[g] < 1.0 ) shortages=true;
+@
+
+
+1.8
+log
+@Added methods to return focussedShortages and added code to call method in main program.
+Also fixed bug where DemandVol was never set to 1.
+@
+text
+@d211 11
+a221 1
+    ilsProb.solve();
+d227 2
+d233 1
+a233 1
+      heading="\"role\",\"band\",\"prob\",\"period\",\"consVol\""; 
+d239 1
+a239 1
+      heading="\"proj\",\"execVol\""; 
+d242 2
+d249 13
+a261 8
+        int p;
+        for (p=0;p<projects.size();p++) {
+          float execVol = ilsProb.getProjectExecVol(projects[p]);
+          fprintf(projExecVolFilePtr,
+                "\"%s\",%f\n",
+                projects[p].c_str(),execVol);
+          if ( execVol < 1.0 ) shortages=true;
+        }
+d271 16
+a286 10
+        int r;
+        for (r=0;r<roles.size();r++) {
+          std::vector<float> consVol = ilsProb.getResourceIbmConsVol(roles[r],bands[r]);
+          int t;
+          for (t=0;t<nPeriods;t++) {
+            fprintf(resrcConsVolFilePtr,
+                "\"%s\",%d,%f,%d,%f\n",
+                roles[r].c_str(),bands[r],-1.0,t,consVol[t]);
+          }
+        }
+d289 2
+a290 1
+      
+d303 1
+@
+
+
+1.7
+log
+@Added methods to get execVol and consVol.
+Updated to write csv files.
+@
+text
+@d231 1
+d241 1
+a241 1
+
+d264 14
+a277 1
+
+@
+
+
+1.6
+log
+@added the Optimize() method to ILSproblem
+@
+text
+@d208 4
+a211 2
+    // Optimize
+    ilsProb.Optimize();
+d214 51
+@
+
+
+1.5
+log
+@Fixed ::test code bug.
+Added reading more of the files to ils.cpp
+@
+text
+@d208 3
+d213 1
+@
+
+
+1.4
+log
+@Updated to use setResourceIbmSupplyVol
+@
+text
+@d97 1
+a97 1
+      // Read Resource File
+d168 37
+a204 1
+      }  // Finished with projFileIter    
+@
+
+
+1.3
+log
+@Added to code to read more of the input files and pass data to ilsProblem
+@
+text
+@a135 2
+#if 0
+          NOT YET IMPLEMENTED
+a136 1
+#endif
+a142 2
+#if 0
+          NOT YET IMPLEMENTED
+a143 1
+#endif
+@
+
+
+1.2
+log
+@Modified to set resource cost
+@
+text
+@a80 16
+    cout <<"Reading input files" <<endl;
+    
+    
+    // Read Global Attributes
+    std::string globalAttrFileName = inputDirectory + "/globalAttr.csv";
+    ILSglobalAttrFile globalAttrFile(globalAttrFileName);
+    {      
+      std::string title=globalAttrFile.fieldAsString("title","attrValue");
+      ilsProb.setTitle(title);
+      
+      nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+      ilsProb.setNPeriods(nPeriods);
+    }
+    
+    
+    // Read Resource File
+d82 23
+a104 10
+      std::string resrcFileName = inputDirectory + "/resrc.csv";
+      ILSresrcFile resrcFile(resrcFileName);
+      ILSresrcFileIterator resrcFileIter(resrcFile);
+      
+      // loop once for each record
+      for ( resrcFileIter(); resrcFileIter()!=NULL; ) {
+        std::string role = resrcFileIter.role();
+        int band = resrcFileIter.bandAsInt();
+        float  ibmCost  = resrcFileIter.ibmCostAsFloat();
+        float contrCost = resrcFileIter.contrCostAsFloat();
+d106 71
+a176 2
+        // Add resource to Model
+        ilsProb.addResource(role,band);
+d178 1
+a178 6
+        ilsProb.setResourceIbmCost(role,band,ibmCost);
+        ilsProb.setResourceContrCost(role,band,contrCost);
+      }  
+    } 
+    
+    
+a179 1
+  //---------------------------------------------------------
+@
+
+
+1.1
+log
+@Adding ils.cpp the main program for our deliverable application
+@
+text
+@a111 1
+#if 0
+a113 1
+#endif
+@
+

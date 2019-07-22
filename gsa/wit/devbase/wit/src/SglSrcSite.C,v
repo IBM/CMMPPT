@@ -1,0 +1,1085 @@
+head	1.23;
+access;
+symbols
+	sce_5_01_20080919:1.14
+	latest_sce_4_20_20060523:1.13.0.2
+	sce_4_20_20060523:1.13
+	latest_sce4_20_OSL:1.12.0.2
+	sce_4_20_OSL:1.12
+	sce_410_withVa:1.10
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3;
+locks; strict;
+comment	@ * @;
+
+
+1.23
+date	2011.09.28.23.50.13;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2011.09.24.00.28.40;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2011.08.30.20.18.12;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2010.09.28.19.25.17;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2010.09.10.22.10.41;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2010.08.03.23.04.25;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2010.06.29.23.25.15;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2010.06.29.22.32.32;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2010.03.16.22.42.28;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2007.08.01.21.28.06;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.05.02.17.34.13;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.02.03.16.48.13;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2005.12.05.22.24.09;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2005.03.28.20.14.38;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2005.03.22.21.45.54;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2005.03.22.19.09.34;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2005.01.27.21.03.28;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2005.01.11.21.07.58;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.12.09.21.34.12;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.11.11.21.25.09;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.03.28.23.05.34;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.03.19.16.48.29;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.03.06.20.28.24;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.23
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "SglSrcSite.C"
+//
+// Contains the implementation of class SglSrcSite.
+//------------------------------------------------------------------------------
+
+#include <SglSrcSite.h>
+#include <Selector.h>
+#include <RtMgr.h>
+#include <RtSite.h>
+#include <RtCand.h>
+#include <MrMgr.h>
+#include <HeurAtor.h>
+#include <BopEntry.h>
+#include <SubEntry.h>
+#include <Part.h>
+#include <Operation.h>
+#include <GlobalComp.h>
+#include <CompMgr.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SglSrcSite.
+//------------------------------------------------------------------------------
+
+WitSglSrcSite::WitSglSrcSite (WitRtSite * theRtSite):
+
+      WitProbAssoc        (theRtSite),
+      myRtSite_           (theRtSite),
+      mySelector_         (theRtSite->myRtMgr ()->mySelector ()),
+      myRtCands_          (myProblem ()),
+      selRtCand_          (NULL),
+      nextRtCand_         (NULL),
+      nextRtCandItr_      (),
+      altered_            (false),
+      curPcIdx_           (-1),
+      incumbPcIdx_        (-1),
+      curVisited_         (false),
+      curUniqueRtCand_    (NULL),
+      incumbUniqueRtCand_ (NULL)
+   {
+   WitRtCand * theRtCand;
+
+   forEachEl (theRtCand, myRtSite_->myRtCands ())
+      if (theRtCand->usedByMr ())
+         myRtCands_.push (theRtCand);
+
+   myRtCands_.reverse ();
+
+   reset ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSglSrcSite::~WitSglSrcSite ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSglSrcSite::isPreferredTo (WitSglSrcSite * othSite)
+   {
+   if (othSite == NULL)
+      return true;
+
+   if (incumbPcIdx_ > othSite->incumbPcIdx_)
+      return true;
+
+   if (incumbPcIdx_ < othSite->incumbPcIdx_)
+      return false;
+
+   return (myRtSite_->heightIdx () > othSite->myRtSite_->heightIdx ());
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSglSrcSite::nextCandIsSglSrc ()
+   {
+   stronglyAssert (nextRtCand_ != NULL);
+
+   return (nextRtCand_ == incumbUniqueRtCand_);
+   }
+
+//------------------------------------------------------------------------------
+    
+void WitSglSrcSite::selectNext ()
+   {
+   stronglyAssert (nextRtCand_ != NULL);
+
+   selRtCand_  = nextRtCand_;
+   nextRtCand_ = NULL;
+
+   nextRtCandItr_.advance (nextRtCand_);
+
+   altered_    = true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::applySel ()
+   {
+   WitMrMgr *  theMrMgr;
+   WitPeriod   thePer;
+   WitRtCand * theMrRtCand;
+
+   if (not sglSrcMode ())
+      return;
+
+   theMrMgr = mySelector_->myMrMgr ();
+
+   forEachPeriod (thePer, myProblem ())
+      if (theMrMgr->valid (selRtCand_, thePer))
+         {
+         theMrRtCand = theMrMgr->selRtCand (myRtSite_, thePer);
+
+         if (theMrRtCand != selRtCand_)
+            {
+            theMrMgr->select (selRtCand_, thePer);
+
+            if (myGlobalComp ()->selectionRecovery ())
+               {
+               theMrMgr->storeRecoveryPair (myRtSite_, thePer);
+               }
+            }
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::resumeMS ()
+   {
+   selRtCand_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::initCmqFixed ()
+   {
+   witAssert (curPcIdx_ >= 0);
+
+   curPcIdx_        = -1;
+   curVisited_      = false;
+   curUniqueRtCand_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::recordVisit (WitRtCand * theRtCand, int thePcIdx)
+   {
+   if (not curVisited_)
+      curUniqueRtCand_ = theRtCand;
+
+   curVisited_ = true;
+
+   if (curUniqueRtCand_ != NULL)
+      if (theRtCand != curUniqueRtCand_)
+         curUniqueRtCand_ = NULL;
+
+   if (not mySelector_->myHeurAtor ()->permCommActive ())
+      return;
+
+   witAssert (thePcIdx >= 0);
+
+   curPcIdx_ = thePcIdx;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::resetIncumb ()
+   {
+   witAssert (incumbPcIdx_ >= 0);
+
+   incumbPcIdx_        = -1;
+   incumbUniqueRtCand_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::saveCurAsIncumb ()
+   {
+   witAssert (incumbPcIdx_ == -1);
+   witAssert (curPcIdx_    >=  0);
+
+   incumbPcIdx_        = curPcIdx_;
+   incumbUniqueRtCand_ = curUniqueRtCand_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSglSrcSite::expProhibited (WitPeriod thePer)
+   {
+   if (sglSrcMode ())
+      if (not mySelector_->myMrMgr ()->valid (selRtCand_, thePer))
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::reset ()
+   {
+   selRtCand_  = NULL;
+   nextRtCand_ = NULL;
+
+   myRtCands_.attachItr (nextRtCandItr_);
+
+   nextRtCandItr_.advance (nextRtCand_);
+
+   altered_  = false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSglSrcSite::prtSel (const char * text)
+   {
+   fprintf (msgFile (),
+      "\n"
+      "-------------------------------------\n"
+      "-> Single-Source Selection %s\n"
+      "-------------------------------------\n"
+      "\n",
+      text);
+
+   myRtSite_->printID (4, 0);
+
+   fprintf (msgFile (), "   Selection:\n");
+
+   selRtCand_->printID (7, 0);
+   }
+@
+
+
+1.22
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.21
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d36 19
+a54 19
+WitProbAssoc        (theRtSite),
+myRtSite_           (theRtSite),
+mySelector_         (theRtSite->myRtMgr ()->mySelector ()),
+myRtCands_          (myProblem ()),
+selRtCand_          (NULL),
+nextRtCand_         (NULL),
+nextRtCandItr_      (),
+altered_            (false),
+curPcIdx_           (-1),
+incumbPcIdx_        (-1),
+curVisited_         (false),
+curUniqueRtCand_    (NULL),
+incumbUniqueRtCand_ (NULL)
+{
+WitRtCand * theRtCand;
+
+forEachEl (theRtCand, myRtSite_->myRtCands ())
+if (theRtCand->usedByMr ())
+myRtCands_.push (theRtCand);
+d56 1
+a56 1
+myRtCands_.reverse ();
+d58 2
+a59 2
+reset ();
+}
+d64 2
+a65 2
+{
+}
+d70 3
+a72 3
+{
+if (othSite == NULL)
+return true;
+d74 2
+a75 2
+if (incumbPcIdx_ > othSite->incumbPcIdx_)
+return true;
+d77 2
+a78 2
+if (incumbPcIdx_ < othSite->incumbPcIdx_)
+return false;
+d80 2
+a81 2
+return (myRtSite_->heightIdx () > othSite->myRtSite_->heightIdx ());
+}
+d86 2
+a87 2
+{
+stronglyAssert (nextRtCand_ != NULL);
+d89 2
+a90 2
+return (nextRtCand_ == incumbUniqueRtCand_);
+}
+d93 1
+a93 1
+
+d95 2
+a96 2
+{
+stronglyAssert (nextRtCand_ != NULL);
+d98 2
+a99 2
+selRtCand_  = nextRtCand_;
+nextRtCand_ = NULL;
+d101 1
+a101 1
+nextRtCandItr_.advance (nextRtCand_);
+d103 2
+a104 2
+altered_    = true;
+}
+d109 26
+a134 26
+{
+WitMrMgr *  theMrMgr;
+WitPeriod   thePer;
+WitRtCand * theMrRtCand;
+
+if (not sglSrcMode ())
+return;
+
+theMrMgr = mySelector_->myMrMgr ();
+
+forEachPeriod (thePer, myProblem ())
+if (theMrMgr->valid (selRtCand_, thePer))
+{
+theMrRtCand = theMrMgr->selRtCand (myRtSite_, thePer);
+
+if (theMrRtCand != selRtCand_)
+{
+theMrMgr->select (selRtCand_, thePer);
+
+if (myGlobalComp ()->selectionRecovery ())
+{
+theMrMgr->storeRecoveryPair (myRtSite_, thePer);
+}
+}
+}
+}
+d139 3
+a141 3
+{
+selRtCand_ = NULL;
+}
+d146 2
+a147 2
+{
+witAssert (curPcIdx_ >= 0);
+d149 4
+a152 4
+curPcIdx_        = -1;
+curVisited_      = false;
+curUniqueRtCand_ = NULL;
+}
+d157 3
+a159 3
+{
+if (not curVisited_)
+curUniqueRtCand_ = theRtCand;
+d161 1
+a161 1
+curVisited_ = true;
+d163 3
+a165 3
+if (curUniqueRtCand_ != NULL)
+if (theRtCand != curUniqueRtCand_)
+curUniqueRtCand_ = NULL;
+d167 2
+a168 2
+if (not mySelector_->myHeurAtor ()->permCommActive ())
+return;
+d170 1
+a170 1
+witAssert (thePcIdx >= 0);
+d172 2
+a173 2
+curPcIdx_ = thePcIdx;
+}
+d178 2
+a179 2
+{
+witAssert (incumbPcIdx_ >= 0);
+d181 3
+a183 3
+incumbPcIdx_        = -1;
+incumbUniqueRtCand_ = NULL;
+}
+d188 7
+a194 7
+{
+witAssert (incumbPcIdx_ == -1);
+witAssert (curPcIdx_    >=  0);
+
+incumbPcIdx_        = curPcIdx_;
+incumbUniqueRtCand_ = curUniqueRtCand_;
+}
+d199 4
+a202 4
+{
+if (sglSrcMode ())
+if (not mySelector_->myMrMgr ()->valid (selRtCand_, thePer))
+return true;
+d204 2
+a205 2
+return false;
+}
+d210 3
+a212 3
+{
+selRtCand_  = NULL;
+nextRtCand_ = NULL;
+d214 1
+a214 1
+myRtCands_.attachItr (nextRtCandItr_);
+d216 1
+a216 1
+nextRtCandItr_.advance (nextRtCand_);
+d218 2
+a219 2
+altered_  = false;
+}
+d224 8
+a231 8
+{
+fprintf (msgFile (),
+"\n"
+"-------------------------------------\n"
+"-> Single-Source Selection %s\n"
+"-------------------------------------\n"
+"\n",
+text);
+d233 1
+a233 1
+myRtSite_->printID (4, 0);
+d235 1
+a235 1
+fprintf (msgFile (), "   Selection:\n");
+d237 2
+a238 2
+selRtCand_->printID (7, 0);
+}
+@
+
+
+1.20
+log
+@Modifiable Heuristic Allocation
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d36 19
+a54 19
+      WitProbAssoc        (theRtSite),
+      myRtSite_           (theRtSite),
+      mySelector_         (theRtSite->myRtMgr ()->mySelector ()),
+      myRtCands_          (myProblem ()),
+      selRtCand_          (NULL),
+      nextRtCand_         (NULL),
+      nextRtCandItr_      (),
+      altered_            (false),
+      curPcIdx_           (-1),
+      incumbPcIdx_        (-1),
+      curVisited_         (false),
+      curUniqueRtCand_    (NULL),
+      incumbUniqueRtCand_ (NULL)
+   {
+   WitRtCand * theRtCand;
+
+   forEachEl (theRtCand, myRtSite_->myRtCands ())
+      if (theRtCand->usedByMr ())
+         myRtCands_.push (theRtCand);
+d56 1
+a56 1
+   myRtCands_.reverse ();
+d58 2
+a59 2
+   reset ();
+   }
+d64 2
+a65 2
+   {
+   }
+d70 3
+a72 3
+   {
+   if (othSite == NULL)
+      return true;
+d74 2
+a75 2
+   if (incumbPcIdx_ > othSite->incumbPcIdx_)
+      return true;
+d77 2
+a78 2
+   if (incumbPcIdx_ < othSite->incumbPcIdx_)
+      return false;
+d80 2
+a81 2
+   return (myRtSite_->heightIdx () > othSite->myRtSite_->heightIdx ());
+   }
+d86 2
+a87 2
+   {
+   stronglyAssert (nextRtCand_ != NULL);
+d89 2
+a90 2
+   return (nextRtCand_ == incumbUniqueRtCand_);
+   }
+d93 1
+a93 1
+    
+d95 2
+a96 2
+   {
+   stronglyAssert (nextRtCand_ != NULL);
+d98 2
+a99 2
+   selRtCand_  = nextRtCand_;
+   nextRtCand_ = NULL;
+d101 1
+a101 1
+   nextRtCandItr_.advance (nextRtCand_);
+d103 2
+a104 2
+   altered_    = true;
+   }
+d109 26
+a134 26
+   {
+   WitMrMgr *  theMrMgr;
+   WitPeriod   thePer;
+   WitRtCand * theMrRtCand;
+
+   if (not sglSrcMode ())
+      return;
+
+   theMrMgr = mySelector_->myMrMgr ();
+
+   forEachPeriod (thePer, myProblem ())
+      if (theMrMgr->valid (selRtCand_, thePer))
+         {
+         theMrRtCand = theMrMgr->selRtCand (myRtSite_, thePer);
+
+         if (theMrRtCand != selRtCand_)
+            {
+            theMrMgr->select (selRtCand_, thePer);
+
+            if (myGlobalComp ()->selectionRecovery ())
+               {
+               theMrMgr->storeRecoveryPair (myRtSite_, thePer);
+               }
+            }
+         }
+   }
+d139 3
+a141 3
+   {
+   selRtCand_ = NULL;
+   }
+d146 2
+a147 2
+   {
+   witAssert (curPcIdx_ >= 0);
+d149 4
+a152 4
+   curPcIdx_        = -1;
+   curVisited_      = false;
+   curUniqueRtCand_ = NULL;
+   }
+d157 3
+a159 3
+   {
+   if (not curVisited_)
+      curUniqueRtCand_ = theRtCand;
+d161 1
+a161 1
+   curVisited_ = true;
+d163 3
+a165 3
+   if (curUniqueRtCand_ != NULL)
+      if (theRtCand != curUniqueRtCand_)
+         curUniqueRtCand_ = NULL;
+d167 2
+a168 2
+   if (not mySelector_->myHeurAtor ()->permCommActive ())
+      return;
+d170 1
+a170 1
+   witAssert (thePcIdx >= 0);
+d172 2
+a173 2
+   curPcIdx_ = thePcIdx;
+   }
+d178 2
+a179 2
+   {
+   witAssert (incumbPcIdx_ >= 0);
+d181 3
+a183 3
+   incumbPcIdx_        = -1;
+   incumbUniqueRtCand_ = NULL;
+   }
+d188 7
+a194 7
+   {
+   witAssert (incumbPcIdx_ == -1);
+   witAssert (curPcIdx_    >=  0);
+
+   incumbPcIdx_        = curPcIdx_;
+   incumbUniqueRtCand_ = curUniqueRtCand_;
+   }
+d199 4
+a202 4
+   {
+   if (sglSrcMode ())
+      if (not mySelector_->myMrMgr ()->valid (selRtCand_, thePer))
+         return true;
+d204 2
+a205 2
+   return false;
+   }
+d210 3
+a212 3
+   {
+   selRtCand_  = NULL;
+   nextRtCand_ = NULL;
+d214 1
+a214 1
+   myRtCands_.attachItr (nextRtCandItr_);
+d216 1
+a216 1
+   nextRtCandItr_.advance (nextRtCand_);
+d218 2
+a219 2
+   altered_  = false;
+   }
+d224 8
+a231 8
+   {
+   fprintf (msgFile (),
+      "\n"
+      "-------------------------------------\n"
+      "-> Single-Source Selection %s\n"
+      "-------------------------------------\n"
+      "\n",
+      text);
+d233 1
+a233 1
+   myRtSite_->printID (4, 0);
+d235 1
+a235 1
+   fprintf (msgFile (), "   Selection:\n");
+d237 2
+a238 2
+   selRtCand_->printID (7, 0);
+   }
+@
+
+
+1.19
+log
+@Heuristic Adjustment
+@
+text
+@d130 1
+a130 1
+               theMrMgr->storeRecoveryPt (myRtSite_, thePer);
+@
+
+
+1.18
+log
+@Selection Recovery
+@
+text
+@d26 1
+a26 1
+#include <Opn.h>
+@
+
+
+1.17
+log
+@Selection reuse.
+@
+text
+@d125 1
+d127 6
+@
+
+
+1.16
+log
+@Selection reuse.
+@
+text
+@a217 3
+   if (not selPrintLevelAt (2))
+      return;
+
+@
+
+
+1.15
+log
+@Changed source file names:
+   Global.h ==> GlobalComp.h
+   Global.C ==> GlobalComp.C
+@
+text
+@d218 1
+a218 1
+   if (myGlobalComp ()->selPrintLevel () < 2)
+@
+
+
+1.14
+log
+@Stochastic Implosion
+@
+text
+@d27 1
+a27 1
+#include <Global.h>
+@
+
+
+1.13
+log
+@Updated the copyright date on all source files.
+@
+text
+@a34 1
+      WitProbAssoc        (theRtSite->myProblem ()),
+d36 1
+@
+
+
+1.12
+log
+@[shared-resource pegging]
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+@
+
+
+1.11
+log
+@[shared-resource pegging]
+@
+text
+@d207 1
+a207 1
+   myRtCands_.attach (nextRtCandItr_);
+@
+
+
+1.10
+log
+@Revised mappingIndex code.
+@
+text
+@d207 1
+a207 1
+   nextRtCandItr_.attachTo (myRtCands_);
+@
+
+
+1.9
+log
+@Second attempt to correct a problem with header file inclusion on
+g++ 3.3.3.
+@
+text
+@a28 1
+#include <MapIdxI.h>
+@
+
+
+1.8
+log
+@An attempt to correct a problem with header file inclusion on g++ 3.3.3.
+@
+text
+@d25 1
+d29 1
+@
+
+
+1.7
+log
+@Pegged critical list.
+@
+text
+@a22 1
+#include <Part.h>
+a23 2
+#include <BomEntry.h>
+#include <ConsEnt.h>
+@
+
+
+1.6
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d18 1
+d40 1
+a40 1
+      mySelector_         (theRtSite->mySelector ()),
+@
+
+
+1.5
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d161 1
+a161 1
+   if (mySelector_->myHeurAtor ()->tempMode ())
+@
+
+
+1.4
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d54 1
+a54 1
+      if (theRtCand->needsMrCand ())
+@
+
+
+1.3
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d230 1
+a230 1
+   myRtSite_->printID (0);
+d234 1
+a234 1
+   selRtCand_->printID (0);
+@
+
+
+1.2
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d51 7
+a57 1
+   mySelector_->myMrMgr ()->getRtCands (myRtSite_, myRtCands_);
+@
+
+
+1.1
+log
+@Continued implementation of proportionate routing.
+@
+text
+@a17 1
+#include <MrMgr.h>
+d20 1
+d51 1
+a51 1
+   myRtSite_->getMrRtCands (myRtCands_);
+d105 1
+d112 2
+d115 1
+a115 1
+      if (selRtCand_->valid (thePer))
+d117 1
+a117 1
+         theMrRtCand = myRtSite_->selMrRtCand (thePer);
+d120 1
+a120 1
+            selRtCand_->beSelectedByMR (thePer);
+d189 1
+a189 1
+      if (not selRtCand_->valid (thePer))
+@
+

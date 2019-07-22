@@ -1,0 +1,774 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.03.03.21.07.28;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2003.02.28.20.47.35;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.02.27.19.20.19;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Continued implementation of proportionate routing.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OldPr1.C"
+//
+// Contains the implementation of the following classes:
+//
+//    OpMgr.
+//    ProdOpMgr.
+//    ConsOpMgr.
+//    OpCoord.
+//    OpCand.
+//    OpBrPt.
+//    OpPt.
+//------------------------------------------------------------------------------
+
+#include <OpMgr1.h>
+#include <OpCoord1.h>
+#include <OpCand1.h>
+#include <OpBrPt1.h>
+#include <OpPt1.h>
+#include <OrMgr1.h>
+#include <OrSite1.h>
+#include <OrCand1.h>
+#include <Selector.h>
+#include <Part.h>
+#include <Opn.h>
+#include <BopEntry.h>
+#include <BomEntry.h>
+#include <Global.h>
+#include <MsgFac.h>
+#include <PtrSchedI.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class OpMgr.
+//------------------------------------------------------------------------------
+
+void WitOpMgr::print ()
+   {
+   myOpCoord_->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpMgr::selSplitNeeded ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpMgr::WitOpMgr (WitOrMgr * theOrMgr, WitSelector * theSelector):
+      WitSelMgr  (theSelector),
+
+      myOpCoord_ (NULL)
+   {
+   if (not myGlobalComp ()->allowPR ())
+      myMsgFac () ("propRoutingNYISmsg");
+
+   myOpCoord_ = new WitOpCoord (theOrMgr, this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpMgr::~WitOpMgr ()
+   {
+   delete myOpCoord_;
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt * WitOpMgr::mySelPtForAltByOpPt (WitOpPt * theOpPt)
+   {
+   if (theOpPt != NULL)
+      if (theOpPt->active ())
+         if (not theOpPt->myOpBrPt ()->singleton ())
+            return theOpPt;
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ProdOpMgr.
+//------------------------------------------------------------------------------
+
+WitProdOpMgr::WitProdOpMgr (WitSelector * theSelector):
+      WitOpMgr     (theSelector->myProdOrMgr (), theSelector),
+
+      myProdOrMgr_ (theSelector->myProdOrMgr ())
+   {
+   myMsgFac () ("oldPrMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitProdOpMgr::~WitProdOpMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOpMgr::propRouting (WitPart * thePart, WitPeriod expPer)
+   {
+   WitOrSite * theOrSite;
+
+   theOrSite = myProdOrMgr_->myOrSiteFor (thePart);
+
+   return myOpCoord ()->propRouting (theOrSite, expPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOpMgr::active (WitBopEntry * theBopEnt, WitPeriod expPer)
+   {
+   WitOpPt * theOpPt;
+
+   theOpPt = myOpPtFor (theBopEnt, expPer);
+
+   witAssert (theOpPt != NULL);
+
+   return theOpPt->active ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitProdOpMgr::normExpShare (WitBopEntry * theBopEnt, WitPeriod expPer)
+   {
+   WitOpPt * theOpPt;
+
+   theOpPt = myOpPtFor (theBopEnt, expPer);
+
+   witAssert (theOpPt != NULL);
+
+   return theOpPt->normExpShare ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt * WitProdOpMgr::mySelPtForAlt (
+      WitBopEntry * theBopEnt,
+      WitConsEntry *,
+      WitPeriod     execPer,
+      WitPeriod)
+   {
+   WitPeriod expPer;
+
+   expPer = theBopEnt->impactPeriod ()[execPer];
+
+   return mySelPtForAltByOpPt (myOpPtFor (theBopEnt, expPer));
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOpMgr::validForNetting ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOpMgr::validForExecBounds ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitProdOpMgr::selCaseName ()
+   {
+   return "Production Proportionate Routing";
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpPt * WitProdOpMgr::myOpPtFor (WitBopEntry * theBopEnt, WitPeriod expPer)
+   {
+   WitOrCand * theOrCand;
+
+   theOrCand = myProdOrMgr_->myOrCandFor (theBopEnt);
+
+   return myOpCoord ()->myOpPtFor (theOrCand, expPer);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ConsOpMgr.
+//------------------------------------------------------------------------------
+
+WitConsOpMgr::WitConsOpMgr (WitSelector * theSelector):
+      WitOpMgr     (theSelector->myConsOrMgr (), theSelector),
+
+      myConsOrMgr_ (theSelector->myConsOrMgr ())
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitConsOpMgr::~WitConsOpMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOpMgr::propRouting (WitBomEntry * theBomEnt, WitPeriod execPer)
+   {
+   WitOrSite * theOrSite;
+
+   theOrSite = myConsOrMgr_->myOrSiteFor (theBomEnt);
+
+   return myOpCoord ()->propRouting (theOrSite, execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOpMgr::active (WitConsEntry * theConsEnt, WitPeriod execPer)
+   {
+   WitOpPt * theOpPt;
+
+   theOpPt = myOpPtFor (theConsEnt, execPer);
+
+   witAssert (theOpPt != NULL);
+
+   return theOpPt->active ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitConsOpMgr::normExpShare (WitConsEntry * theConsEnt, WitPeriod execPer)
+   {
+   WitOpPt * theOpPt;
+
+   theOpPt = myOpPtFor (theConsEnt, execPer);
+
+   witAssert (theOpPt != NULL);
+
+   return theOpPt->normExpShare ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelPt * WitConsOpMgr::mySelPtForAlt (
+      WitBopEntry *,
+      WitConsEntry * theConsEnt,
+      WitPeriod      execPer,
+      WitPeriod)
+   {
+   return mySelPtForAltByOpPt (myOpPtFor (theConsEnt, execPer));
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOpMgr::validForNetting ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOpMgr::validForExecBounds ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitConsOpMgr::selCaseName ()
+   {
+   return "Consumption Proportionate Routing";
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpPt * WitConsOpMgr::myOpPtFor (WitConsEntry * theConsEnt, WitPeriod execPer)
+   {
+   WitOrCand * theOrCand;
+
+   theOrCand = myConsOrMgr_->myOrCandFor (theConsEnt);
+
+   return myOpCoord ()->myOpPtFor (theOrCand, execPer);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OpCoord.
+//------------------------------------------------------------------------------
+
+WitOpCoord::WitOpCoord (WitOrMgr * theOrMgr, WitOpMgr * theOpMgr):
+      WitProbAssoc  (theOpMgr->myProblem ()),
+
+        activeCand_ (NULL),
+      inactiveCand_ (NULL),
+      myOpBrPts_    (),
+      myOpPts_      (),
+      myOrMgr_      (theOrMgr),
+      myOpMgr_      (theOpMgr)
+   {
+     activeCand_ = new WitOpCand (true,  myProblem ());
+   inactiveCand_ = new WitOpCand (false, myProblem ());
+
+   buildOpBrPts ();
+
+   buildOpPts ();
+
+   setUpOpBrPts ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpCoord::~WitOpCoord ()
+   {
+   WitOrCandItr theOrCandItr;
+   WitOrCand *  theOrCand;
+   WitPeriod    thePer;
+   WitOrSiteItr theOrSiteItr;
+   WitOrSite *  theOrSite;
+
+   theOrCandItr.attachTo (myOrMgr_->myOrCands ());
+
+   while (theOrCandItr.advance (theOrCand))
+      if (myOpPts_.myPtrTVecAt (theOrCand).isAllocated ())
+         forEachPeriod (thePer, myProblem ())
+            delete myOpPts_.myPtrAt (theOrCand, thePer);
+
+   theOrSiteItr.attachTo (myOrMgr_->myOrSites ());
+
+   while (theOrSiteItr.advance (theOrSite))
+      if (theOrSite->propRouting ())
+         forEachPeriod (thePer, myProblem ())
+            delete myOpBrPts_.myPtrAt (theOrSite, thePer);
+
+   delete inactiveCand_;
+   delete   activeCand_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpCoord::propRouting (WitOrSite * theOrSite, WitPeriod thePer)
+   {
+   if (theOrSite->propRouting ())
+      if (myOpBrPts_.myPtrAt (theOrSite, thePer) != NULL)
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpCoord::print ()
+   {
+   WitOrSiteItr theOrSiteItr;
+   WitOrSite *  theOrSite;
+   WitPeriod    thePer;
+   WitOpBrPt *  theOpBrPt;
+
+   fprintf (msgFile (),
+      "\n"
+      "Old Proportionate Routing Status (%s Section):\n",
+      myOrMgr_->sectionName ());
+
+   theOrSiteItr.attachTo (myOrMgr_->myOrSites ());
+
+   while (theOrSiteItr.advance (theOrSite))
+      if (theOrSite->propRouting ())
+         forEachPeriod (thePer, myProblem ())
+            {
+            theOpBrPt = myOpBrPts_.myPtrAt (theOrSite, thePer);
+
+            if (theOpBrPt != NULL)
+               theOpBrPt->print ();
+            }
+
+   fprintf (msgFile (), "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpPt * WitOpCoord::myOpPtFor (WitOrCand * theOrCand, WitPeriod thePer)
+   {
+   if (myOpPts_.myPtrTVecAt (theOrCand).isAllocated ())
+      return myOpPts_.myPtrAt (theOrCand, thePer);
+   else
+      return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpCoord::buildOpBrPts ()
+   {
+   WitOrSiteItr theOrSiteItr;
+   WitOrSite *  theOrSite;
+   WitPeriod    thePer;
+
+   myOrMgr_->allocate1D (myOpBrPts_);
+
+   theOrSiteItr.attachTo (myOrMgr_->myOrSites ());
+
+   while (theOrSiteItr.advance (theOrSite))
+      if (theOrSite->propRouting ())
+         {
+         myOpBrPts_.myPtrTVecAt (theOrSite).allocate (myProblem ());
+
+         forEachPeriod (thePer, myProblem ())
+            if (theOrSite->explodeable (thePer))
+               myOpBrPts_.myPtrAt (theOrSite, thePer) =
+                  new WitOpBrPt   (theOrSite, thePer, this);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpCoord::buildOpPts ()
+   {
+   WitOrCandItr theOrCandItr;
+   WitOrCand *  theOrCand;
+   WitOrSite *  theOrSite;
+   WitPeriod    thePer;
+   WitOpBrPt *  theOpBrPt;
+
+   myOrMgr_->allocate1D (myOpPts_);
+
+   theOrCandItr.attachTo (myOrMgr_->myOrCands ());
+
+   while (theOrCandItr.advance (theOrCand))
+      {
+      theOrSite = theOrCand->myOrSite ();
+
+      if (not theOrSite->propRouting ())
+         continue;
+
+      myOpPts_.myPtrTVecAt (theOrCand).allocate (myProblem ());
+
+      forEachPeriod (thePer, myProblem ())
+         if (theOrCand->isEligible (thePer))
+            {
+            theOpBrPt = myOpBrPts_.myPtrAt (theOrSite, thePer);
+
+            myOpPts_.myPtrAt (theOrCand, thePer) =
+               new WitOpPt (theOrCand, theOpBrPt);
+            }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpCoord::setUpOpBrPts ()
+   {
+   WitOrSiteItr theOrSiteItr;
+   WitOrSite *  theOrSite;
+   WitOpBrPt *  theOpBrPt;
+   WitPeriod    thePer;
+
+   theOrSiteItr.attachTo (myOrMgr_->myOrSites ());
+
+   while (theOrSiteItr.advance (theOrSite))
+      if (theOrSite->propRouting ())
+         forEachPeriod (thePer, myProblem ())
+            {
+            theOpBrPt = myOpBrPts_.myPtrAt (theOrSite, thePer);
+
+            if (theOpBrPt != NULL)
+               theOpBrPt->update ();
+            }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OpCand.
+//------------------------------------------------------------------------------
+
+WitOpCand::WitOpCand (bool activeVal, WitProblem * theProblem):
+      WitSelCand (theProblem),
+
+      active_    (activeVal)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpCand::~WitOpCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpCand::prtID ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpCand * WitOpCand::myOpCand ()
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OpBrPt.
+//------------------------------------------------------------------------------
+
+WitOpBrPt::WitOpBrPt (
+         WitOrSite *  theOrSite,
+         WitPeriod    thePer,
+         WitOpCoord * theOpCoord):
+
+      myOrSite_     (theOrSite),
+      myPer_        (thePer),
+      myOpCoord_    (theOpCoord),
+      totInclShare_ (0.0),
+      singleton_    (false)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpBrPt::~WitOpBrPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpBrPt::update ()
+   {
+   WitOrCandItr theOrCandItr;
+   WitOpPt *    theOpPt;
+   int          nActive;
+
+   nActive       = 0;
+   totInclShare_ = 0.0;
+
+   theOrCandItr.attachTo (myOrSite_->myOrCands ());
+
+   while (theOrCandItr.advance ())
+      {
+      theOpPt = myOpCoord_->myOpPtFor (theOrCandItr (), myPer_);
+
+      if (theOpPt != NULL)
+         if (theOpPt->active ())
+            {
+            nActive ++;
+
+            totInclShare_ += theOrCandItr->myBillEntry ()->expShare ();
+            }
+      }
+
+   witAssert (nActive       > 0);
+   witAssert (totInclShare_ > 0.0);
+
+   singleton_ = (nActive == 1);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpBrPt::print ()
+   {
+   WitOrCandItr theOrCandItr;
+   WitOpPt *    theOpPt;
+
+   fprintf (myOpCoord_->msgFile (),
+      "\n"
+      "Old Proportionate Routing Branch Point:\n"
+      "\n");
+
+   myOrSite_->prtOpBrPtID (myPer_);
+
+   if (singleton_)
+      fprintf (myOpCoord_->msgFile (), "   Routing is Singleton\n\n");
+   else
+      fprintf (myOpCoord_->msgFile (), "\n");
+
+   theOrCandItr.attachTo (myOrSite_->myOrCands ());
+
+   while (theOrCandItr.advance ())
+      {
+      theOpPt = myOpCoord_->myOpPtFor (theOrCandItr (), myPer_);
+
+      if (theOpPt != NULL)
+         theOpPt->print ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OpPt.
+//------------------------------------------------------------------------------
+
+WitOpPt::WitOpPt (WitOrCand * theOrCand, WitOpBrPt * theOpBrPt):
+
+      WitSelPt  (),
+         
+      myOrCand_ (theOrCand),
+      myOpBrPt_ (theOpBrPt)
+   {
+   witAssert (myOrCand_->myOrSite () == myOpBrPt_->myOrSite ());
+
+   select (myOpBrPt_->myOpCoord ()->activeCand ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpPt::~WitOpPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpPt::hasResAlt ()
+   {
+   return active ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::alterSelection ()
+   {
+   witAssert (active ());
+
+   witAssert (not myOpBrPt_->singleton ());
+
+   select (myOpBrPt_->myOpCoord ()->inactiveCand ());
+
+   myOpBrPt_->update ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::printSelection ()
+   {
+   myOpBrPt_->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelMgr * WitOpPt::mySelMgr ()
+   {
+   return myOpBrPt_->myOpCoord ()->myOpMgr ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::prtID ()        
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpPt::splittable ()
+   {
+   stronglyAssert (false);
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::getSortData (WitPart * &, WitPeriod &)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPeriod WitOpPt::myPeriod ()
+   {
+   stronglyAssert (false);
+
+   return -1;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::tempAlterSel ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::restoreSel (WitSelCand *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOpPt::normExpShare ()
+   {
+   witAssert (active ());
+
+   return
+        myOrCand_->myBillEntry ()->expShare () 
+      / myOpBrPt_->totInclShare ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpPt::active ()
+   {
+   return selSelCand ()->myOpCand ()->active ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpPt::print ()
+   {
+   if (! active ())
+      return;
+
+   myOrCand_->prtOpPtID ();
+
+   fprintf (myOpBrPt_->myOpCoord ()->msgFile (),
+      "      Norm Exp Share: %.0f%%\n\n",
+      normExpShare () * 100.0);
+   }
+@
+
+
+1.2
+log
+@Continued implementation of proportionate routing.
+@
+text
+@@
+
+
+1.1
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d11 1
+a11 1
+// Source file: "PropRt.C"
+d98 1
+a98 1
+   myMsgFac () ("propRoutingMsg");
+@
+

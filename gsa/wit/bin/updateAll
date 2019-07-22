@@ -1,0 +1,46 @@
+#!/bin/csh
+
+# This script does a cvs update in all of cvs-related directories under 
+# /u/wit/$USER except rwtool directories
+
+# $Id: updateAll.sh,v 1.2 2000/02/23 18:44:02 fasano Exp $
+
+# Syntax:
+#   updateAll
+
+set noglob
+
+# Warning: you have to know how variable expansion is influenced by the
+# various quote characters in csh to understand this script.  You also
+# have to know about list variables in csh.
+
+# Get list of all CVS directories
+chdir /u/wit/devbase
+set allCvs = (`/bin/ls`)
+
+# Get list of user's files and directories, except RW ones
+chdir /u/wit/$USER
+set usersCvs = (`/bin/ls | /bin/grep -v rwtool` )
+
+# Process each user file or directory
+foreach filename ($usersCvs)
+	# Is it a CVS directory?
+	set inCvs = fase
+	foreach cvsDir ($allCvs)
+		if ($cvsDir == $filename) then
+			set inCvs = true
+			break
+		endif
+	end
+	if ($inCvs == true) then
+		pushd $filename > /dev/null
+		echo '------------------------' Updating $filename \
+			'------------------------' 
+		cvs update
+		if ($status != 0) then
+			echo 'CVS update failed: status was' $status
+			exit $status
+		endif
+		popd > /dev/null
+	endif
+end

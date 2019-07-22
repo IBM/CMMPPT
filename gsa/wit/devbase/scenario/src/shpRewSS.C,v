@@ -1,0 +1,387 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.48;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.46;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.36;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+#include <scenario/src/shpRewSS.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/sortSchd.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/machdep.h>
+#include <scenario/src/demdSchP.h>
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrObj1ShipRewardScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  LgFrDemand demand;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( demand, tv );
+
+  // Loop once for each demand
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+
+     demand = setOfDemands()[i];
+
+     // Make itemTimeVec
+     itv.item( demand );
+     itv.timeVecFloat(
+           wipPtr_->obj1ShipReward( setOfDemands()[i] )   );
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+     
+  }
+
+}
+
+// Update (propogate) a demand change to wip 
+void 
+LgFrObj1ShipRewardScheduleStrategy::update(
+          const LgFrItemTimeVecPairFloat & newITV)
+{
+  wipPtr_->obj1ShipReward(newITV.demand(), newITV.timeVecFloat());
+}
+
+// Demand Obj1ShipRewards are mutable
+bool
+LgFrObj1ShipRewardScheduleStrategy::isMutable()
+const
+{
+ return true;
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrObj1ShipRewardScheduleStrategy::clone()
+const
+{
+  LgFrObj1ShipRewardScheduleStrategy* newInst = 
+      new LgFrObj1ShipRewardScheduleStrategy(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with a new Scenario
+LgFrAttributeScheduleStrategy *
+LgFrObj1ShipRewardScheduleStrategy::clone(LgFrScenario & newScenario)
+const
+{
+  LgFrObj1ShipRewardScheduleStrategy* newInst = 
+      new LgFrObj1ShipRewardScheduleStrategy(*this, newScenario);
+  return (newInst);
+}
+
+// Assignment operator
+LgFrObj1ShipRewardScheduleStrategy &
+LgFrObj1ShipRewardScheduleStrategy::operator=(
+	  const LgFrObj1ShipRewardScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrDemandScheduleStrategy::operator= ) (rhs);
+    wipPtr_ = rhs.wipPtr_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrObj1ShipRewardScheduleStrategy::
+   LgFrObj1ShipRewardScheduleStrategy (
+      const LgFrObj1ShipRewardScheduleStrategy & source)
+:  LgFrDemandScheduleStrategy( source ),
+   wipPtr_( source.wipPtr_ ), 
+   id_(__LGFROBJ1SHIPREWARDSCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with new Scenario
+LgFrObj1ShipRewardScheduleStrategy::
+   LgFrObj1ShipRewardScheduleStrategy (
+      const LgFrObj1ShipRewardScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrDemandScheduleStrategy(
+         source, 
+         newScenario ),
+   wipPtr_( &(workingImplosionProblem(newScenario)) ),
+   id_(__LGFROBJ1SHIPREWARDSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrObj1ShipRewardScheduleStrategy::
+   LgFrObj1ShipRewardScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrDemandScheduleStrategy( 
+      LgFrAttributeScheduleStrategy::setOfDemands(scenario),
+                               &(userInputModification(scenario)) ),
+   wipPtr_( &(workingImplosionProblem(scenario)) ),
+   id_(__LGFROBJ1SHIPREWARDSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrObj1ShipRewardScheduleStrategy::
+   LgFrObj1ShipRewardScheduleStrategy ()
+:  LgFrDemandScheduleStrategy( LgFrSetOfDemands() ),
+   wipPtr_( 0 ),
+   id_(__LGFROBJ1SHIPREWARDSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrObj1ShipRewardScheduleStrategy::
+   ~LgFrObj1ShipRewardScheduleStrategy ()
+{
+  // Nothing to do here
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrObj1ShipRewardScheduleStrategy methods.
+void
+LgFrObj1ShipRewardScheduleStrategy::test()
+{
+}
+
+// test LgFrObj1ShipRewardScheduleStrategy methods.
+// Expects the data in testScenario to come from
+// "/u/implode/wit/data/examples/diner12/wit.data"
+void
+LgFrObj1ShipRewardScheduleStrategy::contextTest
+    (LgFrScenario                & testScenario,
+     LgFrWorkingImplosionProblem & wip,			// testScenario's 
+     LgFrSetOfDemands            & sod)			// testScenario's 
+{
+  int i;
+
+  // Test constructor
+  LgFrObj1ShipRewardScheduleStrategy cs1(testScenario);
+
+  // Test copy constructor
+  LgFrObj1ShipRewardScheduleStrategy cs2(cs1);
+
+  // Test assignment operator
+  LgFrObj1ShipRewardScheduleStrategy cs3;
+  cs3 = cs2;
+
+  {
+    // Test clone method
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+
+    // Test destructor
+    delete cs4Ptr;
+  }
+  
+  // Test populate. 
+  LgFrSortingDemandScheduleFloatSmartPointer schedule(new LgFrSortingDemandScheduleFloat); 
+  const LgFrSortingDemandScheduleFloat & constSchedule = *schedule;
+  cs1.populate( *schedule );
+  for ( i=0; i<sod.size(); i++ ) {
+     assert( sod[i] == constSchedule[i].demand() );
+     assert( wip.obj1ShipReward(sod[i]) == constSchedule[i].timeVecFloat() );
+  }
+
+  // Test the update() method
+  LgFrDemand aDemand(sod[0]);
+  LgFrItemTimeVecPairFloat anITV(aDemand, 
+                                constSchedule[0].timeVecFloat() + 2.);
+  cs1.update(anITV);
+  cs1.populate(*schedule);
+  assert(anITV.timeVecFloat() == constSchedule[aDemand].timeVecFloat());
+
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 3
+a3 1
+#include <iostream.h>
+d24 2
+a25 1
+  for ( size_t i=0; i<setOfDemands().entries(); i++ ) {
+d53 1
+a53 1
+RWBoolean
+d57 1
+a57 1
+ return TRUE;
+a80 8
+// Return schedule strategy identifier
+isAReturnType
+LgFrObj1ShipRewardScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a85 1
+  assert( id_ == rhs.id_ );
+a101 1
+  assert( id_ == source.id_ );
+a114 1
+  assert( id_ == source.id_ );
+d135 1
+a135 1
+   wipPtr_( NULL ),
+a170 4
+  assert( cs1.id_ == __LGFROBJ1SHIPREWARDSCHEDULESTRATEGY );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFROBJ1SHIPREWARDSCHEDULESTRATEGY );
+a173 1
+  assert( cs2.isA() == __LGFROBJ1SHIPREWARDSCHEDULESTRATEGY );
+a177 1
+  assert( cs3.isA() == cs2.isA() );
+a181 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d191 1
+a191 1
+  for ( i=0; i<sod.entries(); i++ ) {
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 3
+// RW2STL -- inserted:
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d22 1
+a22 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+d50 1
+a50 1
+bool
+d54 1
+a54 1
+ return true;
+d78 8
+d91 1
+d108 1
+d122 1
+d143 1
+a143 1
+   wipPtr_( 0 ),
+d179 4
+d186 1
+d191 1
+d196 1
+d206 1
+a206 1
+  for ( i=0; i<sod.size(); i++ ) {
+@
+

@@ -1,0 +1,1383 @@
+head	1.23;
+access;
+symbols
+	latest_sce_3_10_20010924:1.6.0.2
+	sce_3_10_20010924:1.6;
+locks; strict;
+comment	@ * @;
+
+
+1.23
+date	2002.09.26.19.05.28;	author rjw;	state dead;
+branches;
+next	1.22;
+
+1.22
+date	2002.07.23.15.18.30;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2002.07.02.21.53.04;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2002.06.18.17.54.44;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2002.06.17.17.29.26;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2002.06.13.21.50.12;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2002.05.24.23.00.05;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2002.05.17.21.45.03;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2002.05.16.23.32.07;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2002.04.18.14.02.37;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2002.04.12.21.02.01;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2002.03.29.23.47.09;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2002.03.15.23.17.30;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2002.03.14.15.05.47;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.03.07.23.24.28;	author bobw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.01.10.22.06.55;	author bobw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2001.12.19.16.17.11;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.09.17.18.56.28;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.09.04.15.44.39;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.08.30.20.29.24;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.08.24.22.03.21;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.08.23.21.13.54;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.08.22.20.41.52;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.23
+log
+@Began implementation of multi-level lot sizes.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef MultiRoute_TIH
+#define MultiRoute_TIH
+
+//------------------------------------------------------------------------------
+// Header file: "MultiRoute_TI.h"
+//
+// Contains the implementation of the following class templates:  
+//
+//    MrMgr     <MrArgs>
+//    MrSelSite <MrArgs>
+//    MrCand    <MrArgs>
+//    MrPt      <MrArgs>
+//------------------------------------------------------------------------------
+
+#include <MrSelSite.h>
+#include <SglSrcMgr.h>
+#include <Global.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class template MrMgr <MrArgs>.
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrMgr <MrArgs>::WitMrMgr (WitSelector * theSelector):
+         WitSelMgr       (theSelector),
+
+         myMrSelSiteFor_ (myProblem ())
+   {
+   buildMrSelSites ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      CandComp * WitMrMgr <MrArgs>::selCandComp (
+         SelComp * theSelComp, 
+         WitPeriod thePer)
+   {
+   return myMrSelSiteFor_ (theSelComp)->selCandComp (thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::modifyRouting (
+         WitPairStack <CandComp, WitPeriod> & theCandCompPers)
+   {
+   CandComp *              theCandComp;
+   WitPeriod               thePer;
+   WitMrSelSite <MrArgs> * theMrSelSite;
+
+   while (theCandCompPers.pop (theCandComp, thePer))
+      {
+      theMrSelSite = myMrSelSiteFor_ (theSelCompFor (theCandComp));
+
+      theMrSelSite->myMrPt ()[thePer]->select (theCandComp);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::findCandComps (
+         SelComp *                theSelComp, 
+         WitPeriod                thePer,
+         WitObjStack <CandComp> & theCandComps)
+   {
+   myMrSelSiteFor_ (theSelComp)->findCandComps (thePer, theCandComps);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::recordFlowSS (
+         SelComp * theSelComp, 
+         WitPeriod thePer,
+         double    incFlowVol)
+   {
+   WitMrSelSite <MrArgs> * theMrSelSite;
+   WitMrPt <MrArgs> *      theMrPt;
+
+   witAssert (selSplit ());
+
+   theMrSelSite = myMrSelSiteFor_ (theSelComp);
+
+   if (! theMrSelSite->multiChoice ())
+      return;
+
+   theMrPt = myMrSelSiteFor_ (theSelComp)->myMrPt ()[thePer];
+
+   WitSelMgr::recordFlowSS (theMrPt, incFlowVol);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrPt <MrArgs> * WitMrMgr <MrArgs>::myMrPt (
+         SelComp * theSelComp,
+         WitPeriod thePer)
+   {
+   return myMrSelSiteFor (theSelComp)->myMrPtWithAlt (thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::selIsSplit (
+         SelComp * theSelComp, 
+         WitPeriod thePer)
+   {
+   WitMrSelSite <MrArgs> * theMrSelSite;
+
+   if (! selSplit ())
+      return witFALSE;
+
+   theMrSelSite = myMrSelSiteFor_ (theSelComp);
+      
+   if (! theMrSelSite->multiChoice ())
+      return witFALSE;
+
+   return theMrSelSite->myMrPt ()[thePer]->isSplit ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::startSplitExp (
+         SelComp * theSelComp, 
+         WitPeriod thePer,
+         double    expVol)
+   {
+   WitMrPt <MrArgs> * theMrPt;
+
+   witAssert (selIsSplit (theSelComp, thePer));
+
+   theMrPt = myMrSelSiteFor_ (theSelComp)->myMrPt ()[thePer];
+
+   startSplitExpAbs (theMrPt, expVol);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::findNextSplit (
+         CandComp * & theCandComp, 
+         double &     splitExpVol)
+   {
+   WitSelCand * theSelCand;
+   WitBoolean   splitFound;
+
+   witAssert (selSplit ());
+
+   splitFound  = findNextSplitAbs (theSelCand, splitExpVol);
+
+   theCandComp =
+      splitFound?
+         WitMrCand <MrArgs>::theMrCandFor (theSelCand)->myCandComp ():
+         NULL;
+
+   return splitFound;
+   }
+ 
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrMgr <MrArgs>::getCandComps (
+         SelComp *                theSelComp,
+         WitObjStack <CandComp> & theCandComps)
+   {
+   WitObjStItr <WitMrCand <MrArgs> > theItr;
+   WitMrCand <MrArgs> *              theMrCand;
+
+   theCandComps.clear ();
+
+   theItr.attachTo (myMrSelSiteFor_ (theSelComp)->myMrCands ());
+
+   while (theItr.advance (theMrCand))
+      theCandComps.push (theMrCand->myCandComp ());
+
+   theCandComps.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::valid (
+         CandComp * theCandComp,
+         WitPeriod  thePer)
+   {
+   WitMrSelSite <MrArgs> * theMrSelSite;
+   WitMrCand    <MrArgs> * theMrCand;
+
+   theMrSelSite = myMrSelSiteFor_ (theSelCompFor (theCandComp));
+
+   theMrCand    = theMrSelSite->myMrCandFor (theCandComp);
+
+   if (theMrCand->isEligible (thePer))
+      if (! theMrCand->prevSel (thePer))
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrMgr <MrArgs>::selSplitNeeded ()
+   {
+   return (myGlobalComp ()->selSplit ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class template MrSelSite <MrArgs>.
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrSelSite <MrArgs>::WitMrSelSite (
+            SelComp *           theSelComp, 
+            WitMrMgr <MrArgs> * theMrMgr):
+
+         WitProbAssoc (theMrMgr),
+
+         myMrMgr_     (theMrMgr),
+         mySelComp_   (theSelComp),
+         myMrCands_   (myProblem ()),
+         multiChoice_ (witFALSE),
+         myMrPt_      ()
+   {
+   if (! myGlobalComp ()->multiRoute ())
+      return;
+
+   buildMrCands ();
+
+   buildMrPts ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrSelSite <MrArgs>::~WitMrSelSite ()
+   {
+   deleteContents (myMrPt_);
+   deleteContents (myMrCands_);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrSelSite <MrArgs>::printHasAlt ()
+   {
+   WitPeriod          thePer;
+   WitMrPt <MrArgs> * theMrPt;
+
+   if (! multiChoice_)
+      return;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      theMrPt = myMrPt_[thePer];
+
+      if (theMrPt != NULL)
+         if (theMrPt->selMrCand () != NULL)
+            theMrPt->printID ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrSelSite <MrArgs>::findCandComps (
+         WitPeriod                thePer, 
+         WitObjStack <CandComp> & theCandComps)
+   {
+   WitMrCandItr         theItr;
+   WitMrCand <MrArgs> * theMrCand;
+   CandComp *           theCandComp;
+
+   theCandComps.clear ();
+
+   if (multiChoice ())
+      {
+      theItr.attachTo (myMrCands_);
+
+      while (theItr.advance (theMrCand))
+         if (theMrCand->isEligible (thePer))
+            if (! theMrCand->prevSel (thePer))
+               theCandComps.push (theMrCand->myCandComp ());
+
+      theCandComps.reverse ();
+      }
+
+   if (theCandComps.isEmpty ())
+      {
+      theCandComp = defaultCandComp (thePer);
+
+      if (theCandComp != NULL)
+         theCandComps.push (theCandComp);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrCand <MrArgs> * WitMrSelSite <MrArgs>::myMrCandFor (
+         CandComp * theCandComp)
+   {
+   WitMrCandItr         theItr;
+   WitMrCand <MrArgs> * theMrCand;
+
+   theItr.attachTo (myMrCands_);
+
+   while (theItr.advance (theMrCand))
+      if (theMrCand->myCandComp () == theCandComp)
+         return theMrCand;
+
+   stronglyAssert (witFALSE);
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      CandComp * WitMrSelSite <MrArgs>::selCandComp (WitPeriod thePer)
+   {
+   WitMrCand <MrArgs> * theMrCand;
+
+   witAssert (defaultCandComp (thePer) != NULL);
+
+   if (multiChoice_)
+      {
+      theMrCand = myMrPt_[thePer]->selMrCand ();
+
+      if (theMrCand != NULL)
+         return theMrCand->myCandComp ();
+      }
+
+   return defaultCandComp (thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrSelSite <MrArgs>::buildMrPts ()
+   {
+   WitPeriod thePer;
+
+   if (! multiChoice_)
+      return;
+
+   myMrPt_.allocate (myProblem ());
+
+   forEachPeriod (thePer, myProblem ())
+      if (defaultCandComp (thePer) != NULL)
+         myMrPt_[thePer] = new WitMrPt <MrArgs> (this, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrPt <MrArgs> * WitMrSelSite <MrArgs>::multiChoiceMrPtWithAlt (
+         WitPeriod thePer)
+   {
+   WitMrPt <MrArgs> * theMrPt;
+
+   witAssert (multiChoice_);
+
+   theMrPt = myMrPt_[thePer];
+
+   witAssert (theMrPt != NULL);
+
+   return
+      (theMrPt->selMrCand () != NULL)?
+         theMrPt:
+         NULL;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class template MrCand <MrArgs>.
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrCand <MrArgs>::WitMrCand (
+            CandComp * theCandComp,
+            WitMrSelSite <MrArgs> * theMrSelSite):
+
+         WitSelCand   (theCandComp),
+
+         myMrSelSite_ (theMrSelSite),
+         myCandComp_  (theCandComp),
+         prevSel_     ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrCand <MrArgs>::~WitMrCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrCand <MrArgs>::setPrevSel (WitPeriod thePer, WitBoolean theVal)
+   {
+   WitSelector * theSelector;
+
+   if (! prevSel_.isAllocated ())
+      prevSel_.allocate (myProblem (), witFALSE);
+
+   theSelector = myMrSelSite_->myMrMgr ()->mySelector ();
+
+   if (theSelector->singleSource ())
+      theSelector->mySglSrcMgr ()->saveConfigVal (prevSel_[thePer]);
+
+   prevSel_[thePer] = theVal;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class template MrPt <MrArgs>.
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrPt <MrArgs>::WitMrPt (
+            WitMrSelSite <MrArgs> * theMrSelSite, 
+            WitPeriod               thePer):
+
+         WitSelPt     (),
+
+         myMrSelSite_ (theMrSelSite),
+         myPer_       (thePer),
+         hasResAlt_   (witFALSE)
+   {
+   CandComp * theCandComp;
+
+   theCandComp = myMrSelSite_->defaultCandComp (myPer_);
+
+   witAssert (theCandComp != NULL);
+
+   WitSelPt::select (myMrSelSite_->myMrCandFor (theCandComp));
+
+   hasResAlt_ = (findNextMrCand () != NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrPt <MrArgs>::~WitMrPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrPt <MrArgs>::hasResAlt ()
+   {
+   witAssert (selMrCand () != NULL);
+
+   return hasResAlt_;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrPt <MrArgs>::alterSelection ()
+   {
+   WitSelector * theSelector;
+
+   witAssert (selMrCand () != NULL);
+
+   theSelector = myMrSelSite_->myMrMgr ()->mySelector ();
+
+   if (theSelector->singleSource ())
+      theSelector->mySglSrcMgr ()->saveConfigVal (hasResAlt_);
+
+   selMrCand ()->setPrevSel (myPer_, witTRUE);
+
+   WitSelPt::select (findNextMrCand ());
+
+   hasResAlt_ = (findNextMrCand () != NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitSelMgr * WitMrPt <MrArgs>::mySelMgr ()
+   {
+   return myMrSelSite_->myMrMgr ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrPt <MrArgs>::splittable ()
+   {
+   WitSelector * theSelector;
+
+   theSelector = myMrSelSite_->myMrMgr ()->mySelector ();
+
+   if (theSelector->singleSource ())
+      if (theSelector->mySglSrcMgr ()->sglSrcMode (this))
+         return witFALSE;
+
+   return (myMrSelSite_->myGlobalComp ()->selSplit ());
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitPeriod WitMrPt <MrArgs>::myPeriod ()
+   {
+   return myPer_;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrPt <MrArgs>::tempAlterSel ()
+   {
+   alterSelection ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrPt <MrArgs>::restoreSel (WitSelCand * theSelCand)
+   {
+   WitMrCand <MrArgs> * theMrCand;
+
+   theMrCand = WitMrCand <MrArgs>::theMrCandFor (theSelCand);
+
+   witAssert (theMrCand->prevSel (myPer_));
+
+   theMrCand->setPrevSel (myPer_, witFALSE);
+
+   WitSelPt::select (theSelCand);
+
+   hasResAlt_ = (findNextMrCand () != NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      void WitMrPt <MrArgs>::select (CandComp * theCandComp)
+   {
+   WitMrCand <MrArgs> * theMrCand;
+
+   theMrCand = myMrSelSite_->myMrCandFor (theCandComp);
+
+   witAssert (theMrCand != selMrCand ());
+
+   witAssert (! theMrCand->prevSel (myPer_));
+
+   WitSelPt::select (theMrCand);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitMrCand <MrArgs> * WitMrPt <MrArgs>::findNextMrCand ()
+   {
+   CandComp *           theCandComp;
+   WitMrCandItr         theItr;
+   WitMrCand <MrArgs> * theMrCand;
+
+   theItr.attachTo (myMrSelSite_->myMrCands ());
+
+   while (theItr.advance (theMrCand))
+      if (theMrCand->isEligible (myPer_))
+         if (! theMrCand->prevSel (myPer_))
+            if (theMrCand != selMrCand ())
+               return theMrCand;
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      FILE * WitMrPt <MrArgs>::msgFile ()
+   {
+   return myMrSelSite_->msgFile ();
+   }
+
+#endif
+@
+
+
+1.22
+log
+@Continued implementation of single-source.
+@
+text
+@@
+
+
+1.21
+log
+@Continued implementation of Single-Source.
+@
+text
+@d506 8
+@
+
+
+1.20
+log
+@Continued implementation of Single-Source.
+@
+text
+@d175 41
+d507 8
+@
+
+
+1.19
+log
+@Continued implementation of Single-Source.
+@
+text
+@a291 45
+      CandComp * WitMrSelSite <MrArgs>::nextCandComp (
+         CandComp *                   theCandComp,
+         const WitTVec <WitBoolean> & activeVec)
+   {
+   WitMrCandItr         theItr;
+   WitMrCand <MrArgs> * theMrCand;
+   WitBoolean           validForActive;
+   WitPeriod            thePer;
+
+   theItr.attachTo (myMrCands_);
+
+   while (theItr.advance (theMrCand))
+      {
+      if (theCandComp != NULL)
+         {
+         if (theMrCand->myCandComp () == theCandComp)
+            theCandComp = NULL;
+
+         continue;
+         }
+
+      validForActive = witTRUE;
+
+      forEachPeriod (thePer, myProblem ())
+         if (activeVec[thePer])
+            {
+            if (theMrCand->isEligible (thePer))
+               if (! theMrCand->prevSel (thePer))
+                  continue;
+
+            validForActive = witFALSE;
+
+            break;
+            }
+
+      if (validForActive)
+         return theMrCand->myCandComp ();
+      }
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+@
+
+
+1.18
+log
+@Continued implementation of Single-Source.
+@
+text
+@d292 3
+a294 2
+      CandComp * WitMrSelSite <MrArgs>::nextAllPerCandComp (
+         CandComp * theCandComp)
+d298 1
+a298 1
+   WitBoolean           validForAll;
+d313 1
+a313 1
+      validForAll = witTRUE;
+d316 5
+a320 4
+         {
+         if (theMrCand->isEligible (thePer))
+            if (! theMrCand->prevSel (thePer))
+               continue;
+d322 1
+a322 1
+         validForAll = witFALSE;
+d324 2
+a325 2
+         break;
+         }
+d327 1
+a327 1
+      if (validForAll)
+@
+
+
+1.17
+log
+@Continued implementation of single-source.
+@
+text
+@d292 43
+@
+
+
+1.16
+log
+@Continued implementation of single-source.
+@
+text
+@d106 3
+a108 4
+      WitSelPt * WitMrMgr <MrArgs>::mySelPt (
+         SelComp *    theSelComp,
+         WitPeriod    thePer,
+         WitBoolean & resFound)
+d110 1
+a110 10
+   WitMrPt <MrArgs> * theMrPt;
+
+   theMrPt  = myMrSelSiteFor (theSelComp)->myMrPtWithAlt (thePer);
+
+   resFound =
+      (theMrPt != NULL)?
+         theMrPt->hasResAlt ():
+         witFALSE;
+
+   return theMrPt;
+d383 1
+a383 1
+      theSelector->mySglSrcMgr ()->saveSelectVal (prevSel_[thePer]);
+d424 10
+d443 1
+a443 1
+      theSelector->mySglSrcMgr ()->saveSelectVal (hasResAlt_);
+@
+
+
+1.15
+log
+@Continued implementation of single source.
+@
+text
+@d392 1
+a392 1
+   if (theSelector->sglSrc ())
+d442 1
+a442 1
+   if (theSelector->sglSrc ())
+@
+
+
+1.14
+log
+@Began implementation of object iteration.
+@
+text
+@d25 1
+d264 1
+a264 1
+            if (! theMrCand->prevSel ()[thePer])
+d361 3
+a363 1
+      WitMrCand <MrArgs>::WitMrCand (CandComp * theCandComp):
+d365 1
+a365 1
+         WitSelCand  (theCandComp),
+d367 3
+a369 2
+         myCandComp_ (theCandComp),
+         prevSel_    (myProblem (), witFALSE)
+d385 11
+a395 1
+   prevSel_.elemRef (thePer) = theVal;
+d436 2
+d440 5
+d485 1
+a485 1
+   witAssert (theMrCand->prevSel ()[myPer_]);
+d505 1
+a505 1
+   witAssert (! theMrCand->prevSel ()[myPer_]);
+d523 1
+a523 1
+         if (! theMrCand->prevSel ()[myPer_])
+@
+
+
+1.13
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@d25 1
+@
+
+
+1.12
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@a24 1
+#include <Splitter.h>
+d81 1
+a81 1
+      void WitMrMgr <MrArgs>::recordFlow (
+d98 1
+a98 1
+   mySplitter ()->recordFlow (theMrPt, incFlowVol);
+@
+
+
+1.11
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@d293 1
+a293 1
+   myMsgFac () ("internalErrorFmsg", "WitMrSelSite <MrArgs>::myMrCandFor");
+@
+
+
+1.10
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@d251 1
+a251 1
+   WitMrCandItr         theMrCandItr;
+d259 1
+a259 1
+      theMrCandItr.attachTo (myMrCands_);
+d261 1
+a261 1
+      while (theMrCandItr.advance (theMrCand))
+d284 1
+a284 1
+   WitMrCandItr         theMrCandItr;
+d287 1
+a287 1
+   theMrCandItr.attachTo (myMrCands_);
+d289 1
+a289 1
+   while (theMrCandItr.advance (theMrCand))
+d399 1
+a399 3
+   CandComp *           theCandComp;
+   WitMrCandItr         theMrCandItr;
+   WitMrCand <MrArgs> * theMrCand;
+d407 1
+a407 10
+   theMrCandItr.attachTo (myMrSelSite_->myMrCands ());
+
+   while (theMrCandItr.advance (theMrCand))
+      if (theMrCand->isEligible (myPer_))
+         if (theMrCand != selMrCand ())
+            {
+            hasResAlt_ = witTRUE;
+
+            break;
+            }
+a421 3
+   WitMrCandItr         theMrCandItr;
+   WitMrCand <MrArgs> * theMrCand;
+
+d426 1
+a426 3
+   WitSelPt::select (NULL);
+
+   hasResAlt_ = witFALSE;
+d428 1
+a428 13
+   theMrCandItr.attachTo (myMrSelSite_->myMrCands ());
+
+   while (theMrCandItr.advance (theMrCand))
+      if (theMrCand->isEligible (myPer_))
+         if (! theMrCand->prevSel ()[myPer_])
+            if (selMrCand () == NULL)
+               WitSelPt::select (theMrCand);
+            else
+               {
+               hasResAlt_ = witTRUE;
+
+               return;
+               }
+d450 1
+a450 1
+      void WitMrPt <MrArgs>::setMrSelPrevSel (WitBoolean theVal)
+d452 19
+a470 1
+   selMrCand ()->setPrevSel (myPer_, theVal);
+d487 20
+@
+
+
+1.9
+log
+@Continued implementation of sel-split fpr pen-exec.
+@
+text
+@a183 27
+      void WitMrMgr <MrArgs>::setPrevSel (
+         CandComp * theCandComp, 
+         WitPeriod  thePer,
+         WitBoolean theVal)
+   {
+   WitMrSelSite           <MrArgs> * theMrSelSite;
+   WitObjStItr <WitMrCand <MrArgs> > theItr;
+   WitMrCand              <MrArgs> * theMrCand;
+
+   theMrSelSite = myMrSelSiteFor_ (theSelCompFor (theCandComp));
+
+   theItr.attachTo (theMrSelSite->myMrCands ());
+
+   while (theItr.advance (theMrCand))
+      if (theMrCand->myCandComp () == theCandComp)
+         {
+         theMrCand->setPrevSel (thePer, theVal);
+
+         return;
+         }
+
+   myMsgFac () ("internalErrorFmsg", "WitMrMgr <MrArgs>::setPrevSel");
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+d473 8
+@
+
+
+1.8
+log
+@Implemented initial prototype of sel-split for pen-exec.
+@
+text
+@d184 27
+d406 1
+a406 1
+      void WitMrCand <MrArgs>::setPrevSel (WitPeriod thePer)
+d408 1
+a408 1
+   prevSel_.elemRef (thePer) = witTRUE;
+d465 1
+a465 1
+   selMrCand ()->setPrevSel (myPer_);
+@
+
+
+1.7
+log
+@Initial implementation of selection splitting for multi-route.
+@
+text
+@d105 20
+a186 21
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitSelPt * WitMrMgr <MrArgs>::mySelPt (
+         CandComp *   theCandComp,
+         WitPeriod    thePer,
+         WitBoolean & resFound)
+   {
+   WitMrPt <MrArgs> * theMrPt;
+
+   theMrPt  = 
+      myMrSelSiteFor (theSelCompFor (theCandComp))->myMrPtWithAlt (thePer);
+
+   resFound =
+      (theMrPt != NULL)?
+         theMrPt->hasResAlt ():
+         witFALSE;
+
+   return theMrPt;
+@
+
+
+1.6
+log
+@Continued implmentation of selective stock reallocation.
+@
+text
+@d25 1
+d82 23
+d166 1
+a166 1
+   return witFALSE;
+d473 1
+a473 1
+   return witFALSE;
+@
+
+
+1.5
+log
+@Continuing implementation of selective stock reallocation.
+@
+text
+@d131 1
+a131 1
+         WitMrCand <MrArgs>::safeCast (theSelCand)->myCandComp ():
+@
+
+
+1.4
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@a147 7
+      void WitMrMgr <MrArgs>::postSplitCommit ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+@
+
+
+1.3
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@d21 1
+a21 1
+//    MrSelPt   <MrArgs>
+d63 1
+a63 1
+      theMrSelSite->myMrSelPt ()[thePer]->select (theCandComp);
+d95 1
+a95 1
+   return theMrSelSite->myMrSelPt ()[thePer]->isSplit ();
+d106 1
+a106 1
+   WitMrSelPt <MrArgs> * theMrSelPt;
+d110 1
+a110 1
+   theMrSelPt = myMrSelSiteFor_ (theSelComp)->myMrSelPt ()[thePer];
+d112 1
+a112 1
+   startSplitExpAbs (theMrSelPt, expVol);
+d160 1
+a160 1
+   WitMrSelPt <MrArgs> * theMrSelPt;
+d162 2
+a163 2
+   theMrSelPt = 
+      myMrSelSiteFor (theSelCompFor (theCandComp))->myMrSelPtWithAlt (thePer);
+d165 3
+a167 3
+   resFound   =
+      (theMrSelPt != NULL)?
+         theMrSelPt->hasResAlt ():
+d170 1
+a170 1
+   return theMrSelPt;
+d188 1
+a188 1
+         myMrSelPt_   ()
+d195 1
+a195 1
+   buildMrSelPts ();
+d203 1
+a203 1
+   deleteContents (myMrSelPt_);
+d212 2
+a213 2
+   WitPeriod             thePer;
+   WitMrSelPt <MrArgs> * theMrSelPt;
+d220 1
+a220 1
+      theMrSelPt = myMrSelPt_[thePer];
+d222 3
+a224 3
+      if (theMrSelPt != NULL)
+         if (theMrSelPt->selMrCand () != NULL)
+            theMrSelPt->printID ();
+d293 1
+a293 1
+      theMrCand = myMrSelPt_[thePer]->selMrCand ();
+d305 1
+a305 1
+      void WitMrSelSite <MrArgs>::buildMrSelPts ()
+d312 1
+a312 1
+   myMrSelPt_.allocate (myProblem ());
+d316 1
+a316 1
+         myMrSelPt_[thePer] = new WitMrSelPt <MrArgs> (this, thePer);
+d322 1
+a322 1
+      WitMrSelPt <MrArgs> * WitMrSelSite <MrArgs>::multiChoiceMrSelPtWithAlt (
+d325 1
+a325 1
+   WitMrSelPt <MrArgs> * theMrSelPt;
+d329 1
+a329 1
+   theMrSelPt = myMrSelPt_[thePer];
+d331 1
+a331 1
+   witAssert (theMrSelPt != NULL);
+d334 2
+a335 2
+      (theMrSelPt->selMrCand () != NULL)?
+         theMrSelPt:
+d369 1
+a369 1
+// Implementation of class template MrSelPt <MrArgs>.
+d373 1
+a373 1
+      WitMrSelPt <MrArgs>::WitMrSelPt (
+d408 1
+a408 1
+      WitMrSelPt <MrArgs>::~WitMrSelPt ()
+d415 1
+a415 1
+      void WitMrSelPt <MrArgs>::alterSelection ()
+d446 1
+a446 1
+      WitSelMgr * WitMrSelPt <MrArgs>::mySelMgr ()
+d454 1
+a454 1
+      WitBoolean WitMrSelPt <MrArgs>::splittable ()
+d462 1
+a462 1
+      void WitMrSelPt <MrArgs>::select (CandComp * theCandComp)
+d478 1
+a478 1
+      FILE * WitMrSelPt <MrArgs>::msgFile ()
+@
+
+
+1.2
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@a461 14
+      void WitMrSelPt <MrArgs>::adjustSplitBound (
+         WitSelCand * theSelCand, 
+         double &     splitBound)
+   {
+   CandComp * theCandComp;
+
+   theCandComp = WitMrCand <MrArgs>::safeCast (theSelCand)->myCandComp ();
+
+   myMrSelSite_->myMrMgr ()->adjustSplitBound (theCandComp, myPer_, splitBound);
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+@
+
+
+1.1
+log
+@Refactoring for constrained stock reallocation.
+@
+text
+@d118 3
+a120 1
+      WitBoolean WitMrMgr <MrArgs>::validForExecBounds ()
+d122 6
+a127 2
+   return forPmr ();
+   }
+d129 4
+a132 1
+//------------------------------------------------------------------------------
+d134 1
+a134 7
+template <MrArgDecs>
+      const char * WitMrMgr <MrArgs>::selCaseName ()
+   {
+   return 
+      forPmr ()?
+         "Production Multi-Route":
+         "Consumption Multi-Route";
+d136 1
+a136 1
+
+a362 16
+      WitBoolean WitMrCand <MrArgs>::isaPmrCand ()
+   {
+   return WitMrMgr <MrArgs>::forPmr ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+      WitBoolean WitMrCand <MrArgs>::isaCmrCand ()
+   {
+   return ! WitMrMgr <MrArgs>::forPmr ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+a414 14
+      WitTlObj * WitMrSelPt <MrArgs>::selectedObj ()
+   {
+   CandComp * theCandComp;
+
+   witAssert (selMrCand () != NULL);
+
+   theCandComp = selMrCand ()->myCandComp ();
+
+   return (WitTlObj *) theCandComp;
+   }
+
+//------------------------------------------------------------------------------
+
+template <MrArgDecs>
+d463 2
+a464 2
+         WitTlObj * theTlObj, 
+         double & splitBound)
+d468 1
+a468 1
+   theCandComp = (CandComp *) theTlObj;
+@
+

@@ -1,0 +1,467 @@
+head	1.7;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.7
+date	2004.11.20.14.32.30;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.11.20.00.00.25;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.11.12.22.20.26;	author grzes;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.11.10.23.22.17;	author grzes;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.11.10.23.21.01;	author grzes;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.11.10.18.33.08;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.11.10.04.11.32;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@modified to plug a memory leak introduced yesterday.
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#pragma warning(disable:4290)
+#endif
+
+
+//#include <map>
+#include <vector>
+#include <cstdlib>
+#include <time.h>
+
+//#include <assert.h>
+//#include <iostream>
+//#include <float.h>
+//#include <math.h>
+
+#include "writeResults.h"
+#include "ovptProblem.h"
+#include "scoFile.h"
+
+FILE * openFile(const std::string & fileName) {
+  FILE * retVal = fopen(fileName.c_str(),"w");
+  if ( retVal==NULL ) {
+    throw SCOexception("ERROR: Can not open output file named " + fileName  +"\n");
+  }
+  return retVal;
+}
+
+void writeResults(const ECCovptProblem & prob, const std::string & outputDirectory) 
+{
+
+  int nPeriods=prob.getNPeriods();
+
+  // Write demand output file
+  {
+    std::string demandFileName = outputDirectory+"/demandO.csv";
+    FILE * demandFilePtr = openFile(demandFileName);
+    
+    std::string heading="\"demand\",\"material\",\"period\",\"demVol\",\"minShipVol\",\"shipVol\",\"unmetVol\""; 
+    fprintf(demandFilePtr,"%s\n",heading.c_str());
+    
+    
+    // Get list of all demands
+    std::vector<std::string> demandNames;
+    std::vector<std::string> materialNames;
+    
+    prob.getDemandNames(materialNames,demandNames);
+    
+    // loop once for each demand
+    unsigned int d;
+    for ( d=0; d<demandNames.size(); ++d ) {
+      std::vector<float> demandVol = prob.getDemandDemandVol(materialNames[d],demandNames[d]);
+      std::vector<float> shipVol = prob.getDemandShipVol(materialNames[d],demandNames[d]);
+      std::vector<float> minShipVol = prob.getDemandMinShipVol(materialNames[d],demandNames[d]);
+      int t;
+      for(t=0; t<nPeriods; t++) {
+        float unmetVol = demandVol[t] - shipVol[t];
+          fprintf(demandFilePtr,
+                  "\"%s\",\"%s\",%d,%f,%f,%f,%f\n",
+                  demandNames[d].c_str(),materialNames[d].c_str(),t+1,demandVol[t],minShipVol[t],shipVol[t],unmetVol);
+      } // end of t loop
+    } // end of d loop
+    
+    fclose(demandFilePtr);
+    
+  } // end of write demand output file
+
+
+  // Write material output file
+  {
+    std::string materialFileName = outputDirectory+"/materialO.csv";
+    FILE * materialFilePtr = openFile(materialFileName);
+    
+    std::string heading="\"material\",\"period\",\"production\",\"consumptionl\",\"scrap\""; 
+    fprintf(materialFilePtr,"%s\n",heading.c_str());
+    
+    
+    // Get list of all materials
+    std::vector<std::string> materialNames;
+    
+    prob.getMaterialNames(materialNames);
+    
+    // loop once for each material
+    unsigned int d;
+    for ( d=0; d<materialNames.size(); ++d ) {
+      std::vector<float> prodVol = prob.getMaterialProductionVolume(materialNames[d]);
+      std::vector<float> consVol = prob.getMaterialConsumptionVolume(materialNames[d]);
+      std::vector<float> scrapVol = prob.getMaterialScrapVolume(materialNames[d]);
+      int t;
+      for(t=0; t<nPeriods; t++) {
+          fprintf(materialFilePtr,
+                  "\"%s\",%d,%f,%f,%f\n",
+                  materialNames[d].c_str(),t+1,prodVol[t],consVol[t],scrapVol[t]);
+      } // end of t loop
+    } // end of d loop
+    
+    fclose(materialFilePtr);
+    
+  } // end of write material output file
+
+  // Write capacity output file
+  {
+    std::string capacityFileName = outputDirectory+"/capacityO.csv";
+    FILE * capacityFilePtr = openFile(capacityFileName);
+    
+    std::string heading="\"capacity\",\"period\",\"supply\",\"consumption\",\"excess\""; 
+    fprintf(capacityFilePtr,"%s\n",heading.c_str());
+    
+    
+    // Get list of all capacitys
+    std::vector<std::string> capacityNames;
+    
+    prob.getCapacityNames(capacityNames);
+    
+    // loop once for each capacities
+    unsigned int d;
+    for ( d=0; d<capacityNames.size(); ++d ) {
+      std::vector<float> supVol = prob.getCapacitySupply(capacityNames[d]);
+      std::vector<float> consVol = prob.getCapacityConsumptionVolume(capacityNames[d]);
+      std::vector<float> excessVol = prob.getCapacityExcessVolume(capacityNames[d]);
+      int t;
+      for(t=0; t<nPeriods; t++) {
+          fprintf(capacityFilePtr,
+                  "\"%s\",%d,%f,%f,%f\n",
+                  capacityNames[d].c_str(),t+1,supVol[t],consVol[t],excessVol[t]);
+      } // end of t loop
+    } // end of d loop
+    
+    fclose(capacityFilePtr);
+    
+  } // end of write capacity output file
+
+  // Write operation output file
+  {
+    std::string operationFileName = outputDirectory+"/operationO.csv";
+    FILE * operationFilePtr = openFile(operationFileName);
+    
+    std::string heading="\"operation\",\"period\",\"minimumProduction\",\"executionVol\""; 
+    fprintf(operationFilePtr,"%s\n",heading.c_str());
+    
+    
+    // Get list of all operations
+    std::vector<std::string> operationNames;
+    
+    prob.getOperationNames(operationNames);
+    
+    // loop once for each operation
+    unsigned int d;
+    for ( d=0; d<operationNames.size(); ++d ) {
+      std::vector<float> minProd = prob.getOperationMinimumProduction(operationNames[d]);
+      std::vector<float> execVol = prob.getOperationExecutionVolume(operationNames[d]);
+      int t;
+      for(t=0; t<nPeriods; t++) {
+          fprintf(operationFilePtr,
+                  "\"%s\",%d,%f,%f\n",
+                  operationNames[d].c_str(),t+1,minProd[t],execVol[t]);
+      } // end of t loop
+    } // end of d loop
+    
+    fclose(operationFilePtr);
+    
+  } // end of write operation output file
+
+  // Write parameters output file
+  {
+    std::string parameterFileName = outputDirectory+"/parameterO.csv";
+    FILE * parameterFilePtr = openFile(parameterFileName);
+    
+    std::string heading="\"parameterName\",\"parameterValue\""; 
+    fprintf(parameterFilePtr,"%s\n",heading.c_str());
+
+    // Write Contribution
+    fprintf(parameterFilePtr, "\"%s\",%f\n","contribution",prob.getEccObjValue());
+
+    // Write contribution by period
+    {
+      std::vector<double> objByPeriod = prob.getEccObjValueByPeriod();
+      int t;
+      for(t=0; t<objByPeriod.size(); ++t) {
+        fprintf(parameterFilePtr, "\"contributionInPeriod%d\",%f\n",t+1,objByPeriod[t]);
+      }
+    }
+
+
+    
+    //read todays date using <time.h>
+    time_t now;
+    now = time(NULL);
+    //write RunDate
+    char * ct= strdup(ctime(&now));
+    ct[24]='\0';
+    fprintf(parameterFilePtr, "\"runDateTime\",\"%s\"\n",ct);
+    free(ct);
+    
+    // Get list of all materials
+    std::vector<std::string> materialNames;
+    prob.getMaterialNames(materialNames);
+    //write numMaterials
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numMaterials",materialNames.size());
+    materialNames.clear();
+    
+    // Get list of all operations
+    std::vector<std::string> operationNames;
+    prob.getOperationNames(operationNames);
+    //write numOperations
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numOperations",operationNames.size());
+    operationNames.clear();
+    
+    // Get list of all capacities
+    std::vector<std::string> capacityNames;
+    prob.getCapacityNames(capacityNames);
+    //write numCapacities
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numCapacities",capacityNames.size());
+    capacityNames.clear();
+    
+    // Get list of all consumptionArcs
+    prob.getConsumptionArcNames(operationNames,materialNames);
+    //write numConsumptionArcs
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numConsumptionArcs",operationNames.size());
+    operationNames.clear();
+    materialNames.clear();
+    
+    // Get list of all productionArcs
+    prob.getProductionArcNames(operationNames,materialNames);
+    //write numProductionArcs
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numProductionArcs",operationNames.size());
+    operationNames.clear();
+    materialNames.clear();
+    
+    // Get list of all demands
+    std::vector<std::string> demandNames;
+    prob.getDemandNames(demandNames,materialNames);
+    //write demands
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numDemands",demandNames.size());
+    demandNames.clear();
+    materialNames.clear();
+    
+    //write periods
+    fprintf(parameterFilePtr, "\"%s\",%d\n","numPeriods",prob.getNPeriods());
+    
+    //write build date
+    std::string headerMsg = std::string(__DATE__);
+    fprintf(parameterFilePtr, "\"%s\",\"%s\"\n","ovptBuildDate",headerMsg.c_str());
+    
+    
+    fclose(parameterFilePtr);
+    
+  } // end of write parameter output file
+
+}
+@
+
+
+1.6
+log
+@Modified to write contributionInPeriod.
+Added quotes around time output strings.
+Removed blank after comma.
+@
+text
+@d194 1
+@
+
+
+1.5
+log
+@Updated output to parameterO.csv file.
+@
+text
+@d165 1
+a165 1
+   // Write parameters output file
+a171 1
+	fprintf(parameterFilePtr, "\"%s\",%f\n","contribution",prob.getEccObjValue());
+d173 21
+a193 5
+	//read todays date using <time.h>
+	time_t now;
+	now = time(NULL);
+	//write RunDate
+    fprintf(parameterFilePtr, "\"%s\",%s","runDateTime",ctime(&now));
+d199 4
+a202 4
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numMaterials",materialNames.size());
+	materialNames.clear();
+	
+	// Get list of all operations
+d206 4
+a209 4
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numOperations",operationNames.size());
+	operationNames.clear();
+	
+	// Get list of all capacities
+d213 4
+a216 4
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numCapacities",capacityNames.size());
+	capacityNames.clear();
+
+	// Get list of all consumptionArcs
+d219 6
+a224 6
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numConsumptionArcs",operationNames.size());
+	operationNames.clear();
+	materialNames.clear();
+
+	// Get list of all productionArcs
+	prob.getProductionArcNames(operationNames,materialNames);
+d226 7
+a232 7
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numProductionArcs",operationNames.size());
+	operationNames.clear();
+	materialNames.clear();
+
+	// Get list of all demands
+	std::vector<std::string> demandNames;
+	prob.getDemandNames(demandNames,materialNames);
+d234 4
+a237 4
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numDemands",demandNames.size());
+	demandNames.clear();
+	materialNames.clear();
+
+d239 2
+a240 2
+	fprintf(parameterFilePtr, "\"%s\",%d\n","numPeriods",prob.getNPeriods());
+
+d242 4
+a245 4
+	std::string headerMsg = std::string(" ") + __DATE__;
+	fprintf(parameterFilePtr, "\"%s\",%s\n","ovptBuildDate",headerMsg.c_str());
+
+
+@
+
+
+1.4
+log
+@Formatted the code, no meaningful changes, only the looks.
+@
+text
+@d178 1
+a178 1
+    fprintf(parameterFilePtr, "\"%s\",%s","Run Date",ctime(&now));
+d185 1
+d192 1
+d199 30
+@
+
+
+1.3
+log
+@Added methods for writing parameterO.csv output file.
+@
+text
+@a198 19
+   /* 
+    // Get list of all operations
+    std::vector<std::string> parameterNames;
+    
+    prob.getOperationNames(parameterNames);
+    
+    // loop once for each operation
+    unsigned int d;
+    for ( d=0; d<operationNames.size(); ++d ) {
+      std::vector<float> minProd = prob.getOperationMinimumProduction(operationNames[d]);
+      std::vector<float> execVol = prob.getOperationExecutionVolume(operationNames[d]);
+      int t;
+      for(t=0; t<nPeriods; t++) {
+          fprintf(operationFilePtr,
+                  "\"%s\",%d,%f,%f\n",
+                  operationNames[d].c_str(),t+1,minProd[t],execVol[t]);
+      } // end of t loop
+    } // end of d loop
+     */
+d201 1
+a201 1
+  } // end of write operation output file
+@
+
+
+1.2
+log
+@updated fileFormats.doc to define output files and updated code to match
+@
+text
+@d11 1
+d164 58
+a221 1
+  
+@
+
+
+1.1
+log
+@added code to write output files.
+added code to set scrapVol
+@
+text
+@d74 1
+a74 1
+    std::string heading="\"material\",\"period\",\"productionVolume\",\"consumptionVolume\",\"scrapVol\""; 
+d106 1
+a106 1
+    std::string heading="\"capacity\",\"period\",\"supplyVol\",\"consumptionVolume\",\"excessVol\""; 
+d138 1
+a138 1
+    std::string heading="\"operation\",\"period\",\"executionVol\""; 
+d150 1
+d155 2
+a156 2
+                  "\"%s\",%d,%f\n",
+                  operationNames[d].c_str(),t+1,execVol[t]);
+@
+

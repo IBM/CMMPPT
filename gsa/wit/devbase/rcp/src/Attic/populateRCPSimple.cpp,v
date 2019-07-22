@@ -1,0 +1,399 @@
+head	1.6;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.6
+date	2004.01.22.14.51.28;	author gresh;	state dead;
+branches;
+next	1.5;
+
+1.5
+date	2004.01.21.20.40.03;	author dpc;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.01.21.19.44.42;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.01.21.19.07.29;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.01.21.18.29.45;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.01.21.17.51.37;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@new version of populate, which calls specific versions of the populate routine
+depending on which file format is specified in the global attribute file
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+#endif
+
+#include "populateRCPSimple.h"
+#include "globalAttrFile.h"
+#include "resourceFileSimple.h"
+#include "bomFileSimple.h"
+#include "matchFile.h"
+#include <cstdio>
+#include <iostream>
+
+void populateSimple(
+              RCPproblem & prob, 
+              const std::string & idir, 
+              const std::string & odir) 
+{
+
+
+  // Get number of periods
+  std::string globalAttrFileName = idir + "/globalAttr.csv";
+  RCPglobalAttrFile globalAttrFile(globalAttrFileName);
+  int nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+
+  //populate the RCPproblem using the given directories and number of periods
+  prob.setNPeriods(nPeriods);  
+  prob.setOslMesgFileName(odir+"/oslMesgFile.txt");
+  
+ //---------------------------------------------------------
+  // Read match file
+  //---------------------------------------------------------
+  int jobRoleMatch, skillSetMatch, lobMatch, sourceMatch, locationMatch;
+  {
+    // Read match File 
+    std::string matchFileName = idir + "/match.csv";
+    RCPmatchFile matchFile(matchFileName);
+    RCPmatchFileIterator matchFileIter(matchFile);
+    matchFileIter();
+    
+    jobRoleMatch = matchFileIter.jobRoleMatchAsInt();
+    skillSetMatch = matchFileIter.skillSetMatchAsInt();
+    lobMatch = matchFileIter.lobMatchAsInt();
+    sourceMatch = matchFileIter.sourceMatchAsInt();
+    locationMatch = matchFileIter.locationMatchAsInt();
+      
+  }
+//---------------------------------------------------------
+  // Read resource file
+  //---------------------------------------------------------
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileSimpleName = idir + "/resource.csv";
+    RCPresourceFileSimple resourceFileSimple(resourceFileSimpleName);
+    RCPresourceFileSimpleIterator resourceFileSimpleIter(resourceFileSimple);
+    
+    // loop once for each record in resource file
+    for ( ; resourceFileSimpleIter()!=NULL; ) {
+      std::string jobRole = resourceFileSimpleIter.jobRole();
+      std::string skillSet = resourceFileSimpleIter.skillSet();
+      std::string LOB = resourceFileSimpleIter.LOB();
+      std::string source = resourceFileSimpleIter.source();
+      std::string resourceLocName = resourceFileSimpleIter.resourceLocName();
+      int period = resourceFileSimpleIter.periodAsInt();
+      float supplyQuantity =  resourceFileSimpleIter.supplyQuantityAsFloat();
+      
+      
+      // test to ensure period is within the planning horizon
+      if ( period >= nPeriods ) {
+        // Write warning message
+        std::cout 
+          <<"-------------------------------------------------------"         <<std::endl
+          <<"Warning: period is beyond planning horizion"                     <<std::endl
+          <<"   resource filename: " <<resourceFileSimple.filename().c_str()        <<std::endl
+          <<"   resource file line number: " <<resourceFileSimpleIter.recNum()      <<std::endl
+          <<"   jobRole: " <<jobRole.c_str()                        <<std::endl
+          <<"   period: " <<period                                            <<std::endl
+          <<"   allowed range: 0<=period<" <<nPeriods                         <<std::endl
+          <<"   record will be ignored. "                                     <<std::endl
+          <<"-------------------------------------------------------"         <<std::endl;
+        continue;
+      }
+      if (jobRoleMatch==0) jobRole = "dummy";
+      if (skillSetMatch==0) skillSet = "dummy";
+      if (lobMatch==0) LOB = "dummy";
+      if (sourceMatch==0) source = "dummy";
+      if (locationMatch==0) resourceLocName= "dummy";
+
+      if ( !prob.resourceExists(jobRole,skillSet,LOB,source,resourceLocName) )
+         prob.addResource(jobRole,skillSet,LOB,source,resourceLocName);
+
+
+      prob.setExogenousResourceSupplyQuantity(jobRole,skillSet,LOB,source,resourceLocName,period,supplyQuantity);
+      if (period == 0){
+	    prob.setBenchResourceSupplyQuantity(jobRole,skillSet,LOB,source,resourceLocName,0,supplyQuantity);
+      }
+      prob.setResourceFixedCost(jobRole,skillSet,LOB,source,resourceLocName,period,1.0);
+
+
+    }
+  }
+
+  //---------------------------------------------------------
+  // Read bom file
+  //---------------------------------------------------------
+  {
+    // Read resource File and set up structures for using data
+    std::string bomFileName = idir + "/bom.csv";
+    RCPbomFileSimple bomFile(bomFileName);
+    RCPbomFileSimpleIterator bomFileSimpleIter(bomFile);
+    
+    // loop once for each record in bom file
+    for ( ; bomFileSimpleIter()!=NULL; ) {
+      std::string jobRole = bomFileSimpleIter.jobRole();
+      std::string skillSet = bomFileSimpleIter.skillSet();
+      std::string LOB = bomFileSimpleIter.LOB();
+      std::string source = bomFileSimpleIter.source();
+      std::string resourceLoc = bomFileSimpleIter.resourceLocName();
+      int period = bomFileSimpleIter.periodAsInt();
+      float usageQuantity =  bomFileSimpleIter.usageQuantityAsFloat();
+
+      
+      // test to ensure period is within the planning horizon
+      if ( period >= nPeriods ) {
+        // Write warning message
+        std::cout 
+          <<"-------------------------------------------------------"         <<std::endl
+          <<"Warning: period is beyond planning horizion"                     <<std::endl
+          <<"   bom filename: " <<bomFile.filename().c_str()                  <<std::endl
+          <<"   bom file line number: " <<bomFileSimpleIter.recNum()                <<std::endl
+          <<"   jobRole: " <<jobRole.c_str()                        <<std::endl
+          <<"   resource location: " <<resourceLoc.c_str()                    <<std::endl
+          <<"   period: " <<period                                            <<std::endl
+          <<"   allowed range: 0<=period<" <<nPeriods                         <<std::endl
+          <<"   record will be ignored. "                                     <<std::endl
+          <<"-------------------------------------------------------"         <<std::endl;
+        continue;
+      }
+      //set names of unmatched fields to dummy
+      if (jobRoleMatch==0) 
+         jobRole="dummy";
+      if (skillSetMatch==0)
+         skillSet="dummy";
+      if (lobMatch==0)
+         LOB = "dummy";
+      if (sourceMatch==0)
+         source = "dummy";
+      if (locationMatch==0) 
+         resourceLoc = "dummy";
+      
+      //need to create an engagement name based on the match flags and the given data.
+      std::string engagementName= createEngagementName(jobRole, skillSet, LOB, source, resourceLoc);
+      if (!prob.engagementExists(engagementName)) {
+         prob.addEngagement(engagementName);
+         prob.setEngagementRevenue(engagementName,100000.);
+         prob.setEngagementStartPeriod(engagementName,0);
+         prob.setEngagementDuration(engagementName,nPeriods);
+         prob.setEngagementLateAllowance(engagementName,0);
+         prob.setEngagementLocation(engagementName,"dummy");
+      }
+                                    
+      if ( !prob.bomExists(engagementName,jobRole,skillSet,LOB,source,resourceLoc) )
+         prob.addBom(engagementName,jobRole,skillSet,LOB,source,resourceLoc);
+
+      prob.setBomUsageQuantity(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,usageQuantity);
+      prob.setBomJobRoleMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,1);
+      prob.setBomSkillSetMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,1);
+      prob.setBomLocationMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,1);
+      prob.setBomLobMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,1);
+      prob.setBomSourceMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,1);
+      prob.setBomJobRoleSub(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,0);
+      prob.setBomSkillSetSub(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,0);
+      prob.setBomLocationSub(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,0);
+      prob.setBomLobSub(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,0);
+      prob.setBomSourceSub(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,0);
+    }
+  }
+ 
+
+   
+  
+  
+  //---------------------------------------------------------
+  // Read resource action file
+  //---------------------------------------------------------
+#if 0
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileName = idir + "/resourceaction.csv";
+    RCPresourceActionFile resourceActionFile(resourceFileName);
+    RCPresourceActionFileIterator resourceActionFileIter(resourceActionFile);
+    
+    // loop once for each record in resource file
+    for ( ; resourceActionFileIter()!=NULL; ) {
+      std::string jobRole = resourceActionFileIter.jobRole();
+      std::string skillSet = resourceActionFileIter.skillSet();
+      std::string LOB = resourceActionFileIter.LOB();
+      std::string source = resourceActionFileIter.source();
+      std::string resourceLoc = resourceActionFileIter.resourceLocName();
+      float acquireCost =  resourceActionFileIter.acquireCostAsFloat();
+      float acquireTime =  resourceActionFileIter.acquireTimeAsFloat();
+      float releaseCost =  resourceActionFileIter.releaseCostAsFloat();
+      float releaseTime =  resourceActionFileIter.releaseTimeAsFloat();
+
+      // test to ensure that resource exists
+      if ( !prob.resourceExists(jobRole,skillSet,LOB,source,resourceLoc) ) {
+        // Resource does not exist. Write warning message
+        std::cout 
+          <<"-------------------------------------------------------"                  <<std::endl
+          <<"Warning: Resource does not exist"                                         <<std::endl
+          <<"   resource action filename: " <<resourceActionFile.filename().c_str()    <<std::endl
+          <<"   resource action file line number: " <<resourceActionFileIter.recNum()  <<std::endl
+          <<"   resource: " <<jobRole.c_str()                                     <<std::endl
+          <<"   resource location: " <<resourceLoc.c_str()                             <<std::endl
+          <<"   record will be ignored. "                                              <<std::endl
+          <<"-------------------------------------------------------"                  <<std::endl;
+        continue;
+      }
+
+      prob.setResourceAcquireTime(jobRole,skillSet,LOB,source,resourceLoc,acquireTime);
+      prob.setResourceAcquireCost(jobRole,skillSet,LOB,source,resourceLoc,acquireCost);
+      prob.setResourceReleaseTime(jobRole,skillSet,LOB,source,resourceLoc,releaseTime);
+      prob.setResourceReleaseCost(jobRole,skillSet,LOB,source,resourceLoc,releaseCost);
+
+    }
+  }
+#endif
+    
+    
+ 
+}
+std::string createEngagementName(std::string jobRole, std::string skillSet, std::string LOB, std::string source, std::string resourceLoc){
+   //this needs to be defined!
+   std::string returnval = "j: "+ jobRole + " sk: "+skillSet+" lob: "+LOB+" sr: "+ source+" lc: "+resourceLoc;
+   return "foo";
+}
+
+@
+
+
+1.5
+log
+@Removed the MRP branch of the model and put the exogenous supply in the bench resource's appData.
+@
+text
+@@
+
+
+1.4
+log
+@better constructed engagement name.
+@
+text
+@d95 1
+a95 1
+	    prob.setAcquireResourceSupplyQuantity(jobRole,skillSet,LOB,source,resourceLocName,0,supplyQuantity);
+@
+
+
+1.3
+log
+@fixed some bugs in the simple file handling
+@
+text
+@d166 5
+a170 5
+      prob.setBomJobRoleMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,jobRoleMatch);
+      prob.setBomSkillSetMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,skillSetMatch);
+      prob.setBomLocationMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,locationMatch);
+      prob.setBomLobMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,lobMatch);
+      prob.setBomSourceMatch(engagementName,jobRole,skillSet,LOB,source,resourceLoc,period,sourceMatch);
+d234 1
+@
+
+
+1.2
+log
+@initialize the match file iterator
+@
+text
+@d48 55
+d153 8
+a160 6
+      prob.addEngagement(engagementName);
+      prob.setEngagementRevenue(engagementName,100000.);
+      prob.setEngagementStartPeriod(engagementName,0);
+      prob.setEngagementDuration(engagementName,nPeriods);
+      prob.setEngagementLateAllowance(engagementName,0);
+      prob.setEngagementLocation(engagementName,"dummy");
+d182 1
+a182 49
+  //---------------------------------------------------------
+  // Read resource file
+  //---------------------------------------------------------
+  {
+    // Read resource File and set up structures for using data
+    std::string resourceFileSimpleName = idir + "/resource.csv";
+    RCPresourceFileSimple resourceFileSimple(resourceFileSimpleName);
+    RCPresourceFileSimpleIterator resourceFileSimpleIter(resourceFileSimple);
+    
+    // loop once for each record in resource file
+    for ( ; resourceFileSimpleIter()!=NULL; ) {
+      std::string jobRole = resourceFileSimpleIter.jobRole();
+      std::string skillSet = resourceFileSimpleIter.skillSet();
+      std::string LOB = resourceFileSimpleIter.LOB();
+      std::string source = resourceFileSimpleIter.source();
+      std::string resourceLocName = resourceFileSimpleIter.resourceLocName();
+      int period = resourceFileSimpleIter.periodAsInt();
+      float supplyQuantity =  resourceFileSimpleIter.supplyQuantityAsFloat();
+      
+      // test to ensure period is within the planning horizon
+      if ( period >= nPeriods ) {
+        // Write warning message
+        std::cout 
+          <<"-------------------------------------------------------"         <<std::endl
+          <<"Warning: period is beyond planning horizion"                     <<std::endl
+          <<"   resource filename: " <<resourceFileSimple.filename().c_str()        <<std::endl
+          <<"   resource file line number: " <<resourceFileSimpleIter.recNum()      <<std::endl
+          <<"   jobRole: " <<jobRole.c_str()                        <<std::endl
+          <<"   period: " <<period                                            <<std::endl
+          <<"   allowed range: 0<=period<" <<nPeriods                         <<std::endl
+          <<"   record will be ignored. "                                     <<std::endl
+          <<"-------------------------------------------------------"         <<std::endl;
+        continue;
+      }
+
+      if ( !prob.resourceExists(jobRole,skillSet,LOB,source,resourceLocName) )
+         prob.addResource(jobRole,skillSet,LOB,source,resourceLocName);
+
+
+      prob.setExogenousResourceSupplyQuantity(jobRole,skillSet,LOB,source,resourceLocName,period,supplyQuantity);
+      if (period == 0){
+	    prob.setAcquireResourceSupplyQuantity(jobRole,skillSet,LOB,source,resourceLocName,0,supplyQuantity);
+      }
+      prob.setResourceFixedCost(jobRole,skillSet,LOB,source,resourceLocName,period,1.0);
+
+
+    }
+  }
+
+@
+
+
+1.1
+log
+@preparing for handling "simple" format files. Not yet exercised in unitTest.
+@
+text
+@d39 1
+@
+

@@ -1,0 +1,513 @@
+head	1.4;
+access;
+symbols
+	EndRw-branch:1.3.0.4
+	Root-of-EndRw:1.3
+	rwToStl:1.3.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.03.03.23.26.52;	author rjw;	state dead;
+branches;
+next	1.3;
+
+1.3
+date	2002.08.26.22.49.02;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.08.26.20.16.07;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.08.23.21.00.37;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.3
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@@
+
+
+1.2
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@a0 443
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef MpModelH
+#define MpModelH
+
+//------------------------------------------------------------------------------
+// Header file: "MpModel.h"
+//
+// Contains the declaration of class MpModel.
+//------------------------------------------------------------------------------
+
+#include <ModelEl.h>
+#include <PtrVec.h>
+
+//------------------------------------------------------------------------------
+// class MpModel.
+// A math programming model, either:
+//    linear programming, or
+//    mixed integer programming.
+//------------------------------------------------------------------------------
+
+class WitMpModel: public WitUtil
+   {
+   public:
+
+      //-----------------------------------------------------------------------
+      // Constructor functions.
+      //-----------------------------------------------------------------------
+
+      WitMpModel (WitOptImploder * theOptImploder);
+         //
+         // myOptImploder <-- theOptImploder.
+
+      //-----------------------------------------------------------------------
+      // Destructor function.
+      //-----------------------------------------------------------------------
+
+      virtual ~WitMpModel ();
+
+      //-----------------------------------------------------------------------
+      // Public pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual WitBoolean needDual () = 0;
+         //
+         // Returns TRUE, iff a dual solution is needed.
+
+      virtual void reportInfeasible () = 0;
+         //
+         // Does any special error reporting for an infeasible solution,
+         // (over and above what is automatically done by myOslMgr_).
+
+      virtual void reportUnbounded () = 0;
+         //
+         // Does any special error reporting for an unbounded solution,
+         // (over and above what is automatically done by myOslMgr_).
+
+      //-----------------------------------------------------------------------
+      // Data access functions.
+      //-----------------------------------------------------------------------
+
+      accessFunc (WitOptImploder *,           myOptImploder)
+      accessFunc (WitProblem *,               myProblem)
+      accessFunc (WitMsgFacility &,           myMsgFac)
+      accessFunc (const WitList <WitMpVar> &, myMpVars)
+      accessFunc (const WitList <WitMpCon> &, myMpCons)
+      accessFunc (int,                        nCoeffs)
+      accessFunc (WitMpObj *,                 mainObj)
+
+      inline static FILE * modelFile ()
+         {
+         return modelFile_;
+         }
+
+      inline int nMpVars ()
+         {
+         return myMpVars ().nElements ();
+         }
+
+      inline int nMpCons ()
+         {
+         return myMpCons ().nElements ();
+         }
+
+      inline int nMpObjs ()
+         {
+         return myMpObjs_.nElements ();
+         }
+
+      inline WitBoolean isaMIP ()
+         {
+         return (nIntVars_ > 0);
+         }
+
+      //-----------------------------------------------------------------------
+      // Other public member functions.
+      //-----------------------------------------------------------------------
+
+      void store (WitMpVar * theVar);
+         //
+         // theVar is a new MpVar created for this MpModel.
+         // This function stores theVar.
+
+      void store (WitMpCon * theCon);
+         //
+         // theCon is a new MpCon created for this MpModel.
+         // This function stores theCon.
+
+      void store (WitMpObj * theObj);
+         //
+         // theObj is a new MpObj created for this MpModel.
+         // This function stores theObj.
+
+      void generateFixed ();
+         //
+         // Generates the fixed aspects of this MpModel (the aspects that do
+         // not change in accelerated mode).
+
+      void countIntVars ();
+         //
+         // Sets nIntVars_.
+
+      void incCoeff (WitMpVar * theVar, float delta);
+         //
+         // Adds delta to the Coeff of theVar in curCon_, constructing it,
+         // if neccesary.  No-op, if delta is (nearly) 0.0.
+
+      void generateFlexible ();
+         //
+         // Generates the flexible aspects of this MpModel (the aspects that
+         // may change in accelerated mode).
+
+      inline const WitBoundPair & preScreenBounds (const WitMpVar * theVar);
+         //
+         // Returns the value that theVar->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      inline const WitBoundPair & preScreenBounds (const WitMpCon * theCon);
+         //
+         // Returns the value that theCon->bounds () held just prior to
+         // screening. Valid only if saveBounds has been called.
+
+      void calcInitSoln ();
+         //
+         // Calculates an initial solution.
+
+      void generateOslVectors (
+            WitVector <int> &    indexRow,
+            WitVector <int> &    startOfEachColumn,
+            WitVector <double> & elements);
+         //
+         // Generates 3 vectors to be passed to ekk_addColmunElementBlock.
+
+      void print (WitBoolean printOslVecs);
+         //
+         // Prints this MpModel.
+         // Also prints the Osl Vectors if printOslVecs is TRUE.
+
+      void getConLBs (WitVector <double> & theConLBvec);
+         //
+         // Loads theConLBvec with the lower bound on each constraint.
+
+      void getConUBs (WitVector <double> & theConUBvec);
+         //
+         // Loads theConUBvec with the upper bound on each constraint.
+
+      void getVarLBs (WitVector <double> & theVarLBvec);
+         //
+         // Loads theVarLBvec with the lower bound on each variable.
+
+      void getVarUBs (WitVector <double> & theVarUBvec);
+         //
+         // Loads theVarUBvec with the upper bound on each variable.
+
+      void getObjCoeffs (WitVector <double> & theObjCoeffVec);
+         //
+         // Loads theObjVec with the objective coefficient on each variable.
+
+      void getInitSoln (double * colsol);
+         //
+         // Copies the initial primal MP solution into colsol.
+
+      void storePrimalSoln (const double * colsol);
+         //
+         // Stores the primal MP solution from colsol to this MpModel.
+
+      void storeDualSoln (const double * rowduals);
+         //
+         // Stores the dual MP solution from rowduals to this MpModel.
+
+      void solve ();
+         //
+         // Solves this MpModel.
+
+   protected:
+
+      //-----------------------------------------------------------------------
+      // Protected pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void generateVariables () = 0;
+         //
+         // Generates all variables.
+
+      virtual void generateConstraints () = 0;
+         //
+         // Generates all MpCons.
+
+      virtual WitMpObj * generateObjectives () = 0;
+         //
+         // Generates all MpObjs.
+         // Returns the main objective.
+
+      virtual void printModelElHeading () = 0;
+         //
+         // Prints a heading for ModelEls to modelFile ().
+
+      //-----------------------------------------------------------------------
+      // Protected non-pure virtual member functions.
+      //-----------------------------------------------------------------------
+
+      virtual void displayDerived ();
+         //
+         // Display any model-specific message in pre-release mode.
+         // This default version is a no-op.
+
+      virtual void printDerived ();
+         //
+         // Prints model-specific aspects of this MpModel.
+         // This default version is a no-op.
+
+      virtual void initDepVars ();
+         //
+         // Initializes the dependent variables, i.e., those variables whose
+         // initial value depends on the initial value of other variables.
+
+      //-----------------------------------------------------------------------
+      // Other protected member functions.
+      //-----------------------------------------------------------------------
+
+      void saveBounds ();
+         //
+         // Copies bounds for each MpVar and MpCon into varPreScreenBounds_ and
+         // conPreScreenBounds_.
+
+      int screen (const WitMpCon * theCon);
+         //
+         // Performs generic screening on theCon and the variables it
+         // intersects.
+         // Returns # MpVars fixed.
+         // No-op, if theCon is NULL.
+
+   private:
+
+      //-----------------------------------------------------------------------
+      // Private member functions.
+      //-----------------------------------------------------------------------
+
+      noCopyCtorAssign (WitMpModel);
+
+      void generateCoeffs ();
+         //
+         // Generates all Coeffs for all MpCons and stores them in the
+         // ModelEl myCoeffs_ vectors.
+
+      void buildCoeffs ();
+         //
+         // Generates all Coeffs for all MpCons.
+
+      void allocVarCoeffs ();
+         //
+         // Invokes allocMyCoeffs for each MpVar in this MpModel.
+
+      void storeCoeffs ();
+         //
+         // Stores all Coeffs in each ModelEl, in MpCon order for MpVars and
+         // MpVar order for MpCons.
+
+      WitCoeff * & varLastCoeff (const WitMpVar * theVar)
+         {
+         return varLastCoeff_[theVar->index ()];
+         }
+
+      void generateMainObjCoeffs ();
+         //
+         // For each MpVar, theVar, computes theVar->mainObjCoeffVal.
+
+      void generateBounds (const WitList <WitModelEl> & theModelEls);
+         //
+         // Generates the bounds for each ModelEl in theModelEls.
+
+      void printVars ();
+         //
+         // Prints all MpVars in this MpModel.
+
+      void printCons ();
+         //
+         // Prints all MpCons in this MpModel.
+
+      void printObjs ();
+         //
+         // Prints all MpObjs in this MpModel.
+
+      void printOslVectors ();
+         //
+         // Temporarly generates the vectors to be passed to
+         // ekk_addColumnElementBlock and prints them.
+
+      void reconstructDual ();
+         //
+         // Assuming the model was screened and an optimal dual solution to the
+         // screened model has been obtained, this function modifies the dual
+         // solution, in order to make it optimal and feasible for the dual of
+         // the unscreened model.
+
+      //-----------------------------------------------------------------------
+      // Static private member data.
+      //-----------------------------------------------------------------------
+
+      static FILE * modelFile_;
+         //
+         // MP model output file.
+
+      //-----------------------------------------------------------------------
+      // Other private member data.
+      //-----------------------------------------------------------------------
+
+      WitOptImploder * const myOptImploder_;
+         //
+         // The OptImploder under which this MpModel is operating.
+
+      WitProblem * const myProblem_;
+         //
+         // The Problem to wich this MpModel belongs.
+
+      WitMsgFacility & myMsgFac_;
+         //
+         // The MsgFacility for this MpModel.
+
+      WitOslMgr * myOslMgr_;
+         //
+         // The OslMgr owned by this MpModel.
+
+      WitList <WitMpVar> myMpVars_;
+         //
+         // The list of all MpVars in this MpModel.
+
+      WitList <WitMpCon> myMpCons_;
+         //
+         // The list of all MpCons in this MpModel.
+
+      WitList <WitMpObj> myMpObjs_;
+         //
+         // List of all MpObjs in this MpModel.
+
+      int nCoeffs_;
+         //
+         // # Coeffs in model.
+
+      WitMpCon * curCon_;
+         //
+         // The MpCon whose Coeffs are currently being generated.
+
+      WitDenseList <WitCoeff> curConCoeffs_;
+         //
+         // The Coeffs for curCon_;
+         // Allocated only during buildCoeffs.
+
+      WitPtrVec <WitCoeff> varLastCoeff_;
+         //
+         // varLastCoeff_[theVar->index ()] is the most recently
+         // generated Coeff whose MpVar is theVar, or NULL is none exists.
+         // Allocated only during buildCoeffs.
+
+      WitMpObj * mainObj_;
+         //
+         // The main objective function.
+
+      int nIntVars_;
+         //
+         // # integer variables in this MpModel.
+
+      WitPtrVec <WitBoundPair> varPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (MpVar *).
+
+      WitPtrVec <WitBoundPair> conPreScreenBounds_;
+         //
+         // Stores the return values of preScreenBounds (MpCon *).
+
+      WitList <WitCoeff> screenedCoeffs_;
+         //
+         // For each Coeff in screenedCoeffs_, theCoeff:
+         //    theCoeff->myVar () is a variable that was screened out.
+         //    theCoeff->myCon () is the constraint that enabled the
+         //    variable to be screened out.
+         // The Coeffs are stored in reverse of the order in which the
+         // screening was performed.
+         // Valid iff needDual () is TRUE.
+   };
+
+//------------------------------------------------------------------------------
+// Implementations of inline member functions for class MpModel.
+//------------------------------------------------------------------------------
+
+inline const WitBoundPair & WitMpModel::preScreenBounds (
+      const WitMpVar * theVar)
+   {
+   return varPreScreenBounds_ (theVar->index ());
+   }
+
+//------------------------------------------------------------------------------
+
+inline const WitBoundPair & WitMpModel::preScreenBounds (
+      const WitMpCon * theCon)
+   {
+   return conPreScreenBounds_ (theCon->index ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementations of inline member functions for clients of class MpModel.
+//------------------------------------------------------------------------------
+
+inline WitOptImploder * WitMpObj::myOptImploder () const
+   {
+   return myMpModel_->myOptImploder ();
+   }
+
+//------------------------------------------------------------------------------
+
+inline WitOptImploder * WitModelEl::myOptImploder () const
+   {
+   return myMpModel ()->myOptImploder ();
+   }
+
+#endif
+@
+
+
+1.1
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@d97 5
+d126 4
+d385 4
+@
+

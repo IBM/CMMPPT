@@ -1,0 +1,1743 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.5
+date	2009.03.19.14.40.08;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2008.11.24.18.44.10;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2008.11.21.16.13.50;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.11.20.18.36.08;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.11.19.16.07.42;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@changes due to bob's changes to witj interface
+@
+text
+@package witviz;
+
+import static com.ibm.witj.Attribute.bomIndex;
+import static com.ibm.witj.Attribute.bopIndex;
+import static com.ibm.witj.Attribute.currentScenario;
+import static com.ibm.witj.Attribute.demandName;
+import static com.ibm.witj.Attribute.nPeriods;
+import static com.ibm.witj.Attribute.nScenarios;
+import static com.ibm.witj.Attribute.operationName;
+import static com.ibm.witj.Attribute.partName;
+import static com.ibm.witj.Attribute.stageByObject;
+import static com.ibm.witj.Attribute.stochMode;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Vector;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.ibm.witj.Attribute;
+import com.ibm.witj.BomEntry;
+import com.ibm.witj.BopEntry;
+import com.ibm.witj.BoundSet;
+import com.ibm.witj.Component;
+import com.ibm.witj.Demand;
+import com.ibm.witj.GlobalAspect;
+import com.ibm.witj.MessageGroup;
+import com.ibm.witj.Operation;
+import com.ibm.witj.Part;
+import com.ibm.witj.Problem;
+import com.ibm.witj.ReadDataException;
+import com.ibm.witj.Substitute;
+import com.ibm.witj.Part.Category;
+
+
+
+
+
+//import com.ibm.mathsci.witinterface.witAttr;
+/**
+ * <p>
+ * Title:
+ * </p>
+ * <p>
+ * Description:
+ * </p>
+ * <p>
+ * Copyright: Copyright (c) 2004
+ * </p>
+ * <p>
+ * Company:
+ * </p>
+ * 
+ * @@author not attributable
+ * @@version 1.0
+ */
+
+public class WitObject  {
+	Log logger = LogFactory.getLog(WitObject.class);
+
+	enum STATUS { OK, DEAD, RETRY }
+
+
+	STATUS allOK=STATUS.OK;
+
+	String message="";
+	
+	private Vector listOfPartAttributes=null;
+	private Vector listOfOperationAttributes=null;
+	private Vector listOfBomAttributes=null;
+	private Vector listOfBopAttributes=null;
+	private Vector listOfSubstituteAttributes=null;
+	private Vector listOfDemandEdgeAttributes=null;
+	private Vector listOfGlobalAttributes=null;
+	private Vector currentChildren = new Vector();
+	private Vector currentParents = new Vector();
+	private Vector selectedChildren = new Vector();
+	private Vector selectedParents = new Vector();
+	private Vector selectedSubstitutes = new Vector();
+	private ListInfo currentFocus;
+	private Vector rawMaterialsList = new Vector();
+	private Vector rawOperationsList = new Vector();
+
+	private ListInfo currentSelected; // (not the same as focus, necessarily)
+	Problem theProblem;
+	int nPeriodsVal;
+
+	public WitObject(String filename)
+			throws Exception {
+	
+
+		
+		theProblem = Problem.newInstance();
+		
+		theProblem.getMessageMgr().setMesgTimesPrint(MessageGroup.INFORMATIONAL,0);
+		
+	    theProblem.getMessageMgr().setMesgFileAccessMode("w");
+	    theProblem.getMessageMgr().setMesgFileName("WitVizErrorLog.txt");
+		theProblem.enable();
+		
+		//check if file exists
+		File file = new File(filename);
+		if (!file.exists()) {
+			message = "File "+filename+" does not exist";
+			allOK=STATUS.RETRY;
+			return;
+		}
+		try {
+			theProblem.readData(filename);
+		}
+		catch (ReadDataException e) {
+			message = "WIT issued a severe error message while attempting to read the data file \n                       \""+filename+"\". \nThis indicates an error in the data file. As a result of this severe error,\nWitViz will need to terminate when this window is closed.  \n\nThe severe error message follows:\n\n";
+			allOK=STATUS.DEAD;
+			
+			
+			File errorfile = new File("WitVizErrorLog.txt");
+	        BufferedReader in = new BufferedReader(new FileReader(errorfile));
+	        String line;
+	        while ((line = in.readLine()) != null) {
+	        	message+=line+"\n";
+	        }
+	        in.close();
+
+			return;
+		}
+		nPeriodsVal = theProblem.getGlobalAspect ().getValue (nPeriods ());
+		
+		
+		CreateRawMaterialsList();
+		CreateRawOperationsList();
+		
+		
+
+	}
+
+public WitObject()
+	throws Exception {
+
+	//just used for setup purposes
+	theProblem = Problem.newInstance();
+	
+	theProblem.getMessageMgr().setMesgTimesPrint(MessageGroup.INFORMATIONAL,0);
+	theProblem.enable();
+	
+	CreateRawMaterialsList();
+	CreateRawOperationsList();
+
+}
+
+
+	public void RecurseUpOperation(int currentLevel) {
+		currentLevel--;
+		if (currentLevel == 0)
+			return;
+		else {
+			// do the stuff at the next level
+
+			// RecurseUpPart(currentLevel, partName);
+		}
+	}
+	public Vector getRawMaterialsList() {
+		return rawMaterialsList;
+	}
+
+	public Vector getRawOperationsList() {
+		return rawOperationsList;
+	}
+	public boolean getStochMode() {
+		boolean stochMode = theProblem.getGlobalAspect().getValue(stochMode());
+		return stochMode;
+	}
+
+
+	public void setFocusObject(ListInfo li) {
+		currentFocus = li;
+	}
+
+	public ListInfo getFocus() {
+		return currentFocus;
+	}
+	public int getNumScenarios() {
+		return theProblem.getGlobalAspect().getValue(nScenarios());
+	}
+	
+	public Vector getListOfGlobalAttributes() {
+
+		if (listOfGlobalAttributes==null) {
+			listOfGlobalAttributes = new Vector();
+		
+			
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(GlobalAspect.class))
+					listOfGlobalAttributes.add(attr);
+			}
+		}
+		return listOfGlobalAttributes;
+
+	}
+	
+	public void setScenario(int scenario) {
+		theProblem.getGlobalAspect().setValue(currentScenario(),scenario);
+	}
+	public int getCurrentScenario() {
+		int scenario = theProblem.getGlobalAspect().getValue(currentScenario());
+		return scenario;
+	}
+
+	
+	public Vector getListOfPartAttributes() {
+
+		if (listOfPartAttributes==null) {
+			listOfPartAttributes = new Vector();
+					
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(Part.class)) {
+					if (attr.toString().compareTo("focusShortageVol")!=0)
+						listOfPartAttributes.add(attr);
+				}
+			}
+		}
+		return listOfPartAttributes;
+
+	}
+	public Vector getPartDemands(String partName) {
+		Vector retVec = new Vector();
+		Part part = theProblem.getPart(partName);
+		List<Demand> demands = part.getDemands();
+		String category = "demand";
+		for (int i=0; i<demands.size(); i++) {
+			Demand demand = demands.get(i);
+			String name = demand.getValue(demandName());
+			ListInfo li = new ListInfo(category, name);
+			retVec.add(li);
+		}
+		return retVec;
+	}
+	
+	public Vector getListOfDemandEdgeAttributes() {
+		
+		
+		if (listOfDemandEdgeAttributes==null) {
+			listOfDemandEdgeAttributes = new Vector();
+		
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(Demand.class))
+					listOfDemandEdgeAttributes.add(attr);
+			}
+		}
+		return listOfDemandEdgeAttributes;
+
+	}
+
+	public Vector getListOfOperationAttributes() {
+		if (listOfOperationAttributes==null) {
+			listOfOperationAttributes = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(Operation.class))
+					if (attr.toString().compareTo("fssExecVol")!=0)
+						listOfOperationAttributes.add(attr);
+			}
+
+		}
+		return listOfOperationAttributes;
+
+	}
+	
+	public Vector getListOfSubstituteAttributes() {
+		if (listOfSubstituteAttributes==null) {
+			listOfSubstituteAttributes = new Vector();
+					
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(Substitute.class))
+					if (attr.toString().compareTo("fssSubVol")!=0)
+						listOfSubstituteAttributes.add(attr);
+			}
+
+		}
+		return listOfSubstituteAttributes;
+
+	}
+
+	
+	public Vector getListOfBomAttributes() {
+		if (listOfBomAttributes==null) {
+			listOfBomAttributes = new Vector();
+					
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(BomEntry.class))
+					listOfBomAttributes.add(attr);
+			}
+		}
+		return listOfBomAttributes;
+
+	}
+
+	public Vector getListOfBopAttributes() {
+		if (listOfBopAttributes==null) {
+			listOfBopAttributes = new Vector();
+			Vector list = new Vector();
+			List<Attribute<?>> allAtts = Attribute.getAttributes();
+			
+			for (int i=0; i<allAtts.size();i++) {
+				Attribute<?> attr = allAtts.get(i);
+				if (attr.appliesTo(BopEntry.class))
+					listOfBopAttributes.add(attr);
+			}
+
+		}
+		return listOfBopAttributes;
+
+	}
+	
+
+	public Vector getBomArcSubstitutes(String name) {
+		Vector vector = new Vector();
+		return vector;
+	}
+	
+	public void setSelectedObject(ListInfo li) {
+		currentSelected = li;
+		selectedChildren.clear();
+		selectedParents.clear();
+		selectedSubstitutes.clear();
+		if (li.type.equals("operation")) {
+			selectedChildren = getOperationChildren(li.name);
+			selectedParents = getOperationParents(li.name);
+		} else if (li.type.equals("material") || (li.type.equals("capacity"))) {
+			selectedChildren = getPartChildren(li.name);
+			selectedParents = getPartParents(li.name);
+		} else if (li.type.equals("bomarc")) {
+			selectedSubstitutes = getBomArcSubstitutes(li.name);
+			selectedChildren = getSubstituteChild(li.name, li.type);
+			selectedParents = getSubstituteParent(li.name, "operation");
+		} else if (li.type.equals("boparc")) {
+			// selectedSubstitutes = getBopArcSubstitutes(li.name);
+			// there are no substitutes on a bop arc
+			selectedParents = getSubstituteParent(li.name, li.type);
+			selectedChildren = getSubstituteChild(li.name, "operation");
+		}
+	}
+
+	public Vector getSelectedSubstitutes() {
+		return selectedSubstitutes;
+	}
+
+	
+
+
+
+
+
+
+	public Vector getBopArcSubstitutes(String arcName) {
+		int separator = arcName.indexOf("xyxyxy");
+		String part = arcName.substring(0, separator);
+		String operation = arcName.substring(separator + 6, arcName.length());
+		return null;
+	}
+
+	public Vector getSubstituteChild(String arcName, String type) {
+		Vector c = new Vector();
+		int separator = arcName.indexOf("xyxyxy");
+		String child = arcName.substring(separator + 6, arcName.length());
+		ListInfo li = new ListInfo(type, child);
+		c.add(li);
+		return c;
+	}
+
+	public Vector getSubstituteParent(String arcName, String type) {
+		Vector p = new Vector();
+		int separator = arcName.indexOf("xyxyxy");
+		String parent = arcName.substring(0, separator);
+		ListInfo li = new ListInfo(type, parent);
+		p.add(li);
+		return p;
+	}
+
+
+	public void finalize() {
+		if (theProblem.isActive())
+			theProblem.deactivate();
+	}
+	
+	String getPartCategory(String partName) {
+		Part thePart = theProblem.getPart(partName);
+		Category category = thePart.getCategory();
+		
+		return category.toString();
+	}
+	
+	String getElementAttributeDescription(Component element, Attribute attr) {
+		
+		String retString=attr.toString()+": ";
+		
+		Class attributeClass = attr.getValueType();
+		if (attributeClass.equals(double[].class)) {
+			Attribute<double[]> doubleAttr;
+			doubleAttr = (Attribute<double[]>)attr;
+			double[] val = element.getValue(doubleAttr);
+			String str="{";
+			for (int i =0; i<val.length-1;i++) {
+				double j = val[i];
+				str += j+",";
+			}
+			str+=val[val.length-1]+"}";
+			return retString+ str+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(Boolean.class)) {
+			Attribute<Boolean> booleanAttr;
+			booleanAttr = (Attribute<Boolean>)attr;
+			Boolean val = element.getValue(booleanAttr);
+			return retString + val.toString()+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(boolean[].class)) {
+			Attribute<boolean[]> booleanAttr;
+			booleanAttr = (Attribute<boolean[]>)attr;
+			boolean[] val = element.getValue(booleanAttr);
+			String str="{";
+			for (int i =0; i<val.length-1;i++) {
+				boolean j = val[i];
+				str += j + ",";
+				//if (j)
+				//	str += "true,";
+				//else
+				//	str += "false,";
+			}
+			str+=val[val.length-1]+"}";
+			return retString+ str+"\n";
+			
+		}
+		else if (attributeClass.equals(Integer.class)) {
+			Attribute<Integer> integerAttr;
+			integerAttr = (Attribute<Integer>)attr;
+			Integer val = element.getValue(integerAttr);
+			return retString+ val.toString()+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(int[].class)) {
+			Attribute<int[]> integerAttr;
+			integerAttr = (Attribute<int[]>)attr;
+			int[] val = element.getValue(integerAttr);
+			String str="{";
+			for (int i =0; i<val.length-1;i++) {
+				int j = val[i];
+				str += j+",";
+			}
+			str+=val[val.length-1]+"}";
+			return retString+ str+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(BoundSet.class)) {
+			Attribute<BoundSet> boundsetAttr;
+			int numPeriods = theProblem.getGlobalAspect().getValue(nPeriods());
+			boundsetAttr = (Attribute<BoundSet>)attr;
+			double[] hlb = new double[numPeriods];
+			double[] slb = new double[numPeriods];
+			double[] hub = new double[numPeriods];
+			element.getValue(boundsetAttr, hlb, slb, hub);
+			
+			String str1="{";
+			for (int i =0; i<hlb.length-1;i++) {
+				double j = hlb[i];
+				str1 += j+",";
+			}
+			str1+=hlb[hlb.length-1]+"}";
+			
+			String str2="{";
+			for (int i =0; i<slb.length-1;i++) {
+				double j = slb[i];
+				str2 += j+",";
+			}
+			str2+=slb[slb.length-1]+"}";
+			
+			String str3="{";
+			for (int i =0; i<hub.length-1;i++) {
+				double j = hub[i];
+				str3 += j+",";
+			}
+			str3+=hub[hub.length-1]+"}";
+			
+			
+			
+			return retString+ "\n"+"  HLB: "+str1+"\n"+"  SLB: "+str2+"\n"+"  HUB: "+str3+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(String.class)) {
+			Attribute<String> stringAttr;
+			stringAttr = (Attribute<String>)attr;
+			String val = element.getValue(stringAttr);
+			return retString+val.toString()+"\n";
+			//print it out
+		}
+		else if (attributeClass.equals(Double.class)) {
+			Attribute<Double> doubleAttr;
+			doubleAttr = (Attribute<Double>)attr;
+			Double val = element.getValue(doubleAttr);
+			return retString+val.toString()+"\n";
+			//print it out
+		}
+		else {
+			System.out.println("unknown attribute class: "+attributeClass.toString());
+			System.exit(0);
+		}
+		
+		
+		return retString;
+	}
+	boolean getElementAttributeInteresting(Component element, Attribute attr) {
+		
+		boolean interesting=false;
+		
+		
+		
+		Class attributeClass = attr.getValueType();
+		if (attributeClass.equals(double[].class)) {
+			Attribute<double[]> doubleAttr;
+			doubleAttr = (Attribute<double[]>)attr;
+			
+			if (doubleAttr.hasDefaultValue()) {
+				double[] val = element.getValue(doubleAttr);
+				double[] defaultValue = new double[nPeriodsVal];
+
+				theProblem.getDefaultValue(doubleAttr, defaultValue);
+				
+				for (int i=0; i<nPeriodsVal; i++) {
+					if (val[i] != defaultValue[i])
+						interesting=true;
+				}
+			}
+		}
+		else if (attributeClass.equals(Boolean.class)) {
+			Attribute<Boolean> booleanAttr;
+			booleanAttr = (Attribute<Boolean>)attr;
+			if (booleanAttr.hasDefaultValue()) {
+				boolean defaultVal = theProblem.getDefaultValue(booleanAttr);
+				Boolean val = element.getValue(booleanAttr);
+				//it is interesting if they are different
+				if (defaultVal != val.booleanValue())
+					interesting = true;
+			}
+		}
+		else if (attributeClass.equals(boolean[].class)) {
+			Attribute<boolean[]> booleanAttr;
+			booleanAttr = (Attribute<boolean[]>)attr;
+			if (booleanAttr.hasDefaultValue()) {
+				boolean[] val = element.getValue(booleanAttr);
+				boolean[] defaultValue = new boolean[nPeriodsVal];
+				theProblem.getDefaultValue(booleanAttr, defaultValue);
+				for (int i=0; i<nPeriodsVal; i++) {
+					if (val[i]!=defaultValue[i])
+						interesting=true;
+				}
+			}
+		}
+		else if (attributeClass.equals(Integer.class)) {
+			Attribute<Integer> integerAttr;
+			integerAttr = (Attribute<Integer>)attr;
+			if (integerAttr.hasDefaultValue()) {
+				Integer val = element.getValue(integerAttr);
+				int defaultValue = theProblem.getDefaultValue(integerAttr);
+				if (defaultValue != val.intValue())
+					interesting=true;
+			}
+		}
+		else if (attributeClass.equals(int[].class)) {
+			Attribute<int[]> integerAttr;
+			integerAttr = (Attribute<int[]>)attr;
+			if (integerAttr.hasDefaultValue()) {
+				int[] val = element.getValue(integerAttr);
+				int[] defaultValue = new int[nPeriodsVal];
+				theProblem.getDefaultValue(integerAttr, defaultValue);
+				for (int i=0; i<nPeriodsVal; i++) 
+					if (defaultValue[i]!=val[i]) 
+						interesting=true;
+			}
+		}
+		else if (attributeClass.equals(BoundSet.class)) {
+			Attribute<BoundSet> boundsetAttr;
+			int numPeriods = theProblem.getGlobalAspect().getValue(nPeriods());
+			boundsetAttr = (Attribute<BoundSet>)attr;
+			if (boundsetAttr.hasDefaultValue()) {
+				double[] hlb = new double[numPeriods];
+				double[] slb = new double[numPeriods];
+				double[] hub = new double[numPeriods];
+				element.getValue(boundsetAttr, hlb, slb, hub);
+						
+				double[] hlbDefault = new double[numPeriods];
+				double[] slbDefault = new double[numPeriods];
+				double[] hubDefault = new double[numPeriods];
+				
+				theProblem.getDefaultValue(boundsetAttr, hlbDefault, slbDefault, hubDefault);
+		
+				for (int i=0; i<numPeriods; i++) {
+					if (hlb[i]!=hlbDefault[i])
+						interesting=true;
+					if (slb[i]!=slbDefault[i])
+						interesting=true;
+					if (hub[i]!=hubDefault[i])
+						interesting=true;
+				}
+			}
+		}
+		else if (attributeClass.equals(String.class)) {
+			Attribute<String> stringAttr;
+			stringAttr = (Attribute<String>)attr;
+			if (stringAttr.hasDefaultValue()) {
+				String val = element.getValue(stringAttr);
+				String defaultValue = theProblem.getDefaultValue(stringAttr);
+				if (val.compareTo(defaultValue)!=0) 
+					interesting=true;
+			}
+		}
+		else if (attributeClass.equals(Double.class)) {
+			Attribute<Double> doubleAttr;
+			doubleAttr = (Attribute<Double>)attr;
+			if (doubleAttr.hasDefaultValue()) {
+				Double val = element.getValue(doubleAttr);
+				double defaultValue = theProblem.getDefaultValue(doubleAttr);
+				if (val.doubleValue()!=defaultValue)
+					interesting=true;
+			}
+		}
+		else if (attributeClass.equals(Part.Category.class)) {
+			interesting=true;
+		}
+		else {
+			System.out.println("Unknown attribute class: "+attributeClass.toString());
+			System.exit(0);
+		}
+		return interesting;
+	}
+	
+	boolean GetStageByObject() {
+	    boolean val = theProblem.getGlobalAspect().getValue(stageByObject());
+		return val;
+	}
+	String GetGlobalAttributeDescription(Attribute attr) {
+		return getElementAttributeDescription((Component)theProblem.getGlobalAspect(), attr);
+	}
+	boolean GetGlobalAttributeInteresting(Attribute attr) {
+		return getElementAttributeInteresting((Component)theProblem.getGlobalAspect(), attr);
+	}
+	
+	String GetPartAttributeDescription(String partName, Attribute attr) {
+		Part thePart = theProblem.getPart(partName);
+		return getElementAttributeDescription((Component)thePart, attr);
+	}
+	boolean GetPartAttributeInteresting(String partName, Attribute attr) {
+		Part thePart = theProblem.getPart(partName);
+		return getElementAttributeInteresting((Component)thePart, attr);
+	}
+	String GetDemandEdgeAttributeDescription(String demandName, String partName, Attribute attr) {
+		Part thePart = theProblem.getPart(partName);
+		Demand demand = thePart.getDemand(demandName);
+		return getElementAttributeDescription((Component)demand, attr);
+	}
+	boolean GetDemandEdgeAttributeInteresting(String demandName, String partName, Attribute attr) {
+		Part thePart = theProblem.getPart(partName);
+		Demand demand = thePart.getDemand(demandName);
+		return getElementAttributeInteresting((Component)demand, attr);
+	}
+
+
+	String GetOperationAttributeDescription(String operationName, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		return getElementAttributeDescription((Component)theOperation, attr);
+	}
+	boolean GetOperationAttributeInteresting(String operationName, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		return getElementAttributeInteresting((Component)theOperation, attr);
+	}
+
+	String GetBomAttributeDescription(String operationName, int bomIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BomEntry> bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries.get(bomIndex);
+		return getElementAttributeDescription((Component)bomEntry, attr);
+	}
+	boolean GetBomAttributeInteresting(String operationName, int bomIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BomEntry> bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries.get(bomIndex);
+		return getElementAttributeInteresting((Component)bomEntry, attr);
+	}
+
+	String GetSubstituteAttributeDescription(String operationName, int bomIndex, int subsBomIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BomEntry> bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries.get(bomIndex);
+		Substitute subs = bomEntry.getSubstitutes().get(subsBomIndex);
+		return getElementAttributeDescription((Component)subs, attr);
+	}
+	boolean GetSubstituteAttributeInteresting(String operationName, int bomIndex, int subsBomIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BomEntry> bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries.get(bomIndex);
+		Substitute subs = bomEntry.getSubstitutes().get(subsBomIndex);
+		return getElementAttributeInteresting((Component)subs, attr);
+	}
+	String GetBopAttributeDescription(String operationName, int bopIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BopEntry> bopEntries = theOperation.getBopEntries();
+		BopEntry bopEntry = bopEntries.get(bopIndex);
+		return getElementAttributeDescription((Component)bopEntry, attr);
+	}
+	boolean GetBopAttributeInteresting(String operationName, int bopIndex, Attribute attr) {
+		Operation theOperation = theProblem.getOperation(operationName);
+		List<BopEntry> bopEntries = theOperation.getBopEntries();
+		BopEntry bopEntry = bopEntries.get(bopIndex);
+		return getElementAttributeInteresting((Component)bopEntry, attr);
+	}
+	
+	boolean isLegalAttribute(String partName, Attribute attr) {
+		String category = getPartCategory(partName);
+		if (category.equals("CAPACITY")) {
+			if (attr.toString().equals("asapPipOrder")) 
+				return false;
+			else if (attr.toString().equals("buildAheadUB")) 
+				return false;
+			else if (attr.toString().equals("buildAsap")) 
+				return false;
+			else if (attr.toString().equals("buildNstn"))
+				return false;
+			else if (attr.toString().equals("stockBounds"))
+				return false;
+			else if (attr.toString().equals("stockCost"))
+				return false;
+		}
+		return true;
+		
+			
+		
+
+	}
+	//boolean getPostProcessed() {
+		
+	//	boolean postProc = theProblem.getGlobalAspect().get(postprocessed());
+	//	return postProc;
+	//}
+
+
+	public void postprocess() {
+		//
+		theProblem.postprocess();
+	}
+	public Vector getOperationChildren(String operationName) {
+
+		Vector kids = new Vector();
+		
+		try {
+			// how many children does this operation have?
+			Operation operation = theProblem.getOperation(operationName);
+			List<BomEntry> bomEntries = operation.getBomEntries();
+			int numBOMentries = bomEntries.size();
+			for (int i = 0; i < numBOMentries; i++) {
+				BomEntry bo = bomEntries.get(i);
+				Part part = bo.getPart();
+				String category = getPartCategory(part.getValue(partName()));
+				ListInfo li;
+				li = new ListInfo(category, part.getValue(partName()));
+				li.setIndex(i);
+				li.index = i; //XXX check this
+				kids.add(li);
+
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return kids;
+	}
+
+	public Vector getOperationParents(String operationName) {
+
+		Vector rents = new Vector();
+		
+		try {
+			// now how many parents does it have?
+			
+			Operation operation = theProblem.getOperation(operationName);
+			List<BopEntry> bopEntries = operation.getBopEntries();
+			int numBopEntries = bopEntries.size();
+			for (int i=0; i<numBopEntries; i++) {
+				BopEntry bo = bopEntries.get(i);
+				Part part = bo.getPart();
+				String category = getPartCategory(part.getValue(partName()));
+				ListInfo li;
+				li = new ListInfo(category, part.getValue(partName()));
+				li.index = i;
+				rents.add(li);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return rents;
+	}
+
+	public Vector getBopEntryIndex(String opName, String partName) {
+		Vector retVal = new Vector();
+
+		try {
+			Operation op = theProblem.getOperation(opName);
+			List<BopEntry> bopEntries = op.getBopEntries();
+			int nBops = bopEntries.size();
+
+			int bei;
+			for (bei = 0; bei < nBops; bei++) {
+				BopEntry bo = bopEntries.get(bei);
+				Part consPart = bo.getPart();
+				if (partName.equals(consPart.getValue(partName())))
+					retVal.add(new Integer(bei));
+				// checkWitRC(witFree(consPartFromWit));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return retVal;
+	}
+
+	
+	public Vector getBomEntryIndex(String opName, String partName) {
+		Vector retVal = new Vector();
+
+		// Get current number of bops connected to operation
+		
+		try {
+			Operation operation = theProblem.getOperation(opName);
+			List<BomEntry> bomEntries = operation.getBomEntries();
+			int nBoms = bomEntries.size();
+			
+			for (int bei = 0;bei<nBoms;bei++) {
+				String consPartFromWit;
+				BomEntry bo = bomEntries.get(bei);
+				Part consPart = bo.getPart();
+				if (partName.compareTo(consPart.getValue(partName()))==0)
+					retVal.add(new Integer(bei));
+				// checkWitRC(witFree(consPartFromWit));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return retVal;
+	}
+
+	public ListInfo getSelected() {
+		return currentSelected;
+	}
+
+	public void createTreeObject(String name, String type) {
+		// basically just creates center, parents, and children
+		ListInfo center = new ListInfo(type, name);
+		setFocusObject(center);
+		if (type.equals("operation"))
+			createTreeOperationObject(name);
+		else
+			createTreePartObject(name);
+	}
+
+	public void createTreeOperationObject(String operationName) {
+		currentParents.clear();
+		currentChildren.clear();
+		currentParents = getOperationParents(operationName);
+		currentChildren = getOperationChildren(operationName);
+	}
+
+	public Vector getPartChildren(String partName) {
+		Vector kids = new Vector();
+		int numBOPentries;
+		String operationName;
+		
+		try {
+			// how many children does this part have?
+			Part part = theProblem.getPart(partName);
+	
+			List<BopEntry> bopEntries = part.getBopEntries();
+			numBOPentries = bopEntries.size();
+			for (int i = 0; i < numBOPentries; i++) {
+				BopEntry bo = bopEntries.get(i);
+				Operation operation = bo.getOperation();
+				operationName = operation.getValue(operationName());
+				int bopEntryIndex = bo.getValue(bopIndex());
+				ListInfo li = new ListInfo("operation", operationName);
+				li.index = bopEntryIndex;
+				kids.add(li);
+			}
+
+		}
+
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		return kids;
+	}
+
+	public Vector getPartParents(String partName) {
+		Vector rents = new Vector();
+		try {
+			// now how many parents does it have?
+			Part part = theProblem.getPart(partName);
+			List<BomEntry> bomEntries = part.getBomEntries();
+			int numBomEntries = bomEntries.size();
+			
+			for (int i = 0; i < numBomEntries; i++) {
+				BomEntry bo = bomEntries.get(i);
+				Operation operation = bo.getOperation();
+				int bomEntryIndex = bo.getValue(bomIndex());
+				String operationName = operation.getValue(operationName());
+				ListInfo li = new ListInfo("operation", operationName);
+				li.index = bomEntryIndex;
+				rents.add(li);
+			}
+		}
+
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		return rents;
+	}
+	
+	
+
+	//public String getRealPartFromSubsParentIndex(String SubsPartName,
+	//		int BOMindex) {
+	//	Vector rents = new Vector();
+	//	Part substitutePart = theProblem.getPart(SubsPartName);
+	//	Substitute[] substitutes = substitutePart.getSubstitutes();
+	//	Substitute subEdge = substitutes[BOMindex];
+	//	BomEntry be = subEdge.getBomEntry();
+	//	Part part = be.getPart();
+	//	return part.get(partName());
+	//}
+	
+
+	public Vector getPartSubstitutes(String pName) {
+		Vector rents = new Vector();
+
+		//starting with a part figure out all the relevant info about things
+		// that substitute for it
+		Part part = theProblem.getPart(pName);
+		List<BomEntry> bomEntries = part.getBomEntries();
+		for (int i=0; i<bomEntries.size();i++) {
+			//for all bom entries that this part is part of
+			BomEntry be = bomEntries.get(i);
+			Operation op = be.getOperation();
+			String opName = op.getValue(operationName());
+			//get any substitutes
+			List<Substitute> subs = be.getSubstitutes();
+			for (int j=0; j<subs.size(); j++) {
+				//get all substitutes
+				Substitute substitute = subs.get(j);
+				Part subsPart = substitute.getPart();
+				String subsPartName = subsPart.getValue(partName());
+				SubsInfo li = new SubsInfo(opName,be.getValue(bomIndex()), j, subsPartName, pName);
+				rents.add(li);
+
+			}
+		}
+		return rents;
+	}
+
+	public void createTreePartObject(String partName) {
+
+		currentParents.clear();
+		currentChildren.clear();
+		currentParents = getPartParents(partName);
+		currentChildren = getPartChildren(partName);
+	}
+
+	public int getPlanningHorizon() {
+		int nPeriods;
+		nPeriods = theProblem.getGlobalAspect().getValue(nPeriods());
+		return nPeriods;
+	}
+
+
+	public Vector getCurrentChildren() {
+		return currentChildren;
+	}
+
+	public Vector getCurrentParents() {
+		return currentParents;
+	}
+
+	public Vector getSelectedChildren() {
+		return selectedChildren;
+	}
+
+	public Vector getSelectedParents() {
+		return selectedParents;
+	}
+
+	public Vector getAllOperations() {
+		Vector retvec = new Vector();
+		try {
+			for (Component theElement: theProblem.getComponents()) {
+				if (theElement instanceof Operation) {
+					String opName = theElement.getValue(operationName());
+					retvec.add(opName);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return retvec;
+	}
+
+	public int getNumOperations() {
+		Vector allOps = getAllOperations();
+		return allOps.size();
+	}
+
+	public Vector getAllParts() {
+		Vector retvec = new Vector();
+		try {
+			for (Component theElement: theProblem.getComponents()) {
+				if (theElement instanceof Part) {
+					String partName = theElement.getValue(partName());
+					retvec.add(partName);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return retvec;
+	}
+
+	public Vector getAllCapacities() {
+		Vector capacityList = new Vector();
+		Vector allParts = getAllParts();
+		Iterator i;
+		for (i=allParts.iterator();i.hasNext();) {
+			String partName = (String)i.next();
+			String category = getPartCategory(partName);
+			if (category.equals("CAPACITY")) {
+				capacityList.add(partName);
+			}
+		}
+		return capacityList;
+	}
+	
+	public Vector getDemandedParts(String demandName) {
+		Vector retVec = new Vector();
+		Vector	allparts = getAllParts();
+		for (Iterator i=allparts.iterator();i.hasNext();) {
+			String partName = (String)i.next();
+			Part p = theProblem.getPart(partName);
+			List<Demand> demands = p.getDemands();
+			for (int j=0; j<demands.size();j++) {
+				Demand demand = demands.get(j);
+				String dName = demand.getValue(demandName());
+				if (dName.compareTo(demandName)==0)
+					retVec.add(partName);
+			}
+		}
+		return retVec;
+	}
+
+	public Vector getAllDemandedParts() {
+		Vector allparts = getAllParts();
+		Vector demandedParts = new Vector();
+		
+		for (int i = 0; i < allparts.size(); i++) {
+			String partName = (String)allparts.elementAt(i);
+			boolean demanded = isPartDemanded(partName);
+			if (demanded)
+				demandedParts.add(partName);
+		}
+		return demandedParts;
+
+	}
+
+	public int getNumParts() {
+
+		Vector allParts = getAllParts();
+		return allParts.size();
+		
+	}
+	
+	boolean isPartDemanded(String partName) {
+		Part part = theProblem.getPart(partName);
+		List<Demand> demand = part.getDemands();
+		if (demand.size()==0)
+			return false;
+		else
+			return true;
+	}
+
+
+
+	
+
+	
+
+	public int getPartNConsumingSubsBomEntries(String name) {
+		Part part = theProblem.getPart(name);
+		List<Substitute> subs = part.getSubstitutes();
+		return subs.size();
+	}
+
+
+
+	public SubsInfo GetPartSubsInfo(String subName, int subsBomIndex) {
+		Part part = theProblem.getPart(subName);
+		List<Substitute> subs = part.getSubstitutes();
+		Substitute sub = subs.get(subsBomIndex);
+		//get the rest of the info
+		BomEntry be = sub.getBomEntry();
+		Operation op = be.getOperation();
+		Part p = be.getPart();
+		SubsInfo si = new SubsInfo(op.getValue(operationName()),be.getValue(bomIndex()), subsBomIndex, subName, p.getValue(partName()));
+		
+		return si;
+	}
+
+
+
+	public Vector getBomArcSubstitutes(String operationName, int bomIndex) {
+		Operation op = theProblem.getOperation(operationName);
+		List<BomEntry> bomEntries = op.getBomEntries();
+		BomEntry be = bomEntries.get(bomIndex);
+		List<Substitute> subs = be.getSubstitutes();
+		Vector subsVec = new Vector();
+		ListInfo li;
+		
+		for (int i=0; i<subs.size(); i++) {
+			Substitute sub = subs.get(i);
+			Part p = sub.getPart();
+			String category = getPartCategory(p.getValue(partName()));
+			String subsPartName = p.getValue(partName());
+			li = new ListInfo(category, subsPartName);
+			li.index = bomIndex;
+			subsVec.add(li);
+		}
+		return subsVec;
+	}
+	
+	public void CreateRawMaterialsList() {
+		try {
+			Vector parts = getAllParts();
+			int numparts = parts.size();
+			for (int j = 0; j < numparts; j++) {
+				// find the parts that have no producing BOP entries and
+				// no consuming substitute BOM entries
+				String partName = (String)parts.elementAt(j);
+				Part part = theProblem.getPart(partName);
+				List<BopEntry> bopEntries = part.getBopEntries();
+				int numbops = bopEntries.size();
+				if (numbops == 0) {
+					// which type of part is it?
+					String cat = getPartCategory(partName);
+					ListInfo li;
+					li = new ListInfo(cat, partName);
+					rawMaterialsList.add(li);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	public void CreateRawOperationsList() {
+		try {
+
+			Vector allOperations = getAllOperations();
+			int numops = allOperations.size();
+			for (int j = 0; j < numops; j++) {
+				// find the operations that have no BOM entries
+				String operationName = (String)allOperations.elementAt(j);
+				Operation operation = theProblem.getOperation(operationName);
+				List<BomEntry> bomEntries = operation.getBomEntries();
+				int numboms = bomEntries.size();
+					if (numboms == 0) {
+					// which type of part is it?
+					ListInfo li;
+					li = new ListInfo("operation",operationName);
+					rawOperationsList.add(li);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+
+
+}@
+
+
+1.4
+log
+@handle setting the scenario number
+@
+text
+@d3 14
+a16 3
+import static com.ibm.witj.Attribute.*;
+
+
+d18 1
+d28 1
+d30 1
+a30 2
+import com.ibm.witj.Element;
+import com.ibm.witj.GlobalElement;
+d35 1
+a35 1
+import com.ibm.witj.Session;
+d65 5
+a69 3
+	
+	
+	boolean allOK = true;
+a88 1
+	Session theSession=null;
+d97 1
+d99 32
+a130 7
+		theSession = Session.newInstance();
+		theSession.getMessageMgr().setQuietMode(true);
+		theSession.getMessageMgr().setMesgTimesPrint(MessageGroup.INFORMATIONAL,0);
+		
+		theProblem = Problem.newInstance(theSession);
+		theProblem.readData(filename);
+		nPeriodsVal = theProblem.getGlobalElement ().getValue (nPeriods ());
+d144 4
+a147 4
+	theSession = Session.newInstance();
+	theSession.getMessageMgr().setQuietMode(true);
+	theSession.getMessageMgr().setMesgTimesPrint(MessageGroup.INFORMATIONAL,0);
+	theProblem = Problem.newInstance(theSession);
+d173 1
+a173 1
+		boolean stochMode = theProblem.getGlobalElement().getValue(stochMode());
+d186 1
+a186 1
+		return theProblem.getGlobalElement().getValue(nScenarios());
+d196 1
+a196 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d198 3
+a200 3
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+				if (attr.appliesTo(GlobalElement.class))
+d209 1
+a209 1
+		theProblem.getGlobalElement().setValue(currentScenario(),scenario);
+d212 1
+a212 1
+		int scenario = theProblem.getGlobalElement().getValue(currentScenario());
+d223 1
+a223 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d225 2
+a226 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d239 1
+a239 1
+		Demand[] demands = part.getDemands();
+d241 2
+a242 2
+		for (int i=0; i<demands.length; i++) {
+			Demand demand = demands[i];
+d257 1
+a257 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d259 2
+a260 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d272 1
+a272 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d274 2
+a275 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d291 1
+a291 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d293 2
+a294 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d311 1
+a311 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d313 2
+a314 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d327 1
+a327 1
+			Attribute<?>[] allAtts = Attribute.getAllAttributes();
+d329 2
+a330 2
+			for (int i=0; i<allAtts.length;i++) {
+				Attribute<?> attr = allAtts[i];
+d407 2
+a408 2
+		if (theSession.isActive())
+			theSession.shutDown();
+d418 1
+a418 1
+	String getElementAttributeDescription(Element element, Attribute attr) {
+d482 1
+a482 1
+			int numPeriods = theProblem.getGlobalElement().getValue(nPeriods());
+d537 1
+a537 1
+	boolean getElementAttributeInteresting(Element element, Attribute attr) {
+d608 1
+a608 1
+			int numPeriods = theProblem.getGlobalElement().getValue(nPeriods());
+d663 1
+a663 1
+	    boolean val = theProblem.getGlobalElement().getValue(stageByObject());
+d667 1
+a667 1
+		return getElementAttributeDescription((Element)theProblem.getGlobalElement(), attr);
+d670 1
+a670 1
+		return getElementAttributeInteresting((Element)theProblem.getGlobalElement(), attr);
+d675 1
+a675 1
+		return getElementAttributeDescription((Element)thePart, attr);
+d679 1
+a679 1
+		return getElementAttributeInteresting((Element)thePart, attr);
+d684 1
+a684 1
+		return getElementAttributeDescription((Element)demand, attr);
+d689 1
+a689 1
+		return getElementAttributeInteresting((Element)demand, attr);
+d695 1
+a695 1
+		return getElementAttributeDescription((Element)theOperation, attr);
+d699 1
+a699 1
+		return getElementAttributeInteresting((Element)theOperation, attr);
+d704 3
+a706 3
+		BomEntry[] bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries[bomIndex];
+		return getElementAttributeDescription((Element)bomEntry, attr);
+d710 3
+a712 3
+		BomEntry[] bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries[bomIndex];
+		return getElementAttributeInteresting((Element)bomEntry, attr);
+d717 4
+a720 4
+		BomEntry[] bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries[bomIndex];
+		Substitute subs = bomEntry.getSubstitute(subsBomIndex);
+		return getElementAttributeDescription((Element)subs, attr);
+d724 4
+a727 4
+		BomEntry[] bomEntries = theOperation.getBomEntries();
+		BomEntry bomEntry = bomEntries[bomIndex];
+		Substitute subs = bomEntry.getSubstitute(subsBomIndex);
+		return getElementAttributeInteresting((Element)subs, attr);
+d731 3
+a733 3
+		BopEntry[] bopEntries = theOperation.getBopEntries();
+		BopEntry bopEntry = bopEntries[bopIndex];
+		return getElementAttributeDescription((Element)bopEntry, attr);
+d737 3
+a739 3
+		BopEntry[] bopEntries = theOperation.getBopEntries();
+		BopEntry bopEntry = bopEntries[bopIndex];
+		return getElementAttributeInteresting((Element)bopEntry, attr);
+d766 1
+a766 1
+	//	boolean postProc = theProblem.getGlobalElement().get(postprocessed());
+d782 2
+a783 2
+			BomEntry[] bomEntries = operation.getBomEntries();
+			int numBOMentries = bomEntries.length;
+d785 1
+a785 1
+				BomEntry bo = bomEntries[i];
+d810 2
+a811 2
+			BopEntry[] bopEntries = operation.getBopEntries();
+			int numBopEntries = bopEntries.length;
+d813 1
+a813 1
+				BopEntry bo = bopEntries[i];
+d832 2
+a833 2
+			BopEntry[] bopEntries = op.getBopEntries();
+			int nBops = bopEntries.length;
+d837 1
+a837 1
+				BopEntry bo = bopEntries[bei];
+d857 4
+a860 4
+			BomEntry[] bomEntries = operation.getBomEntries();
+			int nBoms = bomEntries.length;
+			int bei;
+			for (bei = 0; bei < nBoms; bei++) {
+d862 1
+a862 1
+				BomEntry bo = bomEntries[bei];
+a863 1
+				
+d904 2
+a905 2
+			BopEntry[] bopEntries = part.getBopEntries();
+			numBOPentries = bopEntries.length;
+d907 1
+a907 1
+				BopEntry bo = bopEntries[i];
+d929 2
+a930 2
+			BomEntry[] bomEntries = part.getBomEntries();
+			int numBomEntries = bomEntries.length;
+d933 1
+a933 1
+				BomEntry bo = bomEntries[i];
+d969 2
+a970 2
+		BomEntry[] bomEntries = part.getBomEntries();
+		for (int i=0; i<bomEntries.length;i++) {
+d972 1
+a972 1
+			BomEntry be = bomEntries[i];
+d976 2
+a977 2
+			Substitute[] subs = be.getSubstitutes();
+			for (int j=0; j<subs.length; j++) {
+d979 1
+a979 1
+				Substitute substitute = subs[j];
+d1000 1
+a1000 1
+		nPeriods = theProblem.getGlobalElement().getValue(nPeriods());
+d1024 1
+a1024 1
+			for (Element theElement: theProblem.getElements()) {
+d1044 1
+a1044 1
+			for (Element theElement: theProblem.getElements()) {
+d1076 3
+a1078 3
+			Demand[] demands = p.getDemands();
+			for (int j=0; j<demands.length;j++) {
+				Demand demand = demands[j];
+d1110 2
+a1111 2
+		Demand[] demand = part.getDemands();
+		if (demand.length==0)
+d1125 2
+a1126 2
+		Substitute[] subs = part.getSubstitutes();
+		return subs.length;
+d1133 2
+a1134 2
+		Substitute[] subs = part.getSubstitutes();
+		Substitute sub = subs[subsBomIndex];
+d1148 3
+a1150 3
+		BomEntry[] bomEntries = op.getBomEntries();
+		BomEntry be = bomEntries[bomIndex];
+		Substitute[] subs = be.getSubstitutes();
+d1154 2
+a1155 2
+		for (int i=0; i<subs.length; i++) {
+			Substitute sub = subs[i];
+d1175 2
+a1176 2
+				BopEntry[] bopEntries = part.getBopEntries();
+				int numbops = bopEntries.length;
+d1200 2
+a1201 2
+				BomEntry[] bomEntries = operation.getBomEntries();
+				int numboms = bomEntries.length;
+@
+
+
+1.3
+log
+@bob renamed some methods
+@
+text
+@d93 1
+d146 3
+d168 8
+@
+
+
+1.2
+log
+@getStageByObject method for use when stochMode is set
+@
+text
+@d91 1
+a91 1
+		nPeriodsVal = theProblem.getGlobalElement ().get (nPeriods ());
+d133 1
+a133 1
+		boolean stochMode = theProblem.getGlobalElement().get(stochMode());
+d153 1
+a153 1
+			Attribute<?>[] allAtts = Attribute.values();
+d172 1
+a172 1
+			Attribute<?>[] allAtts = Attribute.values();
+d192 1
+a192 1
+			String name = demand.get(demandName());
+d206 1
+a206 1
+			Attribute<?>[] allAtts = Attribute.values();
+d221 1
+a221 1
+			Attribute<?>[] allAtts = Attribute.values();
+d240 1
+a240 1
+			Attribute<?>[] allAtts = Attribute.values();
+d260 1
+a260 1
+			Attribute<?>[] allAtts = Attribute.values();
+d276 1
+a276 1
+			Attribute<?>[] allAtts = Attribute.values();
+d375 1
+a375 1
+			double[] val = element.get(doubleAttr);
+d388 1
+a388 1
+			Boolean val = element.get(booleanAttr);
+d395 1
+a395 1
+			boolean[] val = element.get(booleanAttr);
+d412 1
+a412 1
+			Integer val = element.get(integerAttr);
+d419 1
+a419 1
+			int[] val = element.get(integerAttr);
+d431 1
+a431 1
+			int numPeriods = theProblem.getGlobalElement().get(nPeriods());
+d436 1
+a436 1
+			element.get(boundsetAttr, hlb, slb, hub);
+d467 1
+a467 1
+			String val = element.get(stringAttr);
+d474 1
+a474 1
+			Double val = element.get(doubleAttr);
+d498 1
+a498 1
+				double[] val = element.get(doubleAttr);
+d514 1
+a514 1
+				Boolean val = element.get(booleanAttr);
+d524 1
+a524 1
+				boolean[] val = element.get(booleanAttr);
+d537 1
+a537 1
+				Integer val = element.get(integerAttr);
+d547 1
+a547 1
+				int[] val = element.get(integerAttr);
+d557 1
+a557 1
+			int numPeriods = theProblem.getGlobalElement().get(nPeriods());
+d563 1
+a563 1
+				element.get(boundsetAttr, hlb, slb, hub);
+d585 1
+a585 1
+				String val = element.get(stringAttr);
+d595 1
+a595 1
+				Double val = element.get(doubleAttr);
+d612 1
+a612 1
+	    boolean val = theProblem.getGlobalElement().get(stageByObject());
+d736 1
+a736 1
+				String category = getPartCategory(part.get(partName()));
+d738 1
+a738 1
+				li = new ListInfo(category, part.get(partName()));
+d764 1
+a764 1
+				String category = getPartCategory(part.get(partName()));
+d766 1
+a766 1
+				li = new ListInfo(category, part.get(partName()));
+d788 1
+a788 1
+				if (partName.equals(consPart.get(partName())))
+d814 1
+a814 1
+				if (partName.compareTo(consPart.get(partName()))==0)
+d859 3
+a861 3
+				operationName = operation.get(operationName());
+				int bopEntryIndex = bo.get(bopIndex());
+					ListInfo li = new ListInfo("operation", operationName);
+d885 2
+a886 2
+				int bomEntryIndex = bo.get(bomIndex());
+				String operationName = operation.get(operationName());
+d924 1
+a924 1
+			String opName = op.get(operationName());
+d931 2
+a932 2
+				String subsPartName = subsPart.get(partName());
+				SubsInfo li = new SubsInfo(opName,be.get(bomIndex()), j, subsPartName, pName);
+d950 1
+a950 1
+		nPeriods = theProblem.getGlobalElement().get(nPeriods());
+d976 1
+a976 1
+					String opName = theElement.get(operationName());
+d996 1
+a996 1
+					String partName = theElement.get(partName());
+d1029 1
+a1029 1
+				String dName = demand.get(demandName());
+d1089 1
+a1089 1
+		SubsInfo si = new SubsInfo(op.get(operationName()),be.get(bomIndex()), subsBomIndex, subName, p.get(partName()));
+d1107 2
+a1108 2
+			String category = getPartCategory(p.get(partName()));
+			String subsPartName = p.get(partName());
+@
+
+
+1.1
+log
+@initial checkin
+@
+text
+@d3 2
+a4 8
+import static com.ibm.witj.Attribute.bomIndex;
+import static com.ibm.witj.Attribute.bopIndex;
+import static com.ibm.witj.Attribute.demandName;
+import static com.ibm.witj.Attribute.nPeriods;
+import static com.ibm.witj.Attribute.operationName;
+import static com.ibm.witj.Attribute.partName;
+import static com.ibm.witj.Attribute.postprocessed;
+import static com.ibm.witj.Attribute.stochMode;
+d611 4
+a614 1
+
+d713 1
+a713 1
+	boolean getPostProcessed() {
+d715 3
+a717 3
+		boolean postProc = theProblem.getGlobalElement().get(postprocessed());
+		return postProc;
+	}
+@
+

@@ -1,0 +1,367 @@
+head	1.6;
+access;
+symbols
+	nextGenBranch:1.4.0.2
+	nextGenRoot:1.4
+	sce_3_30_20030627:1.4
+	EndRw-branch:1.1.0.4
+	Root-of-EndRw:1.1
+	rwToStl:1.1.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2003.09.25.23.49.55;	author rjw;	state dead;
+branches;
+next	1.5;
+
+1.5
+date	2003.09.25.22.58.26;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.01.15.21.01.19;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.13.22.22.08;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.02.22.18.26;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.09.11.18.53.08;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef FlexVecIH
+#define FlexVecIH
+
+//------------------------------------------------------------------------------
+// Header file: "FlexVecI.h"
+//
+// Contains the implementation of class template FlexVec <TheType>.
+//------------------------------------------------------------------------------
+
+#include <FlexVec.h>
+#include <FlexVecRI.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class template FlexVec <TheType>
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      WitFlexVec <TheType>::WitFlexVec (
+         WitProblem * theProblem,
+         TheType      initValue):
+
+     WitFlexVecRep <TheType> (theProblem, initValue)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      WitFlexVec <TheType>::~WitFlexVec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::copyIntoTVec (
+         WitTVec <TheType> & theTVec)
+         const
+   {
+   if (repIsByVec ())
+      theTVec.copy        (myVecRep ());
+   else
+      theTVec.setToScalar (myScalRep ());
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::copyIntoCvector (TheType * theCvector) const
+   {
+   if (repIsByVec ())
+      myVecRep ().copyIntoCvector (theCvector);
+   else
+      {
+      WitPeriod thePer;
+
+      witAssert (theCvector != NULL);
+
+      forEachPeriod (thePer, myProblem ())
+         theCvector[thePer] = myScalRep ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::copy (const WitFlexVec & theFlexVec)
+   {
+   witAssert (length () == theFlexVec.length ());
+
+   if (theFlexVec.repIsByVec ())
+      myRepMadeVec  ().copy (theFlexVec.myVecRep  ());
+   else
+      myRepMadeScal () =     theFlexVec.myScalRep ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::setToScalar (TheType theValue)
+   {
+   myRepMadeScal () = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::copyTVec (
+         const WitTVec <TheType> & theTVec)
+   {
+   witAssert (length () == theTVec.length ());
+
+   if (theTVec == theTVec[0])
+      setToScalar          (theTVec[0]);
+   else
+      myRepMadeVec ().copy (theTVec);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      void WitFlexVec <TheType>::copyCvector (const TheType * theCvector)
+   {
+   if (hasSingleValue (theCvector, myProblem ()))
+      myRepMadeScal () = theCvector[0];
+   else
+      myRepMadeVec ().copyCvector (theCvector);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      bool WitFlexVec <TheType>::operator == (TheType theValue) const
+   {
+   return
+      repIsByVec ()?
+         (myVecRep  () == theValue):
+         (myScalRep () == theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      bool WitFlexVec <TheType>::operator >= (TheType theValue) const
+   {
+   return
+      repIsByVec ()?
+      myVecRepGE      (theValue):
+      (myScalRep () >= theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      bool WitFlexVec <TheType>::myVecRepGE (TheType theValue) const
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      if (myVecRep ()[thePer] < theValue)
+         return false;
+
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      bool hasSingleValue (const TheType * theCvector, WitProblem * theProblem)
+   {
+   TheType   valAt0;
+   WitPeriod thePer;
+
+   witAssert (theCvector != NULL);
+
+   valAt0 = theCvector[0];
+
+   for (thePer = 1; thePer < theProblem->nPeriods (); ++ thePer)
+      if (theCvector[thePer] != valAt0)
+         return false;
+
+   return true;
+   }
+
+#endif
+@
+
+
+1.5
+log
+@Continued implementation of post-implosion pegging.
+@
+text
+@@
+
+
+1.4
+log
+@Various internal changes.
+@
+text
+@d122 1
+a122 11
+      inline TheType & WitFlexVec <TheType>::elemRef (int theIndex)
+   {
+   return myRepMadeVec ()[theIndex];
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      inline bool WitFlexVec <TheType>::operator == (
+         TheType theValue)
+         const
+d133 1
+a133 3
+      inline bool WitFlexVec <TheType>::operator >= (
+         TheType theValue)
+         const
+a138 8
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename TheType> 
+      inline int WitFlexVec <TheType>::length () const
+   {
+   return nPeriods ();
+@
+
+
+1.3
+log
+@Various internal changes.
+@
+text
+@d76 1
+a76 1
+      void WitFlexVec <TheType>::copy (const WitFlexVec <TheType> & theFlexVec)
+@
+
+
+1.2
+log
+@Internal changes.
+@
+text
+@d26 1
+a26 1
+template <class TheType> 
+d37 1
+a37 1
+template <class TheType> 
+d44 1
+a44 1
+template <class TheType> 
+d57 1
+a57 1
+template <class TheType> 
+d75 1
+a75 1
+template <class TheType> 
+d88 1
+a88 1
+template <class TheType> 
+d96 1
+a96 1
+template <class TheType> 
+d110 1
+a110 1
+template <class TheType> 
+d121 1
+a121 1
+template <class TheType> 
+d129 1
+a129 1
+template <class TheType> 
+d142 1
+a142 1
+template <class TheType> 
+d155 1
+a155 1
+template <class TheType> 
+d163 1
+a163 1
+template <class TheType> 
+d177 1
+a177 1
+template <class TheType> 
+@
+
+
+1.1
+log
+@Continued implementation of opt implosion with lot sizes.
+@
+text
+@d130 1
+a130 1
+      inline WitBoolean WitFlexVec <TheType>::operator == (
+d143 1
+a143 1
+      inline WitBoolean WitFlexVec <TheType>::operator >= (
+d164 1
+a164 1
+      WitBoolean WitFlexVec <TheType>::myVecRepGE (TheType theValue) const
+d170 1
+a170 1
+         return witFALSE;
+d172 1
+a172 1
+   return witTRUE;
+d178 1
+a178 3
+      WitBoolean hasSingleValue (
+         const TheType * theCvector,
+         WitProblem *    theProblem)
+d189 1
+a189 1
+         return witFALSE;
+d191 1
+a191 1
+   return witTRUE;
+@
+

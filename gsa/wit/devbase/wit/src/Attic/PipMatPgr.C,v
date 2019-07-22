@@ -1,0 +1,2271 @@
+head	1.28;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.28
+date	2007.07.12.21.27.47;	author rjw;	state dead;
+branches;
+next	1.27;
+
+1.27
+date	2007.07.12.20.41.40;	author rjw;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2007.07.12.19.33.49;	author rjw;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2007.07.12.16.33.33;	author rjw;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2007.07.11.22.38.35;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2007.07.11.16.27.17;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2007.07.10.20.55.23;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2007.07.10.15.57.23;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2007.07.09.23.05.48;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2007.07.09.23.01.15;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2007.07.09.21.49.48;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2007.07.06.21.11.22;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2007.07.06.20.11.28;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2007.07.06.18.08.24;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2007.07.06.14.23.09;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2007.07.05.22.53.39;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2007.07.05.21.51.36;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2007.07.05.18.37.55;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.07.05.15.59.54;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.07.03.20.31.22;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.07.03.19.40.28;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.07.03.16.13.35;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.07.02.22.30.52;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.07.02.21.02.08;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.07.02.16.02.25;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.07.02.13.53.01;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.06.29.21.57.50;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.06.29.15.25.50;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.28
+log
+@ASAP Pegging Order
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "PipMatPgr.C"
+//
+// Contains the implementation of class PipMatPgr.
+//------------------------------------------------------------------------------
+
+#include <PipMatPgr.h>
+#include <PipPgg.h>
+#include <PipAttPgg.h>
+#include <PipReqMgr.h>
+#include <PipReqSrc.h>
+#include <PairStack.h>
+#include <ExecPerSch.h>
+#include <Global.h>
+#include <Material.h>
+#include <Opn.h>
+#include <BopEntry.h>
+#include <Post.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class PipMatPgr.
+//------------------------------------------------------------------------------
+
+WitPipMatPgr::WitPipMatPgr (WitPipReqMgr * theReqMgr):
+
+      WitProbAssoc     (theReqMgr->myProblem ()),
+      myReqMgr_        (theReqMgr),
+      curPartHasStock_ (false),
+      netStockVol_     (myProblem (), 0.0),
+      curPartReqSeq_   (myProblem ()),
+      workReqSeq_      (myProblem ()),
+      overStockReqSeq_ (myProblem ())
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      curPartReqSeq_  [thePer] = new WitPipReqSeq (myProblem ());
+      overStockReqSeq_[thePer] = new WitPipReqSeq (myProblem ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipMatPgr::~WitPipMatPgr ()
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      delete overStockReqSeq_[thePer];
+      delete curPartReqSeq_  [thePer];
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::loadCurPartReqSeqs (WitPart * thePart)
+   {
+   WitPipReqList  theReqList (myProblem ());
+   WitPeriod      fillPer;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   forEachPeriod (fillPer, myProblem ())
+      {
+      myReqMgr_->loadCurReqList (thePart, fillPer);
+
+      myReqMgr_->getCurReqList  (theReqList);
+
+      while (theReqList.pop (theReqSrc, incReqVol))
+         curPartReqSeq_ (fillPer).push (theReqSrc, fillPer, incReqVol);
+
+      curPartReqSeq_ (fillPer).reverse ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::mergeCurPartReqsIntoWorkSeq (WitPeriod thePer)
+   {
+   WitPipReqSeq   curPartSeq (myProblem ());
+   WitPipReqSeq   mergedSeq  (myProblem ());
+   WitPipReqSrc * workSrc;
+   WitPeriod      workPer;
+   double         workReqVol;
+   WitPipReqSrc * curPartSrc;
+   WitPeriod      curPartPer;
+   double         curPartReqVol;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (curPartReqSeq_ (thePer));
+
+      return;
+      }
+
+   curPartSeq.takeContentsFrom (curPartReqSeq_ (thePer));
+
+   popOrNull (workReqSeq_, workSrc,    workPer,    workReqVol);
+   popOrNull (curPartSeq,  curPartSrc, curPartPer, curPartReqVol);
+
+   while ((workSrc != NULL) and (curPartSrc != NULL))
+      if (workSrc->belongsBefore (curPartSrc))
+         {
+         mergedSeq.push         (workSrc, workPer, workReqVol);
+         popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+         }
+      else
+         {
+         mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+         popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+         }
+
+   while (workSrc != NULL)
+      {
+      mergedSeq.push         (workSrc, workPer, workReqVol);
+      popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+      }
+
+   while (curPartSrc != NULL)
+      {
+      mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+      popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+      }
+
+   mergedSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (mergedSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::popOrNull (
+      WitPipReqSeq &   theReqSeq,
+      WitPipReqSrc * & theReqSrc,
+      WitPeriod &      fillPer,
+      double &         incReqVol)
+   {
+   if (theReqSeq.isNonEmpty ())
+      theReqSeq.pop (theReqSrc, fillPer, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      fillPer   = -1;
+      incReqVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::rollReqsBack (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   double         rollVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+
+   witAssert (thePer > 0);
+
+   while (workReqSeq_.isNonEmpty () and (netStockVol_[thePer - 1] > NET_TOL))
+      {
+      workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+      rollVol = min (incReqVol, netStockVol_[thePer - 1]);
+
+      rolledSeq.push (theReqSrc, fillPer, rollVol);
+
+      netStockVol_[thePer - 1] -= rollVol;
+      incReqVol                -= rollVol;
+
+      if (incReqVol > NET_TOL)
+         workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+      }
+
+   overStockReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+   rolledSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::rollReqsFwd (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+   WitPipReqSrc * theReqSrcOv;
+   WitPeriod      fillPerOv;
+   double         incReqVolOv;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (overStockReqSeq_ (thePer));
+
+      return;
+      }
+
+   while (workReqSeq_.isNonEmpty ())
+      {
+      workReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq  .push (theReqSrc, fillPer, incReqVol);
+     
+      netStockVol_[thePer - 1] += incReqVol;
+      }
+
+   if (rolledSeq.isNonEmpty ())
+      if (overStockReqSeq_ (thePer).isNonEmpty ())
+         {
+         rolledSeq                .pop (theReqSrc,   fillPer,   incReqVol);
+         overStockReqSeq_ (thePer).pop (theReqSrcOv, fillPerOv, incReqVolOv);
+
+         if ((theReqSrc == theReqSrcOv) and (fillPer == fillPerOv))
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol + incReqVolOv);
+            }
+         else
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol);
+            rolledSeq.push (theReqSrcOv, fillPerOv, incReqVolOv);
+            }
+         }
+
+   while (overStockReqSeq_ (thePer).isNonEmpty ())
+      {
+      overStockReqSeq_ (thePer).pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq                .push (theReqSrc, fillPer, incReqVol);
+      }
+
+   rolledSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::restoreUnfilledCurPartReqs (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   reducedSeq (myProblem ());
+
+   witAssert (curPartReqSeq_ (thePer).isEmpty ());
+
+   if (not curPartHasStock_)
+      {
+      curPartReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+      return;
+      }
+
+   while (workReqSeq_.isNonEmpty ())
+      {
+      workReqSeq_               .pop  (theReqSrc, fillPer, incReqVol);
+
+      if (fillPer == thePer)
+         curPartReqSeq_ (thePer).push (theReqSrc, fillPer, incReqVol);
+      else
+         reducedSeq             .push (theReqSrc, fillPer, incReqVol);
+      }
+
+   curPartReqSeq_ (thePer).reverse ();
+   reducedSeq             .reverse ();
+
+   workReqSeq_.takeContentsFrom (reducedSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::prtWorkReqSeq (
+      const char * theAttname,
+      WitPart *    thePart,
+      WitPeriod    thePer)
+   {
+   WitPipReqSeq   theReqSeq (myProblem ());
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   witAssert (myGlobalComp ()->printDebug ());
+   
+   theReqSeq.revCopyFrom (workReqSeq_);
+
+   theReqSeq.reverse ();
+
+   fprintf (msgFile (),
+      "\n"
+      "Pegging to %s:\n"
+      "   Part:       %s\n"
+      "   Peg period: %d\n"
+      "\n"
+      "   Requirement sequence:\n",
+      theAttname,
+      thePart->partName ().myCstring (),
+      thePer);
+
+   while (theReqSeq.pop (theReqSrc, fillPer, incReqVol))
+      {
+      fprintf (msgFile (),
+         "\n"
+         "      Fill Period: %d\n"
+         "      ReqVol:      %.0f\n",
+         fillPer,
+         incReqVol);
+
+      theReqSrc->print (msgFile (), "      ");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::prtPegMat (
+      double         pegVol,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc)
+   {
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "   Pegging:\n"
+      "      PegVol:      %.0f\n"
+      "      Fill Period: %d\n",
+      pegVol,
+      fillPer);
+
+   theReqSrc->print (msgFile (), "      ");
+   }
+@
+
+
+1.27
+log
+@ASAP Pegging Order
+@
+text
+@@
+
+
+1.26
+log
+@ASAP Pegging Order
+@
+text
+@a16 1
+#include <PipBldr.h>
+d34 1
+a34 1
+WitPipMatPgr::WitPipMatPgr (WitPipBldr * theBldr):
+d36 2
+a37 2
+      WitProbAssoc     (theBldr->myProblem ()),
+      myBldr_          (theBldr),
+d77 1
+a77 1
+      myBldr_->myReqMgr_->loadCurReqList (thePart, fillPer);
+d79 1
+a79 1
+      myBldr_->myReqMgr_->getCurReqList  (theReqList);
+a284 21
+void WitPipMatPgr::recordInfeas (WitPart * thePart)
+   {
+   WitPeriod      thePer;
+   double         totReqVol;
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      totReqVol = 0.0;
+
+      while (curPartReqSeq_ (thePer).pop (theReqSrc, fillPer, incReqVol))
+         totReqVol += incReqVol;
+
+      myBldr_->recInfeas (thePart, thePer, totReqVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.25
+log
+@ASAP Pegging Order
+@
+text
+@a68 31
+void WitPipMatPgr::fillReqs (WitPart * thePart)
+   {
+   WitMaterial * theMat;
+
+   theMat           = thePart->thisMat ();
+
+   curPartHasStock_ = false;
+
+   if (theMat != NULL)
+      if (theMat->stockVol () != 0.0)
+         curPartHasStock_ = true;
+
+   if (curPartHasStock_)
+      myBldr_->compNonExcStockVol (theMat, netStockVol_);
+   else
+      netStockVol_ = 0.0;
+
+   loadCurPartReqSeqs (thePart);
+
+   if (myGlobalComp ()->newPipPggOrder ())
+      pegToAllAttsNpo (thePart);
+   else
+      pegToAllAttsOpo (thePart);
+
+   recordInfeas (thePart);
+
+   curPartHasStock_ = false;
+   }
+
+//------------------------------------------------------------------------------
+
+a90 74
+void WitPipMatPgr::pegToAllAttsNpo (WitPart * thePart)
+   {
+   if (thePart->supplyVol () != 0.0)
+      pegToAtt (thePart, & WitPipMatPgr::netWithSupply);
+
+   if (thePart->prodVol () != 0.0)
+      pegToAtt (thePart, & WitPipMatPgr::explodeToProd);
+
+   if (not (myBldr_->sideVol_ (thePart) == 0.0))
+      pegToAtt (thePart, & WitPipMatPgr::netWithSideVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::pegToAtt (
+      WitPart *             thePart,
+      void (WitPipMatPgr::* thePegFunc) (WitPart *, WitPeriod))
+   {
+   WitPeriod thePer;
+
+   for (thePer = lastPeriod (); thePer >= 0; thePer --)
+      {
+      mergeCurPartReqsIntoWorkSeq (thePer);
+
+      if (workReqSeq_.isNonEmpty ())
+         (this->*thePegFunc) (thePart, thePer);
+
+      if (thePer > 0)
+         rollReqsBack (thePer);
+      }
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      if (thePer > 0)
+         rollReqsFwd (thePer);
+
+      restoreUnfilledCurPartReqs (thePer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::pegToAllAttsOpo (WitPart * thePart)
+   {
+   WitPeriod thePer;
+
+   for (thePer = lastPeriod (); thePer >= 0; thePer --)
+      {
+      mergeCurPartReqsIntoWorkSeq (thePer);
+
+      if (workReqSeq_.isNonEmpty ())
+         netWithSupply (thePart, thePer);
+
+      if (workReqSeq_.isNonEmpty ())
+         explodeToProd (thePart, thePer);
+
+      if (thePer > 0)
+         rollReqsBack (thePer);
+      }
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      if (thePer > 0)
+         rollReqsFwd (thePer);
+
+      if (workReqSeq_.isNonEmpty ())
+         netWithSideVol (thePart, thePer);
+
+      restoreUnfilledCurPartReqs (thePer);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+a285 185
+void WitPipMatPgr::netWithSupply (WitPart * thePart, WitPeriod thePer)
+   {
+   double nonExcSuppVol;
+
+   if (myGlobalComp ()->printDebug ())
+      prtWorkReqSeq ("SupplyVol", thePart, thePer);
+
+   nonExcSuppVol =
+        thePart->supplyVol ()[thePer]
+      - myProblem ()->myPostprocessor ()->compExcessVol (thePart, thePer);
+
+   pegWorkReqToAtt (
+      nonExcSuppVol, 
+      myBldr_->myPgg_->supplyVolPgg (),
+      thePart,
+      thePer,
+      NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::explodeToProd (WitPart * thePart, WitPeriod thePer)
+   {
+   WitBopEntry * theBopEnt;
+
+   witAssert (workReqSeq_.isNonEmpty ());
+
+   if (thePart->prodVol ()[thePer] <= 0.0)
+      return;
+
+   if (not thePart->explodeable (thePer))
+      return;
+
+   if (myGlobalComp ()->printDebug ())
+      prtWorkReqSeq ("ProdVol", thePart, thePer);
+
+   forEachEl (theBopEnt, thePart->producingBopEntries ())
+      if (theBopEnt->expEligible (thePer))
+         {
+         explodeBopEntry (theBopEnt, thePer);
+
+         if (workReqSeq_.isEmpty ())
+            return;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::explodeBopEntry (WitBopEntry * theBopEnt, WitPeriod thePer)
+   {
+   WitPeriod execPerFirst;
+   WitPeriod execPerLast;
+   WitPeriod execPer;
+
+   witAssert (theBopEnt->expEligible (thePer));
+
+   witAssert (workReqSeq_.isNonEmpty ());
+
+   myBldr_->
+      myExecPerSched_->
+         getExecPerRange (theBopEnt, thePer, execPerFirst, execPerLast);
+
+   for (execPer = execPerLast; execPer >= execPerFirst; execPer --)
+      if (theBopEnt->execPerOKForExp (execPer))
+         if (theBopEnt->impactPeriod ()[execPer] == thePer)
+            {
+            explodeToExecPer (theBopEnt, execPer);
+
+            if (workReqSeq_.isEmpty ())
+               return;
+            }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::explodeToExecPer (WitBopEntry * theBopEnt, WitPeriod execPer)
+   {
+   double         theProdVol;
+   WitPipReqList  pgdReqList (myProblem ());
+   WitPipReqSrc * theReqSrc;
+   double         incProdVol;
+   double         incExecVol;
+
+   witAssert (workReqSeq_.isNonEmpty ());
+
+   theProdVol =
+        theBopEnt->myOperation ()->execVol ()[execPer]
+      * theBopEnt->effProdRate ()            [execPer];
+
+   pegWorkReqToAtt (
+      theProdVol,
+      myBldr_->myPgg_->prodVolPgg (),
+      theBopEnt->myPart (),
+      theBopEnt->impactPeriod ()[execPer],
+      & pgdReqList);
+
+   pgdReqList.reverse ();
+
+   while (pgdReqList.pop (theReqSrc, incProdVol))
+      {
+      incExecVol = incProdVol / theBopEnt->effProdRate ()[execPer];
+
+      myBldr_->addToIncPegVol (incExecVol, theReqSrc);
+
+      myBldr_->myReqMgr_->addReq (theBopEnt, execPer, theReqSrc, incExecVol);
+      }
+
+   myBldr_->
+      myPgg_->
+         coExecVolPgg ()->
+            multiAppend (
+               myBldr_->posDemPers_,
+               theBopEnt,
+               execPer,
+               myBldr_->incPegVol_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::netWithSideVol (WitPart * thePart, WitPeriod thePer)
+   {
+   if (myGlobalComp ()->printDebug ())
+      prtWorkReqSeq ("SideVol", thePart, thePer);
+
+   pegWorkReqToAtt (
+      myBldr_->sideVol_ (thePart)[thePer],
+      myBldr_->myPgg_->sideVolPgg (),
+      thePart,
+      thePer,
+      NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::pegWorkReqToAtt (
+      double                   theAttVol,
+      WitPipAttPgg <WitPart> * theAttPgg,
+      WitPart *                thePart,
+      WitPeriod                thePer,
+      WitPipReqList *          pgdReqListPtr)
+   {
+   double         netAttVol;
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   double         incPegVol;
+
+   witAssert (workReqSeq_.isNonEmpty ());
+
+   netAttVol = theAttVol;
+
+   if (pgdReqListPtr != NULL)
+      pgdReqListPtr->clear ();
+
+   while (workReqSeq_.isNonEmpty () and (netAttVol > NET_TOL))
+      {
+      workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+      incPegVol  = min (incReqVol, netAttVol);
+      
+      incReqVol -= incPegVol;
+      netAttVol -= incPegVol;
+
+      if (incReqVol > NET_TOL)
+         workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+      if (myGlobalComp ()->printDebug ())
+         prtPegMat (incPegVol, fillPer, theReqSrc);
+
+      myBldr_->addToIncPegVol (incPegVol, theReqSrc);
+
+      if (pgdReqListPtr != NULL)
+         pgdReqListPtr->push (theReqSrc, incPegVol);
+      }
+
+   theAttPgg->
+      multiAppend (
+         myBldr_->posDemPers_,
+         thePart,
+         thePer,
+         myBldr_->incPegVol_);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.24
+log
+@ASAP Pegging Order
+@
+text
+@a38 1
+      curPart_         (NULL),
+a72 2
+   curPart_         = thePart;
+
+d86 1
+a86 1
+   loadCurPartReqSeqs ();
+d89 1
+a89 1
+      pegToAllAttsNpo ();
+d91 1
+a91 1
+      pegToAllAttsOpo ();
+d93 1
+a93 1
+   recordInfeas ();
+a95 1
+   curPart_         = NULL;
+d100 1
+a100 1
+void WitPipMatPgr::loadCurPartReqSeqs ()
+d109 1
+a109 1
+      myBldr_->myReqMgr_->loadCurReqList (curPart_, fillPer);
+d122 1
+a122 1
+void WitPipMatPgr::pegToAllAttsNpo ()
+d124 2
+a125 2
+   if (curPart_->supplyVol () != 0.0)
+      pegToAtt (& WitPipMatPgr::netWithSupply);
+d127 2
+a128 2
+   if (curPart_->prodVol () != 0.0)
+      pegToAtt (& WitPipMatPgr::explodeToProd);
+d130 2
+a131 2
+   if (not (myBldr_->sideVol_ (curPart_) == 0.0))
+      pegToAtt (& WitPipMatPgr::netWithSideVol);
+d136 3
+a138 1
+void WitPipMatPgr::pegToAtt (void (WitPipMatPgr::* thePegFunc) (WitPeriod))
+d147 1
+a147 1
+         (this->*thePegFunc) (thePer);
+d164 1
+a164 1
+void WitPipMatPgr::pegToAllAttsOpo ()
+d173 1
+a173 1
+         netWithSupply (thePer);
+d176 1
+a176 1
+         explodeToProd (thePer);
+d188 1
+a188 1
+         netWithSideVol (thePer);
+d391 1
+a391 1
+void WitPipMatPgr::netWithSupply (WitPeriod thePer)
+d396 1
+a396 1
+      prtWorkReqSeq ("SupplyVol", thePer);
+d399 2
+a400 2
+        curPart_->supplyVol ()[thePer]
+      - myProblem ()->myPostprocessor ()->compExcessVol (curPart_, thePer);
+d405 1
+d412 1
+a412 1
+void WitPipMatPgr::explodeToProd (WitPeriod thePer)
+d418 1
+a418 1
+   if (curPart_->prodVol ()[thePer] <= 0.0)
+d421 1
+a421 1
+   if (not curPart_->explodeable (thePer))
+d425 1
+a425 1
+      prtWorkReqSeq ("ProdVol", thePer);
+d427 1
+a427 1
+   forEachEl (theBopEnt, curPart_->producingBopEntries ())
+d483 1
+d510 1
+a510 1
+void WitPipMatPgr::netWithSideVol (WitPeriod thePer)
+d513 1
+a513 1
+      prtWorkReqSeq ("SideVol", thePer);
+d516 1
+a516 1
+      myBldr_->sideVol_ (curPart_)[thePer],
+d518 1
+d528 1
+d569 1
+a569 1
+         curPart_,
+d576 1
+a576 1
+void WitPipMatPgr::recordInfeas ()
+d591 1
+a591 1
+      myBldr_->recInfeas (curPart_, thePer, totReqVol);
+d597 4
+a600 1
+void WitPipMatPgr::prtWorkReqSeq (const char * theAttname, WitPeriod thePer)
+d621 1
+a621 1
+      curPart_->partName ().myCstring (),
+@
+
+
+1.23
+log
+@ASAP Pegging Order
+@
+text
+@a40 1
+      curPer_          (-1),
+d140 1
+a140 1
+void WitPipMatPgr::pegToAtt (void (WitPipMatPgr::* thePegFunc) ())
+d142 3
+a144 1
+   for (curPer_ = lastPeriod (); curPer_ >= 0; curPer_ --)
+d146 1
+a146 1
+      mergeCurPartReqsIntoWorkSeq ();
+d149 1
+a149 1
+         (this->*thePegFunc) ();
+d151 2
+a152 2
+      if (curPer_ > 0)
+         rollReqsBack ();
+d155 1
+a155 1
+   forEachPeriod (curPer_, myProblem ())
+d157 2
+a158 2
+      if (curPer_ > 0)
+         rollReqsFwd ();
+d160 1
+a160 1
+      restoreUnfilledCurPartReqs ();
+a161 2
+
+   curPer_ = -1;
+d168 3
+a170 1
+   for (curPer_ = lastPeriod (); curPer_ >= 0; curPer_ --)
+d172 1
+a172 1
+      mergeCurPartReqsIntoWorkSeq ();
+d175 1
+a175 1
+         netWithSupply ();
+d178 1
+a178 1
+         explodeToProd ();
+d180 2
+a181 2
+      if (curPer_ > 0)
+         rollReqsBack ();
+d184 1
+a184 1
+   forEachPeriod (curPer_, myProblem ())
+d186 2
+a187 2
+      if (curPer_ > 0)
+         rollReqsFwd ();
+d190 1
+a190 1
+         netWithSideVol ();
+d192 1
+a192 1
+      restoreUnfilledCurPartReqs ();
+a193 2
+
+   curPer_ = -1;
+d198 1
+a198 1
+void WitPipMatPgr::mergeCurPartReqsIntoWorkSeq ()
+d201 1
+a201 1
+   WitPipReqSeq   mergedSeq (myProblem ());
+d211 1
+a211 1
+      workReqSeq_.takeContentsFrom (curPartReqSeq_ (curPer_));
+d216 1
+a216 1
+   curPartSeq.takeContentsFrom (curPartReqSeq_ (curPer_));
+d229 1
+a229 1
+         mergedSeq.push        (curPartSrc, curPer_,    curPartReqVol);
+d241 1
+a241 1
+      mergedSeq.push        (curPartSrc, curPer_,    curPartReqVol);
+d270 1
+a270 1
+void WitPipMatPgr::rollReqsBack ()
+d278 1
+a278 1
+   witAssert (curPer_ > 0);
+d280 1
+a280 1
+   while (workReqSeq_.isNonEmpty () and (netStockVol_[curPer_ - 1] > NET_TOL))
+d284 1
+a284 1
+      rollVol = min (incReqVol, netStockVol_[curPer_ - 1]);
+d288 2
+a289 2
+      netStockVol_[curPer_ - 1] -= rollVol;
+      incReqVol                 -= rollVol;
+d295 1
+a295 1
+   overStockReqSeq_ (curPer_).takeContentsFrom (workReqSeq_);
+d304 1
+a304 1
+void WitPipMatPgr::rollReqsFwd ()
+d316 1
+a316 1
+      workReqSeq_.takeContentsFrom (overStockReqSeq_ (curPer_));
+d326 1
+a326 1
+      netStockVol_[curPer_ - 1] += incReqVol;
+d330 1
+a330 1
+      if (overStockReqSeq_ (curPer_).isNonEmpty ())
+d332 2
+a333 2
+         rolledSeq                 .pop (theReqSrc,   fillPer,   incReqVol);
+         overStockReqSeq_ (curPer_).pop (theReqSrcOv, fillPerOv, incReqVolOv);
+d346 1
+a346 1
+   while (overStockReqSeq_ (curPer_).isNonEmpty ())
+d348 2
+a349 2
+      overStockReqSeq_ (curPer_).pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq                 .push (theReqSrc, fillPer, incReqVol);
+d359 1
+a359 1
+void WitPipMatPgr::restoreUnfilledCurPartReqs ()
+d366 1
+a366 1
+   witAssert (curPartReqSeq_ (curPer_).isEmpty ());
+d370 1
+a370 1
+      curPartReqSeq_ (curPer_).takeContentsFrom (workReqSeq_);
+d377 1
+a377 1
+      workReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+d379 2
+a380 2
+      if (fillPer == curPer_)
+         curPartReqSeq_  (curPer_).push (theReqSrc, fillPer, incReqVol);
+d382 1
+a382 1
+         reducedSeq              .push (theReqSrc, fillPer, incReqVol);
+d385 2
+a386 2
+   curPartReqSeq_ (curPer_).reverse ();
+   reducedSeq              .reverse ();
+d393 1
+a393 1
+void WitPipMatPgr::netWithSupply ()
+d398 1
+a398 1
+      prtWorkReqSeq ("SupplyVol");
+d401 2
+a402 2
+        curPart_->supplyVol ()[curPer_]
+      - myProblem ()->myPostprocessor ()->compExcessVol (curPart_, curPer_);
+d407 1
+d413 1
+a413 1
+void WitPipMatPgr::explodeToProd ()
+d419 1
+a419 1
+   if (curPart_->prodVol ()[curPer_] <= 0.0)
+d422 1
+a422 1
+   if (not curPart_->explodeable (curPer_))
+d426 1
+a426 1
+      prtWorkReqSeq ("ProdVol");
+d429 1
+a429 1
+      if (theBopEnt->expEligible (curPer_))
+d431 1
+a431 1
+         explodeBopEntry (theBopEnt);
+d440 1
+a440 1
+void WitPipMatPgr::explodeBopEntry (WitBopEntry * theBopEnt)
+d446 1
+a446 1
+   witAssert (theBopEnt->expEligible (curPer_));
+d452 1
+a452 1
+         getExecPerRange (theBopEnt, curPer_, execPerFirst, execPerLast);
+d456 1
+a456 1
+         if (theBopEnt->impactPeriod ()[execPer] == curPer_)
+d484 1
+d510 1
+a510 1
+void WitPipMatPgr::netWithSideVol ()
+d513 1
+a513 1
+      prtWorkReqSeq ("SideVol");
+d516 1
+a516 1
+      myBldr_->sideVol_ (curPart_)[curPer_],
+d518 1
+d527 1
+d568 1
+a568 1
+         curPer_,
+d595 1
+a595 1
+void WitPipMatPgr::prtWorkReqSeq (const char * theAttname)
+d617 1
+a617 1
+      curPer_);
+@
+
+
+1.22
+log
+@ASAP Pegging Order
+@
+text
+@a48 2
+   stronglyAssert (myGlobalComp ()->newPipPggOrder ());
+
+d92 4
+a95 8
+   if (curPart_->supplyVol () != 0.0)
+      pegToAtt (& WitPipMatPgr::netWithSupply);
+
+   if (curPart_->prodVol () != 0.0)
+      pegToAtt (& WitPipMatPgr::explodeToProd);
+
+   if (not (myBldr_->sideVol_ (curPart_) == 0.0))
+      pegToAtt (& WitPipMatPgr::netWithSideVol);
+d127 14
+d167 32
+@
+
+
+1.21
+log
+@ASAP Pegging Order
+@
+text
+@d39 2
+a40 1
+      curMat_          (NULL),
+d43 2
+a44 2
+      curMatReqList_   (myProblem ()),
+      mainReqSeq_      (myProblem ()),
+d53 2
+a54 2
+      curMatReqList_  [thePer] = new WitPipReqList (myProblem ());
+      overStockReqSeq_[thePer] = new WitPipReqSeq  (myProblem ());
+d67 1
+a67 1
+      delete curMatReqList_  [thePer];
+d73 1
+a73 1
+void WitPipMatPgr::fillReqs (WitMaterial * theMat)
+d75 1
+a75 1
+   curMat_ = theMat;
+d77 1
+a77 1
+   myBldr_->compNonExcStockVol (theMat, netStockVol_);
+d79 1
+a79 1
+   loadCurMatReqLists ();
+d81 14
+a94 1
+   if (curMat_->supplyVol () != 0.0)
+d97 1
+a97 1
+   if (curMat_->prodVol () != 0.0)
+d100 1
+a100 1
+   if (not (myBldr_->sideVol_ (theMat) == 0.0))
+d105 2
+a106 1
+   curMat_ = NULL;
+d111 1
+a111 1
+void WitPipMatPgr::loadCurMatReqLists ()
+d113 4
+a116 1
+   WitPeriod fillPer;
+d120 6
+a125 1
+      myBldr_->myReqMgr_->loadCurReqList (curMat_, fillPer);
+d127 1
+a127 1
+      myBldr_->myReqMgr_->getCurReqList  (curMatReqList_ (fillPer));
+d137 1
+a137 1
+      mergeCurMatReqsIntoMainSeq ();
+d139 1
+a139 1
+      if (mainReqSeq_.isNonEmpty ())
+d151 1
+a151 1
+      restoreUnfilledCurMatReqs ();
+d159 1
+a159 1
+void WitPipMatPgr::mergeCurMatReqsIntoMainSeq ()
+d161 1
+d163 6
+a168 5
+   WitPipReqSrc * mainSeqSrc;
+   WitPeriod      mainSeqPer;
+   double         mainSeqReqVol;
+   WitPipReqSrc * curMatListSrc;
+   double         curMatListReqVol;
+d170 8
+a177 2
+   popMainReqSeqOrNull          (mainSeqSrc,    mainSeqPer, mainSeqReqVol);
+   popCurMatReqListOrNull       (curMatListSrc,             curMatListReqVol);
+d179 5
+a183 2
+   while ((mainSeqSrc != NULL) and (curMatListSrc != NULL))
+      if (mainSeqSrc->belongsBefore (curMatListSrc))
+d185 2
+a186 2
+         mergedSeq.push         (mainSeqSrc,    mainSeqPer, mainSeqReqVol);
+         popMainReqSeqOrNull    (mainSeqSrc,    mainSeqPer, mainSeqReqVol);
+d190 2
+a191 2
+         mergedSeq.push         (curMatListSrc, curPer_,    curMatListReqVol);
+         popCurMatReqListOrNull (curMatListSrc,             curMatListReqVol);
+d194 1
+a194 1
+   while (mainSeqSrc != NULL)
+d196 2
+a197 2
+      mergedSeq.push            (mainSeqSrc,    mainSeqPer, mainSeqReqVol);
+      popMainReqSeqOrNull       (mainSeqSrc,    mainSeqPer, mainSeqReqVol);
+d200 1
+a200 1
+   while (curMatListSrc != NULL)
+d202 2
+a203 2
+      mergedSeq.push            (curMatListSrc, curPer_,    curMatListReqVol);
+      popCurMatReqListOrNull    (curMatListSrc,             curMatListReqVol);
+d208 1
+a208 1
+   mainReqSeq_.takeContentsFrom (mergedSeq);
+d213 2
+a214 16
+void WitPipMatPgr::popCurMatReqListOrNull (
+      WitPipReqSrc * & theReqSrc,
+      double &         incReqVol)
+   {
+   if (curMatReqList_ (curPer_).isNonEmpty ())
+      curMatReqList_ (curPer_).pop (theReqSrc, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      incReqVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::popMainReqSeqOrNull (
+d219 2
+a220 2
+   if (mainReqSeq_.isNonEmpty ())
+      mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+d241 1
+a241 1
+   while (mainReqSeq_.isNonEmpty () and (netStockVol_[curPer_ - 1] > NET_TOL))
+d243 1
+a243 1
+      mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+d253 1
+a253 1
+         mainReqSeq_.push (theReqSrc, fillPer, incReqVol);
+d256 1
+a256 1
+   overStockReqSeq_ (curPer_).takeContentsFrom (mainReqSeq_);
+d260 1
+a260 1
+   mainReqSeq_.takeContentsFrom (rolledSeq);
+d275 1
+a275 1
+   while (mainReqSeq_.isNonEmpty ())
+d277 8
+a284 1
+      mainReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+d315 1
+a315 1
+   mainReqSeq_.takeContentsFrom (rolledSeq);
+d320 1
+a320 1
+void WitPipMatPgr::restoreUnfilledCurMatReqs ()
+d327 1
+a327 1
+   witAssert (curMatReqList_ (curPer_).isEmpty ());
+d329 1
+a329 1
+   while (mainReqSeq_.isNonEmpty ())
+d331 8
+a338 1
+      mainReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+d341 1
+a341 1
+         curMatReqList_ (curPer_).push (theReqSrc,          incReqVol);
+d346 1
+a346 1
+   curMatReqList_ (curPer_).reverse ();
+d349 1
+a349 1
+   mainReqSeq_.takeContentsFrom (reducedSeq);
+d359 1
+a359 1
+      prtMainReqSeq ("SupplyVol");
+d362 2
+a363 2
+        curMat_->supplyVol ()[curPer_]
+      - myProblem ()->myPostprocessor ()->compExcessVol (curMat_, curPer_);
+d365 1
+a365 1
+   pegMainReqToAtt (
+d377 1
+a377 1
+   witAssert (mainReqSeq_.isNonEmpty ());
+d379 1
+a379 1
+   if (curMat_->prodVol ()[curPer_] <= 0.0)
+d382 1
+a382 1
+   if (not curMat_->explodeable (curPer_))
+d386 1
+a386 1
+      prtMainReqSeq ("ProdVol");
+d388 1
+a388 1
+   forEachEl (theBopEnt, curMat_->producingBopEntries ())
+d393 1
+a393 1
+         if (mainReqSeq_.isEmpty ())
+d408 1
+a408 1
+   witAssert (mainReqSeq_.isNonEmpty ());
+d420 1
+a420 1
+            if (mainReqSeq_.isEmpty ())
+d435 1
+a435 1
+   witAssert (mainReqSeq_.isNonEmpty ());
+d441 1
+a441 1
+   pegMainReqToAtt (
+d472 1
+a472 1
+      prtMainReqSeq ("SideVol");
+d474 2
+a475 2
+   pegMainReqToAtt (
+      myBldr_->sideVol_ (curMat_)[curPer_],
+d482 1
+a482 1
+void WitPipMatPgr::pegMainReqToAtt (
+d493 1
+a493 1
+   witAssert (mainReqSeq_.isNonEmpty ());
+d500 1
+a500 1
+   while (mainReqSeq_.isNonEmpty () and (netAttVol > NET_TOL))
+d502 1
+a502 1
+      mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+d510 1
+a510 1
+         mainReqSeq_.push (theReqSrc, fillPer, incReqVol);
+d524 1
+a524 1
+         curMat_,
+d536 1
+d543 1
+a543 1
+      while (curMatReqList_ (thePer).pop (theReqSrc, incReqVol))
+d546 1
+a546 1
+      myBldr_->recInfeas (curMat_, thePer, totReqVol);
+d552 1
+a552 1
+void WitPipMatPgr::prtMainReqSeq (const char * theAttname)
+d561 1
+a561 1
+   theReqSeq.revCopyFrom (mainReqSeq_);
+d573 1
+a573 1
+      curMat_->partName ().myCstring (),
+@
+
+
+1.20
+log
+@ASAP Pegging Order
+@
+text
+@d174 1
+a174 1
+   mergedSeq.passContentsTo (mainReqSeq_);
+d236 1
+a236 3
+   witAssert (overStockReqSeq_ (curPer_).isEmpty ());
+
+   mainReqSeq_.passContentsTo (overStockReqSeq_ (curPer_));
+d240 1
+a240 1
+   rolledSeq.passContentsTo (mainReqSeq_);
+d288 1
+a288 1
+   rolledSeq.passContentsTo (mainReqSeq_);
+d315 1
+a315 1
+   reducedSeq.passContentsTo (mainReqSeq_);
+@
+
+
+1.19
+log
+@ASAP Pegging Order
+@
+text
+@a38 1
+      myReqMgr_        (theBldr->myReqMgr_),
+d102 1
+a102 1
+      myReqMgr_->loadCurReqList (curMat_, fillPer);
+d104 1
+a104 1
+      myReqMgr_->getCurReqList (curMatReqList_ (fillPer));
+d422 1
+a422 1
+      myReqMgr_->addReq (theBopEnt, execPer, theReqSrc, incExecVol);
+@
+
+
+1.18
+log
+@ASAP Pegging Order
+@
+text
+@d105 1
+a105 1
+      myReqMgr_->curReqList_.passContentsTo (curMatReqList_ (fillPer));
+@
+
+
+1.17
+log
+@ASAP Pegging Order
+@
+text
+@d325 1
+a325 7
+   double         netSuppVol;
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   double         incSuppVol;
+
+   witAssert (mainReqSeq_.isNonEmpty ());
+d330 1
+a330 1
+   netSuppVol =
+d334 4
+a337 26
+   while (mainReqSeq_.isNonEmpty () and (netSuppVol > NET_TOL))
+      {
+      mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+      incSuppVol  = min (incReqVol, netSuppVol);
+      
+      incReqVol  -= incSuppVol;
+      netSuppVol -= incSuppVol;
+
+      if (incReqVol > NET_TOL)
+         mainReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+      if (myGlobalComp ()->printDebug ())
+         prtPegMat (incSuppVol, fillPer, theReqSrc);
+
+      myBldr_->addToIncPegVol (incSuppVol, theReqSrc);
+      }
+
+   myBldr_->
+      myPgg_->
+         supplyVolPgg ()->
+            multiAppend (
+               myBldr_->posDemPers_,
+               curMat_,
+               curPer_,
+               myBldr_->incPegVol_);
+d398 2
+a399 1
+   double         netProdVol;
+a400 2
+   WitPeriod      fillPer;
+   double         incReqVol;
+a402 1
+   WitPipReqList  theReqList (myProblem ());
+d404 3
+a406 1
+   netProdVol =
+d410 4
+a413 8
+   while (mainReqSeq_.isNonEmpty () and (netProdVol > NET_TOL))
+      {
+      mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+      incProdVol  = min (incReqVol, netProdVol);
+      
+      incReqVol  -= incProdVol;
+      netProdVol -= incProdVol;
+d415 1
+a415 2
+      if (incReqVol > NET_TOL)
+         mainReqSeq_.push (theReqSrc, fillPer, incReqVol);
+d417 3
+a419 2
+      if (myGlobalComp ()->printDebug ())
+         prtPegMat (incProdVol, fillPer, theReqSrc);
+d421 1
+a421 3
+      myBldr_->addToIncPegVol (incProdVol, theReqSrc);
+
+      incExecVol = incProdVol / theBopEnt->effProdRate ()[execPer];
+a423 2
+
+      theReqList.push (theReqSrc, incExecVol);
+a427 12
+         prodVolPgg ()->
+            multiAppend (
+               myBldr_->posDemPers_,
+               curMat_,
+               curPer_,
+               myBldr_->incPegVol_);
+
+   while (theReqList.pop (theReqSrc, incExecVol))
+      myBldr_->addToIncPegVol (incExecVol, theReqSrc);
+
+   myBldr_->
+      myPgg_->
+d440 17
+a456 1
+   double         netSideVol;
+d460 1
+a460 1
+   double         incSideVol;
+d464 1
+a464 2
+   if (myGlobalComp ()->printDebug ())
+      prtMainReqSeq ("SideVol");
+d466 2
+a467 1
+   netSideVol = myBldr_->sideVol_ (curMat_)[curPer_];
+d469 1
+a469 1
+   while (mainReqSeq_.isNonEmpty () and (netSideVol > NET_TOL))
+d473 1
+a473 1
+      incSideVol  = min (incReqVol, netSideVol);
+d475 2
+a476 2
+      incReqVol  -= incSideVol;
+      netSideVol -= incSideVol;
+d482 3
+a484 1
+         prtPegMat (incSideVol, fillPer, theReqSrc);
+d486 2
+a487 1
+      myBldr_->addToIncPegVol (incSideVol, theReqSrc);
+d490 6
+a495 31
+   myBldr_->
+      myPgg_->
+         sideVolPgg ()->
+            multiAppend (
+               myBldr_->posDemPers_,
+               curMat_,
+               curPer_,
+               myBldr_->incPegVol_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::blob (
+      double &         netSuppVol,
+      WitPipReqSrc * & theReqSrc,
+      double &         incPegVol)
+   {
+   WitPeriod fillPer;
+   double    incReqVol;
+
+   mainReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+   incPegVol   = min (incReqVol, netSuppVol);
+      
+   incReqVol  -= incPegVol;
+   netSuppVol -= incPegVol;
+
+   if (incReqVol > NET_TOL)
+      mainReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+   myBldr_->addToIncPegVol (incPegVol, theReqSrc);
+@
+
+
+1.16
+log
+@ASAP Pegging Order
+@
+text
+@d197 1
+a197 1
+      WitPeriod &      thePer,
+d201 1
+a201 1
+      mainReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d205 1
+a205 1
+      thePer    = -1;
+d215 1
+a215 1
+   WitPeriod      thePer;
+d224 1
+a224 1
+      mainReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d228 1
+a228 1
+      rolledSeq.push (theReqSrc, thePer, rollVol);
+d234 1
+a234 1
+         mainReqSeq_.push (theReqSrc, thePer, incReqVol);
+d251 1
+a251 1
+   WitPeriod      thePer;
+d255 1
+a255 1
+   WitPeriod      thePerOv;
+d260 2
+a261 2
+      mainReqSeq_.pop  (theReqSrc, thePer, incReqVol);
+      rolledSeq  .push (theReqSrc, thePer, incReqVol);
+d269 2
+a270 2
+         rolledSeq                 .pop (theReqSrc,   thePer,   incReqVol);
+         overStockReqSeq_ (curPer_).pop (theReqSrcOv, thePerOv, incReqVolOv);
+d272 1
+a272 1
+         if ((theReqSrc == theReqSrcOv) and (thePer == thePerOv))
+d274 1
+a274 1
+            rolledSeq.push (theReqSrc,   thePer,   incReqVol + incReqVolOv);
+d278 2
+a279 2
+            rolledSeq.push (theReqSrc,   thePer,   incReqVol);
+            rolledSeq.push (theReqSrcOv, thePerOv, incReqVolOv);
+d285 2
+a286 2
+      overStockReqSeq_ (curPer_).pop  (theReqSrc, thePer, incReqVol);
+      rolledSeq                 .push (theReqSrc, thePer, incReqVol);
+d299 1
+a299 1
+   WitPeriod      thePer;
+d307 1
+a307 1
+      mainReqSeq_.pop  (theReqSrc, thePer, incReqVol);
+d309 2
+a310 2
+      if (thePer == curPer_)
+         curMatReqList_ (curPer_).push (theReqSrc,         incReqVol);
+d312 1
+a312 1
+         reducedSeq              .push (theReqSrc, thePer, incReqVol);
+d327 1
+a327 1
+   WitPeriod      thePer;
+d342 1
+a342 1
+      mainReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d350 1
+a350 1
+         mainReqSeq_.push (theReqSrc, thePer, incReqVol);
+d353 1
+a353 1
+         prtPegMat (incSuppVol, thePer, theReqSrc);
+d428 1
+a428 1
+   WitPeriod      thePer;
+d440 1
+a440 1
+      mainReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d448 1
+a448 1
+         mainReqSeq_.push (theReqSrc, thePer, incReqVol);
+d451 1
+a451 1
+         prtPegMat (incProdVol, thePer, theReqSrc);
+d490 1
+a490 1
+   WitPeriod      thePer;
+d503 1
+a503 1
+      mainReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d511 1
+a511 1
+         mainReqSeq_.push (theReqSrc, thePer, incReqVol);
+d514 1
+a514 1
+         prtPegMat (incSideVol, thePer, theReqSrc);
+@
+
+
+1.15
+log
+@ASAP Pegging Order
+@
+text
+@a114 3
+//    if (myGlobalComp ()->printDebug ())
+//       prtMainReqSeq ("Just Before mergeCurMatReqsIntoMainSeq");
+
+a116 3
+//    if (myGlobalComp ()->printDebug ())
+//       prtMainReqSeq ("Just Before Pegging");
+
+a291 3
+
+// if (myGlobalComp ()->printDebug ())
+//    prtMainReqSeq ("After rollReqsFwd");
+d333 3
+a351 3
+//    if (myGlobalComp ()->printDebug ())
+//       prtPegMat ("SupplyVol", incSuppVol, thePer, theReqSrc);
+
+d353 1
+a353 1
+         myBldr_->prtNetToSupply (curMat_, curPer_, incSuppVol, theReqSrc);
+d382 3
+d450 2
+a451 2
+//    if (myGlobalComp ()->printDebug ())
+//       prtPegMat ("ProdVol", incProdVol, thePer, theReqSrc);
+d496 3
+d513 2
+a514 2
+//    if (myGlobalComp ()->printDebug ())
+//       prtPegMat ("SideVol", incSideVol, thePer, theReqSrc);
+d574 1
+a574 27
+void WitPipMatPgr::prtPegMat (
+      const char *   theAttName,
+      double         pegVol,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc)
+   {
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "Pegging To %s:\n"
+      "   Part:        %s\n"
+      "   Peg Period:  %d\n"
+      "   Fill Period: %d\n"
+      "   PegVol:      %.0f\n",
+      theAttName,
+      curMat_->partName ().myCstring (),
+      curPer_,
+      fillPer,
+      pegVol);
+
+   theReqSrc->print (msgFile (), "   ");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipMatPgr::prtMainReqSeq (const char * context)
+d589 8
+a596 2
+      "Main Requirement Sequence %s:\n",
+      context);
+d602 2
+a603 2
+         "   FillPer: %d\n"
+         "   ReqVol:  %.0f\n",
+d607 1
+a607 1
+      theReqSrc->print (msgFile (), "   ");
+d610 20
+@
+
+
+1.14
+log
+@ASAP Pegging Order
+@
+text
+@d115 3
+d120 3
+d298 3
+d324 2
+a325 1
+   reducedSeq.reverse ();
+d358 3
+d456 3
+d516 3
+d574 59
+@
+
+
+1.13
+log
+@ASAP Pegging Order
+@
+text
+@a145 2
+   mainSeqPer = -1;
+
+d197 1
+a197 1
+      WitPeriod        thePer,
+@
+
+
+1.12
+log
+@ASAP Pegging Order
+@
+text
+@d99 1
+a99 1
+   WitPeriod thePer;
+d101 1
+a101 1
+   forEachPeriod (thePer, myProblem ())
+d103 1
+a103 1
+      myReqMgr_->loadCurReqList (curMat_, thePer);
+d105 1
+a105 1
+      myReqMgr_->curReqList_.passContentsTo (curMatReqList_ (thePer));
+d517 23
+@
+
+
+1.11
+log
+@ASAP Pegging Order
+@
+text
+@a74 3
+   WitPeriod thePer;
+   double    unfilledReqVol;
+
+d90 1
+a90 6
+   forEachPeriod (thePer, myProblem ())
+      {
+      unfilledReqVol = myReqMgr_->npoTotReqVol (curMatReqList_ (thePer));
+
+      myBldr_->recInfeas (curMat_, thePer, unfilledReqVol);
+      }
+d514 20
+@
+
+
+1.10
+log
+@ASAP Pegging Order
+@
+text
+@a48 1
+   stronglyAssert (myGlobalComp ()->useNewMatPgg ());
+@
+
+
+1.9
+log
+@ASAP Pegging Order
+@
+text
+@d359 3
+@
+
+
+1.8
+log
+@ASAP Pegging Order
+@
+text
+@d91 3
+d339 1
+a339 1
+   double         pegVol;
+d351 1
+a351 1
+      pegVol      = min (incReqVol, netSuppVol);
+d353 2
+a354 2
+      incReqVol  -= pegVol;
+      netSuppVol -= pegVol;
+d359 1
+a359 1
+      myBldr_->addToIncPegVol (pegVol, theReqSrc);
+d481 39
+@
+
+
+1.7
+log
+@ASAP Pegging Order
+@
+text
+@d23 1
+d26 2
+a51 5
+   if (myCompMgr ()->nOperations () > 0)
+      myMsgFac () ("genericSmsg",
+         "PIP with the new material pegging algorithm is not yet implemented "
+         "for problems with one or more operations.");
+
+d88 3
+d368 110
+@
+
+
+1.6
+log
+@ASAP Pegging Order
+@
+text
+@d78 3
+d90 6
+a95 1
+   myMsgFac () ("newMatPggNyiSmsg", 1);
+d145 5
+a149 5
+   WitPipReqSrc * curSeqSrc;
+   WitPeriod      curSeqPer;
+   double         curSeqReqVol;
+   WitPipReqSrc * mainListSrc;
+   double         mainListReqVol;
+d151 1
+a151 1
+   curSeqPer = -1;
+d153 2
+a154 7
+   popMainReqSeqOrNull          (curSeqSrc,   curSeqPer, curSeqReqVol);
+   popCurMatReqListOrNull       (mainListSrc,            mainListReqVol);
+
+   while (true)
+      {
+      if (curSeqSrc == NULL)
+         break;
+d156 2
+a157 4
+      if (mainListSrc == NULL)
+         break;
+
+      if (curSeqSrc->belongsBefore (mainListSrc))
+d159 2
+a160 2
+         mergedSeq.push         (curSeqSrc,   curSeqPer, curSeqReqVol);
+         popMainReqSeqOrNull    (curSeqSrc,   curSeqPer, curSeqReqVol);
+d164 2
+a165 2
+         mergedSeq.push         (mainListSrc, curPer_,   mainListReqVol);
+         popCurMatReqListOrNull (mainListSrc,            mainListReqVol);
+a166 1
+      }
+d168 1
+a168 1
+   while (curSeqSrc != NULL)
+d170 2
+a171 2
+      mergedSeq.push            (curSeqSrc,   curSeqPer, curSeqReqVol);
+      popMainReqSeqOrNull       (curSeqSrc,   curSeqPer, curSeqReqVol);
+d174 1
+a174 1
+   while (mainListSrc != NULL)
+d176 2
+a177 2
+      mergedSeq.push            (mainListSrc, curPer_,   mainListReqVol);
+      popCurMatReqListOrNull    (mainListSrc,            mainListReqVol);
+d229 1
+a229 1
+   while (mainReqSeq_.isNonEmpty ())
+a230 3
+      if (netStockVol_[curPer_ - 1] <= NET_TOL)
+         break;
+
+d281 1
+a281 1
+            rolledSeq.push (theReqSrc, thePer, incReqVol + incReqVolOv);
+d285 2
+a286 4
+            rolledSeq.push (theReqSrc, thePer, incReqVol);
+
+            overStockReqSeq_ (curPer_).
+               push (theReqSrcOv, thePerOv, incReqVolOv);
+d290 1
+a290 1
+   while (mainReqSeq_.isNonEmpty ())
+d343 1
+a343 1
+   while (netSuppVol > NET_TOL)
+a344 3
+      if (mainReqSeq_.isEmpty ())
+         break;
+
+@
+
+
+1.5
+log
+@ASAP Pegging Order
+@
+text
+@d34 9
+a42 9
+      WitProbAssoc    (theBldr->myProblem ()),
+      myBldr_         (theBldr),
+      myReqMgr_       (theBldr->myReqMgr_),
+      curMat_         (NULL),
+      curPer_         (-1),
+      netStockVol_    (myProblem (), 0.0),
+      curMatReqList_  (myProblem ()),
+      mainReqSeq_     (myProblem ()),
+      unrolledReqSeq_ (myProblem ())
+d56 2
+a57 2
+      curMatReqList_ [thePer] = new WitPipReqList (myProblem ());
+      unrolledReqSeq_[thePer] = new WitPipReqSeq  (myProblem ());
+d69 2
+a70 2
+      delete unrolledReqSeq_[thePer];
+      delete curMatReqList_ [thePer];
+d118 1
+a118 1
+         rollReqs ();
+d121 7
+a127 1
+   myMsgFac () ("newMatPggNyiSmsg", 2);
+d219 1
+a219 1
+void WitPipMatPgr::rollReqs ()
+d247 47
+a293 1
+   witAssert (unrolledReqSeq_ (curPer_).isEmpty ());
+d295 5
+a299 1
+   mainReqSeq_.passContentsTo (unrolledReqSeq_ (curPer_));
+d308 26
+@
+
+
+1.4
+log
+@ASAP Pegging Order
+@
+text
+@d18 2
+d25 1
+d34 9
+a42 8
+      WitProbAssoc (theBldr->myProblem ()),
+      myBldr_      (theBldr),
+      myReqMgr_    (theBldr->myReqMgr_),
+      curMat_      (NULL),
+      curPer_      (-1),
+      netStockVol_ (myProblem (), 0.0),
+      mainReqList_ (myProblem ()),
+      curReqSeq_   (myProblem ())
+d55 4
+a58 1
+      mainReqList_[thePer] = new WitPipReqList (myProblem ());
+d68 4
+a71 1
+      delete mainReqList_[thePer];
+d82 1
+a82 1
+   loadMainReqLists ();
+d87 1
+a87 1
+   myMsgFac () ("newMatPggNyiSmsg");
+d94 1
+a94 1
+void WitPipMatPgr::loadMainReqLists ()
+d102 1
+a102 1
+      myReqMgr_->curReqList_.passContentsTo (mainReqList_ (thePer));
+d112 1
+a112 1
+      mergeMainReqsIntoCurSeq ();
+d114 5
+a118 1
+      myMsgFac () ("newMatPggNyiSmsg");
+d121 2
+d128 1
+a128 1
+void WitPipMatPgr::mergeMainReqsIntoCurSeq ()
+d139 2
+a140 2
+   popCurReqSeqOrNull         (curSeqSrc,   curSeqPer, curSeqReqVol);
+   popMainReqListOrNull       (mainListSrc,            mainListReqVol);
+d152 2
+a153 2
+         mergedSeq.push       (curSeqSrc,   curSeqPer, curSeqReqVol);
+         popCurReqSeqOrNull   (curSeqSrc,   curSeqPer, curSeqReqVol);
+d157 2
+a158 2
+         mergedSeq.push       (mainListSrc, curPer_,   mainListReqVol);
+         popMainReqListOrNull (mainListSrc,            mainListReqVol);
+d164 2
+a165 2
+      mergedSeq.push          (curSeqSrc,   curSeqPer, curSeqReqVol);
+      popCurReqSeqOrNull      (curSeqSrc,   curSeqPer, curSeqReqVol);
+d170 2
+a171 2
+      mergedSeq.push          (mainListSrc, curPer_,   mainListReqVol);
+      popMainReqListOrNull    (mainListSrc,            mainListReqVol);
+d176 1
+a176 1
+   mergedSeq.passContentsTo (curReqSeq_);
+d181 1
+a181 1
+void WitPipMatPgr::popMainReqListOrNull (
+d185 2
+a186 2
+   if (mainReqList_ (curPer_).isNonEmpty ())
+      mainReqList_ (curPer_).pop (theReqSrc, incReqVol);
+d196 1
+a196 1
+void WitPipMatPgr::popCurReqSeqOrNull (
+d201 2
+a202 2
+   if (curReqSeq_.isNonEmpty ())
+      curReqSeq_.pop (theReqSrc, thePer, incReqVol);
+d213 39
+d254 16
+a269 1
+   myMsgFac () ("newMatPggNyiSmsg");
+d271 1
+a271 1
+#if 0
+d273 10
+d284 8
+a291 1
+#endif
+@
+
+
+1.3
+log
+@ASAP Pegging Order
+@
+text
+@d45 5
+@
+
+
+1.2
+log
+@ASAP Pegging Order.
+@
+text
+@d116 2
+@
+
+
+1.1
+log
+@ASAP Pegging Order
+@
+text
+@d18 3
+d22 1
+d33 6
+a38 2
+      myReqMgr_    (theBldr->myReqMgr ()),
+      netStockVol_ (myProblem (), 0.0)
+d40 2
+d44 3
+d53 4
+d63 2
+d67 5
+d73 125
+@
+

@@ -1,0 +1,127 @@
+--- dprsrch.f	Mon Apr 22 18:19:33 2002
++++ dprsrch_p.f	Mon Apr 22 18:19:46 2002
+@@ -1,6 +1,43 @@
+       subroutine dprsrch(n,x,xl,xu,a,diag,col_ptr,row_ind,g,w,
+-     +                   wa1,wa2)
++     +                   wa1,wa2,
++     1     indfree,
++     1     IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE, IVAR,
++     1     NFIX, IFIX, SOFLAG, C,
++     1     NLB, ILB, NUB, IUB, S_L, S_U,
++     1     KCONSTR, LRS, RS, LIS, IS, LRW, RW, LIW, IW, IERR)
++      IMPLICIT NONE
+       integer n
++      integer indfree(n)
++      integer IPITER
++      integer IPN
++      integer NIND
++      integer M
++      integer NORIG
++      double precision XORIG(NORIG)
++      double precision CSCALE(*)
++      integer IVAR(IPN)
++      integer NFIX
++      integer IFIX(NFIX)
++      logical SOFLAG
++      double precision C(M)
++      integer NLB
++      integer ILB(NLB)
++      integer NUB
++      integer IUB(NUB)
++      double precision S_L(NLB)
++      double precision S_U(NUB)
++      integer KCONSTR(6)
++      integer LRS
++      double precision RS(LRS)
++      integer LIS
++      integer IS(LIS)
++      integer LRW
++      double precision RW(LRW)
++      integer LIW
++      integer IW(LIW)
++      integer IERR
++
++c      integer n
+       integer col_ptr(n+1), row_ind(*)
+       double precision a(*), diag(n), x(n), xl(n), xu(n), g(n), w(n)
+       double precision wa1(n), wa2(n)
+@@ -112,11 +149,36 @@
+       logical search
+       integer nbrpt, nsteps
+       double precision alpha, brptmin, brptmax, gts, q
++      double precision macheps, precfact
++      parameter( precfact = 1.d1 )
++
++CAWAE
++      integer p_rwend, p_iwend
++      integer p_vin, p_vout, i
+ 
+-      double precision ddot
+-      external daxpy, dcopy, ddot
++      include 'IPOPT.INC'
++
++      double precision ddot, dnrm2, d1mach
++      external daxpy, dcopy, ddot, dnrm2, d1mach
+       external dbreakpt, dgpstep, dmid, dssyax
+ 
++      macheps = d1mach(4)
++
++      p_rwend = 0
++      p_iwend = 0
++      if( QTRONHESS.eq.0 ) then
++         p_vin   = p_rwend
++         p_vout  = p_vin + IPN
++         p_rwend = p_vout + IPN
++         if( p_rwend.gt.LRW ) then
++            IERR = 98
++            return
++         endif
++      else
++         p_vin   = 0
++         p_vout  = 0
++      endif
++
+ c     Set the initial alpha = 1 because the quadratic function is 
+ c     decreasing in the ray x + alpha*w for 0 <= alpha <= 1.
+ 
+@@ -138,8 +200,27 @@
+ 
+          nsteps = nsteps + 1
+          call dgpstep(n,x,xl,xu,alpha,w,wa1)
+-         call dssyax(n,a,diag,col_ptr,row_ind,wa1,wa2)
++
++         if( QTRONHESS.eq.0 ) then
++            call DCOPY(IPN, 0.d0, 0, RW(p_vin+1), 1)
++            do i = 1, n
++               RW(p_vin+indfree(i)) = wa1(i)
++            enddo
++            call RES_HV(IPITER, IPN, NIND, M, NORIG, XORIG, CSCALE,
++     1           IVAR, NFIX, IFIX, SOFLAG, C, RW(p_vin+1), RW(p_vout+1),
++     1           NLB, ILB, NUB, IUB, S_L, S_U,
++     1           KCONSTR, LRS, RS, LIS, IS, LRW-p_rwend, RW(p_rwend+1),
++     1           LIW-p_iwend, IW(p_iwend+1), IERR)
++            if( IERR.ne.0 ) return
++            do i = 1, n
++               wa2(i) = RW(p_vout+indfree(i))
++            enddo
++         else
++            call dssyax(n,a,diag,col_ptr,row_ind,wa1,wa2)
++         endif
++
+          gts = ddot(n,g,1,wa1,1)
++     1        + precfact*macheps*dnrm2(n,g,1)*dnrm2(n,wa1,1)!for round off error
+          q = p5*ddot(n,wa1,1,wa2,1) + gts
+          if (q .le. mu0*gts) then
+             search = .false.
+@@ -149,6 +230,11 @@
+ c           will be replaced in future versions of the code.
+ 
+             alpha = interpf*alpha
++            if( alpha.eq.0.d0 ) then
++               call C_OUT(2,0,1,'dprsrch(tron): alpha becomes 0.d0')
++               IERR = 573
++               return
++            endif
+ 
+          end if
+       end do

@@ -1,0 +1,579 @@
+head	1.7;
+access;
+symbols
+	start:1.1.1.1 dummy-vendor:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.7
+date	2011.09.20.19.32.32;	author rjw;	state dead;
+branches;
+next	1.6;
+
+1.6
+date	2011.09.15.23.05.46;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.09.15.20.29.25;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.07.08.20.45.57;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.06.30.23.43.47;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.06.30.22.03.38;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.16.22.08.55;	author rjw;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2011.05.16.22.08.55;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@InputTables
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File CsvFileReader.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+
+/*******************************************************************************
+ * A CsvFileReader is responsible for reading a CSV file and storing the
+ * resulting data.
+ *******************************************************************************
+ */
+final class CsvFileReader
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The name of the CSV file to be read by this CsvFileReader.
+ *******************************************************************************
+ */
+   private final String myFileName;
+
+/*******************************************************************************
+ * BufferedReader of the CSV file.
+ *******************************************************************************
+ */
+   private BufferedReader myBufReader = null;
+
+/*******************************************************************************
+ * {@@code myHeadings.get (colIdx-1)} is the heading for column #{@@code colIdx}.
+ *******************************************************************************
+ */
+   private final ArrayList <String> myHeadings;
+
+/*******************************************************************************
+ * {@@code myCellRows.get (rowIdx-1).get (colIdx-1)} is the table cell for
+ * {@@code rowIdx} and {@@code colIdx}.
+ *******************************************************************************
+ */
+   private final LinkedList <ArrayList <String>> myCellRows;
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+   
+   private CsvFileReader (
+         String                          theFileName,
+         ArrayList  <String>             theHeadings,
+         LinkedList <ArrayList <String>> theCellRows)
+      {
+      myFileName = theFileName;
+      myHeadings = theHeadings;
+      myCellRows = theCellRows;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Throws an exception indicating an empty CSV file.
+ *******************************************************************************
+ */
+   private void reportEmptyFile ()
+      {
+      throw
+         new IllegalStateException (
+            "\n"
+          + "\n"
+          + "   The CSV file is empty.\n"
+          + "\n"
+          + "      File: " + myFileName + "\n");
+      }
+
+/*******************************************************************************
+ * Throws an exception indicating theHeading appeared twice, once in the each
+ * the indicated columns.
+ *******************************************************************************
+ */
+   private void reportDupHeading (String theHeading, int colIdx1, int colIdx2)
+      {
+      throw
+         new IllegalStateException (
+            "\n"
+          + "\n"
+          + "   A duplicate column heading was found in a CSV file.\n"
+          + "\n"
+          + "      File:              \"" + myFileName + "\"\n"
+          + "      Duplicate Heading: \"" + theHeading + "\"\n"
+          + "      First  Column:     "   + colIdx1    + "\n"
+          + "      Second Column:     "   + colIdx2    + "\n");
+      }
+
+/*******************************************************************************
+ * Reads the column headings from the first line of the file.
+ *******************************************************************************
+ */
+   private void readHeadings ()
+      throws
+         IOException
+      {
+      String                    firstLine;
+      HashMap <String, Integer> theColIndexMap;
+      int                       colIdx;
+      String                    theHeading;
+
+      firstLine      = myBufReader.readLine ();
+
+      if (firstLine == null)
+         reportEmptyFile ();
+      
+      myHeadings.clear ();
+
+      myHeadings.addAll (Arrays.asList (firstLine.split (",")));
+
+      theColIndexMap = new HashMap <String, Integer> (3 * myHeadings.size ());
+
+      for (colIdx = 1; colIdx <= myHeadings.size (); colIdx ++)
+         {
+         theHeading = myHeadings.get (colIdx - 1);
+
+         if (theColIndexMap.containsKey (theHeading))
+            {
+            reportDupHeading (
+               theHeading,
+               theColIndexMap.get (theHeading),
+               colIdx);
+            }
+         
+         theColIndexMap.put (theHeading, colIdx);
+         }
+      }
+
+/*******************************************************************************
+ * Throws an exception indicating that the current line has a different number
+ * of cells than the number of column headings.
+ *******************************************************************************
+ */
+   private void reportCellCountMisMatch (int lineNo, int nCells)
+      {
+      throw
+         new IllegalStateException (
+            "\n"
+          + "\n"
+          + "   A line in a CSV file was read that contained a number of\n"
+          + "   cells that was different from the number of column headings.\n"
+          + "\n"
+          + "      File:       \"" + myFileName         + "\"\n"
+          + "      # Headings: "   + myHeadings.size () +   "\n"
+          + "      Line #      "   + lineNo             +   "\n"
+          + "      # Cells:    "   + nCells             +   "\n");
+      }
+
+/*******************************************************************************
+ * Reads the rows of cells and stores them in myCellRows.
+ *******************************************************************************
+ */
+   private void readRows ()
+      throws
+         IOException
+      {
+      int                lineNo;
+      String             curLine;
+      ArrayList <String> theCells;
+
+      myCellRows.clear ();
+
+      for (lineNo = 2; ; lineNo ++)
+         {
+         curLine = myBufReader.readLine ();
+
+         if (curLine == null)
+            break;
+
+         theCells = new ArrayList <String> (myHeadings.size ());
+
+         theCells.addAll (Arrays.asList (curLine.split (",")));
+
+         if (theCells.size () != myHeadings.size ())
+            reportCellCountMisMatch (lineNo, theCells.size ());
+
+         myCellRows.add (theCells);
+         }
+      }
+
+/*******************************************************************************
+ * Reads the CSV file and stores the resulting column headings and cells.
+ *******************************************************************************
+ */
+   private void readFile ()
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      FileReader theFileReader = null;
+
+      try
+         {
+         theFileReader = new FileReader     (myFileName);
+         myBufReader   = new BufferedReader (theFileReader);
+
+         readHeadings ();
+         readRows     ();
+         }
+
+      finally
+         {
+         if (theFileReader != null)
+            {
+            theFileReader.close ();
+            }
+         }
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package-Internal Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Reads a CSV file.
+ * 
+ * @@param theFileName The name of the file to be read.
+ * @@param theHeadings On return, {@@code theHeadings.get (colIdx-1)} is the
+ *                    heading for column {@@code #colIdx}.
+ * @@param theCellRows On return,
+ *                    {@@code theCellRows.get (rowIdx-1).get (colIdx-1)}
+ *                    is the table cell for {@@code rowIdx} and {@@code colIdx}.
+ *
+ * @@throws FileNotFoundException If thrown when reading the file
+ * @@throws IOException           If thrown when reading the file
+ * @@throws IllegalStateException If the file is empty
+ * @@throws IllegalStateException If two or more column headings are identical
+ * @@throws IllegalStateException If a row is read whose length does not match
+ *                               the number of column headings
+ *******************************************************************************
+ */
+   static void read (
+         String                          theFileName,
+         ArrayList  <String>             theHeadings,
+         LinkedList <ArrayList <String>> theCellRows)
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      CsvFileReader theCsvFileReader;
+
+      theCsvFileReader =
+         new CsvFileReader (theFileName, theHeadings, theCellRows);
+
+      theCsvFileReader.readFile ();
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.6
+log
+@Table reading.
+@
+text
+@@
+
+
+1.5
+log
+@Re-ordered members
+@
+text
+@d122 2
+d177 2
+d193 1
+a193 1
+         myCellRows.addLast (theCells);
+a207 3
+      myHeadings.clear ();
+      myCellRows.clear ();
+
+@
+
+
+1.4
+log
+@Class ProblemMgr.
+@
+text
+@d25 1
+a25 1
+// Package-Internal
+d27 6
+d35 1
+a35 15
+ * Reads a CSV file.
+ * 
+ * @@param theFileName The name of the file to be read.
+ * @@param theHeadings On return, {@@code theHeadings.get (colIdx-1)} is the
+ *                    heading for column {@@code #colIdx}.
+ * @@param theCellRows On return,
+ *                    {@@code theCellRows.get (rowIdx-1).get (colIdx-1)}
+ *                    is the table cell for {@@code rowIdx} and {@@code colIdx}.
+ *
+ * @@throws FileNotFoundException If thrown when reading the file
+ * @@throws IOException           If thrown when reading the file
+ * @@throws IllegalStateException If the file is empty
+ * @@throws IllegalStateException If two or more column headings are identical
+ * @@throws IllegalStateException If a row is read whose length does not match
+ *                               the number of column headings
+d38 1
+a38 9
+   static void read (
+         String                          theFileName,
+         ArrayList  <String>             theHeadings,
+         LinkedList <ArrayList <String>> theCellRows)
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      CsvFileReader theCsvFileReader;
+d40 5
+a44 2
+      theCsvFileReader =
+         new CsvFileReader (theFileName, theHeadings, theCellRows);
+d46 6
+a51 2
+      theCsvFileReader.readFile ();
+      }
+d54 1
+a54 1
+// Private
+a56 4
+/*******************************************************************************
+ * Constructor.
+ *******************************************************************************
+ */
+d67 4
+d72 1
+a72 1
+ * Reads the CSV file and stores the resulting column headings and cells.
+d75 1
+a75 4
+   private void readFile ()
+      throws
+         FileNotFoundException,
+         IOException
+d77 8
+a84 1
+      FileReader theFileReader = null;
+d86 17
+a102 19
+      myHeadings.clear ();
+      myCellRows.clear ();
+
+      try
+         {
+         theFileReader = new FileReader     (myFileName);
+         myBufReader   = new BufferedReader (theFileReader);
+
+         readHeadings ();
+         readRows     ();
+         }
+
+      finally
+         {
+         if (theFileReader != null)
+            {
+            theFileReader.close ();
+            }
+         }
+d144 2
+a145 1
+ * Throws an exception indicating an empty CSV file.
+d148 1
+a148 1
+   private void reportEmptyFile ()
+d154 2
+a155 1
+          + "   The CSV file is empty.\n"
+d157 4
+a160 20
+          + "      File: " + myFileName + "\n");
+      }
+
+/*******************************************************************************
+ * Throws an exception indicating theHeading appeared twice, once in the each
+ * the indicated columns.
+ *******************************************************************************
+ */
+   private void reportDupHeading (String theHeading, int colIdx1, int colIdx2)
+      {
+      throw
+         new IllegalStateException (
+            "\n"
+          + "\n"
+          + "   A duplicate column heading was found in a CSV file.\n"
+          + "\n"
+          + "      File:              \"" + myFileName + "\"\n"
+          + "      Duplicate Heading: \"" + theHeading + "\"\n"
+          + "      First  Column:     "   + colIdx1    + "\n"
+          + "      Second Column:     "   + colIdx2    + "\n");
+d194 1
+a194 2
+ * Throws an exception indicating that the current line has a different number
+ * of cells than the number of column headings.
+d197 4
+a200 1
+   private void reportCellCountMisMatch (int lineNo, int nCells)
+d202 21
+a222 11
+      throw
+         new IllegalStateException (
+            "\n"
+          + "\n"
+          + "   A line in a CSV file was read that contained a number of\n"
+          + "   cells that was different from the number of column headings.\n"
+          + "\n"
+          + "      File:       \"" + myFileName         + "\"\n"
+          + "      # Headings: "   + myHeadings.size () +   "\n"
+          + "      Line #      "   + lineNo             +   "\n"
+          + "      # Cells:    "   + nCells             +   "\n");
+d225 3
+a227 5
+/*******************************************************************************
+ * The name of the CSV file to be read by this CsvFileReader.
+ *******************************************************************************
+ */
+   private final String myFileName;
+d230 15
+a244 1
+ * BufferedReader of the CSV file.
+d247 9
+a255 1
+   private BufferedReader myBufReader = null;
+d257 2
+a258 5
+/*******************************************************************************
+ * {@@code myHeadings.get (colIdx-1)} is the heading for column #{@@code colIdx}.
+ *******************************************************************************
+ */
+   private final ArrayList <String> myHeadings;
+d260 2
+a261 6
+/*******************************************************************************
+ * {@@code myCellRows.get (rowIdx-1).get (colIdx-1)} is the table cell for
+ * {@@code rowIdx} and {@@code colIdx}.
+ *******************************************************************************
+ */
+   private final LinkedList <ArrayList <String>> myCellRows;
+@
+
+
+1.3
+log
+@//=== ==> /////
+@
+text
+@d6 1
+a6 1
+package       com.ibm.witm;
+@
+
+
+1.2
+log
+@Various revisions.
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d24 1
+a24 1
+//==============================================================================
+d26 1
+a26 1
+//==============================================================================
+d62 1
+a62 1
+//==============================================================================
+d64 1
+a64 1
+//==============================================================================
+d259 1
+a259 1
+//==============================================================================
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a7 2
+import static com.ibm.witm.Utility.*;
+
+@
+
+
+1.1.1.1
+log
+@Renaming WIT-ML to WIT-M.
+
+@
+text
+@@

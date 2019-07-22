@@ -1,0 +1,195 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2004.11.08.23.23.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.04.44.11;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Fixed up to recognize and test for records with duplicate keys.
+@
+text
+@#ifndef ECCmaterialAttributesFile_h
+#define ECCmaterialAttributesFile_h
+
+#include "scoFile.h"
+
+
+class ECCmaterialAttributesFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(material);
+  getIntFieldH(period);
+  getFloatFieldH(supply);
+  
+  // preferred constructor
+  ECCmaterialAttributesFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("mtm");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(3);
+    commentRecords(true);
+    
+    // don't normally call initialize here, but doing this for eastman
+    // to make sure duplicate records are found.
+    initialize();  
+  };
+  
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & material,
+    int period) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = material+uniqueString()+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ECCmaterialAttributesFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ECCmaterialAttributesFile file("../data/example1/materialAttributes.csv");
+    
+    // Test reading first record
+    assert( file.material(0) == "CG_AC20" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.supplyAsFloat(0) == 549. );
+
+    assert( file.material(2) == "CG_AC20" );
+    assert( file.periodAsInt(2) == 3 );
+    assert( file.supplyAsFloat(2) == 549. );
+
+    // Test reading record by key    
+    assert( file.supplyAsFloat(file.key("CG_Acid",4)) == 1293.f );
+
+    int nr = file.numRecords();
+    assert( nr == 10 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      material(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ECCmaterialAttributesFile();
+  
+  // copy constructor  -- don't use!
+  ECCmaterialAttributesFile( const ECCmaterialAttributesFile& source );
+  
+  // assignment operator -- don't use!
+  ECCmaterialAttributesFile&
+  operator=(const ECCmaterialAttributesFile& rhs);
+
+  
+};
+
+
+
+class ECCmaterialAttributesFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  
+  getFieldFileWithIteratorH(material);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(supply);
+  
+  // preferred constructor
+  ECCmaterialAttributesFileIterator(const ECCmaterialAttributesFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ECCmaterialAttributesFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ECCmaterialAttributesFile file("../data/example1/materialAttributes.csv");
+    ECCmaterialAttributesFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.material() == "CG_AC20" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.supplyAsFloat() == 549. );
+      }   
+      else if ( recNo == 1 ) {
+        assert( fileIter.material() == "CG_AC20" );
+        assert( fileIter.periodAsInt() == 2 );
+        assert( fileIter.supplyAsFloat() == 549. );
+           
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ECCmaterialAttributesFileIterator();
+  
+  // copy constructor  -- don't use!
+  ECCmaterialAttributesFileIterator( const ECCmaterialAttributesFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ECCmaterialAttributesFileIterator&
+  operator=(const ECCmaterialAttributesFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.1
+log
+@added materialAttributesFile and materialFile
+@
+text
+@d28 4
+@
+

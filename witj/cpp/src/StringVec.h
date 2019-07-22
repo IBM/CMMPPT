@@ -1,0 +1,88 @@
+//------------------------------------------------------------------------------
+// WIT-J C++ Header File StringVec.h.
+//
+// Contains the declaration of class StringVec.
+//------------------------------------------------------------------------------
+
+#ifndef StringVec_h
+#define StringVec_h
+
+#include <Includes.h>
+
+#include   <vector>
+
+//------------------------------------------------------------------------------
+// Class StringVec
+//
+// "String Vector"
+// Represents a vector of strings.
+//------------------------------------------------------------------------------
+
+namespace WitJ
+{
+class StringVec
+   {
+   //---------------------------------------------------------------------------
+   // Public member functions.
+   //---------------------------------------------------------------------------
+
+   public:
+
+   explicit StringVec ();
+      //
+      // Constructor.
+
+   ~StringVec ();
+      //
+      // Destructor.
+
+   void resize (int theLength);
+      //
+      // Resizes this StringVec to length theLength.
+
+   void resizeAt (int theIdx, int theLength);
+      //
+      // Resizes the vector that stores the string at theIdx to accommodate a
+      // string of length theLength.
+      // Stores a null string at theIdx.
+
+   char * operator[] (int theIdx);
+      //
+      // Returns the vector that stores the string at theIdx.
+
+   const char * const * getCStringCVec () const;
+      //
+      // Returns the c-vector of c-strings stored by this StringVec.
+
+   int getLength () const;
+      //
+      // Returns the length of the vector of strings stored by this StringVec.
+
+   //---------------------------------------------------------------------------
+   // Private member functions.
+   //---------------------------------------------------------------------------
+
+   private:
+
+   void clear ();
+      //
+      // Makes this StringVec into an empty vector.
+
+   StringVec              (const StringVec &);
+   StringVec & operator = (const StringVec &);
+      //
+      // Not implemented; prevents accidental copying and assignment.
+
+   //---------------------------------------------------------------------------
+   // Private member data.
+   //---------------------------------------------------------------------------
+
+   std::vector <char *> myCStringVec_;
+      //
+      // The vector of c-strings owned by this StringVec.
+   };
+};
+//
+// End of namespace WitJ.
+
+#endif

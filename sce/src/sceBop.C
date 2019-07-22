@@ -1,0 +1,386 @@
+
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+// file: sceBop.C
+// author: tom & robin 
+
+#include <sce/src/sceBop.h>
+#include <sce/src/bopAData.h>
+#include <sce/src/sceDefin.h>
+#include <scenario/src/machdep.h> // for "portableFree"
+#include <math.h> // for fabs
+
+// RW2STL - implement (RWGVector, LgFrSceBop)
+
+// RW2STL - implement (RWGOrderedVector, LgFrSceBop)
+
+
+// a better constructor 
+LgFrSceBop::LgFrSceBop(float defaultPreference,
+                                     int defaultEarly,
+                                     int defaultLate,
+                                     std::string & defaultOpName,
+                                     int defaultBopIndex )
+  :   preference_ (defaultPreference),
+      early_ (defaultEarly),
+      late_ (defaultLate),
+      opName_ (defaultOpName),
+      bopIndex_ (defaultBopIndex)
+{
+  // all the work is done in initializer
+}
+
+// default constructor 
+LgFrSceBop::LgFrSceBop()
+  :   preference_ (0.0), 
+      early_ (0),
+      late_ (0),
+      opName_ (""),
+      bopIndex_ (0)
+{
+  // use the prefered constructor instead.
+}
+
+// get "preference" 
+const
+float
+LgFrSceBop::preference () const
+{
+  return preference_;
+}
+
+
+// set "preference"
+void
+LgFrSceBop::preference (const float pref)
+{                                                  
+  preference_ = pref ;
+}
+
+// get "early" 
+const
+int
+LgFrSceBop::early () const
+{
+  return early_;
+}
+
+// set "early"
+void
+LgFrSceBop::early (const int earliestPeriod)
+{                                                  
+  early_ = earliestPeriod ;
+}
+
+// get "late" 
+const
+int
+LgFrSceBop::late () const
+{
+  return late_;
+}
+
+// set "late"
+void
+LgFrSceBop::late (const int latestPeriod)
+{                                                  
+  late_ = latestPeriod ;
+}
+
+
+// get "opName"
+const
+std::string&
+LgFrSceBop::opName () const
+{
+  return opName_;
+}
+
+// set "opName"
+void
+LgFrSceBop::opName (const std::string & operationName)
+{                                                  
+  opName_ = operationName ;
+}
+
+
+// get "bopIndex" 
+const
+int
+LgFrSceBop::bopIndex () const
+{
+  return bopIndex_;
+}
+
+// set "bopIndex"
+void
+LgFrSceBop::bopIndex (const int bopIndexNumber)
+{                                                  
+  bopIndex_ = bopIndexNumber ;
+}
+
+// Split the specified bop at the given date.
+// The specified bop becomes the early "half" and 
+// the later "half" is returned as a new bop.
+// The bop is split both in WIT and in the object.
+LgFrSceBop 
+LgFrSceBop::splitBop ( WitRun * const theWitRun,
+                       int endingDateOfFirstHalf)
+{
+  int nBops;
+  witBoolean expAllowed;
+  float * offset;
+  float prodRate;
+  char * producedPartName;
+  LgFrSceBopAppData * bopAppDataPtr = 0 ;
+  
+  // copy wit bop entry to create a wit bop for the "later" half
+  witGetOperationNBopEntries ( theWitRun, opName_.c_str(), & nBops );
+  witGetBopEntryAppData ( theWitRun, opName_.c_str(), bopIndex_, (void **) & bopAppDataPtr );
+  witGetBopEntryExpAllowed ( theWitRun, opName_.c_str(), bopIndex_, & expAllowed );
+  witGetBopEntryOffset ( theWitRun, opName_.c_str(), bopIndex_, & offset );
+  witGetBopEntryProdRate ( theWitRun, opName_.c_str(), bopIndex_, & prodRate );
+  witGetBopEntryProducedPart ( theWitRun, opName_.c_str(), bopIndex_, & producedPartName );
+
+  witAddBopEntry ( theWitRun, opName_.c_str(), producedPartName );
+
+  // the new bop needs it's own copy of the bop AppData...
+  LgFrSceBopAppData * bopAppDataCopy = new LgFrSceBopAppData ( *bopAppDataPtr );
+  witSetBopEntryAppData ( theWitRun, opName_.c_str(), nBops, (void *) bopAppDataCopy ) ;
+  witSetBopEntryExpAllowed ( theWitRun, opName_.c_str(), nBops, expAllowed ) ;
+  int beginDateOfSecondHalf = endingDateOfFirstHalf + 1 ;
+  witSetBopEntryEarliestPeriod ( theWitRun, opName_.c_str(), nBops, beginDateOfSecondHalf ) ;
+  witSetBopEntryLatestPeriod ( theWitRun, opName_.c_str(), nBops, late_ ) ;
+  witSetBopEntryOffset ( theWitRun, opName_.c_str(), nBops,  offset );
+  witSetBopEntryProdRate ( theWitRun, opName_.c_str(), nBops,  prodRate );
+
+  
+  // shrink original wit bop entry down to just the "early" half
+  witSetBopEntryLatestPeriod ( theWitRun, opName_.c_str(), bopIndex_, endingDateOfFirstHalf ) ;
+
+  // copy the original sce bop object to create the "later" sce bop object
+  // shrink the orginal sce bop object down to just the "early" half
+  LgFrSceBop newBop( preference_, beginDateOfSecondHalf, late_, opName_, nBops );
+  late_ = endingDateOfFirstHalf;
+
+  portableFree ( offset );
+  portableFree ( producedPartName );
+
+  return ( newBop);
+
+}
+
+// assignment operator
+LgFrSceBop&
+LgFrSceBop::operator=(const LgFrSceBop& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    preference_ = rhs.preference_;
+    early_ = rhs.early_;
+    late_ = rhs.late_;
+    opName_ = rhs.opName_;
+    bopIndex_ = rhs.bopIndex_;
+
+  }
+  return *this;
+}
+
+// copy constructor 
+LgFrSceBop::LgFrSceBop(const LgFrSceBop& source)
+  :   preference_ (source.preference_),
+      early_ (source.early_),
+      late_ (source.late_),
+      opName_ (source.opName_),
+      bopIndex_ (source.bopIndex_)
+{
+  // nothing to do
+}
+
+// destructor
+LgFrSceBop::~LgFrSceBop()
+{
+  // nothing to do, 
+}
+
+// == operator
+int
+LgFrSceBop::operator==(const LgFrSceBop& rhs)
+{
+  return this->bopIndex() == rhs.bopIndex();
+}
+
+
+// ============================
+// SCE Part SetOfBops Class
+// ============================
+
+  
+// copy constructor
+LgFrScePartSetOfBops::LgFrScePartSetOfBops(const LgFrScePartSetOfBops& source)
+  : setOfBops_(source.setOfBops_)
+{
+  // nothing to do
+}
+
+// destructor
+LgFrScePartSetOfBops::~LgFrScePartSetOfBops()
+{
+  // nothing to do
+}
+
+// default constructor
+LgFrScePartSetOfBops::LgFrScePartSetOfBops()
+{
+  // DO NOT INVOKE
+  assert (1 == 0); // don't use this constructor
+}
+
+// better constructor constructor
+// This constructor automatically populates the setOfBops for
+// the given partname
+LgFrScePartSetOfBops::LgFrScePartSetOfBops(WitRun * const theWitRun,
+                                           std::string & partName)
+  : setOfBops_()
+{
+  // this is a bit tricky because you need to manually
+  // put them in order using the RWOrderedVector's insertAt.
+  // So its a linear insertion, but who cares, there won't be that many
+  // bop entries
+
+  // The  sorted insertion of  witBops into the setOfBops.
+  // If there are ties, it puts the witBop after the sceBop thats already
+  // in the setOfBops (ie, breaks ties via witBopIndex).  
+  // NOTE: don't need to new one.  Because when you insert, a copy is
+  // made.
+  assert(setOfBops_.size() == 0);
+
+  int  nBops;
+  witGetPartNProducingBopEntries (theWitRun, partName.c_str(), &nBops);
+  
+  // for each bop entry, create an instance of the bop class.
+  int j = 0; // Pulled out of the for below by RW2STL
+  for (j=0; j<nBops; j++) {
+    char *  operationName;
+    int bopIndex;
+    float pref;
+    int earliest;
+    int latest;
+
+    LgFrSceBopAppData * bopAppDataPtr = 0 ;
+    
+    witGetPartProducingBopEntry ( theWitRun, partName.c_str(), j, &operationName, &bopIndex );
+    witGetBopEntryEarliestPeriod ( theWitRun, operationName, bopIndex, &earliest );
+    witGetBopEntryLatestPeriod ( theWitRun, operationName, bopIndex, &latest );
+    witGetBopEntryAppData ( theWitRun, operationName, bopIndex, (void**) &bopAppDataPtr );
+    if ( bopAppDataPtr == 0 )
+      pref = 1.0 ;
+    else
+      pref = bopAppDataPtr->preference();
+    
+    // create a bop object (off the stack)
+    std::string opName (operationName); 
+    LgFrSceBop sceBop(pref, earliest, latest, opName, bopIndex);      
+    
+    
+    // now insert it into the ordered vector
+    size_t bopCounter = 0;
+    while ((bopCounter < setOfBops_.size())
+           &&
+           (pref >= setOfBops_[bopCounter].preference())) {
+      bopCounter++;
+    }
+    setOfBops_.insert(setOfBops_.begin() + bopCounter, sceBop);
+
+
+
+
+    portableFree(operationName);
+  }
+  
+}
+
+  // Here's how you get access to one of the Bops as a reference!
+  // from here you can modify at your leisure via splitBop()
+LgFrSceBop &
+LgFrScePartSetOfBops::operator[](size_t i)
+{
+  return setOfBops_[i];
+}
+
+  
+
+// assignment operator
+LgFrScePartSetOfBops&
+LgFrScePartSetOfBops::operator=(const LgFrScePartSetOfBops& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    setOfBops_ = rhs.setOfBops_ ;
+  }
+  return *this;
+  // nothing to do
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+  
+
+// test method 
+void
+LgFrScePartSetOfBops::test()
+{
+  float pref = 3.0;
+  int earliest = 0;
+  int latest = 4;  
+  std::string opName ("operationName");
+  int bopIndex = 0;
+
+  int size = setOfBops_.size();
+  
+  LgFrSceBop sceTestBop(pref, earliest, latest, opName, bopIndex);
+  // now insert sceTestBop into the ordered vector
+  size_t bopCounter = 0;
+  while ((bopCounter < setOfBops_.size())
+         &&
+         (pref >= setOfBops_[bopCounter].preference())) {
+    bopCounter++;
+    }
+  setOfBops_.insert(setOfBops_.begin()+bopCounter, sceTestBop);
+  
+    // =======================================
+    // now a bit of testing and asserting ....
+    // this can be deleted when its all working
+    //
+    // 1: should be size+1 things in the set
+    assert(setOfBops_.size() == size+1);
+    // 2: preference should be the same
+    assert(fabs(setOfBops_[bopCounter].preference() - pref)                    < 0.001);
+    assert(fabs(setOfBops_[bopCounter].preference() - sceTestBop.preference())     < 0.001);
+    assert(fabs(this->setOfBops_[bopCounter].preference() - pref)                        < 0.001);
+    // 3: earliest should be the same
+    assert(setOfBops_[bopCounter].early() == earliest);
+    assert(setOfBops_[bopCounter].early() == sceTestBop.early());
+    assert(this->setOfBops_[bopCounter].early() == earliest);
+    // 4: OK, now try to change one.  (I THINK I FOUND THE ERROR ...)
+    // first work directly on the reference ...
+    (*this)[bopCounter].early(135);
+    assert(setOfBops_[bopCounter].early() == 135);
+    assert((*this)[bopCounter].early() == 135);
+    // now index into the set and get a local copy of the sceBop
+    // if we change this, it does not change the one in the set!!!
+    // here's the local copy ...
+    LgFrSceBop myLocalCopyOfBopInSet = (*this)[bopCounter];
+    // change early of local copy ...
+    myLocalCopyOfBopInSet.early(111);
+    // see, if this assert passes, it means we did NOT chnage the sceBop in the Set.
+    assert((*this)[bopCounter].early() == 135);
+    // now change it back to its original value ...
+    (*this)[bopCounter].early(earliest);
+    assert((*this)[bopCounter].early() == earliest);
+    // =======================================    
+  
+}
+

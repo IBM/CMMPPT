@@ -1,0 +1,330 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2009.01.21.21.43.23;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2009.01.20.22.05.02;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.01.16.21.11.47;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.01.16.20.55.48;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.01.16.19.42.43;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.01.16.19.09.00;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.01.16.18.49.18;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.01.16.17.03.35;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Change the names of the ProbMgr classes to Coordinator, etc.
+@
+text
+@//------------------------------------------------------------------------------
+// WIT-J C++ Source File ProbMgr.C.
+//
+// Contains the implementation of class ProbMgr.
+//------------------------------------------------------------------------------
+
+#include       <ProbMgr.h>
+#include <GlobalElement.h>
+#include      <CTVecRes.h>
+#include     <Extractor.h>
+
+#include           <wit.h>
+
+//------------------------------------------------------------------------------
+
+WitJ::ProbMgr::ProbMgr ():
+
+      JavaAccObj       (this),
+      myProblem_       (NULL),
+      myWitRun_        (NULL),
+      myGlobalElement_ (NULL),
+      myCTVecRes_      (NULL),
+      myExtractor_     (NULL)
+   {
+   witNewRun (& myWitRun_);
+
+   myExtractor_ = new Extractor (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::ProbMgr::~ProbMgr ()
+   {
+   delete myExtractor_;
+   delete myCTVecRes_;
+
+   witDeleteRun (myWitRun_);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::ProbMgr * WitJ::ProbMgr::asProbMgr ()
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ProbMgr::store (Problem * theProblem)
+   {
+   myProblem_ = theProblem;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ProbMgr::store (GlobalElement * theGlobalElement)
+   {
+   EXCEPTION_ASSERT (myGlobalElement_ == NULL);
+   EXCEPTION_ASSERT (theGlobalElement != NULL);
+
+   EXCEPTION_ASSERT (theGlobalElement->getProbMgr () == this);
+
+   myGlobalElement_ = theGlobalElement;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ProbMgr::freezeNPeriods ()
+   {
+   myCTVecRes_ = new CTVecRes (myGlobalElement_->getNPeriods ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::Part * WitJ::ProbMgr::findPart (const char * thePartName)
+   {
+   void * theAppData;
+
+   witGetPartAppData (myWitRun_, thePartName, & theAppData);
+
+   return static_cast <Part *> (theAppData);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::Operation * WitJ::ProbMgr::findOperation (const char * theOpnName)
+   {
+   void * theAppData;
+
+   witGetOperationAppData (myWitRun_, theOpnName, & theAppData);
+
+   return static_cast <Operation *> (theAppData);
+   }
+
+//------------------------------------------------------------------------------
+
+WitJ::BomEntry * WitJ::ProbMgr::findBomEntry (
+      const char * theOpnName,
+      int          theBomIndex)
+   {
+   void * theAppData;
+
+   witGetBomEntryAppData (
+      myWitRun_,
+      theOpnName,
+      theBomIndex,
+    & theAppData);
+
+   return static_cast <BomEntry *> (theAppData);
+   }
+@
+
+
+1.7
+log
+@Continued implementation of the ProbMgr classes.
+@
+text
+@@
+
+
+1.6
+log
+@ProbMgr classes.
+@
+text
+@d12 2
+d18 6
+a23 7
+      JavaAccObj          (this),
+      myProblem_          (NULL),
+      myWitRun_           (NULL),
+      myGlobalElement_    (NULL),
+      myCTVecRes_         (NULL),
+      myExtractor_        (NULL),
+      mySimpleWitFuncMap_ ()
+a27 2
+
+   defineAllSimpleWitFuncs ();
+a74 16
+void WitJ::ProbMgr::callSimpleWitFunc (const char * theFuncName)
+   {
+   std::map <std::string, SimpleWitFunc>::iterator theItr;
+   SimpleWitFunc                                   theFunc;
+
+   theItr = mySimpleWitFuncMap_.find (theFuncName);
+
+   EXCEPTION_ASSERT (theItr != mySimpleWitFuncMap_.end ());
+
+   theFunc = theItr->second;
+
+   theFunc (myWitRun_);
+   }
+
+//------------------------------------------------------------------------------
+
+a110 36
+
+//------------------------------------------------------------------------------
+
+void WitJ::ProbMgr::defineAllSimpleWitFuncs ()
+   {
+   defineSimpleWitFunc ("witBuildPip",           witBuildPip);
+   defineSimpleWitFunc ("witClearPegging",       witClearPegging);
+   defineSimpleWitFunc ("witClearPipSeq",        witClearPipSeq);
+   defineSimpleWitFunc ("witClearStochSoln",     witClearStochSoln);
+   defineSimpleWitFunc ("witEvalObjectives",     witEvalObjectives);
+   defineSimpleWitFunc ("witFinishExtOpt",       witFinishExtOpt);
+   defineSimpleWitFunc ("witFinishHeurAlloc",    witFinishHeurAlloc);
+   defineSimpleWitFunc ("witGeneratePriorities", witGeneratePriorities);
+   defineSimpleWitFunc ("witHeurImplode",        witHeurImplode);
+   defineSimpleWitFunc ("witMrp",                witMrp);
+   defineSimpleWitFunc ("witOptImplode",         witOptImplode);
+   defineSimpleWitFunc ("witPreprocess",         witPreprocess);
+   defineSimpleWitFunc ("witPostprocess",        witPostprocess);
+   defineSimpleWitFunc ("witPurgeData",          witPurgeData);
+   defineSimpleWitFunc ("witShutDownExtOpt",     witShutDownExtOpt);
+   defineSimpleWitFunc ("witShutDownHeurAlloc",  witShutDownHeurAlloc);
+   defineSimpleWitFunc ("witStartExtOpt",        witStartExtOpt);
+   defineSimpleWitFunc ("witStartHeurAlloc",     witStartHeurAlloc);
+   defineSimpleWitFunc ("witStochImplode",       witStochImplode);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitJ::ProbMgr::defineSimpleWitFunc (
+      const char *  theFuncName,
+      SimpleWitFunc theFunc)
+   {
+   EXCEPTION_ASSERT (mySimpleWitFuncMap_.count (theFuncName) == 0);
+
+   mySimpleWitFuncMap_[theFuncName] = theFunc;
+   }
+@
+
+
+1.5
+log
+@ProbMgr classes.
+@
+text
+@d92 39
+@
+
+
+1.4
+log
+@ProbMgr classes.
+@
+text
+@a11 2
+#include           <wit.h>
+
+d16 7
+a22 6
+      JavaAccObj       (this),
+      myProblem_       (NULL),
+      myWitRun_        (NULL),
+      myGlobalElement_ (NULL),
+      myCTVecRes_      (NULL),
+      myExtractor_     (NULL)
+d27 2
+d73 52
+@
+
+
+1.3
+log
+@ProbMgr classes.
+@
+text
+@d10 1
+d22 2
+a23 1
+      myCTVecRes_      (NULL)
+d26 2
+d34 1
+@
+
+
+1.2
+log
+@ProbMgr classes.
+@
+text
+@d9 1
+d20 2
+a21 1
+      myGlobalElement_ (NULL)
+d30 2
+d60 7
+@
+
+
+1.1
+log
+@Change the mname of the ProbCtr classes to ProbMgr in both Java and C++.
+@
+text
+@d7 2
+a8 1
+#include <ProbMgr.h>
+d10 1
+a10 1
+#include     <wit.h>
+d16 4
+a19 3
+      JavaAccObj (this),
+      myProblem_ (NULL),
+      myWitRun_  (NULL)
+d44 12
+@
+

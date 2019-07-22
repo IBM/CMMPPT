@@ -1,0 +1,363 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.06.05.19.48.20;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2003.05.30.22.41.04;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.05.30.18.19.13;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Continued implementation of opt with COIN.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef OsiSolverIH
+#define OsiSolverIH
+
+//------------------------------------------------------------------------------
+// Header file: "OsiSolverI.h"
+//
+// Contains the main and dummy implementations of class OsiSolver.
+//
+// This file is included by CoinSolver.C and no other file.
+//------------------------------------------------------------------------------
+
+#include <OsiSolver.h>
+#include <OptModel.h>
+#include <OptCon.h>
+#include <OptVar.h>
+#include <OptImp.h>
+#include <OptStarter.h>
+#include <OptComp.h>
+#include <MsgFac.h>
+#include <Timing.h>
+
+#ifdef OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// Main implementation of class OsiSolver.
+//------------------------------------------------------------------------------
+
+#if USE_COIN
+
+#include <coin/OsiSolverInterface.hpp>
+
+//------------------------------------------------------------------------------
+
+WitOsiSolver::WitOsiSolver (WitOptModel * theOptModel):
+
+      WitOptSolver (theOptModel)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOsiSolver::~WitOsiSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passFixedModel ()
+   {
+   WitVector <int>    indexRow;
+   WitVector <int>    startOfEachColumn;
+   WitVector <double> elements;
+
+   WitTimer::enterSection ("model");
+
+   myOptModel ()->defMatrixByCols (indexRow, startOfEachColumn, elements);
+
+   WitTimer::leaveSection ("model");
+
+   myOsiSI ()->loadProblem (
+      myOptModel ()->nOptVars (),
+      myOptModel ()->nOptCons (),
+      startOfEachColumn.myCvector (),
+      indexRow.myCvector (),
+      elements.myCvector (),
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL);
+      
+   myOsiSI ()->setObjSense (-1.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passFlexibleModel ()
+   {
+   passConBounds ();
+   passVarBounds ();
+   passObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::writeMps ()
+   {
+   if (myOptImploder ()->printMps ())
+      {
+      myMsgFac () ("mpsFileMsg");
+
+      myOsiSI ()->writeMps ("model", "mps");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passInitSoln ()
+   {
+   WitVector <double> initSoln;
+   WitOptVar *        theVar;
+   
+   if (not myOptComp ()->optInitMethod ()->external ())
+      return;
+
+   initSoln.resize (myOptModel ()->nOptVars (), 0.0);
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      initSoln[theVar->index ()] = theVar->primalValue ();
+
+   WitTimer::leaveSection ("model");
+
+   myOsiSI ()->setColSolution (initSoln.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::storePrimalSoln ()
+   {
+   const double * primalSoln;
+   WitOptVar *    theVar;
+
+   primalSoln = myOsiSI ()->getColSolution ();
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theVar, myOptModel ()->myOptVars ())
+      theVar->setPrimalValue (primalSoln[theVar->index ()]);
+
+   WitTimer::leaveSection ("model");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::storeDualSoln ()
+   {
+   const double * dualSoln;
+   WitOptCon *    theCon;
+
+   dualSoln = myOsiSI ()->getRowPrice ();
+
+   WitTimer::enterSection ("model");
+
+   forEachEl (theCon, myOptModel ()->myOptCons ())
+      theCon->setDualValue (- dualSoln[theCon->index ()]);
+
+   WitTimer::leaveSection ("model");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passConBounds ()
+   {
+   int                nCons;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptCon *        theOptCon;
+   int                conIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nCons = myOptModel ()->nOptCons ();
+
+   indexVec.resize (nCons + 1);
+   boundVec.resize (nCons * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptCon, myOptModel ()->myOptCons ())
+      {
+      conIdx = theOptCon->index ();
+
+      witAssert (bndIdx == conIdx * 2);
+
+      indexVec[conIdx]     = conIdx;
+
+      boundVec[bndIdx]     = theOptCon->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptCon->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiSI ()->setRowSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nCons,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passVarBounds ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> boundVec;
+   WitOptVar *        theOptVar;
+   int                varIdx;
+   int                bndIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   boundVec.resize (nVars * 2);
+
+   bndIdx = 0;
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      varIdx = theOptVar->index ();
+
+      witAssert (bndIdx == varIdx * 2);
+
+      indexVec[varIdx]     = varIdx;
+
+      boundVec[bndIdx]     = theOptVar->bounds ().lower ();
+      boundVec[bndIdx + 1] = theOptVar->bounds ().upper ();
+
+      bndIdx += 2;
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiSI ()->setColSetBounds (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      boundVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOsiSolver::passObjCoeffs ()
+   {
+   int                nVars;
+   WitVector <int>    indexVec;
+   WitVector <double> objVec;
+   WitOptVar *        theOptVar;
+   int                theIdx;
+
+   WitTimer::enterSection ("model");
+
+   nVars = myOptModel ()->nOptVars ();
+
+   indexVec.resize (nVars + 1);
+   objVec  .resize (nVars);
+
+   forEachEl (theOptVar, myOptModel ()->myOptVars ())
+      {
+      theIdx           = theOptVar->index ();
+
+      indexVec[theIdx] = theIdx;
+
+      objVec  [theIdx] = static_cast <double> (theOptVar->mainObjCoeffVal ());
+      }
+
+   WitTimer::leaveSection ("model");
+
+   myOsiSI ()->setObjCoeffSet (
+      indexVec.myCvector (),
+      indexVec.myCvector () + nVars,
+      objVec.myCvector ());
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // USE_COIN
+
+//------------------------------------------------------------------------------
+// Dummy implementation of class OsiSolver.
+//------------------------------------------------------------------------------
+
+#if ! USE_COIN
+
+//------------------------------------------------------------------------------
+
+WitOsiSolver::WitOsiSolver (WitOptModel * theOptModel):
+
+      WitOptSolver (theOptModel)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOsiSolver::~WitOsiSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+#endif // Not USE_COIN
+
+//------------------------------------------------------------------------------
+
+#endif // OPT_IMPLODE
+
+#endif
+@
+
+
+1.2
+log
+@Continued implementation of opt with COIN.
+@
+text
+@@
+
+
+1.1
+log
+@Continued implementation of opt with COIN.
+@
+text
+@d23 6
+d82 195
+@
+

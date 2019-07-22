@@ -1,0 +1,562 @@
+head	1.2;
+access;
+symbols
+	beforeTiersAdded:1.2
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2002.03.06.21.15.42;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Moved substitution back down below home/remote site operations.
+Added code to peg home and remote site usage to a portfolio as a postProcess step.
+@
+text
+@#ifndef GRAppData_h
+#define GRAppData_h
+
+#include <vector>
+#include <map>
+
+class GRappData  {
+public:
+  virtual GRappData * clone() const = 0;
+
+  // destructor
+  virtual ~GRappData(){};
+
+protected:
+  
+  // constructor
+  GRappData(){};
+  
+  // copy constructor
+  GRappData( const GRappData& source ){};
+  
+  // assignment operator
+  GRappData & operator=(const GRappData& rhs)
+  {  
+    if (this != &rhs) {        
+    // nothing to do here
+    }
+    return *this;
+  }
+  
+  // Self-test
+  //static void test();
+
+  static void setVector(int len, const float * inputVec, std::vector<float> & outputVec )
+  {
+    int i;
+    for ( i=0; outputVec.size()<len; ++i ) outputVec.push_back(0.0);
+    for ( i=0; i<len; ++i ) outputVec[i] = inputVec[i];
+  };
+  
+  static void setVector(int len, float inputScalar, std::vector<float> & outputVec )
+  {
+    int i;
+    for ( i=0; outputVec.size()<len; ++i ) outputVec.push_back(0.0);
+    for ( i=0; i<len; ++i ) outputVec[i] = inputScalar;
+  };
+
+  //v2=v2+v1
+  static void addVector(const std::vector<float> & v1, std::vector<float> & v2)
+  { 
+    assert(v1.size()==v2.size());
+    for (int t=0; t<v1.size(); t++) v2[t]+=v1[t];
+  };
+
+};
+
+
+
+class GRportLocOpAppData : public GRappData {
+public:
+  
+
+  const std::vector<float> & unitConsVol() const { return unitConsVol_; };
+  void unitConsVol(int len, const float * unitConsVol ) { setVector( len, unitConsVol, unitConsVol_ ); }; 
+  void unitConsVol(int len, float unitConsVol ) { setVector( len, unitConsVol, unitConsVol_ ); }; 
+  void unitConsVol(const std::vector<float> & unitConsVol ) { unitConsVol_=unitConsVol; }; 
+  void addToUnitConsVol( const std::vector<float> & unitConsVol ) { addVector(unitConsVol,unitConsVol_); };
+  
+  float unitExecCost() const { return unitExecCost_; };
+  void unitExecCost(float unitExecCost ) { unitExecCost_=unitExecCost; };
+
+  // the specified resource has consVol for this operation,
+  // so save these amounts.
+  // This is used by postProcessing
+  void addConsVol(const std::string & resource, std::vector<float> & consVol )
+  {
+    std::map< std::string, std::vector<float> >::iterator it;
+    it=consVolMap_.find(resource);
+    if ( it==consVolMap_.end() ) {
+      // Resource has not yet been added to map, so insert it now
+      consVolMap_.insert(std::map< std::string, std::vector<float> >::value_type(resource,consVol));
+    }
+    else {
+      // Resource was previously added to map, so its consVol
+      for ( int t=0; t<consVol.size(); t++ ) {
+        (*it).second[t]+=consVol[t];
+      }
+    }
+  };
+  void addConsVol(const std::string & resource, int numPeriods, int period, float consVol )
+  {
+    std::vector<float> cv;
+    for ( int t=0; t<numPeriods; t++ ) cv.push_back(0.0);
+    assert( period<numPeriods );
+    cv[period]=consVol;
+    addConsVol(resource,cv);
+  };
+
+  // Get list of all resources consumed in solution and their associated consVol
+  void consVol( 
+    std::vector<std::string> & resources, 
+    std::vector< std::vector<float> > & consVols ) const
+  {
+    resources.clear();
+    consVols.clear();
+    std::map< std::string, std::vector<float> >::const_iterator it;
+    for ( it=consVolMap_.begin(); it!=consVolMap_.end(); it++ ) {
+      std::string r=(*it).first;
+      std::vector<float> cv=(*it).second;
+      assert( cv.size()>0 );
+      resources.push_back(r);
+      consVols.push_back(cv);
+    }
+    assert(resources.size()==consVols.size());
+  };
+
+  void clear()
+  {
+    unitExecCost_ = 0.0;
+    unitConsVol_.clear();
+    consVolMap_.clear();
+  }
+   
+  // default constructor
+  GRportLocOpAppData()
+    :
+    unitExecCost_(0.0),unitConsVol_(),consVolMap_(){};
+  
+  // destructor
+  virtual ~GRportLocOpAppData(){};
+  
+  // copy constructor
+  GRportLocOpAppData( const GRportLocOpAppData& source ):
+  GRappData(source),
+    unitExecCost_(source.unitExecCost_),
+    unitConsVol_(source.unitConsVol_),
+    consVolMap_(source.consVolMap_)
+  {};
+  
+  // assignment operator
+  GRportLocOpAppData&
+    operator=(const GRportLocOpAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRportLocOpAppData::operator=(rhs);
+      unitExecCost_ = rhs.unitExecCost_;
+      unitConsVol_ = rhs.unitConsVol_;
+      consVolMap_ = rhs.consVolMap_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRportLocOpAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+  
+  // Cost of doing portfolio at location assuming no subs used.
+  // computed during preprocessing
+  float unitExecCost_;
+
+  // Number of resources consumed when doing portfolio at location assuming no subs used.
+  // computed during preprocessing
+  std::vector<float> unitConsVol_;
+
+  // Resources consumed by portfolio at location in solution.
+  // This is computed during postprocessing
+  std::map< std::string, std::vector<float> > consVolMap_;
+  
+};
+
+
+#if 0
+class GRmtmAppData : public GRappData {
+public:
+  
+  double mtmSalePrice() const { return mtmSalePrice_; };
+  void mtmSalePrice(float sc) { mtmSalePrice_ = sc; };
+
+  double mtmNibPrice() const { return mtmNibPrice_; };
+  void mtmNibPrice(float sc) { mtmNibPrice_ = sc; };
+  
+  // default constructor
+  GRmtmAppData()
+    :mtmSalePrice_(0.0),
+    mtmNibPrice_(0.0)
+  {};
+  
+  // destructor
+  virtual ~GRmtmAppData(){};
+  
+  // copy constructor
+  GRmtmAppData( const GRmtmAppData& source ):
+  GRappData(source),
+    mtmSalePrice_(source.mtmSalePrice_),
+    mtmNibPrice_(source.mtmNibPrice_)
+  {};
+  
+  // assignment operator
+  GRmtmAppData&
+    operator=(const GRmtmAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRappData::operator=(rhs);
+      mtmSalePrice_ = rhs.mtmSalePrice_;
+      mtmNibPrice_ = rhs.mtmNibPrice_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRmtmAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+  
+  float mtmSalePrice_;
+  float mtmNibPrice_;
+  
+};
+#endif
+
+#if 0
+class GRdemandAppData : public GRappData {
+public:
+
+  const std::vector<float> & demQty() const { return demQty_; };
+  void demQty(int len, const float * demQty) 
+  { setVector(len, demQty, demQty_); };
+
+  void setDemQtyElem(int i,float v) { demQty_[i] = v; };
+  
+  // constructor
+  GRdemandAppData(int nPeriods):
+  GRappData(),
+  demQty_()
+  //econCovQty_(),
+  //nonEconCovQty_()
+  {
+    for ( int i=0; i<nPeriods; ++i ) {
+      demQty_.push_back(0.0f);
+      //econCovQty_.push_back(0.0f);
+      //nonEconCovQty_.push_back(0.0f);
+    }
+  };
+  
+  // destructor
+  virtual ~GRdemandAppData(){};
+  
+  // copy constructor
+  GRdemandAppData( const GRdemandAppData& source ):
+  GRappData(source),
+  demQty_(source.demQty_)
+  //econCovQty_(source.econCovQty_),
+  //nonEconCovQty_(source.nonEconCovQty_)
+  {};
+  
+  // assignment operator
+  GRdemandAppData&
+    operator=(const GRdemandAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRappData::operator=(rhs);
+      demQty_ = rhs.demQty_;
+      //econCovQty_ = rhs.econCovQty_;
+      //nonEconCovQty_ = rhs.nonEconCovQty_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRdemandAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+    
+  // default constructor - not to be used
+  GRdemandAppData():
+  GRappData(),
+  demQty_()
+  //econCovQty_(),
+  //nonEconCovQty_()
+  {};
+  
+  std::vector<float> demQty_; 
+  //std::vector<float> econCovQty_;
+  //std::vector<float> nonEconCovQty_;
+  
+  
+};
+#endif
+
+#if 0
+class GRdismantleOpAppData : public GRappData {
+public:
+
+  const std::vector<float> & dismantleQtyEcon() const { return dismantleQtyEcon_; };
+  void dismantleQtyEcon(int len, const float * dismantleQty) 
+  { setVector(len, dismantleQty, dismantleQtyEcon_); };
+
+  const std::vector<float> & dismantleQtyNonEcon() const { return dismantleQtyNonEcon_; };
+  void dismantleQtyNonEcon(int len, const float * dismantleQty) 
+  { setVector(len, dismantleQty, dismantleQtyNonEcon_); };
+
+  // constructor
+  GRdismantleOpAppData(int nPeriods):
+  GRappData(),
+  dismantleQtyEcon_(),
+  dismantleQtyNonEcon_()
+  {
+    for ( int i=0; i<nPeriods; ++i ) {
+      dismantleQtyEcon_.push_back(0.0f);
+      dismantleQtyNonEcon_.push_back(0.0f);
+    }
+  };
+  
+  // destructor
+  virtual ~GRdismantleOpAppData(){};
+  
+  // copy constructor
+  GRdismantleOpAppData( const GRdismantleOpAppData& source ):
+  GRappData(source),
+  dismantleQtyEcon_(source.dismantleQtyEcon_),
+  dismantleQtyNonEcon_(source.dismantleQtyNonEcon_)
+  {};
+  
+  // assignment operator
+  GRdismantleOpAppData&
+    operator=(const GRdismantleOpAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRappData::operator=(rhs);
+      dismantleQtyEcon_ = rhs.dismantleQtyEcon_;
+      dismantleQtyNonEcon_ = rhs.dismantleQtyNonEcon_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRdismantleOpAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+    
+  // default constructor - not to be used
+  GRdismantleOpAppData():
+  GRappData(),
+  dismantleQtyEcon_(),
+  dismantleQtyNonEcon_()
+  {};
+  
+  std::vector<float> dismantleQtyEcon_;  // This is equivalent to WIT's execVol
+  std::vector<float> dismantleQtyNonEcon_; 
+  
+};
+
+
+class GRacquireMtmOpAppData : public GRappData {
+public:
+
+  const std::vector<float> & acquireQtyEcon() const { return acquireQtyEcon_; };
+  void acquireQtyEcon(int len, const float * acquireQty) 
+  { setVector(len, acquireQty, acquireQtyEcon_); };
+
+  const std::vector<float> & acquireQtyNonEcon() const { return acquireQtyNonEcon_; };
+  void acquireQtyNonEcon(int len, const float * acquireQty) 
+  { setVector(len, acquireQty, acquireQtyNonEcon_); };
+
+  // constructor
+  GRacquireMtmOpAppData(int nPeriods):
+  GRappData(),
+  acquireQtyEcon_(),
+  acquireQtyNonEcon_()
+  {
+    for ( int i=0; i<nPeriods; ++i ) {
+      acquireQtyEcon_.push_back(0.0f);
+      acquireQtyNonEcon_.push_back(0.0f);
+    }
+  };
+  
+  // destructor
+  virtual ~GRacquireMtmOpAppData(){};
+  
+  // copy constructor
+  GRacquireMtmOpAppData( const GRacquireMtmOpAppData& source ):
+  GRappData(source),
+  acquireQtyEcon_(source.acquireQtyEcon_),
+  acquireQtyNonEcon_(source.acquireQtyNonEcon_)
+  {};
+  
+  // assignment operator
+  GRacquireMtmOpAppData&
+    operator=(const GRacquireMtmOpAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRappData::operator=(rhs);
+      acquireQtyEcon_ = rhs.acquireQtyEcon_;
+      acquireQtyNonEcon_ = rhs.acquireQtyNonEcon_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRacquireMtmOpAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+    
+  // default constructor - not to be used
+  GRacquireMtmOpAppData():
+  GRappData(),
+  acquireQtyEcon_(),
+  acquireQtyNonEcon_()
+  {};
+  
+  std::vector<float> acquireQtyEcon_;  // This is equivalent to WIT's execVol
+  std::vector<float> acquireQtyNonEcon_;  // This is equivalent to WIT's execVol
+  
+};
+#endif
+
+#if 0
+class GRcombinePartsOpAppData : public GRappData {
+public:
+
+  const std::vector<float> & subsUsageQtyEcon() const { return subsUsageQtyEcon_; };
+  void subsUsageQtyEcon(int len, const float * subsUsageQty) 
+  { setVector(len, subsUsageQty, subsUsageQtyEcon_); };
+
+  const std::vector<float> & subsUsageQtyNonEcon() const { return subsUsageQtyNonEcon_; };
+  void subsUsageQtyNonEcon(int len, const float * subsUsageQty) 
+  { setVector(len, subsUsageQty, subsUsageQtyNonEcon_); };
+
+  // constructor
+  GRcombinePartsOpAppData(int nPeriods):
+  GRappData(),
+  subsUsageQtyEcon_(),
+  subsUsageQtyNonEcon_()
+  {
+    for ( int i=0; i<nPeriods; ++i ) {
+      subsUsageQtyEcon_.push_back(0.0f);
+      subsUsageQtyNonEcon_.push_back(0.0f);
+    }
+  };
+  
+  // destructor
+  virtual ~GRcombinePartsOpAppData(){};
+  
+  // copy constructor
+  GRcombinePartsOpAppData( const GRcombinePartsOpAppData& source ):
+  GRappData(source),
+  subsUsageQtyEcon_(source.subsUsageQtyEcon_),
+  subsUsageQtyNonEcon_(source.subsUsageQtyNonEcon_)
+  {};
+  
+  // assignment operator
+  GRcombinePartsOpAppData&
+    operator=(const GRcombinePartsOpAppData& rhs)
+  {  
+    if (this != &rhs) {        
+      GRappData::operator=(rhs);
+      subsUsageQtyEcon_ = rhs.subsUsageQtyEcon_;
+      subsUsageQtyNonEcon_ = rhs.subsUsageQtyNonEcon_;
+    }
+    return *this;
+  }
+
+  virtual GRappData * clone() const
+  { return (new GRcombinePartsOpAppData(*this));}
+  
+  // Self-test
+  //static void test();
+private:
+    
+  // default constructor - not to be used
+  GRcombinePartsOpAppData():
+  GRappData(),
+  subsUsageQtyEcon_(),
+  subsUsageQtyNonEcon_()
+  {};
+  
+  std::vector<float> subsUsageQtyEcon_;  // This is equivalent to WIT's execVol
+  std::vector<float> subsUsageQtyNonEcon_;  
+};
+#endif
+#endif
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d5 1
+d71 52
+d127 1
+a127 1
+    unitExecCost_(0.0),unitConsVol_(){};
+d136 2
+a137 1
+    unitConsVol_(source.unitConsVol_)
+d148 1
+d160 2
+a161 1
+  // Cost of doing portfolio at location
+d164 2
+a165 1
+  // Number of resources consumed when doing portfolio at location
+d167 4
+@
+
+
+1.1.1.1
+log
+@globalResource import
+@
+text
+@@

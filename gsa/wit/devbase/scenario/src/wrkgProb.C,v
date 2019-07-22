@@ -1,0 +1,2776 @@
+head	1.6;
+access;
+symbols
+	sce_5_01_20080919:1.5
+	latest_sce_4_20_20060523:1.5.0.6
+	sce_4_20_20060523:1.5
+	latest_sce4_20_OSL:1.5.0.4
+	sce_4_20_OSL:1.5
+	sce_4_05_20040511:1.5
+	sce_4_00_20040201:1.5
+	nextGenBranch:1.5.0.2
+	nextGenRoot:1.5
+	sce_3_30_20030627:1.5
+	EndRw-branch:1.4.0.2
+	Root-of-EndRw:1.4
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	UsedBySCE:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.6
+date	2009.12.01.20.19.52;	author ervolina;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.01.15.19.36.48;	author rwToStl;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.12.05.00.35.03;	author fasano;	state Exp;
+branches
+	1.4.2.1;
+next	1.3;
+
+1.3
+date	2002.12.02.17.42.25;	author austel;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.17;	author austel;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.55;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.55;	author wit;	state Exp;
+branches;
+next	;
+
+1.4.2.1
+date	2003.01.08.17.42.38;	author rwToStl;	state Exp;
+branches;
+next	1.4.2.2;
+
+1.4.2.2
+date	2003.01.09.13.54.39;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.6
+log
+@jettison references in scenario to Wit's OBJ2
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <scenario/src/wrkgProb.h>
+
+#include <math.h>
+#include <assert.h>
+
+// Include file needed for testing
+#include <scenario/src/machdep.h>
+#include <scenario/src/usrInMod.h>
+
+// Usefull constants
+const int originalSchedule = 0;		// Used for accessing partSchedules
+const int latestSchedule = 1;		// Used for accessing partSchedules
+const int nSchedules = 2;		// Number of part-schedules
+
+
+int
+LgFrWorkingImplosionProblem::isValid()
+     const
+{
+  return (lpsPtr_ != 0);	// If it is null, *this is not a valid
+  				// instance, except for assignment
+}
+
+
+// Return a list of all parts that have been changed since this problem was
+// initialized
+LgFrPartVector
+LgFrWorkingImplosionProblem::changedParts()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of parts
+  // that have been changed.
+  size_t nChangedParts = partSchedules_[latestSchedule].size();
+  LgFrPartVector partVec;
+  partVec.reserve( nChangedParts );//size_tMax(1,nChangedParts) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedParts;  ++i) {
+    partVec.push_back ( partSchedules_[latestSchedule][i].part() );
+  }
+
+  return partVec;
+}
+
+// Return a list of all parts that have been changed since this problem was
+// initialized
+LgFrPartVector
+LgFrWorkingImplosionProblem::changedPartsCycleTime()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of parts
+  // that have been changed.
+  size_t nChangedParts = cycleTimeSchedules_[latestSchedule].size();
+  LgFrPartVector partVec;
+  partVec.reserve( nChangedParts );//size_tMax(1,nChangedParts) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedParts;  ++i) {
+    partVec.push_back ( cycleTimeSchedules_[latestSchedule][i].part() );
+  }
+
+  return partVec;
+}
+
+
+// Return a list of all demands that have had their demandVol
+// changed since this problem was initialized
+LgFrDemandVector
+LgFrWorkingImplosionProblem::changedDemands()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of demands
+  // that have been changed.
+  size_t nChangedDemands = demandSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( demandSchedules_[latestSchedule][i].demand() );
+  }
+
+  return demandVec;
+}
+
+// Return a list of all demands that have had their priorities
+// changed since this problem was initialized
+LgFrDemandVector
+LgFrWorkingImplosionProblem::changedDemandsPriority()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of demands
+  // that have been changed.
+  size_t nChangedDemands = prioritySchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( prioritySchedules_[latestSchedule][i].demand() );
+  }
+
+  return demandVec;
+}
+
+
+// Return a list of all demands that have had their obj1ShipRewards
+// changed since this problem was initialized
+LgFrDemandVector
+LgFrWorkingImplosionProblem::changedDemandsObj1ShipReward()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of demands
+  // that have been changed.
+  size_t nChangedDemands = obj1ShipRewardSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( obj1ShipRewardSchedules_[latestSchedule][i].demand() );
+  }
+
+  return demandVec;
+}
+
+// Return a list of all demands that have had their cumShipSoftLowerBound
+// changed since this problem was initialized
+LgFrDemandVector
+LgFrWorkingImplosionProblem::changedDemandsCumShipSoftLowerBound()
+     const
+{
+  assert (this-> isValid());
+  // Construct an ordered vector capable of holding the number of demands
+  // that have been changed.
+  size_t nChangedDemands
+    = cumShipSoftLowerBoundSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+     // size_tMax used to avoid suspected problem with purify or RW
+
+  // Fill the vector in
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back(
+                    cumShipSoftLowerBoundSchedules_[latestSchedule][i].demand()
+                    );
+  }
+
+  return demandVec;
+}
+
+// Return a schedule containing the orignal or latest values of
+// supplyVolume for each part whose supply has changed.
+const LgFrSortingPartScheduleFloat&
+LgFrWorkingImplosionProblem::supplyVolume(const LgFrWipSchedule& which)
+const
+{
+  return 
+    partSchedules_[ which==LgFrORIGINAL ? originalSchedule : latestSchedule];
+}
+
+// Return a schedule of all changes made to part supplies
+LgFrSortingPartScheduleFloat
+LgFrWorkingImplosionProblem::changedSupplyVolume()
+const
+{
+   return 
+      partSchedules_[latestSchedule] -
+      partSchedules_[originalSchedule];
+}
+
+// Return a schedule of all changes made to part supplies
+LgFrSortingPartScheduleFloat
+LgFrWorkingImplosionProblem::changedCycleTime()
+const
+{
+   return 
+      cycleTimeSchedules_[latestSchedule] -
+      cycleTimeSchedules_[originalSchedule];
+}
+
+// Return a schedule of all changes made to demand volumes
+LgFrSortingDemandScheduleFloat
+LgFrWorkingImplosionProblem::changedDemandVolume()
+const
+{
+   return 
+      demandSchedules_[latestSchedule] -
+      demandSchedules_[originalSchedule];
+}
+
+// Return a schedule of all changes made to demand priorities
+LgFrSortingDemandScheduleFloat
+LgFrWorkingImplosionProblem::changedPriority()
+const
+{
+   return 
+      prioritySchedules_[latestSchedule] -
+      prioritySchedules_[originalSchedule];
+}
+
+
+// Return a schedule of all changes made to demand obj1ShipRewards
+LgFrSortingDemandScheduleFloat
+LgFrWorkingImplosionProblem::changedObj1ShipReward()
+const
+{
+   return
+      obj1ShipRewardSchedules_[latestSchedule] -
+      obj1ShipRewardSchedules_[originalSchedule];
+}
+
+// Return a schedule of all changes made to demand cumShipSoftLowerBound
+LgFrSortingDemandScheduleFloat
+LgFrWorkingImplosionProblem::changedCumShipSoftLowerBound()
+const
+{
+   return
+     cumShipSoftLowerBoundSchedules_[latestSchedule] -
+     cumShipSoftLowerBoundSchedules_[originalSchedule];
+}
+
+// Return a part's (latest) supply vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::timeVec (
+				      const LgFrPart part)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingPartScheduleFloat &latestPartSched =
+     partSchedules_[latestSchedule];
+  if (  latestPartSched.contains (part)  ) 
+    return 
+      (latestPartSched[part]).timeVecFloat();
+  else
+    return lpsPtr_->supplyVolume (&part);
+}
+
+
+// Change a part's supply vector
+void
+LgFrWorkingImplosionProblem::timeVec (
+				      const LgFrPart part,
+				      const LgFrTimeVecFloat& timeVec
+				      )
+{
+  assert ( this->isValid() );
+  // If the part is not already in *this, record the original
+  // vector for it.
+  if (! (partSchedules_[originalSchedule] . contains (part) )  ) {
+    partSchedules_[originalSchedule] 
+      . insertKeyAndValue (part,
+			   lpsPtr_ -> supplyVolume (&part));
+  };
+  partSchedules_[latestSchedule] . insertKeyAndValue (part, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+// Return a demand's (latest) demand quantity vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::timeVec (
+				      const LgFrDemand demand)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingDemandScheduleFloat &latestDemandSched 
+    = demandSchedules_[latestSchedule];
+  if (  latestDemandSched.contains (demand)  )
+    return 
+      (latestDemandSched[demand]).timeVecFloat();
+  else
+    return lpsPtr_ -> demandVolume (&demand);
+}
+
+
+// Change a demand's demand Quantity vector
+void
+LgFrWorkingImplosionProblem::timeVec (
+				      const LgFrDemand demand,
+				      const LgFrTimeVecFloat& timeVec
+				      )
+{
+  assert ( this->isValid() );
+  // If the demand is not already in *this, record the original
+  // vector for it.
+  if (! (demandSchedules_[originalSchedule] . contains (demand) )  ) {
+    demandSchedules_[originalSchedule] 
+      . insertKeyAndValue (demand,
+			   lpsPtr_ -> demandVolume (&demand));
+  };
+  demandSchedules_[latestSchedule] . insertKeyAndValue (demand, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+
+// Return a demand's (latest) priority vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::priority (
+				      const LgFrDemand demand)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingDemandScheduleFloat &latestDemandSched 
+    = prioritySchedules_[latestSchedule];
+  if (  latestDemandSched.contains (demand)  )
+    return 
+      (latestDemandSched[demand]).timeVecFloat();
+  else
+    return lpsPtr_ -> priority (&demand);
+}
+
+
+
+
+
+// Change a demand's priority vector
+void
+LgFrWorkingImplosionProblem::priority (
+				      const LgFrDemand demand,
+				      const LgFrTimeVecFloat& timeVec
+				      )
+{
+  assert ( this->isValid() );
+  // If the demand is not already in *this, record the original
+  // vector for it.
+  if (! (prioritySchedules_[originalSchedule] . contains (demand) )  ) {
+    prioritySchedules_[originalSchedule] 
+      . insertKeyAndValue (demand,
+			   lpsPtr_ -> priority (&demand));
+  };
+  prioritySchedules_[latestSchedule] . insertKeyAndValue (demand, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+
+
+
+// Return a demand's (latest) obj1ShipReward vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::obj1ShipReward (
+                                      const LgFrDemand demand)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingDemandScheduleFloat &latestDemandSched
+    = obj1ShipRewardSchedules_[latestSchedule];
+  if (  latestDemandSched.contains (demand)  )
+    return
+      (latestDemandSched[demand]).timeVecFloat();
+  else
+    return lpsPtr_ -> obj1ShipReward (&demand);
+}
+
+
+// Change a demand's obj1ShipReward vector
+void
+LgFrWorkingImplosionProblem::obj1ShipReward (
+                                      const LgFrDemand demand,
+                                      const LgFrTimeVecFloat& timeVec
+                                      )
+{
+  assert ( this->isValid() );
+  // If the demand is not already in *this, record the original
+  // vector for it.
+  if (! (obj1ShipRewardSchedules_[originalSchedule] . contains (demand) )  ) {
+    obj1ShipRewardSchedules_[originalSchedule]
+      . insertKeyAndValue (demand,
+                           lpsPtr_ -> obj1ShipReward (&demand));
+  };
+  obj1ShipRewardSchedules_[latestSchedule] . insertKeyAndValue (
+     demand, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+
+
+// Return a demand's (latest) cumShipSoftLowerBound vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::cumShipSoftLowerBound (
+                                      const LgFrDemand demand)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingDemandScheduleFloat &latestDemandSched
+    = cumShipSoftLowerBoundSchedules_[latestSchedule];
+
+  if (  latestDemandSched.contains (demand)  )
+    return
+      (latestDemandSched[demand]).timeVecFloat();
+  else
+    return lpsPtr_ -> cumShipSoftLowerBound (&demand);
+}
+
+
+// Change a demand's cumShipSoftLowerBound vector
+void
+LgFrWorkingImplosionProblem::cumShipSoftLowerBound (
+                                      const LgFrDemand demand,
+                                      const LgFrTimeVecFloat& timeVec
+                                      )
+{
+  assert ( this->isValid() );
+  // If the demand is not already in *this, record the original
+  // vector for it.
+  if (
+     !(cumShipSoftLowerBoundSchedules_[originalSchedule] . contains (demand) )
+     )
+    {
+      cumShipSoftLowerBoundSchedules_[originalSchedule]
+        . insertKeyAndValue (demand,
+                             lpsPtr_ -> cumShipSoftLowerBound (&demand));
+    };
+  cumShipSoftLowerBoundSchedules_[latestSchedule] . insertKeyAndValue (
+     demand, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+
+
+// Return a part's cycleTime vector
+LgFrTimeVecFloat
+LgFrWorkingImplosionProblem::cycleTime (
+				      const LgFrPart part)
+     const
+{
+  assert (  this->isValid()  );
+  const LgFrSortingPartScheduleFloat &latestPartCycleTimeSched 
+    = cycleTimeSchedules_[latestSchedule];
+  if (  latestPartCycleTimeSched.contains (part)  )
+    return 
+      ( latestPartCycleTimeSched[part] )  .  timeVecFloat();
+  else
+    return lpsPtr_->cycleTime (&part);
+}
+
+
+void
+LgFrWorkingImplosionProblem::cycleTime (
+				      const LgFrPart part,
+				      const LgFrTimeVecFloat& timeVec
+				      )
+{
+  assert ( this->isValid() );
+  // If the part is not already in *this, record the original
+  // vector for it.
+  if (! (cycleTimeSchedules_[originalSchedule] . contains (part) )  ) {
+    cycleTimeSchedules_[originalSchedule] 
+      . insertKeyAndValue (part,
+			   lpsPtr_ -> cycleTime (&part));
+  };
+  cycleTimeSchedules_[latestSchedule] . insertKeyAndValue (part, timeVec);
+
+  // Inform subscribers that wip has been updated
+  if (!inTransaction_)  {
+    LgFrUserInputModification modify(*this);
+    LgFrSubscription::externalChange( &modify );
+  }
+}
+
+
+void
+LgFrWorkingImplosionProblem::beginSeriesOfChanges()
+{
+  inTransaction_ = 1;
+}
+
+void
+LgFrWorkingImplosionProblem::endSeriesOfChanges()
+{
+  inTransaction_ = 0;
+  LgFrUserInputModification modify(*this);
+  LgFrSubscription::externalChange( &modify );
+}
+
+// Another Constructor
+LgFrWorkingImplosionProblem::LgFrWorkingImplosionProblem (
+				LgFrLastProblemSolved& myLps,
+				LgFrSetOfParts& mySoParts,
+				LgFrSetOfDemands& mySoDemands
+							  )
+: soPartsPtr_ (&mySoParts),
+  soDemandsPtr_ (&mySoDemands),
+  lpsPtr_ (&myLps),
+  // Don't know what size to use for partSchedules_[0 and 1] so let
+  // defaults get taken.
+  implosionMethod_   (3, 0),
+  defaultImplosionMethod_(LgFrHEURISTIC),
+  equitability_      (3, 0),
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+  weightBounds_      (3, 0.0),
+  inTransaction_ (0)  
+{
+  // Nothing to do here
+}
+
+
+// Another "copy constructor"
+LgFrWorkingImplosionProblem::LgFrWorkingImplosionProblem(
+			      const LgFrWorkingImplosionProblem & source,
+			      LgFrLastProblemSolved& sourceLps,
+			      const LgFrSetOfParts& sourceSoParts,
+			      const LgFrSetOfDemands& sourceSoDemands)
+: soPartsPtr_ (&sourceSoParts),
+  soDemandsPtr_ (&sourceSoDemands),
+  lpsPtr_ (&sourceLps)
+{
+  this->copyInPlace (source);
+}
+
+
+// This method copies the data that is contained in the source to *this
+// without changing the soPartsPtr_, soDemandsPtr_, lpsPtr_ of *this.
+void
+LgFrWorkingImplosionProblem::copyInPlace (const LgFrWorkingImplosionProblem& source)
+{
+  implosionMethod_   = source.implosionMethod_;
+  defaultImplosionMethod_= LgFrHEURISTIC;
+  equitability_      = source.equitability_;
+  buildAhead_        = source.buildAhead_;
+  computeCriticalList_ = source.computeCriticalList_; 
+  weightBounds_      = source.weightBounds_;
+  inTransaction_     = source.inTransaction_;
+  
+  // Copy the part and demand schedules
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nSchedules; i++) {
+    partSchedules_ [i] = source.partSchedules_[i];
+    demandSchedules_ [i] = source.demandSchedules_[i];
+  }
+}
+
+
+// Destructor
+LgFrWorkingImplosionProblem::~LgFrWorkingImplosionProblem()
+{
+  // The thing lpsPtr_ points to should not be deleted by this class.
+}
+
+
+// Assignment operator
+LgFrWorkingImplosionProblem&
+LgFrWorkingImplosionProblem::operator=(
+            const LgFrWorkingImplosionProblem& rhs)
+{
+  soPartsPtr_ = rhs.soPartsPtr_;
+  soDemandsPtr_ = rhs.soDemandsPtr_;
+  lpsPtr_ = rhs.lpsPtr_;
+  inTransaction_ = rhs.inTransaction_;
+
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nSchedules; ++i) {
+    partSchedules_[i] = rhs.partSchedules_[i];
+    demandSchedules_[i] = rhs.demandSchedules_[i];
+  }
+
+  return *this;
+}
+
+// Set Implostion Method
+void
+LgFrWorkingImplosionProblem::implosionMethod(
+   const LgFrImplosionMethod newMeth )
+{
+   if ( implosionMethod_[isChanged]==0 ) {
+      implosionMethod_[orig] = (int) defaultImplosionMethod_;
+      implosionMethod_[isChanged] = 1;
+   }
+   implosionMethod_[latest] = (int) newMeth;
+}
+
+// Get Implosion Method
+LgFrImplosionMethod
+LgFrWorkingImplosionProblem::implosionMethod()
+const
+{
+   LgFrImplosionMethod retVal;
+   if ( implosionMethod_[isChanged]!=0 ) 
+      {
+         retVal = (LgFrImplosionMethod) implosionMethod_[latest];
+      }
+   else
+      {
+         retVal = defaultImplosionMethod_;
+      }
+   return retVal;
+}
+
+
+// Set heuristic equitable allocation
+void
+LgFrWorkingImplosionProblem::equitability(
+   const int newValue )
+{
+   setWitInt(newValue,
+               equitability_,
+	     &LgFrLastProblemSolved::equitability);
+}
+
+// Get heuristic equitable allocation
+int
+LgFrWorkingImplosionProblem::equitability()
+const
+{
+   return getWitInt(equitability_, 
+		    &LgFrLastProblemSolved::equitability );
+}
+
+// Set heuristic build ahead or not
+void
+LgFrWorkingImplosionProblem::buildAhead(
+   const bool newValue )
+{
+   setWitbool(newValue,
+               buildAhead_,
+		   &LgFrLastProblemSolved::buildAhead);
+}
+
+// Get heuristic build ahead or not
+bool
+LgFrWorkingImplosionProblem::buildAhead()
+const
+{
+   return getWitbool(buildAhead_, 
+			  &LgFrLastProblemSolved::buildAhead );
+}
+
+// Set heuristic compute critical list or not
+void
+LgFrWorkingImplosionProblem::computeCriticalList(
+   const bool newValue )
+{
+   setWitbool(newValue,
+               computeCriticalList_,
+		   &LgFrLastProblemSolved::computeCriticalList);
+}
+
+// Get heuristic compute critical list or not
+bool
+LgFrWorkingImplosionProblem::computeCriticalList()
+const
+{
+   return getWitbool(computeCriticalList_, 
+			  &LgFrLastProblemSolved::computeCriticalList );
+}
+
+
+// Set objective function weight on Bounds
+void
+LgFrWorkingImplosionProblem::weightBounds(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               weightBounds_,
+               &LgFrLastProblemSolved::weightBounds);
+}
+
+// Get objective function weight on Bounds
+float
+LgFrWorkingImplosionProblem::weightBounds()
+const
+{
+   return getWitFloat(weightBounds_, 
+                      &LgFrLastProblemSolved::weightBounds );
+}
+
+
+
+
+   //-------------------------------------------------------------------------
+   //
+   // Subscribe methods
+   //
+   //-------------------------------------------------------------------------
+
+   // Inform object m when the implosion solution or MRP solution
+   // has changed.  The object added must have a member function
+   // updateFrom( LgFrModel * p, void * d ).  
+   // When the working implosion problem
+   // is changed then m.updateFrom( this, LgFrUserInputModification() ) is invoked.
+   //
+   // See LgFrModel and LgFrModelClient.
+
+void 
+LgFrWorkingImplosionProblem::addDependent(
+   LgFrModelClient * m)
+{
+   LgFrSubscription::addDependent( m );
+}
+
+   // No longer inform object m when implosion or MRP solution has changed.
+void 
+LgFrWorkingImplosionProblem::removeDependent(
+   LgFrModelClient * m )
+{
+   LgFrSubscription::removeDependent( m );
+}
+
+// Update From should not be invoked because wip does not subscribe to
+// any other objects.
+void 
+LgFrWorkingImplosionProblem::localUpdate(
+   LgFrModel *,
+   void * )
+{
+   std::cerr <<"LgFrWorkingImplosionProblem::updateFrom()" <<std::endl
+        <<"This method should not be invoked because wip does not" <<std::endl
+        <<"subscribe to any other objects" <<std::endl;
+   abort();
+}
+
+
+
+// Copy constructor
+LgFrWorkingImplosionProblem::LgFrWorkingImplosionProblem(
+            const LgFrWorkingImplosionProblem& source)
+: soPartsPtr_ (source.soPartsPtr_),
+  soDemandsPtr_ (source.soDemandsPtr_),
+  lpsPtr_ (source.lpsPtr_),
+  implosionMethod_   (3, 0),
+  defaultImplosionMethod_(LgFrHEURISTIC),
+  equitability_      (3, 0),
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+  weightBounds_      (3, 0.0)
+{
+  this->copyInPlace (source);  
+}
+
+// Default Constructor
+// Initialize file name to null string.
+LgFrWorkingImplosionProblem::LgFrWorkingImplosionProblem()
+: soPartsPtr_ (0),
+  soDemandsPtr_ (0),
+  lpsPtr_ (0),
+  implosionMethod_   (3, 0),
+  defaultImplosionMethod_(LgFrHEURISTIC),
+  equitability_      (3, 0),
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+  weightBounds_      (3, 0.0)
+{
+  // Nothing else to do
+}
+
+
+// Set WIT Float attribute
+void
+LgFrWorkingImplosionProblem::setWitFloat(
+   const float newValue,
+   LgFrFloatVector & statusVec,
+   float (LgFrLastProblemSolved::*lpsGetFunc) () const )
+{
+   assert ( statusVec.size() == 3 );
+   if ( statusVec[isChanged]==0. ) {
+      statusVec[orig] = (lpsPtr_->*lpsGetFunc)();
+      statusVec[isChanged] = 1.;
+   }
+   statusVec[latest] = newValue;
+}
+
+// Get WIT Float attribute
+float
+LgFrWorkingImplosionProblem::getWitFloat(
+   const LgFrFloatVector statusVec,
+   float (LgFrLastProblemSolved::*lpsGetFunc) () const )
+const
+{
+   float retVal;
+   if ( statusVec[isChanged]!=0 ) 
+      {
+         retVal = statusVec[latest];
+      }
+   else
+      {
+         retVal = (lpsPtr_->*lpsGetFunc)();
+      }
+   return retVal;
+}
+
+// Set WIT bool attribute
+void
+LgFrWorkingImplosionProblem::setWitbool(
+   const bool newValue,
+   LgFrBoolVector & statusVec,
+   bool (LgFrLastProblemSolved::*lpsGetFunc) () const )
+{
+   if ( !statusVec[isChanged] ) {
+      statusVec[orig] = (lpsPtr_->*lpsGetFunc)();
+      statusVec[isChanged] = true;
+   }
+   statusVec[latest] = newValue;
+}
+
+// Get WIT Int attribute
+bool
+LgFrWorkingImplosionProblem::getWitbool(
+   const LgFrBoolVector statusVec,
+   bool (LgFrLastProblemSolved::*lpsGetFunc) () const )
+const
+{
+   bool retVal;
+   if ( statusVec[isChanged] ) 
+      {
+         retVal = statusVec[latest];
+      }
+   else
+      {
+         retVal = (lpsPtr_->*lpsGetFunc)();
+      }
+   return retVal;
+}
+
+// Set WIT Int attribute
+void
+LgFrWorkingImplosionProblem::setWitInt(
+   const int newValue,
+   LgFrIntVector & statusVec,
+   int (LgFrLastProblemSolved::*lpsGetFunc) () const )
+{
+   if ( statusVec[isChanged]==0 ) {
+      statusVec[orig] = (lpsPtr_->*lpsGetFunc)();
+      statusVec[isChanged] = 1;
+   }
+   statusVec[latest] = newValue;
+}
+
+// Get WIT Int attribute
+int
+LgFrWorkingImplosionProblem::getWitInt(
+   const LgFrIntVector statusVec,
+   int (LgFrLastProblemSolved::*lpsGetFunc) () const )
+const
+{
+   int retVal;
+   if ( statusVec[isChanged]!=0 ) 
+      {
+         retVal = statusVec[latest];
+      }
+   else
+      {
+         retVal = (lpsPtr_->*lpsGetFunc)();
+      }
+   return retVal;
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+void
+LgFrWorkingImplosionProblem::test()
+{
+  // Test constructor
+  LgFrWorkingImplosionProblem defaultWip;
+  assert (defaultWip.lpsPtr_ == 0);
+}
+
+
+// Expects the data in aWip to come from
+// "/u/implode/wit/data/standard/obj1/wit.data"
+void
+LgFrWorkingImplosionProblem::contextTest
+  (LgFrWorkingImplosionProblem & aWip,
+   LgFrSetOfParts & sop,		// from same scenario as aWip
+   LgFrSetOfDemands & sod)		// from same scenario as aWip
+{
+  const float fltEps = .0001f;
+  const LgFrPart * comp1ptr = sop.findValue ("COMP1");
+  assert (comp1ptr != 0);
+  const LgFrDemand * s2demand1ptr = sod.findValue ("S2DEMAND1", "SUBASMBL2");
+  assert (s2demand1ptr != 0);
+  LgFrPart comp1 = (*comp1ptr);
+  LgFrDemand s2demand1 = (*s2demand1ptr); 
+  
+  // Test regular methods
+  LgFrTimeVecFloat ptv = aWip.timeVec (comp1);
+  assert (ptv[0] == 100  && ptv[7] == 50);
+  ptv[0]=99;
+  aWip.timeVec(comp1, ptv);
+  LgFrTimeVecFloat nptv = aWip.timeVec (comp1);
+  assert (nptv[0] == ptv[0]);
+
+  LgFrPartVector changedParts(aWip.changedParts());
+  assert (changedParts.size() == 1);
+  assert (changedParts[0] == comp1);
+
+  {
+    // Test changedDemands when the number of changed demands is zero
+    LgFrDemandVector changedDemands(aWip.changedDemands());
+    assert (changedDemands.size() == 0);
+  }
+
+  LgFrTimeVecFloat dtv = aWip.timeVec (s2demand1);
+  assert (dtv[0] == 0  &&  dtv[1] == 0  && dtv[7] == 20);
+  dtv[0]=17;
+  aWip.timeVec (s2demand1, dtv);
+  LgFrTimeVecFloat ndtv = aWip.timeVec (s2demand1);
+  assert (ndtv[0] == dtv[0]);
+
+  LgFrDemandVector changedDemands(aWip.changedDemands());
+  assert (changedDemands.size() == 1);
+  assert (changedDemands[0] == s2demand1);
+
+  LgFrTimeVecFloat prioritytv = aWip.priority (s2demand1);
+  float priority1 = prioritytv[1];
+  aWip.priority (s2demand1, prioritytv+1. );
+  LgFrTimeVecFloat nprioritytv = aWip.priority (s2demand1);
+  assert (nprioritytv == prioritytv+1. );
+
+  LgFrDemandVector changedPriority(aWip.changedDemandsPriority());
+  assert (changedPriority.size() == 1);
+  assert (changedPriority[0] == s2demand1);
+
+  // Test setting/getting implosion method
+  assert( aWip.implosionMethod() == LgFrHEURISTIC );
+  aWip.implosionMethod(LgFrHEURISTIC);
+  assert( aWip.implosionMethod() == LgFrHEURISTIC );
+#ifdef OPT_IMPLODE
+  aWip.implosionMethod(LgFrOPTIMIZE);
+  assert( aWip.implosionMethod() == LgFrOPTIMIZE );
+#endif
+
+
+  // Test setting/getting of WIT equitability
+  aWip.equitability( 35 );
+  assert( aWip.equitability()==35 );
+  aWip.equitability( 1 );
+  assert( aWip.equitability()==1 );
+
+  // Test setting/getting of WIT build ahead
+  aWip.buildAhead( true );
+  assert( aWip.buildAhead() );
+  aWip.buildAhead( false );
+  assert( !aWip.buildAhead() );
+
+  // Test setting/getting of WIT critical list 
+  aWip.computeCriticalList( false );
+  assert( !aWip.computeCriticalList() );
+  aWip.computeCriticalList( true );
+  assert( aWip.computeCriticalList() );
+
+
+  // Test setting/getting of WIT weightBounds
+  aWip.weightBounds( 3. );
+  assert( fabs(aWip.weightBounds()-3.) < fltEps );
+  aWip.weightBounds( 4. );
+  assert( fabs(aWip.weightBounds()-4.) < fltEps );
+
+  // Test changedSupplyVolume
+  {
+  LgFrSortingPartScheduleFloat deltaSupply( aWip.changedSupplyVolume() );
+  const  LgFrSortingPartScheduleFloat & constDeltaSupply = deltaSupply;
+  // cout <<"changedSupplyVolume" <<std::endl;
+  // cout <<deltaSupply.format() <<std::endl;
+  assert( deltaSupply.size()==1 );
+  assert( constDeltaSupply[0].part() == comp1 );
+  assert( constDeltaSupply[0].timeVecFloat()[0] == -1 );
+  }
+
+  // Test changedDemandVolume
+  {
+  LgFrSortingDemandScheduleFloat deltaDemand( aWip.changedDemandVolume() );
+  const LgFrSortingDemandScheduleFloat & constDeltaDemand = deltaDemand;
+  // cout <<"changedDemandVolume" <<std::endl;
+  // cout <<deltaDemand.format() <<std::endl;
+  assert( deltaDemand.size()==1 );
+  assert( constDeltaDemand[0].demand() == s2demand1 );
+  assert( constDeltaDemand[0].timeVecFloat()[0] == 17 );
+  }
+
+  // Test changedPriority
+  {
+  LgFrSortingDemandScheduleFloat deltaPriority( aWip.changedPriority() );
+  const LgFrSortingDemandScheduleFloat & constDeltaPriority = deltaPriority;
+  // cout <<"changedDemandVolume" <<std::endl;
+  // cout <<deltaDemand.format() <<std::endl;
+  assert( deltaPriority.size()==1 );
+  assert( constDeltaPriority[0].demand() == s2demand1 );
+  assert( constDeltaPriority[0].timeVecFloat() == nprioritytv - prioritytv );
+  }
+
+  // Test cumShipSoftLowerBound
+  {   
+  LgFrTimeVecFloat csslb = aWip.cumShipSoftLowerBound (s2demand1);
+  LgFrTimeVecFloat newCsslb = csslb + 15;
+  aWip.cumShipSoftLowerBound (s2demand1, newCsslb );
+  assert (aWip.cumShipSoftLowerBound (s2demand1) == newCsslb );
+
+  LgFrDemandVector chgDemands
+    = aWip.changedDemandsCumShipSoftLowerBound();
+  assert( chgDemands.size() == 1 );
+  assert( chgDemands[0] == s2demand1 );
+  
+  LgFrSortingDemandScheduleFloat delta( aWip.changedCumShipSoftLowerBound() );
+  const LgFrSortingDemandScheduleFloat & constDelta = delta;
+  assert( delta.size()==1 );
+  assert( constDelta[0].demand() == s2demand1 );
+  assert( constDelta[0].timeVecFloat() == ( newCsslb - csslb ) );
+  }
+
+}
+@
+
+
+1.5
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@a536 1
+  capitalCost_       (3, 0.0),
+a539 5
+  inventoryCost_     (3, 0.0),
+  obj2WeightInventory_ (3, 0.0),
+  obj2WeightRevenue_ (3, 0.0),
+  obj2WeightService_ (3, 0.0),
+  obj2WeightSubstitutes_ (3, 0.0),
+a567 1
+  capitalCost_       = source.capitalCost_;
+a570 5
+  inventoryCost_     = source.inventoryCost_;
+  obj2WeightInventory_ = source.obj2WeightInventory_;
+  obj2WeightRevenue_ = source.obj2WeightRevenue_;
+  obj2WeightService_ = source.obj2WeightService_;
+  obj2WeightSubstitutes_ = source.obj2WeightSubstitutes_;
+a637 18
+// Set Cost of Capital
+void
+LgFrWorkingImplosionProblem::capitalCost(
+   const float newCapCost )
+{
+   setWitFloat(newCapCost,
+               capitalCost_,
+               &LgFrLastProblemSolved::capitalCost);
+}
+
+// Get Cost of Capital
+float
+LgFrWorkingImplosionProblem::capitalCost()
+const
+{
+   return getWitFloat(capitalCost_, 
+                      &LgFrLastProblemSolved::capitalCost );
+}
+a695 94
+// Set Cost of Inventory
+void
+LgFrWorkingImplosionProblem::inventoryCost(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               inventoryCost_,
+               &LgFrLastProblemSolved::inventoryCost);
+}
+
+// Get Cost of Inventory
+float
+LgFrWorkingImplosionProblem::inventoryCost()
+const
+{
+   return getWitFloat(inventoryCost_, 
+                      &LgFrLastProblemSolved::inventoryCost );
+}
+
+// Set objective function 2 weight on inventory
+void
+LgFrWorkingImplosionProblem::obj2WeightInventory(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               obj2WeightInventory_,
+               &LgFrLastProblemSolved::obj2WeightInventory);
+}
+
+// Get objective function 2 weight on inventory
+float
+LgFrWorkingImplosionProblem::obj2WeightInventory()
+const
+{
+   return getWitFloat(obj2WeightInventory_, 
+                      &LgFrLastProblemSolved::obj2WeightInventory );
+}
+
+// Set objective function 2 weight on Revenue
+void
+LgFrWorkingImplosionProblem::obj2WeightRevenue(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               obj2WeightRevenue_,
+               &LgFrLastProblemSolved::obj2WeightRevenue);
+}
+
+// Get objective function 2 weight on Revenue
+float
+LgFrWorkingImplosionProblem::obj2WeightRevenue()
+const
+{
+   return getWitFloat(obj2WeightRevenue_, 
+                      &LgFrLastProblemSolved::obj2WeightRevenue );
+}
+
+// Set objective function 2 weight on Service
+void
+LgFrWorkingImplosionProblem::obj2WeightService(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               obj2WeightService_,
+               &LgFrLastProblemSolved::obj2WeightService);
+}
+
+// Get objective function 2 weight on Service
+float
+LgFrWorkingImplosionProblem::obj2WeightService()
+const
+{
+   return getWitFloat(obj2WeightService_, 
+                      &LgFrLastProblemSolved::obj2WeightService );
+}
+
+// Set objective function 2 weight on Substitutes
+void
+LgFrWorkingImplosionProblem::obj2WeightSubstitutes(
+   const float newValue )
+{
+   setWitFloat(newValue,
+               obj2WeightSubstitutes_,
+               &LgFrLastProblemSolved::obj2WeightSubstitutes);
+}
+
+// Get objective function 2 weight on Substitutes
+float
+LgFrWorkingImplosionProblem::obj2WeightSubstitutes()
+const
+{
+   return getWitFloat(obj2WeightSubstitutes_, 
+                      &LgFrLastProblemSolved::obj2WeightSubstitutes );
+}
+a770 1
+  capitalCost_       (3, 0.0),
+a773 5
+  inventoryCost_     (3, 0.0),
+  obj2WeightInventory_ (3, 0.0),
+  obj2WeightRevenue_ (3, 0.0),
+  obj2WeightService_ (3, 0.0),
+  obj2WeightSubstitutes_ (3, 0.0),
+a786 1
+  capitalCost_       (3, 0.0),
+a789 5
+  inventoryCost_     (3, 0.0),
+  obj2WeightInventory_ (3, 0.0),
+  obj2WeightRevenue_ (3, 0.0),
+  obj2WeightService_ (3, 0.0),
+  obj2WeightSubstitutes_ (3, 0.0),
+a971 5
+  // Test setting/getting of WIT capitalCost
+  aWip.capitalCost( 35. );
+  assert( fabs(aWip.capitalCost()-35.) < fltEps );
+  aWip.capitalCost( 40. );
+  assert( fabs(aWip.capitalCost()-40.) < fltEps );
+a990 29
+  // Test setting/getting of WIT inventoryCost
+  aWip.inventoryCost( 3. );
+  assert( fabs(aWip.inventoryCost()-3.) < fltEps );
+  aWip.inventoryCost( 4. );
+  assert( fabs(aWip.inventoryCost()-4.) < fltEps );
+
+  // Test setting/getting of WIT obj2WeightInventory
+  aWip.obj2WeightInventory( 5. );
+  assert( fabs(aWip.obj2WeightInventory()-5.) < fltEps );
+  aWip.obj2WeightInventory( 6. );
+  assert( fabs(aWip.obj2WeightInventory()-6.) < fltEps );
+
+  // Test setting/getting of WIT obj2WeightRevenue
+  aWip.obj2WeightRevenue( 7. );
+  assert( fabs(aWip.obj2WeightRevenue()-7.) < fltEps );
+  aWip.obj2WeightRevenue( 8. );
+  assert( fabs(aWip.obj2WeightRevenue()-8.) < fltEps );
+
+  // Test setting/getting of WIT obj2WeightService
+  aWip.obj2WeightService( 9. );
+  assert( fabs(aWip.obj2WeightService()-9.) < fltEps );
+  aWip.obj2WeightService( 0. );
+  assert( fabs(aWip.obj2WeightService()-0.) < fltEps );
+
+  // Test setting/getting of WIT obj2WeightSubstitutes
+  aWip.obj2WeightSubstitutes( 1. );
+  assert( fabs(aWip.obj2WeightSubstitutes()-1.) < fltEps );
+  aWip.obj2WeightSubstitutes( 2. );
+  assert( fabs(aWip.obj2WeightSubstitutes()-2.) < fltEps );
+@
+
+
+1.4
+log
+@Modified to get sce to link on windows.
+Code was changed to conditionally include implement statements
+@
+text
+@d1 3
+a5 1
+#include <rw/rstream.h>
+a18 5
+#ifndef WIN32
+// added for vacpp - vra
+implement (RWGVector, int)
+#endif
+
+d23 1
+a23 1
+  return (lpsPtr_ != NULL);	// If it is null, *this is not a valid
+d30 1
+a30 1
+LgFrOrderedVectorPart
+d37 3
+a39 2
+  size_t nChangedParts = partSchedules_[latestSchedule].entries();
+  LgFrOrderedVectorPart partVec( size_tMax(1,nChangedParts) );
+d43 3
+a45 2
+  for (int i = 0;  i < nChangedParts;  ++i) {
+    partVec.insert ( partSchedules_[latestSchedule][i].part() );
+d53 1
+a53 1
+LgFrOrderedVectorPart
+d60 3
+a62 2
+  size_t nChangedParts = cycleTimeSchedules_[latestSchedule].entries();
+  LgFrOrderedVectorPart partVec( size_tMax(1,nChangedParts) );
+d66 3
+a68 2
+  for (int i = 0;  i < nChangedParts;  ++i) {
+    partVec.insert ( cycleTimeSchedules_[latestSchedule][i].part() );
+d77 1
+a77 1
+LgFrOrderedVectorDemand
+d84 3
+a86 2
+  size_t nChangedDemands = demandSchedules_[latestSchedule].entries();
+  LgFrOrderedVectorDemand demandVec( size_tMax(1,nChangedDemands) );
+d90 3
+a92 2
+  for (int i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.insert ( demandSchedules_[latestSchedule][i].demand() );
+d100 1
+a100 1
+LgFrOrderedVectorDemand
+d107 3
+a109 2
+  size_t nChangedDemands = prioritySchedules_[latestSchedule].entries();
+  LgFrOrderedVectorDemand demandVec( size_tMax(1,nChangedDemands) );
+d113 3
+a115 2
+  for (int i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.insert ( prioritySchedules_[latestSchedule][i].demand() );
+d124 1
+a124 1
+LgFrOrderedVectorDemand
+d131 3
+a133 2
+  size_t nChangedDemands = obj1ShipRewardSchedules_[latestSchedule].entries();
+  LgFrOrderedVectorDemand demandVec( size_tMax(1,nChangedDemands) );
+d137 3
+a139 2
+  for (int i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.insert ( obj1ShipRewardSchedules_[latestSchedule][i].demand() );
+d147 1
+a147 1
+LgFrOrderedVectorDemand
+d155 3
+a157 2
+    = cumShipSoftLowerBoundSchedules_[latestSchedule].entries();
+  LgFrOrderedVectorDemand demandVec( size_tMax(1,nChangedDemands) );
+d161 3
+a163 2
+  for (int i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.insert(
+d539 2
+a540 2
+  buildAhead_        (3, FALSE),
+  computeCriticalList_ (3, FALSE),
+d587 2
+a588 1
+  for (int i = 0;  i < nSchedules; i++) {
+d612 2
+a613 1
+  for (int i = 0;  i < nSchedules; ++i) {
+d691 1
+a691 1
+   const RWBoolean newValue )
+d693 1
+a693 1
+   setWitRWBoolean(newValue,
+d699 1
+a699 1
+RWBoolean
+d703 1
+a703 1
+   return getWitRWBoolean(buildAhead_, 
+d710 1
+a710 1
+   const RWBoolean newValue )
+d712 1
+a712 1
+   setWitRWBoolean(newValue,
+d718 1
+a718 1
+RWBoolean
+d722 1
+a722 1
+   return getWitRWBoolean(computeCriticalList_, 
+d879 3
+a881 3
+   cerr <<"LgFrWorkingImplosionProblem::updateFrom()" <<endl
+        <<"This method should not be invoked because wip does not" <<endl
+        <<"subscribe to any other objects" <<endl;
+d897 2
+a898 2
+  buildAhead_        (3, FALSE),
+  computeCriticalList_ (3, FALSE),
+d912 3
+a914 3
+: soPartsPtr_ (NULL),
+  soDemandsPtr_ (NULL),
+  lpsPtr_ (NULL),
+d919 2
+a920 2
+  buildAhead_        (3, FALSE),
+  computeCriticalList_ (3, FALSE),
+d936 1
+a936 1
+   LgFrVectorFloat & statusVec,
+d939 1
+a939 1
+   assert ( statusVec.length() == 3 );
+d950 1
+a950 1
+   const LgFrVectorFloat statusVec,
+d966 1
+a966 1
+// Set WIT RWBoolean attribute
+d968 4
+a971 4
+LgFrWorkingImplosionProblem::setWitRWBoolean(
+   const RWBoolean newValue,
+   LgFrVectorRWBoolean & statusVec,
+   RWBoolean (LgFrLastProblemSolved::*lpsGetFunc) () const )
+d975 1
+a975 1
+      statusVec[isChanged] = TRUE;
+d981 4
+a984 4
+RWBoolean
+LgFrWorkingImplosionProblem::getWitRWBoolean(
+   const LgFrVectorRWBoolean statusVec,
+   RWBoolean (LgFrLastProblemSolved::*lpsGetFunc) () const )
+d987 1
+a987 1
+   RWBoolean retVal;
+d1003 1
+a1003 1
+   LgFrVectorInt & statusVec,
+d1016 1
+a1016 1
+   const LgFrVectorInt statusVec,
+d1040 1
+a1040 1
+  assert (defaultWip.lpsPtr_ == NULL);
+d1054 1
+a1054 1
+  assert (comp1ptr != NULL);
+d1056 1
+a1056 1
+  assert (s2demand1ptr != NULL);
+d1068 2
+a1069 2
+  LgFrOrderedVectorPart changedParts(aWip.changedParts());
+  assert (changedParts.entries() == 1);
+d1074 2
+a1075 2
+    LgFrOrderedVectorDemand changedDemands(aWip.changedDemands());
+    assert (changedDemands.entries() == 0);
+d1085 2
+a1086 2
+  LgFrOrderedVectorDemand changedDemands(aWip.changedDemands());
+  assert (changedDemands.entries() == 1);
+d1095 2
+a1096 2
+  LgFrOrderedVectorDemand changedPriority(aWip.changedDemandsPriority());
+  assert (changedPriority.entries() == 1);
+d1121 1
+a1121 1
+  aWip.buildAhead( TRUE );
+d1123 1
+a1123 1
+  aWip.buildAhead( FALSE );
+d1127 1
+a1127 1
+  aWip.computeCriticalList( FALSE );
+d1129 1
+a1129 1
+  aWip.computeCriticalList( TRUE );
+d1172 3
+a1174 3
+  // cout <<"changedSupplyVolume" <<endl;
+  // cout <<deltaSupply.format() <<endl;
+  assert( deltaSupply.entries()==1 );
+d1183 3
+a1185 3
+  // cout <<"changedDemandVolume" <<endl;
+  // cout <<deltaDemand.format() <<endl;
+  assert( deltaDemand.entries()==1 );
+d1194 3
+a1196 3
+  // cout <<"changedDemandVolume" <<endl;
+  // cout <<deltaDemand.format() <<endl;
+  assert( deltaPriority.entries()==1 );
+d1208 1
+a1208 1
+  LgFrOrderedVectorDemand chgDemands
+d1210 1
+a1210 1
+  assert( chgDemands.entries() == 1 );
+d1215 1
+a1215 1
+  assert( delta.entries()==1 );
+@
+
+
+1.4.2.1
+log
+@Roguewave is gone
+@
+text
+@a0 3
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+d3 1
+d17 5
+d26 1
+a26 1
+  return (lpsPtr_ != 0);	// If it is null, *this is not a valid
+d33 1
+a33 1
+LgFrPartVector
+d40 2
+a41 3
+  size_t nChangedParts = partSchedules_[latestSchedule].size();
+  LgFrPartVector partVec;
+  partVec.reserve( nChangedParts );//size_tMax(1,nChangedParts) );
+d45 2
+a46 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedParts;  ++i) {
+    partVec.push_back ( partSchedules_[latestSchedule][i].part() );
+d54 1
+a54 1
+LgFrPartVector
+d61 2
+a62 3
+  size_t nChangedParts = cycleTimeSchedules_[latestSchedule].size();
+  LgFrPartVector partVec;
+  partVec.reserve( nChangedParts );//size_tMax(1,nChangedParts) );
+d66 2
+a67 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedParts;  ++i) {
+    partVec.push_back ( cycleTimeSchedules_[latestSchedule][i].part() );
+d76 1
+a76 1
+LgFrDemandVector
+d83 2
+a84 3
+  size_t nChangedDemands = demandSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+d88 2
+a89 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( demandSchedules_[latestSchedule][i].demand() );
+d97 1
+a97 1
+LgFrDemandVector
+d104 2
+a105 3
+  size_t nChangedDemands = prioritySchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+d109 2
+a110 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( prioritySchedules_[latestSchedule][i].demand() );
+d119 1
+a119 1
+LgFrDemandVector
+d126 2
+a127 3
+  size_t nChangedDemands = obj1ShipRewardSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+d131 2
+a132 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back ( obj1ShipRewardSchedules_[latestSchedule][i].demand() );
+d140 1
+a140 1
+LgFrDemandVector
+d148 2
+a149 3
+    = cumShipSoftLowerBoundSchedules_[latestSchedule].size();
+  LgFrDemandVector demandVec;
+  demandVec.reserve( nChangedDemands );//size_tMax(1,nChangedDemands) );
+d153 2
+a154 3
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nChangedDemands;  ++i) {
+    demandVec.push_back(
+d530 2
+a531 2
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+d578 1
+a578 2
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nSchedules; i++) {
+d602 1
+a602 2
+  int i = 0; // Pulled out of the for below by RW2STL robot
+  for (i = 0;  i < nSchedules; ++i) {
+d680 1
+a680 1
+   const bool newValue )
+d682 1
+a682 1
+   setWitbool(newValue,
+d688 1
+a688 1
+bool
+d692 1
+a692 1
+   return getWitbool(buildAhead_, 
+d699 1
+a699 1
+   const bool newValue )
+d701 1
+a701 1
+   setWitbool(newValue,
+d707 1
+a707 1
+bool
+d711 1
+a711 1
+   return getWitbool(computeCriticalList_, 
+d886 2
+a887 2
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+d901 3
+a903 3
+: soPartsPtr_ (0),
+  soDemandsPtr_ (0),
+  lpsPtr_ (0),
+d908 2
+a909 2
+  buildAhead_        (3, false),
+  computeCriticalList_ (3, false),
+d925 1
+a925 1
+   LgFrFloatVector & statusVec,
+d928 1
+a928 1
+   assert ( statusVec.size() == 3 );
+d939 1
+a939 1
+   const LgFrFloatVector statusVec,
+d955 1
+a955 1
+// Set WIT bool attribute
+d957 4
+a960 4
+LgFrWorkingImplosionProblem::setWitbool(
+   const bool newValue,
+   LgFrBoolVector & statusVec,
+   bool (LgFrLastProblemSolved::*lpsGetFunc) () const )
+d964 1
+a964 1
+      statusVec[isChanged] = true;
+d970 4
+a973 4
+bool
+LgFrWorkingImplosionProblem::getWitbool(
+   const LgFrBoolVector statusVec,
+   bool (LgFrLastProblemSolved::*lpsGetFunc) () const )
+d976 1
+a976 1
+   bool retVal;
+d992 1
+a992 1
+   LgFrIntVector & statusVec,
+d1005 1
+a1005 1
+   const LgFrIntVector statusVec,
+d1029 1
+a1029 1
+  assert (defaultWip.lpsPtr_ == 0);
+d1043 1
+a1043 1
+  assert (comp1ptr != 0);
+d1045 1
+a1045 1
+  assert (s2demand1ptr != 0);
+d1057 2
+a1058 2
+  LgFrPartVector changedParts(aWip.changedParts());
+  assert (changedParts.size() == 1);
+d1063 2
+a1064 2
+    LgFrDemandVector changedDemands(aWip.changedDemands());
+    assert (changedDemands.size() == 0);
+d1074 2
+a1075 2
+  LgFrDemandVector changedDemands(aWip.changedDemands());
+  assert (changedDemands.size() == 1);
+d1084 2
+a1085 2
+  LgFrDemandVector changedPriority(aWip.changedDemandsPriority());
+  assert (changedPriority.size() == 1);
+d1110 1
+a1110 1
+  aWip.buildAhead( true );
+d1112 1
+a1112 1
+  aWip.buildAhead( false );
+d1116 1
+a1116 1
+  aWip.computeCriticalList( false );
+d1118 1
+a1118 1
+  aWip.computeCriticalList( true );
+d1163 1
+a1163 1
+  assert( deltaSupply.size()==1 );
+d1174 1
+a1174 1
+  assert( deltaDemand.size()==1 );
+d1185 1
+a1185 1
+  assert( deltaPriority.size()==1 );
+d1197 1
+a1197 1
+  LgFrDemandVector chgDemands
+d1199 1
+a1199 1
+  assert( chgDemands.size() == 1 );
+d1204 1
+a1204 1
+  assert( delta.size()==1 );
+@
+
+
+1.4.2.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d879 3
+a881 3
+   std::cerr <<"LgFrWorkingImplosionProblem::updateFrom()" <<std::endl
+        <<"This method should not be invoked because wip does not" <<std::endl
+        <<"subscribe to any other objects" <<std::endl;
+d1172 2
+a1173 2
+  // cout <<"changedSupplyVolume" <<std::endl;
+  // cout <<deltaSupply.format() <<std::endl;
+d1183 2
+a1184 2
+  // cout <<"changedDemandVolume" <<std::endl;
+  // cout <<deltaDemand.format() <<std::endl;
+d1194 2
+a1195 2
+  // cout <<"changedDemandVolume" <<std::endl;
+  // cout <<deltaDemand.format() <<std::endl;
+@
+
+
+1.3
+log
+@Added implement (RWGVector, XXX) to satisfy vacpp linker.
+@
+text
+@d16 2
+d20 1
+a20 1
+
+@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d16 3
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d641 1
+a641 1
+               LgFrLastProblemSolved::capitalCost);
+d650 1
+a650 1
+                      LgFrLastProblemSolved::capitalCost );
+d660 1
+a660 1
+               LgFrLastProblemSolved::equitability);
+d669 1
+a669 1
+                      LgFrLastProblemSolved::equitability );
+d679 1
+a679 1
+               LgFrLastProblemSolved::buildAhead);
+d688 1
+a688 1
+                      LgFrLastProblemSolved::buildAhead );
+d698 1
+a698 1
+               LgFrLastProblemSolved::computeCriticalList);
+d707 1
+a707 1
+                      LgFrLastProblemSolved::computeCriticalList );
+d717 1
+a717 1
+               LgFrLastProblemSolved::inventoryCost);
+d726 1
+a726 1
+                      LgFrLastProblemSolved::inventoryCost );
+d736 1
+a736 1
+               LgFrLastProblemSolved::obj2WeightInventory);
+d745 1
+a745 1
+                      LgFrLastProblemSolved::obj2WeightInventory );
+d755 1
+a755 1
+               LgFrLastProblemSolved::obj2WeightRevenue);
+d764 1
+a764 1
+                      LgFrLastProblemSolved::obj2WeightRevenue );
+d774 1
+a774 1
+               LgFrLastProblemSolved::obj2WeightService);
+d783 1
+a783 1
+                      LgFrLastProblemSolved::obj2WeightService );
+d793 1
+a793 1
+               LgFrLastProblemSolved::obj2WeightSubstitutes);
+d802 1
+a802 1
+                      LgFrLastProblemSolved::obj2WeightSubstitutes );
+d812 1
+a812 1
+               LgFrLastProblemSolved::weightBounds);
+d821 1
+a821 1
+                      LgFrLastProblemSolved::weightBounds );
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

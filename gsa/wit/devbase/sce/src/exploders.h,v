@@ -1,0 +1,1094 @@
+head	1.10;
+access;
+symbols
+	sce_5_01_20080919:1.10
+	latest_sce_4_20_20060523:1.9.0.4
+	sce_4_20_20060523:1.9
+	latest_sce4_20_OSL:1.9.0.2
+	sce_4_20_OSL:1.9
+	sce_4_20_20051222:1.9
+	sce_4_10_30050426:1.6
+	sce_4_05_20040511:1.6
+	sce_4_00_20040201:1.6
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2007.05.29.19.43.55;	author ervolina;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2005.11.03.00.25.38;	author ervolina;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2005.11.02.18.40.01;	author ervolina;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2005.08.10.22.44.52;	author ervolina;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.01.22.02.47.48;	author ervolina;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.01.10.17.56.11;	author ervolina;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.08.04.20.47.54;	author dpc;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.55;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.10.17.22.04.42;	author ervolina;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.50;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.50;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.43.14;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@print impact period report for explosion
+@
+text
+@#ifndef LGFRSCEEXPLODERS
+#define LGFRSCEEXPLODERS
+
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+
+#include <scenario/src/machdep.h>
+#include <scenario/src/idnumber.h>
+#include <wit/src/wit.h>
+#include <sce/src/scenSceP.h>
+#include <sce/src/sceDefin.h>
+
+// forward declarations
+class LgFrMultiPlantHelper;
+class WitRun;
+class LgFrSceSetOfParameters;
+class LgFrSceCritList;
+
+
+
+
+
+
+// + SCE Exploder Subsytem
+// + =====================
+// +
+// + Based on Decorator Design Pattern
+// +
+// + Base class: LgFrSceBaseExploder
+// +     1) defines public standard wit mrp on originalWitRun (no offset adjusts)
+// +     2) Cannot be used with sceFSS
+// +     3) localWitRun --> originalWitRun
+// +     4) May only be used for standard wit MRP
+// +     5) Implements some function
+// + Implementation Notes:
+// +    - member data is defined in Base Class (witRun, localWitRun, mpHelper, setOfParams)
+// +      therefore, all decorators have this local dta as well.  The constructor of Base
+// +      decorator populates these data as pointers to the one owned by concrete exploder.
+// +      This is not good OO, but is more efficient, so that the decorators can get
+// +      pointers to these without lots of indirection via vprl.
+// +
+// + Concrete Component: LgFrSceExploder
+// +     1) standard wit mrp on originalWitRun (no offset adjusts)
+// +     2) populates a local witRun
+// +     3) All decorators must use this component
+// +     2) Cannot be used with sceFSS
+// +
+// + Decorator Base Class: LgFrSceBaseExploderDecorator
+// +
+// + Concrete Decorator: LgFrSceFssableExploderDecorator
+// +
+// + Concrete Decorator: LgFrSceFssableExploderDecorator
+// +     1) extends LgFrSceBaseExploder to do FSS work
+// +
+// + Concrete Decorator: LgFrSceFullExploderDecorator
+// +     1) extends LgFrSceFullExploderDecorator to do full explode
+// +     2) (adjusts offsets)
+// +
+// + Concrete Decorator: LgFrSceOptExploderDecorator
+// +     1) extends LgFrSceFullExploderDecorator OR LgFrSceFssExploderDecorator
+// +        to do implode based explosion
+// +     2) (modifies structures for implosion)
+// +     3) does witOptExplode
+
+
+
+
+
+
+class LgFrSceBaseExploder {
+public:
+
+  // The "Action" method ... Just do it
+  virtual int explode();
+
+  virtual std::string title();
+
+  // determine if this part is something that you deal with
+  virtual witBoolean  exists(const std::string& part);
+
+  // Get the four wit mrp part attributes:
+  // Default implementation
+#if 0
+  virtual   int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+#endif
+  virtual   int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual   int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual   int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual   int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual   int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+
+  // subUsage Vol
+  // must be overridden
+  virtual   int subUsageVol(  const std::string& operation,
+                              const int bomIndex,
+                              const int subBomIndex,
+                              float ** subUsageVolPtr);
+
+
+  // Print out all the attributes (in "del" format)
+  virtual void print(std::string& filename);
+
+
+  void
+  setWitInformationalMessagingExpl(WitRun * const theWitRun,
+                                                  int onOrOff);
+
+
+
+  // Constructor to be used by Client, and Exploder concrete class
+  LgFrSceBaseExploder(WitRun * originalWitRun,
+                      LgFrMultiPlantHelper * mpHelper,
+                      LgFrSceSetOfParameters * setOfParameters);
+
+  // constructor to be used by Decorator Base Class
+  LgFrSceBaseExploder(WitRun * originalWitRun,
+                      WitRun * localWitRun,
+                      LgFrMultiPlantHelper * mpHelper,
+                      LgFrSceSetOfParameters * setOfParameters);
+
+
+  // Return Comparison Strategy Identifier
+  virtual
+     isAReturnType
+        isA()
+           const;
+
+  virtual  WitRun *                   theWitRun();
+  virtual  WitRun *                   localWitRun();
+  virtual  LgFrMultiPlantHelper *     mpHelper();
+  virtual  LgFrSceSetOfParameters *   setOfParameters();
+
+  virtual  int                        nPeriods();
+  virtual  int                        state();
+  virtual  void                       state(int state);
+
+  void mallocZeroVec(float ** floatVecPtr);
+
+  // default constructor
+  LgFrSceBaseExploder();
+
+  // destructor
+  virtual
+  ~LgFrSceBaseExploder();
+
+protected:
+  WitRun *  originalWitRun_;
+  WitRun *  localWitRun_;
+  LgFrMultiPlantHelper * mpHelper_;
+  LgFrSceSetOfParameters * setOfParameters_;
+  int nPeriods_;
+  int       state_;
+
+
+private:
+
+  // copy constructor
+  LgFrSceBaseExploder( const LgFrSceBaseExploder& source );
+
+  // assignment operator
+  LgFrSceBaseExploder&
+  operator=(const LgFrSceBaseExploder& rhs);
+
+  const isAReturnType id_;
+};
+
+
+// + ==================================
+// + Concrete Component: LgFrSceExploder
+// + ===================================
+// +
+
+
+class LgFrSceExploder : public LgFrSceBaseExploder {
+public:
+
+
+  // preferred constructor
+  LgFrSceExploder(WitRun * originalWitRun,
+                  LgFrMultiPlantHelper * mpHelper,
+                  LgFrSceSetOfParameters * setOfParameters);
+
+  virtual std::string title();
+
+  // destructor
+  ~LgFrSceExploder();
+
+  // Return Comparison Strategy Identifier
+  virtual
+     isAReturnType
+        isA()
+           const;
+
+  // default constructor -- don't use!
+  LgFrSceExploder();
+
+  // copy constructor  -- don't use!
+  LgFrSceExploder( const LgFrSceExploder& source );
+
+  // assignment operator -- don't use!
+  LgFrSceExploder&
+  operator=(const LgFrSceExploder& rhs);
+
+
+private:
+  void
+  copyAppData();
+
+  void
+  modifyCustChoiceSupplyVols();
+
+
+  const isAReturnType id_;
+};
+
+
+// + ==================================================
+// + Decorator Base Class: LgFrSceBaseExploderDecorator
+// + ==================================================
+// +
+// + Provides a default implementation for all public methods
+// + this default is to pass the call on to myExploder
+
+
+class LgFrSceBaseExploderDecorator : public LgFrSceBaseExploder {
+public:
+
+  // The "Action" method ... Just do it
+  virtual int explode();
+
+
+
+
+
+
+  virtual witBoolean exists(const std::string& part);
+
+  // + Access functions are not overridden by concrete decorators
+  WitRun *                  theWitRun();
+  WitRun *                  localWitRun();
+  LgFrMultiPlantHelper *    mpHelper();
+  LgFrSceSetOfParameters *  setOfParameters();
+  int                       nPeriods();
+  int                       state();
+  void                      state(int);
+
+#if 0
+  virtual int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+#endif
+  virtual int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+
+  // subUsage Vol
+  // must be overridden
+  virtual int subUsageVol(  const std::string& operation,
+                            const int bomIndex,
+                            const int subBomIndex,
+                            float ** subUsageVolPtr);
+
+  virtual void print(std::string& filename);
+
+  // preferred constructor
+  LgFrSceBaseExploderDecorator(LgFrSceBaseExploder * myExploder);
+
+
+  // destructor
+  ~LgFrSceBaseExploderDecorator();
+
+  // Return Exploder Identifier
+  virtual
+     isAReturnType
+        isA()
+           const;
+
+  // default constructor -- don't use!
+  LgFrSceBaseExploderDecorator();
+
+  // copy constructor  -- don't use!
+  LgFrSceBaseExploderDecorator( const LgFrSceBaseExploderDecorator& source );
+
+  // assignment operator -- don't use!
+  LgFrSceBaseExploderDecorator&
+  operator=(const LgFrSceBaseExploderDecorator& rhs);
+
+protected:
+  LgFrSceBaseExploder  *   myExploder_;
+
+private:
+  const isAReturnType id_;
+};
+
+
+
+// + ==================================
+// + class LgFrSceFullExploderDecorator
+// + ==================================
+// +
+// + Decorates:
+// +    - the witRun with offset modifications
+// +
+// + Overrides:
+// +    - isA()
+// +    - explode()
+// +    -
+class LgFrSceFullExploderDecorator : public LgFrSceBaseExploderDecorator {
+public:
+
+  virtual int explode();
+
+  virtual std::string title();
+
+  // preferred constructor
+  LgFrSceFullExploderDecorator(LgFrSceBaseExploder * myExploder);
+
+  // destructor
+  ~LgFrSceFullExploderDecorator();
+
+  // Return Exploder Identifier
+  virtual
+     isAReturnType
+        isA()
+           const;
+
+
+
+private:
+  // internal method ... populates the witrun copy
+  void decorateLocalWitRun();
+
+  // default constructor -- don't use!
+  LgFrSceFullExploderDecorator();
+
+  // copy constructor  -- don't use!
+  LgFrSceFullExploderDecorator( const LgFrSceFullExploderDecorator& source );
+
+  // assignment operator -- don't use!
+  LgFrSceFullExploderDecorator&
+  operator=(const LgFrSceFullExploderDecorator& rhs);
+
+  const isAReturnType id_;
+};
+
+
+// + ==================================
+// + class LgFrSceSmartExploderDecorator
+// + ==================================
+// +
+// + Decorates:
+// +    - the witRun via
+// +        -
+// +        -
+// +        -
+// +        -
+// +
+// + Overrides:
+// +    - isA()
+// +    - explode()
+// +    -
+class LgFrSceSmartExploderDecorator : public LgFrSceBaseExploderDecorator {
+public:
+
+  virtual
+  int explode();
+
+  virtual void loadPIPDataIntoAppData(WitRun * const theWitRun);
+
+  virtual std::string title();
+#if 0
+  virtual int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+#endif
+  virtual int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+
+  // subUsage Vol
+  // must be overridden
+  virtual int subUsageVol(  const std::string& operation,
+                            const int bomIndex,
+                            const int subBomIndex,
+                            float ** subUsageVolPtr);
+
+
+
+  // preferred constructor
+  LgFrSceSmartExploderDecorator(LgFrSceBaseExploder * myExploder,
+                                LgFrScenarioForSceSmartPointer sceScenSP,
+                                LgFrMultiPlantHelper * mpHelper);
+
+  // destructor
+  ~LgFrSceSmartExploderDecorator();
+
+  // Return Exploder Identifier
+  virtual
+     isAReturnType
+        isA()
+           const;
+
+  virtual void print(std::string& filename);
+
+private:
+  // internal method ... populates the witrun copy
+  void decorateLocalWitRun();
+  void restructureForImplosionToSolveExplosion();
+  void disableSubBomAccordingToAppData();
+
+
+void printImpactPeriodFile(
+    WitRun * const theWitRun,
+    const int nPeriods,
+    const std::string & fileName,
+    LgFrMultiPlantHelper & mpHelper);
+
+  void decorateLocalWitRunForPrioritizedExplode();
+
+
+  // default constructor -- don't use!
+  LgFrSceSmartExploderDecorator();
+
+  // copy constructor  -- don't use!
+  LgFrSceSmartExploderDecorator( const LgFrSceSmartExploderDecorator& source );
+
+  // assignment operator -- don't use!
+  LgFrSceSmartExploderDecorator&
+  operator=(const LgFrSceSmartExploderDecorator& rhs);
+
+  const isAReturnType id_;
+  LgFrScenarioForSceSmartPointer sceScenSP_;
+  LgFrMultiPlantHelper * mpHelper_;
+
+
+};
+
+
+// + ================================
+// + LgFrSceFssableExploderDecorator
+// + ================================
+// +
+// + Extends:
+// +    - adds functions that extend any exploders capabilities
+// +      for FSS.  Mainly, lets client modify localWitRun.
+// +
+// + All other access functions are passed off
+class LgFrSceFssableExploderDecorator : public LgFrSceBaseExploderDecorator {
+public:
+
+  virtual int explode();
+
+  // preferred constructor
+  LgFrSceFssableExploderDecorator(LgFrSceBaseExploder * myExploder);
+
+
+  virtual std::string title();
+  // Put your fss-specific calls here
+
+
+  virtual void setAllSupplyToZero();
+
+  virtual void setAllDemandToZero();
+
+  // Return Exploder Identifier
+  virtual isAReturnType isA() const;
+
+  // destructor
+  ~LgFrSceFssableExploderDecorator();
+
+
+private:
+  // default constructor -- don't use!
+  LgFrSceFssableExploderDecorator();
+
+  // copy constructor  -- don't use!
+  LgFrSceFssableExploderDecorator( const LgFrSceFssableExploderDecorator& source );
+
+  // assignment operator -- don't use!
+  LgFrSceFssableExploderDecorator&
+  operator=(const LgFrSceFssableExploderDecorator& rhs);
+
+  // set supplyVols and demandVols to the current
+  // setting in originalWitRun_.
+  virtual void  synchronize();
+
+
+  const isAReturnType id_;
+};
+
+
+
+
+// + ======================================================
+// + Exploder Factory -- creates the right decorated exploder
+// + based on SetOfParameters.  Global Function
+// + ======================================================
+#if 0
+// this function is in the sceScenario object.
+LgFrSceBaseExploder *
+createAppropriateSceExploder(WitRun * theWitRun,
+                             LgFrMultiPlantHelper * mpHelper,
+                             LgFrSceSetOfParameters * setOfParameters);
+#endif
+
+
+// These definitions follow the pattern used by Rogue Wave
+#define __LGFRSCEBASEEXPLODER                0x2500
+#define __LGFRSCEEXPLODER                    0x2501
+#define __LGFRSCEBASEEXPLODERDECORATOR       0x2502
+#define __LGFRSCEFSSABLEEXPLODERDECORATOR    0x2503
+#define __LGFRSCEFULLEXPLODERDECORATOR       0x2504
+#define __LGFRSCESMARTEXPLODERDECORATOR      0x2505
+
+#endif
+@
+
+
+1.9
+log
+@incorrectly mapped fallout to falloutRate when we got rid of witAddxxxVa
+@
+text
+@d23 1
+a23 1
+ 
+d73 1
+a73 1
+  
+d98 1
+a98 1
+                              float ** subUsageVolPtr);  
+d105 5
+a109 3
+  void 
+  setWitInformationalMessagingExpl(WitRun * const theWitRun,   
+						  int onOrOff);
+a110 2
+  
+  
+d121 2
+a122 2
+  
+  
+d128 1
+a128 1
+  
+d136 2
+a137 2
+  virtual  void                       state(int state);  
+  
+d139 1
+a139 1
+  
+d147 1
+a147 1
+protected:  
+d154 1
+a154 1
+  
+d160 1
+a160 1
+  
+d164 1
+a164 1
+  
+d177 1
+a177 1
+  
+d183 1
+a183 1
+  
+d185 1
+a185 1
+  
+d194 1
+a194 1
+  
+d197 1
+a197 1
+  
+d200 1
+a200 1
+  
+d206 1
+a206 1
+private:  
+d238 1
+a238 1
+  
+d263 1
+a263 1
+  
+d268 2
+a269 2
+  
+  
+d278 1
+a278 1
+  
+d281 1
+a281 1
+  
+d284 1
+a284 1
+  
+d289 1
+a289 1
+protected:  
+d299 1
+a299 1
+// + class LgFrSceFullExploderDecorator 
+d308 1
+a308 1
+// +    - 
+d311 1
+a311 1
+  
+d314 1
+a314 1
+  virtual std::string title();  
+d318 1
+a318 1
+  
+d327 3
+a329 3
+  
+  
+  
+d336 1
+a336 1
+  
+d339 1
+a339 1
+  
+d349 1
+a349 1
+// + class LgFrSceSmartExploderDecorator 
+d354 1
+a354 1
+// +        - 
+d362 1
+a362 1
+// +    - 
+d365 1
+a365 1
+  
+d371 1
+a371 1
+  virtual std::string title();  
+d387 1
+a387 1
+  
+d392 2
+a393 2
+				LgFrScenarioForSceSmartPointer sceScenSP,
+				LgFrMultiPlantHelper * mpHelper);
+d403 3
+a405 3
+  
+  virtual void print(std::string& filename);  
+  
+d413 6
+d424 1
+a424 1
+  
+d427 1
+a427 1
+  
+d451 1
+a451 1
+  
+d456 1
+a456 1
+  
+d460 1
+a460 1
+  
+d468 1
+a468 1
+  
+d472 1
+a472 1
+  
+d476 1
+a476 1
+  
+d479 1
+a479 1
+  
+d487 2
+a488 2
+  
+  
+d509 3
+a511 3
+#define __LGFRSCEBASEEXPLODER		     0x2500
+#define __LGFRSCEEXPLODER		     0x2501
+#define __LGFRSCEBASEEXPLODERDECORATOR	     0x2502
+@
+
+
+1.8
+log
+@First pass at sce 4.20 function.
+@
+text
+@d410 2
+a411 1
+  void copyMoreStuffOver();
+@
+
+
+1.7
+log
+@4.20 commit: global subs, prioritized explode
+@
+text
+@a17 1
+#ifdef HEUR_ALLOC_EXPLODE
+d19 1
+a19 1
+#endif
+d104 1
+a104 1
+#if 1
+a107 1
+#endif
+a204 5
+#if 0
+  void 
+  setWitInformationalMessagingExpl(WitRun * const theWitRun,   
+						  int onOrOff);
+#endif
+d208 5
+a212 1
+  smartCopyData();
+a389 1
+#ifdef HEUR_ALLOC_EXPLODE
+a393 4
+#else  
+  // preferred constructor
+  LgFrSceSmartExploderDecorator(LgFrSceBaseExploder * myExploder);
+#endif
+d412 3
+a425 1
+#ifdef HEUR_ALLOC_EXPLODE  
+a427 1
+#endif
+@
+
+
+1.6
+log
+@permanently replaced Concurrent Pegging with Post Implosion pegging.
+Parameters stay the same though.
+@
+text
+@d11 1
+d18 6
+d135 1
+d234 6
+d392 7
+d401 2
+a402 1
+  
+d431 6
+@
+
+
+1.5
+log
+@first level of PIP
+@
+text
+@a357 2
+  virtual void loadPegDataIntoAppData(WitRun * const theWitRun);
+
+a358 2
+
+
+@
+
+
+1.4
+log
+@changed
+virtual exists (stuff)
+to
+virtual witBoolean exists (stuff)
+for the gcc compiler
+@
+text
+@d360 1
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d226 1
+a226 1
+  virtual exists(const std::string& part);
+@
+
+
+1.2
+log
+@premiminary coomit for release 3.11
+@
+text
+@d4 4
+a10 1
+#include <rw/cstring.h>
+d71 1
+a71 1
+  virtual RWCString title();
+d74 1
+a74 1
+  virtual witBoolean  exists(const char * part);
+d79 1
+a79 1
+  virtual   int mrpProdVol(  const char * part, float ** mrpProdVol);
+d81 5
+a85 5
+  virtual   int mrpExcessVol(  const char * part, float ** mrpExcessVol);
+  virtual   int mrpResidualVol(const char * part, float ** mrpResidualVol);
+  virtual   int reqVol(        const char * part, float ** reqVolPtr);
+  virtual   int mrpConsVol(    const char * part, float ** mrpConsVolPtr);
+  virtual   int mrpExecVol(    const char * operation, float ** mrpExecVolPtr);
+d89 1
+a89 1
+  virtual   int subUsageVol(  const char * operation,
+d96 1
+a96 1
+  virtual void print(char * filename);
+d178 1
+a178 1
+  virtual RWCString title();
+d226 1
+a226 1
+  virtual exists(const char * part);
+d238 1
+a238 1
+  virtual int mrpProdVol(  const char * part, float ** mrpProdVol);
+d240 5
+a244 5
+  virtual int mrpExcessVol(  const char * part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const char * part, float ** mrpResidualVol);
+  virtual int reqVol(        const char * part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const char * part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const char * operation, float ** mrpExecVolPtr);
+d248 1
+a248 1
+  virtual int subUsageVol(  const char * operation,
+d253 1
+a253 1
+  virtual void print(char * filename);
+d303 1
+a303 1
+  virtual RWCString title();  
+d363 1
+a363 1
+  virtual RWCString title();  
+d365 1
+a365 1
+  virtual int mrpProdVol(  const char * part, float ** mrpProdVol);
+d367 5
+a371 5
+  virtual int mrpExcessVol(  const char * part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const char * part, float ** mrpResidualVol);
+  virtual int reqVol(        const char * part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const char * part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const char * operation, float ** mrpExecVolPtr);
+d375 1
+a375 1
+  virtual int subUsageVol(  const char * operation,
+d393 1
+a393 1
+  virtual void print(char * filename);  
+d433 1
+a433 1
+  virtual RWCString title();
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@a3 4
+// RW2STL - inserted:
+#include <string>
+// End of RW2STL - inserted includes.
+
+d7 1
+d68 1
+a68 1
+  virtual std::string title();
+d71 1
+a71 1
+  virtual witBoolean  exists(const std::string& part);
+d76 1
+a76 1
+  virtual   int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+d78 5
+a82 5
+  virtual   int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual   int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual   int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual   int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual   int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+d86 1
+a86 1
+  virtual   int subUsageVol(  const std::string& operation,
+d93 1
+a93 1
+  virtual void print(std::string& filename);
+d175 1
+a175 1
+  virtual std::string title();
+d223 1
+a223 1
+  virtual exists(const std::string& part);
+d235 1
+a235 1
+  virtual int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+d237 5
+a241 5
+  virtual int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+d245 1
+a245 1
+  virtual int subUsageVol(  const std::string& operation,
+d250 1
+a250 1
+  virtual void print(std::string& filename);
+d300 1
+a300 1
+  virtual std::string title();  
+d360 1
+a360 1
+  virtual std::string title();  
+d362 1
+a362 1
+  virtual int mrpProdVol(  const std::string& part, float ** mrpProdVol);
+d364 5
+a368 5
+  virtual int mrpExcessVol(  const std::string& part, float ** mrpExcessVol);
+  virtual int mrpResidualVol(const std::string& part, float ** mrpResidualVol);
+  virtual int reqVol(        const std::string& part, float ** reqVolPtr);
+  virtual int mrpConsVol(    const std::string& part, float ** mrpConsVolPtr);
+  virtual int mrpExecVol(    const std::string& operation, float ** mrpExecVolPtr);
+d372 1
+a372 1
+  virtual int subUsageVol(  const std::string& operation,
+d390 1
+a390 1
+  virtual void print(std::string& filename);  
+d430 1
+a430 1
+  virtual std::string title();
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d354 6
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@

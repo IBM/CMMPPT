@@ -1,0 +1,1598 @@
+head	1.10;
+access;
+symbols
+	sce_5_01_20080919:1.6;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2011.09.28.23.49.54;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.09.24.00.28.16;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.08.30.20.17.55;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.03.16.22.42.27;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.08.01.21.28.05;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.07.13.21.23.19;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.07.13.19.44.40;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.07.13.18.36.27;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.07.13.18.22.53;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.07.12.21.27.48;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "PipPartReqMgr.C"
+//
+// Contains the implementation of class PipPartReqMgr.
+//------------------------------------------------------------------------------
+
+#include <PipPartReqMgr.h>
+#include <PipReqMgr.h>
+#include <PipReqSrc.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <Post.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class PipPartReqMgr.
+//------------------------------------------------------------------------------
+
+WitPipPartReqMgr::WitPipPartReqMgr (WitPipReqMgr * theReqMgr):
+
+      WitProbAssoc     (theReqMgr),
+      myReqMgr_        (theReqMgr),
+      curPartHasStock_ (false),
+      netStockVol_     (myProblem (), 0.0),
+      curPartReqSeq_   (myProblem ()),
+      workReqSeq_      (myProblem ()),
+      overStockReqSeq_ (myProblem ()),
+      maxInfeas_       (0.0),
+      maxInfeasPart_   (NULL),
+      maxInfeasPer_    (-1)
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      curPartReqSeq_  [thePer] = new WitPipReqSeq (myProblem ());
+      overStockReqSeq_[thePer] = new WitPipReqSeq (myProblem ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitPipPartReqMgr::~WitPipPartReqMgr ()
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      delete overStockReqSeq_[thePer];
+      delete curPartReqSeq_  [thePer];
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::setUpPartReqs (WitPart * thePart)
+   {
+   WitMaterial * theMat;
+
+   theMat           = thePart->thisMat ();
+
+   curPartHasStock_ = false;
+
+   if (theMat != NULL)
+      if (theMat->stockVol () != 0.0)
+         curPartHasStock_ = true;
+
+   if (curPartHasStock_)
+      compNonExcStockVol (theMat);
+   else
+      netStockVol_ = 0.0;
+
+   loadCurPartReqSeqs (thePart);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::mergeCurPartReqsIntoWorkSeq (WitPeriod thePer)
+   {
+   WitPipReqSeq   curPartSeq (myProblem ());
+   WitPipReqSeq   mergedSeq  (myProblem ());
+   WitPipReqSrc * workSrc;
+   WitPeriod      workPer;
+   double         workReqVol;
+   WitPipReqSrc * curPartSrc;
+   WitPeriod      curPartPer;
+   double         curPartReqVol;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (curPartReqSeq_ (thePer));
+
+      return;
+      }
+
+   curPartSeq.takeContentsFrom (curPartReqSeq_ (thePer));
+
+   popOrNull (workReqSeq_, workSrc,    workPer,    workReqVol);
+   popOrNull (curPartSeq,  curPartSrc, curPartPer, curPartReqVol);
+
+   while ((workSrc != NULL) and (curPartSrc != NULL))
+      if (workSrc->belongsBefore (curPartSrc))
+         {
+         mergedSeq.push         (workSrc, workPer, workReqVol);
+         popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+         }
+      else
+         {
+         mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+         popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+         }
+
+   while (workSrc != NULL)
+      {
+      mergedSeq.push         (workSrc, workPer, workReqVol);
+      popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+      }
+
+   while (curPartSrc != NULL)
+      {
+      mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+      popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+      }
+
+   mergedSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (mergedSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPipPartReqMgr::workSeqIsEmpty ()
+   {
+   return workReqSeq_.isEmpty ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::getNextReq (
+      double &         netAttVol,
+      WitPipReqSrc * & theReqSrc,
+      double &         incPegVol)
+   {
+   WitPeriod fillPer;
+   double    incReqVol;
+
+   witAssert (not workSeqIsEmpty ());
+   witAssert (netAttVol > NET_TOL);
+
+   workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+   incPegVol  = min (incReqVol, netAttVol);
+      
+   incReqVol -= incPegVol;
+   netAttVol -= incPegVol;
+
+   if (incReqVol > NET_TOL)
+      workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+   if (myGlobalComp ()->printDebug ())
+      prtPeg (incPegVol, fillPer, theReqSrc);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::rollReqsBack (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   double         rollVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+
+   witAssert (thePer > 0);
+
+   while (not workSeqIsEmpty () and (netStockVol_[thePer - 1] > NET_TOL))
+      {
+      workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+      rollVol = min (incReqVol, netStockVol_[thePer - 1]);
+
+      rolledSeq.push (theReqSrc, fillPer, rollVol);
+
+      netStockVol_[thePer - 1] -= rollVol;
+      incReqVol                -= rollVol;
+
+      if (incReqVol > NET_TOL)
+         workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+      }
+
+   overStockReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+   rolledSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::rollReqsFwd (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+   WitPipReqSrc * theReqSrcOv;
+   WitPeriod      fillPerOv;
+   double         incReqVolOv;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (overStockReqSeq_ (thePer));
+
+      return;
+      }
+
+   while (not workSeqIsEmpty ())
+      {
+      workReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq  .push (theReqSrc, fillPer, incReqVol);
+     
+      netStockVol_[thePer - 1] += incReqVol;
+      }
+
+   if (rolledSeq.isNonEmpty ())
+      if (overStockReqSeq_ (thePer).isNonEmpty ())
+         {
+         rolledSeq                .pop (theReqSrc,   fillPer,   incReqVol);
+         overStockReqSeq_ (thePer).pop (theReqSrcOv, fillPerOv, incReqVolOv);
+
+         if ((theReqSrc == theReqSrcOv) and (fillPer == fillPerOv))
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol + incReqVolOv);
+            }
+         else
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol);
+            rolledSeq.push (theReqSrcOv, fillPerOv, incReqVolOv);
+            }
+         }
+
+   while (overStockReqSeq_ (thePer).isNonEmpty ())
+      {
+      overStockReqSeq_ (thePer).pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq                .push (theReqSrc, fillPer, incReqVol);
+      }
+
+   rolledSeq.reverse ();
+
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::restoreUnfilledCurPartReqs (WitPeriod thePer)
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   reducedSeq (myProblem ());
+
+   witAssert (curPartReqSeq_ (thePer).isEmpty ());
+
+   if (not curPartHasStock_)
+      {
+      curPartReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+      return;
+      }
+
+   while (not workSeqIsEmpty ())
+      {
+      workReqSeq_               .pop  (theReqSrc, fillPer, incReqVol);
+
+      if (fillPer == thePer)
+         curPartReqSeq_ (thePer).push (theReqSrc, fillPer, incReqVol);
+      else
+         reducedSeq             .push (theReqSrc, fillPer, incReqVol);
+      }
+
+   curPartReqSeq_ (thePer).reverse ();
+   reducedSeq             .reverse ();
+
+   workReqSeq_.takeContentsFrom (reducedSeq);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::prtWorkReqSeq (
+      const char * theAttname,
+      WitPart *    thePart,
+      WitPeriod    thePer)
+   {
+   WitPipReqSeq   theReqSeq (myProblem ());
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   witAssert (myGlobalComp ()->printDebug ());
+   
+   theReqSeq.revCopyFrom (workReqSeq_);
+
+   theReqSeq.reverse ();
+
+   fprintf (msgFile (),
+      "\n"
+      "Pegging to %s:\n"
+      "   Part:       %s\n"
+      "   Peg period: %d\n"
+      "\n"
+      "   Requirement sequence:\n",
+      theAttname,
+      thePart->partName ().myCstring (),
+      thePer);
+
+   while (theReqSeq.pop (theReqSrc, fillPer, incReqVol))
+      {
+      fprintf (msgFile (),
+         "\n"
+         "      Fill Period: %d\n"
+         "      ReqVol:      %.0f\n",
+         fillPer,
+         incReqVol);
+
+      theReqSrc->print (msgFile (), "      ");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::prtPeg (
+      double         pegVol,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc)
+   {
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "   Pegging:\n"
+      "      PegVol:      %.0f\n"
+      "      Fill Period: %d\n",
+      pegVol,
+      fillPer);
+
+   theReqSrc->print (msgFile (), "      ");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::recordInfeas (WitPart * thePart)
+   {
+   WitPeriod      thePer;
+   double         totReqVol;
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      totReqVol = 0.0;
+
+      while (curPartReqSeq_ (thePer).isNonEmpty ())
+         {
+         curPartReqSeq_ (thePer).pop (theReqSrc, fillPer, incReqVol);
+
+         totReqVol += incReqVol;
+         }
+
+      if (totReqVol > maxInfeas_)
+         {
+         maxInfeas_     = totReqVol;
+         maxInfeasPart_ = thePart;
+         maxInfeasPer_  = thePer;
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::prtInfeas ()
+   {
+   myMsgFac () ("pipMaxInfeasMsg", maxInfeas_);
+
+   if (maxInfeas_ > 0.0)
+      myMsgFac () ("pipMaxInfDataMsg",
+         maxInfeasPart_->partName (),
+         maxInfeasPer_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::compNonExcStockVol (WitMaterial * theMat)
+   {
+   double    excStockVol;
+   WitPeriod thePer;
+
+   excStockVol = 0.0;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      excStockVol +=
+         myProblem ()->myPostprocessor ()->compExcessVol (theMat, thePer);
+
+      excStockVol -= theMat->scrapVol ()[thePer];
+
+      setToMax (excStockVol, 0.0);
+
+      setToMin (excStockVol, theMat->stockVol ()[thePer]);
+
+      netStockVol_[thePer] = theMat->stockVol ()[thePer] - excStockVol;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::loadCurPartReqSeqs (WitPart * thePart)
+   {
+   WitPipReqList  theReqList (myProblem ());
+   WitPeriod      fillPer;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   forEachPeriod (fillPer, myProblem ())
+      {
+      myReqMgr_->loadCurReqList (thePart, fillPer);
+
+      myReqMgr_->getCurReqList  (theReqList);
+
+      while (theReqList.pop (theReqSrc, incReqVol))
+         curPartReqSeq_ (fillPer).push (theReqSrc, fillPer, incReqVol);
+
+      curPartReqSeq_ (fillPer).reverse ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPipPartReqMgr::popOrNull (
+      WitPipReqSeq &   theReqSeq,
+      WitPipReqSrc * & theReqSrc,
+      WitPeriod &      fillPer,
+      double &         incReqVol)
+   {
+   if (theReqSeq.isNonEmpty ())
+      theReqSeq.pop (theReqSrc, fillPer, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      fillPer   = -1;
+      incReqVol = 0.0;
+      }
+   }
+@
+
+
+1.9
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.8
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d30 19
+a48 19
+WitProbAssoc     (theReqMgr),
+myReqMgr_        (theReqMgr),
+curPartHasStock_ (false),
+netStockVol_     (myProblem (), 0.0),
+curPartReqSeq_   (myProblem ()),
+workReqSeq_      (myProblem ()),
+overStockReqSeq_ (myProblem ()),
+maxInfeas_       (0.0),
+maxInfeasPart_   (NULL),
+maxInfeasPer_    (-1)
+{
+WitPeriod thePer;
+
+forEachPeriod (thePer, myProblem ())
+{
+curPartReqSeq_  [thePer] = new WitPipReqSeq (myProblem ());
+overStockReqSeq_[thePer] = new WitPipReqSeq (myProblem ());
+}
+}
+d53 2
+a54 2
+{
+WitPeriod thePer;
+d56 6
+a61 6
+forEachPeriod (thePer, myProblem ())
+{
+delete overStockReqSeq_[thePer];
+delete curPartReqSeq_  [thePer];
+}
+}
+d66 2
+a67 2
+{
+WitMaterial * theMat;
+d69 1
+a69 1
+theMat           = thePart->thisMat ();
+d71 1
+a71 1
+curPartHasStock_ = false;
+d73 3
+a75 3
+if (theMat != NULL)
+if (theMat->stockVol () != 0.0)
+curPartHasStock_ = true;
+d77 4
+a80 4
+if (curPartHasStock_)
+compNonExcStockVol (theMat);
+else
+netStockVol_ = 0.0;
+d82 2
+a83 2
+loadCurPartReqSeqs (thePart);
+}
+d88 45
+a132 45
+{
+WitPipReqSeq   curPartSeq (myProblem ());
+WitPipReqSeq   mergedSeq  (myProblem ());
+WitPipReqSrc * workSrc;
+WitPeriod      workPer;
+double         workReqVol;
+WitPipReqSrc * curPartSrc;
+WitPeriod      curPartPer;
+double         curPartReqVol;
+
+if (not curPartHasStock_)
+{
+workReqSeq_.takeContentsFrom (curPartReqSeq_ (thePer));
+
+return;
+}
+
+curPartSeq.takeContentsFrom (curPartReqSeq_ (thePer));
+
+popOrNull (workReqSeq_, workSrc,    workPer,    workReqVol);
+popOrNull (curPartSeq,  curPartSrc, curPartPer, curPartReqVol);
+
+while ((workSrc != NULL) and (curPartSrc != NULL))
+if (workSrc->belongsBefore (curPartSrc))
+{
+mergedSeq.push         (workSrc, workPer, workReqVol);
+popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+}
+else
+{
+mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+}
+
+while (workSrc != NULL)
+{
+mergedSeq.push         (workSrc, workPer, workReqVol);
+popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+}
+
+while (curPartSrc != NULL)
+{
+mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+}
+d134 1
+a134 1
+mergedSeq.reverse ();
+d136 2
+a137 2
+workReqSeq_.takeContentsFrom (mergedSeq);
+}
+d142 3
+a144 3
+{
+return workReqSeq_.isEmpty ();
+}
+d149 23
+a171 23
+double &         netAttVol,
+WitPipReqSrc * & theReqSrc,
+double &         incPegVol)
+{
+WitPeriod fillPer;
+double    incReqVol;
+
+witAssert (not workSeqIsEmpty ());
+witAssert (netAttVol > NET_TOL);
+
+workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+incPegVol  = min (incReqVol, netAttVol);
+
+incReqVol -= incPegVol;
+netAttVol -= incPegVol;
+
+if (incReqVol > NET_TOL)
+workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+if (myGlobalComp ()->printDebug ())
+prtPeg (incPegVol, fillPer, theReqSrc);
+}
+d176 6
+a181 6
+{
+WitPipReqSrc * theReqSrc;
+WitPeriod      fillPer;
+double         incReqVol;
+double         rollVol;
+WitPipReqSeq   rolledSeq (myProblem ());
+d183 1
+a183 1
+witAssert (thePer > 0);
+d185 3
+a187 3
+while (not workSeqIsEmpty () and (netStockVol_[thePer - 1] > NET_TOL))
+{
+workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+d189 1
+a189 1
+rollVol = min (incReqVol, netStockVol_[thePer - 1]);
+d191 1
+a191 1
+rolledSeq.push (theReqSrc, fillPer, rollVol);
+d193 2
+a194 2
+netStockVol_[thePer - 1] -= rollVol;
+incReqVol                -= rollVol;
+d196 3
+a198 3
+if (incReqVol > NET_TOL)
+workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+}
+d200 1
+a200 1
+overStockReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+d202 1
+a202 1
+rolledSeq.reverse ();
+d204 2
+a205 2
+workReqSeq_.takeContentsFrom (rolledSeq);
+}
+d210 46
+a255 46
+{
+WitPipReqSrc * theReqSrc;
+WitPeriod      fillPer;
+double         incReqVol;
+WitPipReqSeq   rolledSeq (myProblem ());
+WitPipReqSrc * theReqSrcOv;
+WitPeriod      fillPerOv;
+double         incReqVolOv;
+
+if (not curPartHasStock_)
+{
+workReqSeq_.takeContentsFrom (overStockReqSeq_ (thePer));
+
+return;
+}
+
+while (not workSeqIsEmpty ())
+{
+workReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+rolledSeq  .push (theReqSrc, fillPer, incReqVol);
+
+netStockVol_[thePer - 1] += incReqVol;
+}
+
+if (rolledSeq.isNonEmpty ())
+if (overStockReqSeq_ (thePer).isNonEmpty ())
+{
+rolledSeq                .pop (theReqSrc,   fillPer,   incReqVol);
+overStockReqSeq_ (thePer).pop (theReqSrcOv, fillPerOv, incReqVolOv);
+
+if ((theReqSrc == theReqSrcOv) and (fillPer == fillPerOv))
+{
+rolledSeq.push (theReqSrc,   fillPer,   incReqVol + incReqVolOv);
+}
+else
+{
+rolledSeq.push (theReqSrc,   fillPer,   incReqVol);
+rolledSeq.push (theReqSrcOv, fillPerOv, incReqVolOv);
+}
+}
+
+while (overStockReqSeq_ (thePer).isNonEmpty ())
+{
+overStockReqSeq_ (thePer).pop  (theReqSrc, fillPer, incReqVol);
+rolledSeq                .push (theReqSrc, fillPer, incReqVol);
+}
+d257 1
+a257 1
+rolledSeq.reverse ();
+d259 2
+a260 2
+workReqSeq_.takeContentsFrom (rolledSeq);
+}
+d265 24
+a288 24
+{
+WitPipReqSrc * theReqSrc;
+WitPeriod      fillPer;
+double         incReqVol;
+WitPipReqSeq   reducedSeq (myProblem ());
+
+witAssert (curPartReqSeq_ (thePer).isEmpty ());
+
+if (not curPartHasStock_)
+{
+curPartReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+return;
+}
+
+while (not workSeqIsEmpty ())
+{
+workReqSeq_               .pop  (theReqSrc, fillPer, incReqVol);
+
+if (fillPer == thePer)
+curPartReqSeq_ (thePer).push (theReqSrc, fillPer, incReqVol);
+else
+reducedSeq             .push (theReqSrc, fillPer, incReqVol);
+}
+d290 2
+a291 2
+curPartReqSeq_ (thePer).reverse ();
+reducedSeq             .reverse ();
+d293 2
+a294 2
+workReqSeq_.takeContentsFrom (reducedSeq);
+}
+d299 38
+a336 38
+const char * theAttname,
+WitPart *    thePart,
+WitPeriod    thePer)
+{
+WitPipReqSeq   theReqSeq (myProblem ());
+WitPipReqSrc * theReqSrc;
+WitPeriod      fillPer;
+double         incReqVol;
+
+witAssert (myGlobalComp ()->printDebug ());
+
+theReqSeq.revCopyFrom (workReqSeq_);
+
+theReqSeq.reverse ();
+
+fprintf (msgFile (),
+"\n"
+"Pegging to %s:\n"
+"   Part:       %s\n"
+"   Peg period: %d\n"
+"\n"
+"   Requirement sequence:\n",
+theAttname,
+thePart->partName ().myCstring (),
+thePer);
+
+while (theReqSeq.pop (theReqSrc, fillPer, incReqVol))
+{
+fprintf (msgFile (),
+"\n"
+"      Fill Period: %d\n"
+"      ReqVol:      %.0f\n",
+fillPer,
+incReqVol);
+
+theReqSrc->print (msgFile (), "      ");
+}
+}
+d341 13
+a353 13
+double         pegVol,
+WitPeriod      fillPer,
+WitPipReqSrc * theReqSrc)
+{
+witAssert (myGlobalComp ()->printDebug ());
+
+fprintf (msgFile (),
+"\n"
+"   Pegging:\n"
+"      PegVol:      %.0f\n"
+"      Fill Period: %d\n",
+pegVol,
+fillPer);
+d355 2
+a356 2
+theReqSrc->print (msgFile (), "      ");
+}
+d361 26
+a386 26
+{
+WitPeriod      thePer;
+double         totReqVol;
+WitPipReqSrc * theReqSrc;
+WitPeriod      fillPer;
+double         incReqVol;
+
+forEachPeriod (thePer, myProblem ())
+{
+totReqVol = 0.0;
+
+while (curPartReqSeq_ (thePer).isNonEmpty ())
+{
+curPartReqSeq_ (thePer).pop (theReqSrc, fillPer, incReqVol);
+
+totReqVol += incReqVol;
+}
+
+if (totReqVol > maxInfeas_)
+{
+maxInfeas_     = totReqVol;
+maxInfeasPart_ = thePart;
+maxInfeasPer_  = thePer;
+}
+}
+}
+d391 2
+a392 2
+{
+myMsgFac () ("pipMaxInfeasMsg", maxInfeas_);
+d394 5
+a398 5
+if (maxInfeas_ > 0.0)
+myMsgFac () ("pipMaxInfDataMsg",
+maxInfeasPart_->partName (),
+maxInfeasPer_);
+}
+d403 3
+a405 3
+{
+double    excStockVol;
+WitPeriod thePer;
+d407 1
+a407 1
+excStockVol = 0.0;
+d409 4
+a412 4
+forEachPeriod (thePer, myProblem ())
+{
+excStockVol +=
+myProblem ()->myPostprocessor ()->compExcessVol (theMat, thePer);
+d414 1
+a414 1
+excStockVol -= theMat->scrapVol ()[thePer];
+d416 1
+a416 1
+setToMax (excStockVol, 0.0);
+d418 1
+a418 1
+setToMin (excStockVol, theMat->stockVol ()[thePer]);
+d420 3
+a422 3
+netStockVol_[thePer] = theMat->stockVol ()[thePer] - excStockVol;
+}
+}
+d427 18
+a444 18
+{
+WitPipReqList  theReqList (myProblem ());
+WitPeriod      fillPer;
+WitPipReqSrc * theReqSrc;
+double         incReqVol;
+
+forEachPeriod (fillPer, myProblem ())
+{
+myReqMgr_->loadCurReqList (thePart, fillPer);
+
+myReqMgr_->getCurReqList  (theReqList);
+
+while (theReqList.pop (theReqSrc, incReqVol))
+curPartReqSeq_ (fillPer).push (theReqSrc, fillPer, incReqVol);
+
+curPartReqSeq_ (fillPer).reverse ();
+}
+}
+d449 14
+a462 14
+WitPipReqSeq &   theReqSeq,
+WitPipReqSrc * & theReqSrc,
+WitPeriod &      fillPer,
+double &         incReqVol)
+{
+if (theReqSeq.isNonEmpty ())
+theReqSeq.pop (theReqSrc, fillPer, incReqVol);
+else
+{
+theReqSrc = NULL;
+fillPer   = -1;
+incReqVol = 0.0;
+}
+}
+@
+
+
+1.7
+log
+@Changed source file names:
+   Global.h ==> GlobalComp.h
+   Global.C ==> GlobalComp.C
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d30 19
+a48 19
+      WitProbAssoc     (theReqMgr),
+      myReqMgr_        (theReqMgr),
+      curPartHasStock_ (false),
+      netStockVol_     (myProblem (), 0.0),
+      curPartReqSeq_   (myProblem ()),
+      workReqSeq_      (myProblem ()),
+      overStockReqSeq_ (myProblem ()),
+      maxInfeas_       (0.0),
+      maxInfeasPart_   (NULL),
+      maxInfeasPer_    (-1)
+   {
+   WitPeriod thePer;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      curPartReqSeq_  [thePer] = new WitPipReqSeq (myProblem ());
+      overStockReqSeq_[thePer] = new WitPipReqSeq (myProblem ());
+      }
+   }
+d53 2
+a54 2
+   {
+   WitPeriod thePer;
+d56 6
+a61 6
+   forEachPeriod (thePer, myProblem ())
+      {
+      delete overStockReqSeq_[thePer];
+      delete curPartReqSeq_  [thePer];
+      }
+   }
+d66 2
+a67 2
+   {
+   WitMaterial * theMat;
+d69 1
+a69 1
+   theMat           = thePart->thisMat ();
+d71 1
+a71 1
+   curPartHasStock_ = false;
+d73 3
+a75 3
+   if (theMat != NULL)
+      if (theMat->stockVol () != 0.0)
+         curPartHasStock_ = true;
+d77 4
+a80 4
+   if (curPartHasStock_)
+      compNonExcStockVol (theMat);
+   else
+      netStockVol_ = 0.0;
+d82 2
+a83 2
+   loadCurPartReqSeqs (thePart);
+   }
+d88 45
+a132 45
+   {
+   WitPipReqSeq   curPartSeq (myProblem ());
+   WitPipReqSeq   mergedSeq  (myProblem ());
+   WitPipReqSrc * workSrc;
+   WitPeriod      workPer;
+   double         workReqVol;
+   WitPipReqSrc * curPartSrc;
+   WitPeriod      curPartPer;
+   double         curPartReqVol;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (curPartReqSeq_ (thePer));
+
+      return;
+      }
+
+   curPartSeq.takeContentsFrom (curPartReqSeq_ (thePer));
+
+   popOrNull (workReqSeq_, workSrc,    workPer,    workReqVol);
+   popOrNull (curPartSeq,  curPartSrc, curPartPer, curPartReqVol);
+
+   while ((workSrc != NULL) and (curPartSrc != NULL))
+      if (workSrc->belongsBefore (curPartSrc))
+         {
+         mergedSeq.push         (workSrc, workPer, workReqVol);
+         popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+         }
+      else
+         {
+         mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+         popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+         }
+
+   while (workSrc != NULL)
+      {
+      mergedSeq.push         (workSrc, workPer, workReqVol);
+      popOrNull (workReqSeq_, workSrc, workPer, workReqVol);
+      }
+
+   while (curPartSrc != NULL)
+      {
+      mergedSeq.push        (curPartSrc, thePer,     curPartReqVol);
+      popOrNull (curPartSeq, curPartSrc, curPartPer, curPartReqVol);
+      }
+d134 1
+a134 1
+   mergedSeq.reverse ();
+d136 2
+a137 2
+   workReqSeq_.takeContentsFrom (mergedSeq);
+   }
+d142 3
+a144 3
+   {
+   return workReqSeq_.isEmpty ();
+   }
+d149 23
+a171 23
+      double &         netAttVol,
+      WitPipReqSrc * & theReqSrc,
+      double &         incPegVol)
+   {
+   WitPeriod fillPer;
+   double    incReqVol;
+
+   witAssert (not workSeqIsEmpty ());
+   witAssert (netAttVol > NET_TOL);
+
+   workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+
+   incPegVol  = min (incReqVol, netAttVol);
+      
+   incReqVol -= incPegVol;
+   netAttVol -= incPegVol;
+
+   if (incReqVol > NET_TOL)
+      workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+
+   if (myGlobalComp ()->printDebug ())
+      prtPeg (incPegVol, fillPer, theReqSrc);
+   }
+d176 6
+a181 6
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   double         rollVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+d183 1
+a183 1
+   witAssert (thePer > 0);
+d185 3
+a187 3
+   while (not workSeqIsEmpty () and (netStockVol_[thePer - 1] > NET_TOL))
+      {
+      workReqSeq_.pop (theReqSrc, fillPer, incReqVol);
+d189 1
+a189 1
+      rollVol = min (incReqVol, netStockVol_[thePer - 1]);
+d191 1
+a191 1
+      rolledSeq.push (theReqSrc, fillPer, rollVol);
+d193 2
+a194 2
+      netStockVol_[thePer - 1] -= rollVol;
+      incReqVol                -= rollVol;
+d196 3
+a198 3
+      if (incReqVol > NET_TOL)
+         workReqSeq_.push (theReqSrc, fillPer, incReqVol);
+      }
+d200 1
+a200 1
+   overStockReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+d202 1
+a202 1
+   rolledSeq.reverse ();
+d204 2
+a205 2
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+d210 46
+a255 46
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   rolledSeq (myProblem ());
+   WitPipReqSrc * theReqSrcOv;
+   WitPeriod      fillPerOv;
+   double         incReqVolOv;
+
+   if (not curPartHasStock_)
+      {
+      workReqSeq_.takeContentsFrom (overStockReqSeq_ (thePer));
+
+      return;
+      }
+
+   while (not workSeqIsEmpty ())
+      {
+      workReqSeq_.pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq  .push (theReqSrc, fillPer, incReqVol);
+     
+      netStockVol_[thePer - 1] += incReqVol;
+      }
+
+   if (rolledSeq.isNonEmpty ())
+      if (overStockReqSeq_ (thePer).isNonEmpty ())
+         {
+         rolledSeq                .pop (theReqSrc,   fillPer,   incReqVol);
+         overStockReqSeq_ (thePer).pop (theReqSrcOv, fillPerOv, incReqVolOv);
+
+         if ((theReqSrc == theReqSrcOv) and (fillPer == fillPerOv))
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol + incReqVolOv);
+            }
+         else
+            {
+            rolledSeq.push (theReqSrc,   fillPer,   incReqVol);
+            rolledSeq.push (theReqSrcOv, fillPerOv, incReqVolOv);
+            }
+         }
+
+   while (overStockReqSeq_ (thePer).isNonEmpty ())
+      {
+      overStockReqSeq_ (thePer).pop  (theReqSrc, fillPer, incReqVol);
+      rolledSeq                .push (theReqSrc, fillPer, incReqVol);
+      }
+d257 1
+a257 1
+   rolledSeq.reverse ();
+d259 2
+a260 2
+   workReqSeq_.takeContentsFrom (rolledSeq);
+   }
+d265 24
+a288 24
+   {
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+   WitPipReqSeq   reducedSeq (myProblem ());
+
+   witAssert (curPartReqSeq_ (thePer).isEmpty ());
+
+   if (not curPartHasStock_)
+      {
+      curPartReqSeq_ (thePer).takeContentsFrom (workReqSeq_);
+
+      return;
+      }
+
+   while (not workSeqIsEmpty ())
+      {
+      workReqSeq_               .pop  (theReqSrc, fillPer, incReqVol);
+
+      if (fillPer == thePer)
+         curPartReqSeq_ (thePer).push (theReqSrc, fillPer, incReqVol);
+      else
+         reducedSeq             .push (theReqSrc, fillPer, incReqVol);
+      }
+d290 2
+a291 2
+   curPartReqSeq_ (thePer).reverse ();
+   reducedSeq             .reverse ();
+d293 2
+a294 2
+   workReqSeq_.takeContentsFrom (reducedSeq);
+   }
+d299 38
+a336 38
+      const char * theAttname,
+      WitPart *    thePart,
+      WitPeriod    thePer)
+   {
+   WitPipReqSeq   theReqSeq (myProblem ());
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   witAssert (myGlobalComp ()->printDebug ());
+   
+   theReqSeq.revCopyFrom (workReqSeq_);
+
+   theReqSeq.reverse ();
+
+   fprintf (msgFile (),
+      "\n"
+      "Pegging to %s:\n"
+      "   Part:       %s\n"
+      "   Peg period: %d\n"
+      "\n"
+      "   Requirement sequence:\n",
+      theAttname,
+      thePart->partName ().myCstring (),
+      thePer);
+
+   while (theReqSeq.pop (theReqSrc, fillPer, incReqVol))
+      {
+      fprintf (msgFile (),
+         "\n"
+         "      Fill Period: %d\n"
+         "      ReqVol:      %.0f\n",
+         fillPer,
+         incReqVol);
+
+      theReqSrc->print (msgFile (), "      ");
+      }
+   }
+d341 13
+a353 13
+      double         pegVol,
+      WitPeriod      fillPer,
+      WitPipReqSrc * theReqSrc)
+   {
+   witAssert (myGlobalComp ()->printDebug ());
+
+   fprintf (msgFile (),
+      "\n"
+      "   Pegging:\n"
+      "      PegVol:      %.0f\n"
+      "      Fill Period: %d\n",
+      pegVol,
+      fillPer);
+d355 2
+a356 2
+   theReqSrc->print (msgFile (), "      ");
+   }
+d361 26
+a386 26
+   {
+   WitPeriod      thePer;
+   double         totReqVol;
+   WitPipReqSrc * theReqSrc;
+   WitPeriod      fillPer;
+   double         incReqVol;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      totReqVol = 0.0;
+
+      while (curPartReqSeq_ (thePer).isNonEmpty ())
+         {
+         curPartReqSeq_ (thePer).pop (theReqSrc, fillPer, incReqVol);
+
+         totReqVol += incReqVol;
+         }
+
+      if (totReqVol > maxInfeas_)
+         {
+         maxInfeas_     = totReqVol;
+         maxInfeasPart_ = thePart;
+         maxInfeasPer_  = thePer;
+         }
+      }
+   }
+d391 2
+a392 2
+   {
+   myMsgFac () ("pipMaxInfeasMsg", maxInfeas_);
+d394 5
+a398 5
+   if (maxInfeas_ > 0.0)
+      myMsgFac () ("pipMaxInfDataMsg",
+         maxInfeasPart_->partName (),
+         maxInfeasPer_);
+   }
+d403 3
+a405 3
+   {
+   double    excStockVol;
+   WitPeriod thePer;
+d407 1
+a407 1
+   excStockVol = 0.0;
+d409 4
+a412 4
+   forEachPeriod (thePer, myProblem ())
+      {
+      excStockVol +=
+         myProblem ()->myPostprocessor ()->compExcessVol (theMat, thePer);
+d414 1
+a414 1
+      excStockVol -= theMat->scrapVol ()[thePer];
+d416 1
+a416 1
+      setToMax (excStockVol, 0.0);
+d418 1
+a418 1
+      setToMin (excStockVol, theMat->stockVol ()[thePer]);
+d420 3
+a422 3
+      netStockVol_[thePer] = theMat->stockVol ()[thePer] - excStockVol;
+      }
+   }
+d427 18
+a444 18
+   {
+   WitPipReqList  theReqList (myProblem ());
+   WitPeriod      fillPer;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+
+   forEachPeriod (fillPer, myProblem ())
+      {
+      myReqMgr_->loadCurReqList (thePart, fillPer);
+
+      myReqMgr_->getCurReqList  (theReqList);
+
+      while (theReqList.pop (theReqSrc, incReqVol))
+         curPartReqSeq_ (fillPer).push (theReqSrc, fillPer, incReqVol);
+
+      curPartReqSeq_ (fillPer).reverse ();
+      }
+   }
+d449 14
+a462 14
+      WitPipReqSeq &   theReqSeq,
+      WitPipReqSrc * & theReqSrc,
+      WitPeriod &      fillPer,
+      double &         incReqVol)
+   {
+   if (theReqSeq.isNonEmpty ())
+      theReqSeq.pop (theReqSrc, fillPer, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      fillPer   = -1;
+      incReqVol = 0.0;
+      }
+   }
+@
+
+
+1.6
+log
+@Stochastic Implosion
+@
+text
+@d19 1
+a19 1
+#include <Global.h>
+@
+
+
+1.5
+log
+@ASAP pegging order
+@
+text
+@d30 1
+a30 1
+      WitProbAssoc     (theReqMgr->myProblem ()),
+@
+
+
+1.4
+log
+@ASAP Pegging Order
+@
+text
+@a16 2
+#include <PipPgg.h>
+#include <PipAttPgg.h>
+a18 2
+#include <PairStack.h>
+#include <ExecPerSch.h>
+a20 2
+#include <Opn.h>
+#include <BopEntry.h>
+d141 1
+a141 1
+bool WitPipPartReqMgr::hasUnfilledReqs ()
+d143 1
+a143 1
+   return workReqSeq_.isNonEmpty ();
+d156 1
+a156 1
+   witAssert (hasUnfilledReqs ());
+d185 1
+a185 1
+   while (hasUnfilledReqs () and (netStockVol_[thePer - 1] > NET_TOL))
+d226 1
+a226 1
+   while (hasUnfilledReqs ())
+d280 1
+a280 1
+   while (hasUnfilledReqs ())
+@
+
+
+1.3
+log
+@ASAP Pegging Order
+@
+text
+@d147 34
+d191 1
+a191 1
+   while (workReqSeq_.isNonEmpty () and (netStockVol_[thePer - 1] > NET_TOL))
+d232 1
+a232 1
+   while (workReqSeq_.isNonEmpty ())
+d286 1
+a286 1
+   while (workReqSeq_.isNonEmpty ())
+@
+
+
+1.2
+log
+@ASAP Pegging Order
+@
+text
+@d42 4
+a45 1
+      overStockReqSeq_ (myProblem ())
+d332 42
+@
+
+
+1.1
+log
+@ASAP Pegging Order
+@
+text
+@d68 1
+a68 1
+void WitPipPartReqMgr::loadCurPartReqSeqs (WitPart * thePart)
+d70 3
+a72 4
+   WitPipReqList  theReqList (myProblem ());
+   WitPeriod      fillPer;
+   WitPipReqSrc * theReqSrc;
+   double         incReqVol;
+d74 1
+a74 3
+   forEachPeriod (fillPer, myProblem ())
+      {
+      myReqMgr_->loadCurReqList (thePart, fillPer);
+d76 3
+a78 1
+      myReqMgr_->getCurReqList  (theReqList);
+d80 4
+a83 2
+      while (theReqList.pop (theReqSrc, incReqVol))
+         curPartReqSeq_ (fillPer).push (theReqSrc, fillPer, incReqVol);
+d85 1
+a85 2
+      curPartReqSeq_ (fillPer).reverse ();
+      }
+a143 18
+void WitPipPartReqMgr::popOrNull (
+      WitPipReqSeq &   theReqSeq,
+      WitPipReqSrc * & theReqSrc,
+      WitPeriod &      fillPer,
+      double &         incReqVol)
+   {
+   if (theReqSeq.isNonEmpty ())
+      theReqSeq.pop (theReqSrc, fillPer, incReqVol);
+   else
+      {
+      theReqSrc = NULL;
+      fillPer   = -1;
+      incReqVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+d309 1
+a309 1
+void WitPipPartReqMgr::prtPegMat (
+d326 64
+@
+

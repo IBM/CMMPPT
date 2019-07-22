@@ -1,0 +1,880 @@
+head	1.20;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.20
+date	2011.10.05.23.07.34;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2011.10.04.22.57.13;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2011.10.04.22.35.49;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.09.20.19.32.34;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.09.14.23.14.36;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.09.13.20.48.07;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.09.09.21.17.39;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.09.08.22.43.39;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.09.07.23.15.39;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.08.11.23.41.49;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.08.05.14.55.44;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.07.22.23.47.21;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.07.22.20.05.25;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.07.22.17.51.14;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.07.22.16.15.30;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.07.21.21.44.46;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.07.20.20.18.26;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.07.20.18.38.44;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.07.19.21.37.04;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.07.19.21.13.12;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.20
+log
+@ban ==> rej
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File ModelInstance.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.util.List;
+
+/*******************************************************************************
+ * A ModelInstance is the central object representing a concrete embodiment of a
+ * WIT model, i.e., a WIT model as populated with specific data.<br><br>
+ *
+ * The factory method for this class is
+ * ModelScheme.newModelInstance (theName).
+ *******************************************************************************
+ */
+public final class ModelInstance
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * current is the current ModelInstance that will be used by various WIT-M
+ * methods if any; otherwise null.
+ *******************************************************************************
+ */
+   private static ModelInstance current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The ModelScheme implemented by this ModelInstance
+ *******************************************************************************
+ */
+   private final ModelScheme myModelScheme;
+   
+/*******************************************************************************
+ * The name of this ModelInstance
+ *******************************************************************************
+ */
+   private final String myName;
+   
+/*******************************************************************************
+ * myItemMgrArr[theItemCat.getIndex ()] is the ItemMgr for theItemCat in this
+ * ModelInstance.
+ *******************************************************************************
+ */
+   private final ItemMgr <?> [] myItemMgrArr;
+
+/*******************************************************************************
+ * The PeriodMgr for this ModelInstance.
+ *******************************************************************************
+ */
+   private final PeriodMgr myPeriodMgr;
+   
+/*******************************************************************************
+ * The global Primitive for this ModelInstance.
+ *******************************************************************************
+ */
+   private final Primitive myGlobalPrimitive;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The array of ItemMgrs to which myItemMgrArr is to be set in the ctor.
+ *******************************************************************************
+ */
+   private ItemMgr <?>[] newItemMgrArr ()
+      {
+      int           nCats;
+      ItemMgr <?>[] theItemMgrArr;
+      int           theIdx;
+      
+      nCats         = myModelScheme.getItemCategories ().size ();
+      
+      theItemMgrArr = new ItemMgr <?>[nCats];
+
+      for (ItemCategory <?> theItemCat: myModelScheme.getItemCategories ())
+         {
+         theIdx                = theItemCat.getIndex   ();
+         
+         theItemMgrArr[theIdx] = theItemCat.newItemMgr (this);
+         }
+      
+      return theItemMgrArr;
+      }
+   
+/*******************************************************************************
+ * Verifies that the set of Periods for the current ModelInstance is not frozen.
+ *******************************************************************************
+ */
+   private static void rejFrozenPerSet (String signature)
+      {
+      if (current.myPeriodMgr.isFrozen ())
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to " + signature + ", when the set of Periods\n"
+             + "   for the current ModelInstance is frozen.\n");
+      }
+
+/*******************************************************************************
+ * Verifies that theName does not match the name of a Period in the current
+ * ModelInstance.
+ *******************************************************************************
+ */
+   private static void rejDupPerName (String theName)
+      {
+      Period thePer;
+      
+      thePer = current.myPeriodMgr.getPeriod (theName);
+      
+      if (thePer != null)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to ModelInstance.newPeriod (theName), where theName\n"
+             + "   matches the name of an existing Period in the current\n"
+             + "   ModelInstance.\n"
+             + "\n"
+             + "      theName: \"" + theName + "\"\n");
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   ModelInstance (ModelScheme theScheme, String theName)
+      {
+      PrimitiveCategory theGlobalCat;
+      
+      myModelScheme     = theScheme;
+      myName            = theName;
+      myItemMgrArr      = newItemMgrArr ();
+
+      myPeriodMgr       = new PeriodMgr (this);
+      
+      theGlobalCat      = theScheme.getGlobalCat ();
+      
+      myGlobalPrimitive = new Primitive (theGlobalCat, "Global", this);
+      
+      current           = this;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return the ItemMgr for theItemCat in this ModelInstance.
+ *******************************************************************************
+ */                            @@SuppressWarnings("unchecked")
+   <I extends Item> ItemMgr <I> getItemMgr (ItemCategory <I> theItemCat)
+      {
+      ItemMgr <?> theItemMgr;
+      
+      assert (theItemCat.getModelScheme () == myModelScheme);
+         
+      theItemMgr = myItemMgrArr[theItemCat.getIndex ()];
+      
+      return (ItemMgr <I>) theItemMgr;
+      }
+  
+/*******************************************************************************
+ * @@return the PrimitiveMgr for thePrimCat in this ModelInstance.
+ *******************************************************************************
+ */
+   PrimitiveMgr getPrimitiveMgr (PrimitiveCategory thePrimCat)
+      {
+      return (PrimitiveMgr) getItemMgr (thePrimCat);
+      }
+   
+/*******************************************************************************
+ * @@return the TupleMgr for theTupleCat in this ModelInstance.
+ *******************************************************************************
+ */
+   TupleMgr getTupleMgr (TupleCategory theTupleCat)
+      {
+      return (TupleMgr) getItemMgr (theTupleCat);
+      }
+   
+/*******************************************************************************
+ * @@return The PeriodMgr for this ModelInstance
+ *******************************************************************************
+ */
+   PeriodMgr getPeriodMgr ()
+      {
+      return myPeriodMgr;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Sets the current ModelInstance.<br>
+ * Note: The current ModelInstance should eventually be set to null, in order to
+ * allow the ModelInstance to be garbage collected.
+ * 
+ * @@param theInst The ModelInstance which is to become current.
+ *                (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentModelInstance (ModelInstance theInst)
+      {
+      current = theInst;
+      }
+
+/*******************************************************************************
+ * @@return The current ModelInstance, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static ModelInstance getCurrentModelInstance ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * @@return The current Problem, if any; otherwise null.
+ *******************************************************************************
+ *//*
+   public static Problem getCurrentProblem ()
+      {
+      return currentProblem;
+      }
+*/
+/*******************************************************************************
+ * @@return The global Primitive for the current ModelInstance.
+ *******************************************************************************
+ */
+   public static Primitive getGlobalPrimitive ()
+      {
+      return current.myGlobalPrimitive;
+      }
+
+/*******************************************************************************
+ * Puts the set of Periods for the current ModelInstance into a "frozen" state:
+ * closed to further alteration.
+ * 
+ * @@throws IllegalStateException If the current ModelInstance is null
+ * @@throws IllegalStateException If the set of Periods in the current
+ *                               ModelInstance is frozen
+ *******************************************************************************
+ */
+   public static void freezePeriodSet ()
+      {
+      reqCurModelInst ();
+      rejFrozenPerSet ("ModelInstance.freezePeriods ()");
+      
+      current.myPeriodMgr.freeze ();
+      }
+
+/*******************************************************************************
+ * @@return True, iff the set of of Periods for the current ModelInstance is
+ *         "frozen", closed to alteration.
+ *         
+ * @@throws IllegalStateException If the current ModelInstance is null
+ *******************************************************************************
+ */
+   public static boolean frozenPeriodSet ()
+      {
+      reqCurModelInst ();
+      
+      return current.myPeriodMgr.isFrozen ();
+      }
+
+/*******************************************************************************
+ * Factory Method:<br>
+ * Constructs a new Period in the current ModelInstance.
+ * 
+ * @@param  theName                  The name for the new Period
+ * @@return                          The new Period
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalStateException    If the current ModelInstance is null
+ * @@throws IllegalArgumentException If theName matches the name of an existing
+ *                                  Period in the current ModelInstance
+ * @@throws IllegalStateException    If the set of Periods in the current
+ *                                  ModelInstance is frozen
+ *******************************************************************************
+ */
+   public static Period newPeriod (String theName)
+      {
+      rejNull         (theName, "theName");
+      reqCurModelInst ();
+      rejDupPerName   (theName);
+      rejFrozenPerSet ("ModelInstance.newPeriod (theName)");
+      
+      return new Period (theName, current.getPeriodMgr ());
+      }
+
+/*******************************************************************************
+ * @@return A list of all Periods in the current ModelInstance;
+ *         this is an unmodifiable view of an ArrayList.
+ * 
+ * @@throws IllegalStateException If the current ModelInstance is null
+ *******************************************************************************
+ */
+   public static List <Period> getAllPeriods ()
+      {
+      reqCurModelInst ();
+      
+      return current.myPeriodMgr.getAllPeriods ();
+      }
+   
+/*******************************************************************************
+ * @@return The number of Periods in the current ModelInstance.
+ * 
+ * @@throws IllegalStateException If the current ModelInstance is null
+ *******************************************************************************
+ */
+   public static int getNPeriods ()
+      {
+      reqCurModelInst ();
+      
+      return current.myPeriodMgr.getAllPeriods ().size ();
+      }
+   
+/*******************************************************************************
+ * Period look-up method.
+ * 
+ * @@param  theName               The name of the Period to be retrieved
+ * @@return                       The Period in the current ModelInstance whose
+ *                               name matches theName, if any; otherwise null
+ * @@throws NullPointerException  If any argument is null
+ * @@throws IllegalStateException If the current ModelInstance is null
+ *******************************************************************************
+ */
+   public static Period getPeriod (String theName)
+      {
+      rejNull         (theName, "theName");
+      reqCurModelInst ();
+      
+      return current.myPeriodMgr.getPeriod (theName);
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The name of this ModelInstance
+ *******************************************************************************
+ */
+   public String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * @@return The ModelScheme of this ModelInstance
+ *******************************************************************************
+ */
+   public ModelScheme getModelScheme ()
+      {
+      return myModelScheme;
+      }
+
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */             @@Override
+   public String toString ()
+      {
+      return myName;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.19
+log
+@bar ==> ban
+@
+text
+@d100 1
+a100 1
+   private static void banFrozenPerSet (String signature)
+d115 1
+a115 1
+   private static void banDupPerName (String theName)
+d256 1
+a256 1
+      banFrozenPerSet ("ModelInstance.freezePeriods ()");
+d291 1
+a291 1
+      banNull         (theName, "theName");
+d293 2
+a294 2
+      banDupPerName   (theName);
+      banFrozenPerSet ("ModelInstance.newPeriod (theName)");
+d338 1
+a338 1
+      banNull         (theName, "theName");
+@
+
+
+1.18
+log
+@getCellAsPeriod (...)
+@
+text
+@d100 1
+a100 1
+   private static void barFrozenPerSet (String signature)
+d115 1
+a115 1
+   private static void barDupPerName (String theName)
+d256 1
+a256 1
+      barFrozenPerSet ("ModelInstance.freezePeriods ()");
+d291 1
+a291 1
+      barNull         (theName, "theName");
+d293 2
+a294 2
+      barDupPerName   (theName);
+      barFrozenPerSet ("ModelInstance.newPeriod (theName)");
+d338 1
+a338 1
+      barNull         (theName, "theName");
+@
+
+
+1.17
+log
+@InputTables
+@
+text
+@a131 17
+/*******************************************************************************
+ * This method refers to the following classes:
+ *    InputTable
+ * The purpose is to cause these classes to be compiled whenever class
+ * ModelInstance is compiled.<br>
+ * The method is not intended to be invoked.
+ *******************************************************************************
+ */            @@SuppressWarnings("unused")
+   private void referToClasses ()
+      {
+      InputTable.class.toString ();
+      
+      throw
+         new UnsupportedOperationException (
+            "Call to ModelInstance.referToClasses ().");
+      }
+
+@
+
+
+1.16
+log
+@getNPeriods ()
+@
+text
+@d133 2
+a134 1
+ * This method refers to the following classes: InputTable.
+d143 4
+d296 1
+a296 1
+ * @@param theName                   The name for the new Period
+d346 3
+a348 4
+ * @@param theName The name of the Period to be retrieved
+ * @@return        The Period in the current ModelInstance whose name matches
+ *                theName, if any; otherwise null
+ *         
+@
+
+
+1.15
+log
+@Simplified toString.
+@
+text
+@d326 13
+@
+
+
+1.14
+log
+@Class renaming:
+   ValueByPeriod  ==> PeriodValue
+   DoubleByPeriod ==> PeriodDouble
+@
+text
+@d372 1
+a372 1
+      return concatenation ("ModelInstance ", myName);
+@
+
+
+1.13
+log
+@ValueByPeriod
+@
+text
+@d133 1
+a133 1
+ * This method refers to the following classes: InputTable, DoubleByPeriod.
+@
+
+
+1.12
+log
+@ValueByPeriod
+@
+text
+@d13 1
+a13 1
+ * An ModelInstance is the central object representing a concrete embodiment of a
+d57 1
+a57 1
+ * The global Primitive for this ModelInstance.
+d60 1
+a60 1
+   private final Primitive myGlobalPrimitive;
+d63 1
+a63 1
+ * The PeriodMgr for this ModelInstance.
+d66 1
+a66 1
+   private final PeriodMgr myPeriodMgr;
+d82 1
+a82 1
+      nCats         = myModelScheme.getCategories ().size ();
+d86 1
+a86 1
+      for (ItemCategory <?> theItemCat: myModelScheme.getCategories ())
+d156 2
+a161 2
+      myPeriodMgr       = new PeriodMgr ();
+   
+d220 2
+a221 1
+ * @@param theInst The ModelInstance which is to become current. (Null is allowed.)
+d308 1
+a308 1
+      return new Period (theName, current);
+d369 1
+a369 1
+ */     @@Override
+@
+
+
+1.11
+log
+@Started classes ValueByPeriod and DoubleByPeriod.
+@
+text
+@d141 1
+a141 2
+      InputTable    .class.toString ();
+      DoubleByPeriod.class.toString ();
+@
+
+
+1.10
+log
+@Fixed a warning that arose after upgrading to Eclipse 3.6.
+@
+text
+@d133 3
+a135 3
+ * This method refers to class InputTable, so that class InputTable and the
+ * classes it refers to will be compiled whenever class ModelInstance is
+ * compiled.<br>
+d139 1
+a139 1
+   private void referToInputTable ()
+d141 2
+a142 1
+      InputTable.class.toString ();
+@
+
+
+1.9
+log
+@Class PeriodTrait
+@
+text
+@d132 12
+a374 14
+// Static initialization block
+//
+// This block contains vacuous code that refers to class InputTable, so that
+// class InputTable and the classes it refers to will be compiled whenever class
+// ModelInstance is compiled.
+////////////////////////////////////////////////////////////////////////////////
+
+   static
+      {
+      if (false)
+         InputTable.class.toString ();
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+@
+
+
+1.8
+log
+@Period set freeze
+@
+text
+@d359 1
+a359 1
+      return concatenation ("ModelInstance \"", myName, "\"");
+@
+
+
+1.7
+log
+@Class Period
+@
+text
+@d97 14
+d115 1
+a115 1
+   private static void barDupName (String theName)
+d160 1
+a160 2
+ */
+                               @@SuppressWarnings("unchecked")
+d244 31
+d284 2
+d292 2
+a293 1
+      barDupName      (theName);
+@
+
+
+1.6
+log
+@Class Period
+@
+text
+@d252 2
+a253 1
+ * @@return an unmodifiable list of all Periods in the current ModelInstance.
+@
+
+
+1.5
+log
+@Removed first implementation of the period concept.
+@
+text
+@d10 1
+a10 1
+import com.ibm.witj.Problem;
+d62 6
+d96 22
+d134 2
+d177 9
+d231 24
+a254 1
+ * Test for linking in WIT-J.
+d257 1
+a257 1
+   public static Problem newProblem ()
+d259 3
+a261 1
+      return Problem.newInstance ();
+d263 20
+a282 1
+  
+@
+
+
+1.4
+log
+@ProblemMgr ==> ProblemManager
+@
+text
+@d28 1
+a28 1
+ * method,s if any; otherwise null.
+@
+
+
+1.3
+log
+@Some renaming.
+@
+text
+@a242 3
+      
+      if (false)
+         ProblemMgr.class.toString ();
+@
+
+
+1.2
+log
+@Scheme ==> ModelScheme
+@
+text
+@d94 1
+a94 1
+   ModelInstance (ModelScheme theModelScheme, String theName)
+d98 1
+a98 1
+      myModelScheme          = theModelScheme;
+d102 1
+a102 1
+      theGlobalCat      = theModelScheme.getGlobalCat ();
+@
+
+
+1.1
+log
+@Embodiment ==> ModelInstance
+@
+text
+@d17 1
+a17 1
+ * Scheme.newModelInstance (theName).
+d38 1
+a38 1
+ * The Scheme implemented by this ModelInstance
+d41 1
+a41 1
+   private final Scheme myScheme;
+d76 1
+a76 1
+      nCats         = myScheme.getCategories ().size ();
+d80 1
+a80 1
+      for (ItemCategory <?> theItemCat: myScheme.getCategories ())
+d94 1
+a94 1
+   ModelInstance (Scheme theScheme, String theName)
+d98 1
+a98 1
+      myScheme          = theScheme;
+d102 1
+a102 1
+      theGlobalCat      = theScheme.getGlobalCat ();
+d122 1
+a122 1
+      assert (theItemCat.getScheme () == myScheme);
+d214 1
+a214 1
+ * @@return The Scheme of this ModelInstance
+d217 1
+a217 1
+   public Scheme getScheme ()
+d219 1
+a219 1
+      return myScheme;
+@
+

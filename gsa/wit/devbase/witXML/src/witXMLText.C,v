@@ -1,0 +1,598 @@
+head     1.1;
+branch   1.1.1;
+access   ;
+symbols  start:1.1.1.1 IBM:1.1.1;
+locks    ; strict;
+comment  @ * @;
+
+
+1.1
+date     2001.04.04.18.43.50;  author fasano;  state Exp;
+branches 1.1.1.1;
+next     ;
+
+1.1.1.1
+date     2001.04.04.18.43.50;  author fasano;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@/*
+ *	Description: WitXMLText.C
+ *		class WitXMLText is used to deal with the value of an attribute in  
+ *		xml file	
+ *		
+ *	Owner:
+ *		IBM T. J. Watson Research Center
+ *		Route 134
+ *		Yorktown Heights, NY 10598
+ *
+ *	Author: Shuzheng Liu (LSZ)     
+ *		35-238   liusz@@watson.ibm.com    8-862-2952
+ *
+ *	Proprietary Statement:
+ *		IBM Confidential
+ *		(C) Copyright IBM Corp. 2000
+ *
+ * 	Change History:
+ *    	March, 2001  LSZ: New code.
+ */
+
+#include <util/XMLUniDefs.hpp>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "wit.h"
+#include "witXMLText.h"
+#include "witXML.h"
+#include "witXMLErrorHandler.h"
+
+
+// ---------------------------------------------------------------------------
+//  Wit format for a vector 
+// ---------------------------------------------------------------------------
+const int   WitXMLText::numOfDataFormat = 3;
+const char *WitXMLText::witdataformat[numOfDataFormat] = {
+								"single",
+								"dense",
+								"sparse"};
+
+
+WitXMLText::WitXMLText(const DOM_Node &thisNode,const char *filename,const int LineNum):
+	inDOMString(thisNode.getNodeValue()),inString(NULL),dVector(NULL),
+	attrName(thisNode.getNodeName()),fileName(filename),LineNumber(LineNum)
+{
+	convertContent(inDOMString);
+	inString = WitXML::transcode(inDOMString);
+}
+
+WitXMLText::WitXMLText(const DOMString &name,const DOMString &adomstring,const char *filename,int LineNum):
+	inDOMString(adomstring),inString(NULL),dVector(NULL),
+	attrName(name),fileName(filename),LineNumber(LineNum)
+{
+	convertContent(inDOMString);
+	inString = WitXML::transcode(inDOMString);
+}
+
+WitXMLText::WitXMLText(WitXMLText& aWitXMLText)
+{
+	if (this!=&aWitXMLText)
+		setAttr(aWitXMLText);
+}
+
+WitXMLText& WitXMLText::operator=(WitXMLText& aWitXMLText)
+{
+	if (this!=&aWitXMLText)
+		setAttr(aWitXMLText);
+
+	return *this;
+}
+
+int WitXMLText::GetInteger()
+{
+	int IntegerValue;
+		
+	if (IsNumber(inString))
+		IntegerValue = atoi(inString);
+
+	if (strchr(inString,'.'))	// check if this is a float number
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetValueErrorMsg(inString,"an integer",inString,attrName,fileName,LineNumber);
+		throw(errorHandler);
+	}
+
+	return IntegerValue;
+}
+
+bool WitXMLText::GetBool()
+{
+	if (strcmp(inString,"True")==0)
+		return WitTRUE;
+	else
+	{
+		if (strcmp(inString,"False")==0)
+			return WitFALSE;
+		else
+		{
+			WitXMLErrorHandler errorHandler;
+			errorHandler.SetValueErrorMsg(inString,"a boolean",inString,attrName,fileName,LineNumber);
+			throw(errorHandler);
+		}
+	}
+}
+
+float WitXMLText::GetFloat()
+{
+	return (float)GetDouble(inString);
+}
+
+double WitXMLText::GetDouble(const char *String)
+{
+	double FloatValue;
+
+	if (IsNumber(String))
+		FloatValue = atof(String);
+
+	return FloatValue;
+}
+
+char *WitXMLText::GetText()
+{
+	return WitXML::transcode(inDOMString);
+}
+
+int *WitXMLText::GetIntegerVector(const int NPeriods)
+{
+	int *iVector;
+
+	nPeriods = NPeriods;
+	GetDoubleVector();
+	iVector = new int[nPeriods];
+	for (int index=0;index<nPeriods;index++)
+		iVector[index] = (long int)dVector[index];
+
+	delete dVector;
+
+	return iVector;
+}
+
+float *WitXMLText::GetFloatVector(const int NPeriods)
+{
+	float *fVector;
+
+	nPeriods = NPeriods;
+	fVector = new float[nPeriods];
+	GetDoubleVector();
+	for (int index=0;index<nPeriods;index++)
+		fVector[index] = (float)dVector[index];
+
+	delete dVector;
+
+	return fVector;
+}
+
+double *WitXMLText::GetDoubleVector()
+{
+	createDoubleVector();
+	return dVector;
+}
+
+int WitXMLText::PrintVector(const char *attr,const int *avector,ofstream &outFile,const int nPeriods)
+{
+	int Count=0,i,Equal;
+
+	outFile << " " << attr;
+
+	for (i=0;i<nPeriods;i++)
+		if (avector[i]==(int)DEFAULTVALUE)
+			Count++;
+
+	if (Count==nPeriods)
+	{
+		outFile << "=\"" << witdataformat[0];		// single, all 0
+		outFile << " " << avector[0] << "\"";
+		return 0;
+	}
+
+	if (Count==0)
+	{
+		Equal = 1;
+		for (i=1;i<nPeriods;i++)					// are all elements equal?
+			if (avector[i]!=avector[0])
+			{
+				Equal = 0;
+				break;
+			}
+		if (Equal)
+		{
+			outFile << "=\"" << witdataformat[0];	// single, not 0
+			outFile << " " << avector[0] << "\"";
+			return 0;
+		}
+	}
+
+	if (Count>nPeriods/2)
+	{
+		outFile << "=\"" << witdataformat[2];		// sparse
+		for ( int i=0; i<nPeriods; i++ )
+			if (avector[i]!=DEFAULTVALUE)
+				outFile << " " << i+1 << ":" << avector[i];
+		outFile << "\"";
+		return 0;
+	}
+
+	outFile << "=\"" << witdataformat[1];			// dense
+	for (i=0; i<nPeriods; i++)
+		outFile << " " << avector[i];
+	outFile << "\"";
+
+	return 0;
+}
+
+int WitXMLText::PrintVector(const char *attr,const float *avector,ofstream &outFile,const int nPeriods)
+{
+	int Count=0,i,Equal;
+
+	outFile << " " << attr;
+
+	for (i=0;i<nPeriods;i++)
+		if (avector[i]==DEFAULTVALUE)
+			Count++;
+
+	if (Count==nPeriods)
+	{
+		outFile << "=\"" << witdataformat[0];		// single, all 0
+		outFile << " " << avector[0] << "\"";
+		return 0;
+	}
+
+	if (Count==0)
+	{
+		Equal = 1;
+		for (i=1;i<nPeriods;i++)					// are all elements equal?
+			if (avector[i]!=avector[0])
+			{
+				Equal = 0;
+				break;
+			}
+		if (Equal)
+		{
+			outFile << "=\"" << witdataformat[0];	// single, not 0
+			outFile << " " << avector[0] << "\"";
+			return 0;
+		}
+	}
+
+	if (Count>nPeriods/2)
+	{
+		outFile << "=\"" << witdataformat[2];		// sparse
+		for ( int i=0; i<nPeriods; i++ )
+			if (avector[i]!=DEFAULTVALUE)
+				outFile << " " << i << ":" << avector[i];
+		outFile << "\"";
+		return 0;
+	}
+
+	outFile << "=\"" << witdataformat[1];			// dense
+	for (i=0; i<nPeriods; i++)
+		outFile << " " << avector[i];
+	outFile << "\"";
+	return 0;
+}
+
+int WitXMLText::createDoubleVector()
+{
+	int i;
+	double value;
+	dVector = new double[nPeriods];
+
+	// read the format
+	char *Format=GetNextToken();
+	for (i=0;i<numOfDataFormat;i++)
+		if (strcmp(Format,witdataformat[i])==0)
+			break;
+	dataFormat = i;
+#ifndef _MSC_VER
+	delete [] Format;
+#endif
+
+	switch (dataFormat)
+	{
+	case single:
+		{
+			char *floatstr=WitXML::transcode(inDOMString);
+			value = GetDouble(floatstr);
+#ifndef _MSC_VER
+			delete floatstr;
+#endif
+			for (i=0;i<nPeriods;i++)
+				dVector[i] = value;
+			break;
+		}
+
+	case dense:
+		{
+			createDenseVector();
+			break;
+		}
+
+	case sparse:
+		{
+			createSparseVector();
+			break;
+		}
+
+	default:
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetValueErrorMsg(inString,"single, dense or sparse",Format,attrName,fileName,LineNumber);
+		throw(errorHandler);
+	}
+
+	return 0;
+}
+
+int WitXMLText::createDenseVector()
+{
+	int		count=0;
+	char	*next;
+
+	while (next=GetNextToken())
+	{
+		IsNumber(next);		// check if this is a number
+		dVector[count++] = GetDouble(next);
+#ifndef _MSC_VER
+		delete [] next;
+#endif
+	}
+
+	if (count!=nPeriods)
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetValueErrorMsg(inString,nPeriods,count,attrName,fileName,LineNumber);
+		throw(errorHandler);
+	}
+
+	return 0;
+}
+
+int WitXMLText::createSparseVector()
+{
+	int		count=0,index=0,*setFlag;
+	bool	ErrorFlag=WitFALSE;
+	char	*next,indexStr[16];
+
+	// initialize all dVector to default value
+	for (index=0;index<nPeriods;index++)
+		dVector[index] = 0.0;
+
+	// create a set of flag to record the index which value has been set
+	setFlag	= new int[nPeriods];
+	for (index=0;index<nPeriods;index++)
+		setFlag[index] = 0;
+
+	while (next=GetNextToken())
+	{
+		if (count==nPeriods)
+		{
+			ErrorFlag = WitTRUE;
+			break;
+		}
+
+		// get the next item
+		if (sscanf(next,"%d:%s",&index,indexStr)!=2)
+		{
+			ErrorFlag = WitTRUE;
+			break;
+		}
+		if (index >= nPeriods)
+		{
+			ErrorFlag = WitTRUE;
+			break;
+		}
+		if (setFlag[index])
+		{
+			ErrorFlag = WitTRUE;
+			break;
+		}
+		if (IsNumber(indexStr)==False)
+		{
+			ErrorFlag = WitTRUE;
+			break;
+		}
+		dVector[index] = (float)atof(indexStr);
+		count++;
+		setFlag[index] = 1;
+#ifndef _MSC_VER
+		delete [] next;
+#endif
+	}
+
+	if (ErrorFlag==WitTRUE)
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetValueErrorMsg(inString,"a sparse vector",next,attrName,fileName,LineNumber);
+		throw(errorHandler);
+	}
+
+	return 0;
+}
+
+char *WitXMLText::GetNextToken()
+{
+        int		here = 0;
+        int		length = inDOMString.length();
+         const XMLCh*	chars  = inDOMString.rawBuffer();
+
+	if (length==0)				// an empty string
+		return NULL;
+
+	// looking for the start of next token
+	for (here=0;here<length;here++)
+		if(chars[here]==chSpace||chars[here]==chHTab||chars[here]==chLF||chars[here]==chCR)
+			continue;
+		else
+			break;
+
+	// remove the leading white spaces
+	inDOMString.deleteData(0,here);
+	length = inDOMString.length();		
+	
+	if (length>0)
+	{
+		// looking for the length of next token
+		for (here=0;here<length;here++)
+			if(chars[here]==chSpace||chars[here]==chHTab||chars[here]==chLF||chars[here]==chCR)
+				break;
+
+		// get the next token and remove this token from inDOMString
+		DOMString Next = inDOMString.substringData(0,here);
+		char *next = WitXML::transcode(Next);
+		inDOMString.deleteData(0,here);
+		return next;
+	}
+
+	return NULL;			//no token at all
+}
+
+int WitXMLText::IsNumber(const char *str)
+{
+	int start,end,size=strlen(str);
+	bool error=False,found=False,sformat=False;
+
+	for (start=0;start<size;start++)	// remove leading white space
+		if (str[start]!=' ')
+			break;
+	for (end=0;end<size;end++)			// remove tailing white space
+		if (str[size-end-1]!=' ')
+			break;
+	size -= start;
+	size -= end;
+
+	if (size==0)
+		error = True;
+	else
+	{
+		if (str[start]=='0' && size >1 && (size<3 || str[start+1]!='.'))
+			error = True;
+		else
+		{
+			for (int i=start; i<size; i++)
+			{
+				if (str[i]=='.')
+				{
+					if (!found)
+					{          // at most a decimal point
+						found = True;
+						continue;
+					}
+					else
+					{
+						error = True;
+						break;
+					}
+				}
+
+				if (i==start && (str[i]=='-' || str[i]=='+'))
+					continue;
+
+				if (i==size-1 && str[i]==' ')
+					break;
+
+				if (!isdigit(str[i]))       // found a nondigit character
+				{
+					if ( sformat==False && (str[i]=='e' || str[i]=='E') && (str[i+1]=='+' || str[i+1]=='-') )
+					{						// scientific format
+						sformat = True;
+						i++;
+					}
+					else
+					{
+						error = True;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// check if this is not a number
+	if (error)
+	{
+		WitXMLErrorHandler errorHandler;
+		errorHandler.SetValueErrorMsg(inString,"a number",str,attrName,fileName,LineNumber);
+		throw(errorHandler);
+	}
+	
+	return True;
+
+}
+
+// ---------------------------------------------------------------------------
+//
+//  outputContent  - convert a DOMString so that all leading and tailing white
+//                   spaces and all default character entities (<, &, etc.)
+//                   are removed.
+//
+// ---------------------------------------------------------------------------
+DOMString & WitXMLText::convertContent(DOMString &toWrite)
+{
+	int		length = toWrite.length();
+	const XMLCh*	chars  = toWrite.rawBuffer();
+	int		index, count;
+
+//		cerr << ":" << toWrite << ":" << endl;
+
+	for (index = 0, count = 0; index < length; index++,count++)
+            if (chars[index]==chSpace||chars[index]==chHTab||chars[index]==chLF||chars[index]==chCR)
+                continue;
+	else
+		break;
+	if (count>0)
+	    toWrite.deleteData(0,count);
+	chars  = toWrite.rawBuffer();
+	length = toWrite.length();
+	if (length==0)
+	   return toWrite;
+	for (index = length-1, count = 0; index >= 0; index--,count++)
+	{
+	  if (chars[index]==chSpace||chars[index]==chHTab||chars[index]==chLF||chars[index]==chCR)
+            continue;
+	  else
+	    break;
+	}
+
+	if (count>0)
+		toWrite.deleteData(index+1,count);
+
+	return toWrite;
+}
+
+void WitXMLText::setAttr(WitXMLText& aWitXMLText)
+{
+	inDOMString = aWitXMLText.inDOMString;
+	inString = aWitXMLText.inString;
+	attrName = aWitXMLText.attrName;
+	dVector = NULL;
+	fileName = aWitXMLText.fileName;
+	LineNumber = aWitXMLText.LineNumber;
+}
+@
+
+
+1.1.1.1
+log
+@Importing wit xml code
+@
+text
+@@

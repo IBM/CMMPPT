@@ -1,0 +1,505 @@
+#include <iostream.h>
+#include <assert.h>
+#include <scenario/src/scenP.h>
+#include <scenario/src/scDifTP.h>
+#include <scenario/src/scenDifT.h>
+#include <scenario/src/ipDifT.h>
+#include <scenario/src/schFctry.h>
+
+
+// Default Constructor
+LgFrScenarioForDifTestingSmartPointerToConst::LgFrScenarioForDifTestingSmartPointerToConst() : pointer_(NULL)
+{
+};
+
+// Preferred Constructor
+LgFrScenarioForDifTestingSmartPointerToConst::LgFrScenarioForDifTestingSmartPointerToConst(LgFrScenarioForDifTesting* newedPointer) 
+: pointer_(newedPointer), count_(1)
+{
+}
+
+// Constructor for cast operator
+LgFrScenarioForDifTestingSmartPointerToConst::LgFrScenarioForDifTestingSmartPointerToConst(
+    LgFrScenarioForDifTesting* existingPointer,
+    LgFrReferenceCount& count) : pointer_(existingPointer)
+{
+    count_ = count;
+}
+
+// Constructor 
+LgFrScenarioForDifTestingSmartPointerToConst::LgFrScenarioForDifTestingSmartPointerToConst(
+    LgFrScenarioSmartPointerToConst rhs)
+{
+    if (rhs->isA() != __LGFRSCENARIOFORDIFTESTING)  {
+	cerr << "Cannot construct a LgFrScenarioForDifTestingSmartPointerToConst from a non LgFrScenarioForDifTesting object" << endl;
+	assert(0);
+    }
+    else  {
+	pointer_ = (LgFrScenarioForDifTesting*)(rhs.pointer_);
+	count_ = rhs.count_;
+    }
+}
+
+// Destructor
+LgFrScenarioForDifTestingSmartPointerToConst::~LgFrScenarioForDifTestingSmartPointerToConst()
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	 && (count_.reference() == 3) ) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = NULL;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+    else if ( (count_.reference() == 2) && 
+	      ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = NULL;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+    else if (count_.reference() == 1) {
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	delete pointer_;
+	pointer_ = NULL;
+	LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+    }
+}
+
+// Copy Constructor
+LgFrScenarioForDifTestingSmartPointerToConst::LgFrScenarioForDifTestingSmartPointerToConst(const LgFrScenarioForDifTestingSmartPointerToConst& rhs) 
+: pointer_(rhs.pointer_)
+{
+    count_ = ((LgFrScenarioForDifTestingSmartPointerToConst&)rhs).count_;
+}
+
+// Deep Copy
+LgFrScenarioForDifTestingSmartPointerToConst
+LgFrScenarioForDifTestingSmartPointerToConst::deepCopy() const
+{
+    // do scenario deep copy and create a new smart pointer
+    LgFrScenarioForDifTestingSmartPointer temp(new LgFrScenarioForDifTesting(*pointer_));
+
+    // fix the ipp - since Scenario::initialProblemAndParameters() is non-const
+    //  we need to cast away *pointer_
+    temp->initialProblemAndParameters(((LgFrInitialProblemForDifTesting&)(((LgFrScenarioForDifTesting&)(*pointer_)).initialProblemAndParameters())).clone(temp));
+
+    // fix the schedule factory - since Scenario::scheduleFactory() 
+    // is non-const we need to cast away *pointer_
+    temp->scheduleFactory(((LgFrScheduleFactory*)(((LgFrScenarioForDifTesting&)(*pointer_)).scheduleFactory()))->clone(temp));
+
+    return temp;
+}
+
+// Assignment Operator
+LgFrScenarioForDifTestingSmartPointerToConst& 
+LgFrScenarioForDifTestingSmartPointerToConst::operator=(const LgFrScenarioForDifTestingSmartPointerToConst& rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != NULL)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrScenarioForDifTestingSmartPointerToConst&)rhs).count_;
+    pointer_ = rhs.pointer_;
+    return *this;
+}
+
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointerToConst::operator==(const LgFrScenarioForDifTestingSmartPointerToConst& rhs) const
+{
+    if ( (pointer_ == rhs.pointer_) && (count_ == rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+}
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointerToConst::operator!=(const LgFrScenarioForDifTestingSmartPointerToConst& rhs) const
+{
+    if ( (pointer_ != rhs.pointer_) || (count_ != rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+}
+
+const LgFrScenarioForDifTesting* const
+LgFrScenarioForDifTestingSmartPointerToConst::operator->() const
+{
+    // implicit cast to const
+    return pointer_;
+}
+
+const LgFrScenarioForDifTesting&
+LgFrScenarioForDifTestingSmartPointerToConst::operator*() const
+{
+    // implicit cast to const
+    return *pointer_;
+}
+
+
+LgFrScenarioForDifTestingSmartPointerToConst::operator LgFrScenarioSmartPointerToConst () const
+{
+    // need to cast away const for count_
+    return LgFrScenarioSmartPointerToConst(pointer_, (LgFrReferenceCount&)count_);
+}
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointerToConst::unique() const
+{
+    return (count_.reference() == 1);
+}
+
+RWBoolean 
+LgFrScenarioForDifTestingSmartPointerToConst::null() const
+{
+    return (pointer_ == NULL);
+}
+
+void
+LgFrScenarioForDifTestingSmartPointerToConst::test()
+{
+    cout << "Testing default constructor" << endl;
+    LgFrScenarioForDifTestingSmartPointerToConst dummy;
+    assert(dummy.pointer_ == NULL);
+    cout << "dummy count is " << dummy.count_.reference() << endl;
+
+    cout << "Testing preferred constructor (dummy)" << endl;
+    LgFrScenarioForDifTestingSmartPointerToConst b(new LgFrScenarioForDifTesting);
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing assignement operator dummy = b" << endl;
+    dummy = b;
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing copy constructor (c = b)" << endl;
+    LgFrScenarioForDifTestingSmartPointerToConst c(b);
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing backdoor constructor" << endl;
+    LgFrScenarioForDifTestingSmartPointerToConst e(b.pointer_, b.count_);
+    cout << "e count is " << e.count_.reference() << endl;    
+
+    cout << "Testing equality operator (c == b)" << endl;
+    assert(c == b);
+
+    cout << "Testing inequality operator (c != d)" << endl;
+    LgFrScenarioForDifTestingSmartPointerToConst d(new LgFrScenarioForDifTesting);
+    assert(c != d);
+
+    cout << "Test destructor" << endl;
+    c = d;
+    cout << "b count is " << b.count_.reference() << endl;    
+    c = b;
+    d = b;
+
+    // this should be a compiler error
+//    LgFrScenarioForDifTestingSmartPointerToConst e(&(*d));
+}
+
+
+
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer() 
+{
+    // calls base class default constructor
+}
+
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer(LgFrScenarioForDifTesting* newedPointer) 
+: LgFrScenarioForDifTestingSmartPointerToConst(newedPointer)
+{
+}
+
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer(
+    LgFrScenarioForDifTesting* existingPointer,
+    LgFrReferenceCount& count) 
+: LgFrScenarioForDifTestingSmartPointerToConst(existingPointer, count)
+{
+}
+
+
+LgFrScenarioForDifTestingSmartPointer::~LgFrScenarioForDifTestingSmartPointer()
+{
+    // call base class destructor
+}
+
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer(const LgFrScenarioForDifTestingSmartPointer& rhs) 
+: LgFrScenarioForDifTestingSmartPointerToConst(rhs.pointer_)
+{
+    count_ = ((LgFrScenarioForDifTestingSmartPointer&)rhs).count_;
+}
+
+// need to do some casting to a derived class so that we can access protected
+//  members
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer(LgFrScenarioForDifTestingSmartPointerToConst rhs) 
+    : LgFrScenarioForDifTestingSmartPointerToConst(((LgFrScenarioForDifTestingSmartPointer&)rhs).pointer_)
+{
+    count_ = ((LgFrScenarioForDifTestingSmartPointer&)rhs).count_;
+}
+
+// Constructor 
+LgFrScenarioForDifTestingSmartPointer::LgFrScenarioForDifTestingSmartPointer(
+    LgFrScenarioSmartPointerToConst rhs)
+{
+    if (rhs->isA() != __LGFRSCENARIOFORDIFTESTING)  {
+	cerr << "Cannot construct a LgFrScenarioForDifTestingSmartPointerToConst from a non LgFrScenarioForDifTesting object" << endl;
+	assert(0);
+    }
+    else  {
+	// silly casting to derived class (SmartPointerToConst -> SmartPointer)
+	//   so that we can access protected members pointer_, count_
+	pointer_ = (LgFrScenarioForDifTesting*)(((LgFrScenarioSmartPointer&)rhs).pointer_);
+	count_ = ((LgFrScenarioSmartPointer&)rhs).count_;
+    }
+}
+
+// Deep Copy
+LgFrScenarioForDifTestingSmartPointer
+LgFrScenarioForDifTestingSmartPointer::deepCopy()
+{
+    // do scenario deep copy and create a new smart pointer
+    LgFrScenarioForDifTestingSmartPointer temp(new LgFrScenarioForDifTesting(*pointer_));
+
+    // fix the ipp 
+    temp->initialProblemAndParameters(((LgFrInitialProblemForDifTesting&)(pointer_->initialProblemAndParameters())).clone(temp));
+
+    // fix the schedule factory 
+    temp->scheduleFactory(((LgFrScheduleFactory*)(pointer_->scheduleFactory()))->clone(temp));
+
+
+    return temp;
+}
+
+LgFrScenarioForDifTestingSmartPointer& 
+LgFrScenarioForDifTestingSmartPointer::operator=(const LgFrScenarioForDifTestingSmartPointer& rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != NULL)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrScenarioForDifTestingSmartPointer&)rhs).count_;
+    pointer_ = rhs.pointer_;
+    return *this;
+}
+
+// need to do some casting to a derived class so that we can access protected
+//  members
+LgFrScenarioForDifTestingSmartPointer& 
+LgFrScenarioForDifTestingSmartPointer::operator=(LgFrScenarioForDifTestingSmartPointerToConst rhs)
+{
+    // If a scenario smart pointer is fully constructed, there are
+    //  3 references to the actual scenario. 
+    //    1 from the routine that owns the last Smart Pointer
+    //    1 from the scenario's Initial Problem and Parameters
+    //    1 from the scenario's Schedule Factory
+    //  but we need to check to make sure that a full scenario is
+    //    built up!
+
+    if (pointer_ != NULL)  {
+	if ( (pointer_->ippPtr_) && (pointer_->sfPtr_) 
+	     && (count_.reference() == 3) ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 3)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if ( (count_.reference() == 2) && 
+		  ( (pointer_->ippPtr_) || (pointer_->sfPtr_) )  ) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 2)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+	else if (count_.reference() == 1) {
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 1;
+	    cout << "deleting LgFrTestScenario (count_.reference() == 1)" << endl;
+	    delete pointer_;
+	    cout << "deleted LgFrTestScenario" << endl;
+	    pointer_ = NULL;
+	    LgFrScenarioSmartPointerToConst::deletingScenario_ = 0;
+	}
+    }
+    count_ = ((LgFrScenarioForDifTestingSmartPointer&)rhs).count_;
+    pointer_ = ((LgFrScenarioForDifTestingSmartPointer&)rhs).pointer_;
+    return *this;
+}
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointer::operator==(const LgFrScenarioForDifTestingSmartPointer& rhs) const
+{
+    if ( (pointer_ == rhs.pointer_) && (count_ == rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+}
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointer::operator!=(const LgFrScenarioForDifTestingSmartPointer& rhs) const
+{
+    if ( (pointer_ != rhs.pointer_) || (count_ != rhs.count_) )
+	return TRUE;
+    else
+	return FALSE;
+}
+
+LgFrScenarioForDifTesting* const
+LgFrScenarioForDifTestingSmartPointer::operator->()
+{
+    return pointer_;
+}
+
+const LgFrScenarioForDifTesting* const
+LgFrScenarioForDifTestingSmartPointer::operator->() const
+{
+    return pointer_;
+}
+
+LgFrScenarioForDifTesting &
+LgFrScenarioForDifTestingSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+const LgFrScenarioForDifTesting &
+LgFrScenarioForDifTestingSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+
+LgFrScenarioForDifTestingSmartPointer::operator LgFrScenarioSmartPointerToConst () const
+{
+    // need to cast away const for count_
+    return LgFrScenarioSmartPointerToConst(pointer_, (LgFrReferenceCount&)count_);
+}
+
+LgFrScenarioForDifTestingSmartPointer::operator LgFrScenarioSmartPointer () 
+{
+    return LgFrScenarioSmartPointer(pointer_, count_);
+}
+
+
+
+RWBoolean
+LgFrScenarioForDifTestingSmartPointer::unique() const
+{
+    return (count_.reference() == 1);
+}
+
+RWBoolean 
+LgFrScenarioForDifTestingSmartPointer::null() const
+{
+    return (pointer_ == NULL);
+}
+
+void
+LgFrScenarioForDifTestingSmartPointer::test()
+{
+    cout << "Testing default constructor" << endl;
+    LgFrScenarioForDifTestingSmartPointer dummy;
+    assert(dummy.pointer_ == NULL);
+    cout << "dummy count is " << dummy.count_.reference() << endl;
+
+    cout << "Testing preferred constructor (dummy)" << endl;
+    LgFrScenarioForDifTestingSmartPointer b(new LgFrScenarioForDifTesting);
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing assignement operator dummy = b" << endl;
+    dummy = b;
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing copy constructor (c = b)" << endl;
+    LgFrScenarioForDifTestingSmartPointer c(b);
+    cout << "b count is " << b.count_.reference() << endl;    
+
+    cout << "Testing backdoor constructor" << endl;
+    LgFrScenarioForDifTestingSmartPointer e(b.pointer_, b.count_);
+    cout << "e count is " << e.count_.reference() << endl;    
+
+    cout << "Testing equality operator (c == b)" << endl;
+    assert(c == b);
+
+    cout << "Testing inequality operator (c != d)" << endl;
+    LgFrScenarioForDifTestingSmartPointer d(new LgFrScenarioForDifTesting);
+    assert(c != d);
+
+    cout << "Test destructor" << endl;
+    c = d;
+    cout << "b count is " << b.count_.reference() << endl;    
+    c = b;
+    d = b;
+}

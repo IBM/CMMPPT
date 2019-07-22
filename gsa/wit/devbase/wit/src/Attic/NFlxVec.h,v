@@ -1,0 +1,323 @@
+head	1.3;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2004.03.20.00.12.12;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2004.03.19.22.00.53;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.03.16.22.39.28;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Double Precision.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef NFlxVecH
+#define NFlxVecH
+
+//------------------------------------------------------------------------------
+// Header file: "NFlxVec.h"
+//
+// Contains the declaration of class template NFlxVec <Elem>.
+//------------------------------------------------------------------------------
+
+#include <NFlxVData.h>
+
+//------------------------------------------------------------------------------
+// NonClass "convCopy" functions.
+// "Convert-Copy"
+// Each of these functions copies the elements of the 2nd vector
+// into the corresponding elements of the 1st vector.
+// In each case, the 2 vectors are instances of 2 different classes, and one or
+// both of the classes is a NFlxVec <> class.
+//------------------------------------------------------------------------------
+
+namespace WitNonClass
+{
+
+void convCopy (WitTVec    <double> &, const WitNFlxVec <float>  &);
+void convCopy (WitNFlxVec <float>  &, const WitTVec    <double> &);
+void convCopy (WitNFlxVec <double> &, const WitTVec    <float>  &);
+void convCopy (WitNFlxVec <float>  &, const WitNFlxVec <double> &);
+void convCopy (WitTVec    <float>  &, const WitNFlxVec <double> &);
+void convCopy (            float   *, const WitNFlxVec <double> &);
+void convCopy (WitNFlxVec <double> &, const             float   *);
+
+// Leaving namespace NonClass.
+}
+
+//------------------------------------------------------------------------------
+// Class template NFlxVec <Elem>
+//
+// "New Flexible Vector"
+// A vector whose representation changes dynamically between a scalar
+// representation and a vector representation.
+// The length of the represented vector is nPeriods for the corresponding
+// Problem.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      class WitNFlxVec
+   {
+      //------------------------------------------------------------------------
+      // Friends.
+      //------------------------------------------------------------------------
+
+      friend void WitNonClass::convCopy (
+         WitTVec <double> &,
+         const WitNFlxVec <float>  &);
+
+      friend void WitNonClass::convCopy (
+         WitNFlxVec <float> &,
+         const WitTVec <double> &);
+
+      friend void WitNonClass::convCopy (
+         WitNFlxVec <double> &,
+         const WitTVec <float> &);
+
+      friend void WitNonClass::convCopy (
+         WitNFlxVec <float> &,
+         const WitNFlxVec <double> &);
+
+      friend void WitNonClass::convCopy (
+         WitTVec <float> &,
+         const WitNFlxVec <double> &);
+
+      friend void WitNonClass::convCopy (
+         float *,
+         const WitNFlxVec <double> &);
+
+      friend void WitNonClass::convCopy (
+         WitNFlxVec <double> &,
+         const float *);
+
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions
+      //------------------------------------------------------------------------
+
+      WitNFlxVec (WitProblem *, Elem initValue);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitNFlxVec ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void convCopyInto (WitTVec <Elem> &) const;
+      void convCopyInto (Elem *)           const;
+         //
+         // "Convert-Copy Into"
+         // Each of these functions copies the elements of this NFlxVec
+         // into the corresponding elements of the argument vector.
+
+      void copy (const WitNFlxVec & theNFlxVec);
+         //
+         // Copies theNFlxVec into this NFlxVec.
+
+      void setToScalar (Elem theValue);
+         //
+         // Sets every element of this NFlxVec to theValue.
+
+      void convCopy (const WitTVec <Elem> &);
+      void convCopy (const Elem *);
+         //
+         // "Convert-Copy"
+         // Each of these functions copies the elements of the argument vector
+         // into the corresponding elements of this NFlxVec.
+
+      inline Elem operator [] (WitPeriod thePer) const;
+         //
+         // Returns the value of the element of the represented vector indexed
+         // by thePer.
+
+      inline Elem & elemRef (int theIndex);
+         //
+         // Same as [], but returns a reference.
+
+      bool operator == (Elem theValue) const;
+      bool operator >= (Elem theValue) const;
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitNFlxVec);
+
+      void checkBounds (WitPeriod thePer) const;
+         //
+         // Verifies that thePer is in [0, nPeriods ()).
+
+      inline void beInVectorMode ();
+         //
+         // If this NFlxVec is in scalar mode, it is switched to vector mode.
+
+      inline void beInScalarMode ();
+         //
+         // If this NFlxVec is in vector mode, it is switched to scalar mode.
+
+      //------------------------------------------------------------------------
+      // Wrappers for the corresponding functions in myData_.
+      //------------------------------------------------------------------------
+
+      inline bool   vectorMode () const;
+      inline bool   scalarMode () const;
+      inline int    nPeriods   () const;
+      inline Elem * myCVec     () const;
+      inline Elem & myScalar   () const;
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      mutable WitNFlxVData <Elem> myData_;
+         //
+         // The NFlxVecData owned by this NFlxVec.
+   };
+
+//------------------------------------------------------------------------------
+// Implementation of inlines.
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline Elem WitNFlxVec <Elem>::operator [] (WitPeriod thePer) const
+   {
+   ifDebug (checkBounds (thePer));
+
+   return
+      vectorMode  ()?
+         myCVec   ()[thePer]:
+         myScalar ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem>
+      inline Elem & WitNFlxVec <Elem>::elemRef (WitPeriod thePer)
+   {
+   ifDebug (checkBounds (thePer));
+
+   beInVectorMode ();
+
+   return myCVec ()[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline void WitNFlxVec <Elem>::beInVectorMode ()
+   {
+   if (scalarMode ())
+      myData_.switchToVectorMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline void WitNFlxVec <Elem>::beInScalarMode ()
+   {
+   if (vectorMode ())
+      myData_.switchToScalarMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline bool WitNFlxVec <Elem>::vectorMode () const
+   {
+   return myData_.vectorMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline bool WitNFlxVec <Elem>::scalarMode () const
+   {
+   return myData_.scalarMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline int WitNFlxVec <Elem>::nPeriods () const
+   {
+   return myData_.nPeriods ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline Elem * WitNFlxVec <Elem>::myCVec () const
+   {
+   return myData_.myCVec ();
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Elem> 
+      inline Elem & WitNFlxVec <Elem>::myScalar () const
+   {
+   return myData_.myScalar ();
+   }
+
+//------------------------------------------------------------------------------
+
+#endif
+@
+
+
+1.2
+log
+@Double Precision.
+@
+text
+@@
+
+
+1.1
+log
+@Double Precision.
+@
+text
+@a148 5
+      static bool hasSingleValue (const Elem * theCVec, int nPers);
+         //
+         // Returns true, iff all the elements of theCVec have the same value.
+         // theCVec is assumed to have length == nPers.
+
+@
+

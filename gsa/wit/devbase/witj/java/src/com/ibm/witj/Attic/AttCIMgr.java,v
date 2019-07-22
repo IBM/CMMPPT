@@ -1,0 +1,933 @@
+head	1.21;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.21
+date	2008.08.09.00.18.27;	author rjw;	state dead;
+branches;
+next	1.20;
+
+1.20
+date	2008.08.08.23.56.52;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2008.08.08.23.02.07;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2008.08.08.21.26.12;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2008.08.07.19.58.28;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2008.08.07.15.25.46;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2008.08.01.18.19.19;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2008.08.01.17.56.29;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2008.08.01.16.29.32;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2008.07.31.16.40.32;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2008.07.31.15.52.01;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2008.07.30.22.43.27;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2008.07.30.22.05.20;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2008.07.30.21.18.58;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2008.07.25.15.53.48;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2008.07.14.22.08.54;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2008.07.10.21.20.06;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2008.07.10.20.04.35;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2008.07.09.23.15.34;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.07.09.22.59.58;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.07.09.22.26.46;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.21
+log
+@AttReps.
+@
+text
+@
+//==============================================================================
+// WIT-J Java Source File AttCIMgr.java.
+//
+// Contains the declaration of class AttCIMgr.
+//==============================================================================
+
+package com.ibm.witj;
+
+import     java.util.*;
+
+//==============================================================================
+// Class AttCIMgr
+//
+// "AttCI Manager"
+// Owns and provides access to the AttCIs for a problem.
+//
+// Class Hierarchy:
+//
+//    InternalObject
+//       AttCIMgr
+//==============================================================================
+
+final class AttCIMgr extends InternalObject
+{
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Constructor
+//------------------------------------------------------------------------------
+
+   AttCIMgr (ProbCoord theProbCoord)
+      {
+      myProbCoord = theProbCoord;
+
+      buildAttCIs ();
+
+      if (myProbCoord.selfTestMode ())
+         selfTest ();
+      }
+
+//------------------------------------------------------------------------------
+// shutDown ()
+//
+// Override from class InternalObject.
+//------------------------------------------------------------------------------
+
+   void shutDown ()
+      {
+      myProbCoord = null;
+
+      super.shutDown ();
+      }
+
+//==============================================================================
+// Private Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// buildAttCIs ()
+//
+// Creates and stores the AttCIs that are to be owned by this AttCIMgr.
+//------------------------------------------------------------------------------
+
+   private void buildAttCIs ()
+      {
+      AttBldrCI                    theAttBldrCI;
+      EnumMap <CompClassID, AttCI> theInnerMap;
+      String                       theAttCIName;
+      AttCI                        theAttCI;
+
+      myAttCIMap   =
+         new EnumMap <AttID, EnumMap <CompClassID, AttCI>> (AttID.class);
+
+      theAttBldrCI = new AttBldrCI (myProbCoord.getProbCoordCI ());
+
+      for (AttID theAttID: AttID.values ())
+         {
+         theInnerMap = new EnumMap <CompClassID, AttCI> (CompClassID.class);
+
+         myAttCIMap.put (theAttID, theInnerMap);
+
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCIName = theCompClassID + "." + theAttID;
+
+            if (theAttBldrCI.hasAttFor (theAttCIName))
+               {
+               theAttCI = new AttCI (theAttBldrCI, theAttCIName);
+
+               theInnerMap.put (theCompClassID, theAttCI);
+               }
+            }
+         }
+
+      if (myProbCoord.selfTestMode ())
+         {
+         if (theAttBldrCI.isEmpty ())
+            {
+            System.out.println (
+                 "\n"
+               + "All C++ Atts have been matched to "
+               + "corresponding Java AttIDs.");
+            }
+         else
+            theAttBldrCI.print ();
+         }
+
+      theAttBldrCI.shutDown ();
+      }
+
+//------------------------------------------------------------------------------
+// selfTest ()
+//
+// Performs self-test for attributes-related code.
+//------------------------------------------------------------------------------
+
+   private void selfTest ()
+      {
+      checkAlphaOrder ();
+      }
+
+//------------------------------------------------------------------------------
+// checkAlphaOrder ()
+//
+// Verifies that the AttIDs are listed in alphabetical order.
+//------------------------------------------------------------------------------
+
+   private static void checkAlphaOrder ()
+      {
+      String theAttName;
+      String prevAttName = null;
+
+      System.out.println (
+           "\n"
+         + "Verifying that the AttIDs are listed in alphabetical order.\n");
+
+      for (AttID theAttID: AttID.values ())
+         {
+         theAttName = theAttID.toString ();
+
+         if (prevAttName != null)
+            if (theAttName.compareTo (prevAttName) < 0)
+               intAbortWmsg (
+                  "   An AttID was found whose name is alphabetically earlier\n"
+                + "   than that of the preceding AttID.\n"
+                + "\n"
+                + "      Preceding AttID: " + prevAttName + "\n"
+                + "      Current   AttID: " + theAttName);
+
+         prevAttName = theAttName;
+         }
+
+      System.out.println (
+           "Verified: The AttIDs are listed in alphabetical order.");
+      }
+
+//------------------------------------------------------------------------------
+// getAttCIFor (theAttID, theCompClassID)
+//
+// Returns the AttCI that owns the C++ Att that's identified by theAttID and
+// applies to the Component class identified by theCompClassID, or null if none
+// exists.
+//------------------------------------------------------------------------------
+
+   private AttCI getAttCIFor (
+         AttID       theAttID,
+         CompClassID theCompClassID)
+      {
+      return myAttCIMap.get (theAttID).get (theCompClassID);
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+ 
+//------------------------------------------------------------------------------
+// myProbCoord
+//
+// The ProbCoord that owns this AttCIMgr.
+//------------------------------------------------------------------------------
+
+   private ProbCoord myProbCoord;
+
+//------------------------------------------------------------------------------
+// myAttCIMap
+//
+// myAttCIMap.get (theAttID).get (theCompClassID) is the AttCI that owns the C++
+// Att that's identified by theAttID and applies to the Component class
+// identified by theCompClassID, if any.
+//------------------------------------------------------------------------------
+
+   private EnumMap <AttID, EnumMap <CompClassID, AttCI>> myAttCIMap;
+
+//------------------------------------------------------------------------------
+}
+@
+
+
+1.20
+log
+@AttReps.
+@
+text
+@@
+
+
+1.19
+log
+@AttReps.
+@
+text
+@a121 1
+      checkValueTypes ();
+a125 44
+// checkValueTypes ()
+//
+// Verifies that the value type of each Java AttSpec matches that of all
+// corresponding C++ Atts.
+//------------------------------------------------------------------------------
+
+   private void checkValueTypes ()
+      {
+      String theTypeName;
+      AttCI  theAttCI;
+
+      System.out.println (
+           "\n"
+         + "Verifying that the value type of each Java AttSpec\n"
+         + "matches that of all corresponding C++ Atts.\n");
+
+      for (AttID theAttID: AttID.values ())
+         {
+         theTypeName = theAttID.getAttSpec ().getValueType ().getSimpleName ();
+
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCI = getAttCIFor (theAttID, theCompClassID);
+
+            if (theAttCI == null)
+               continue;
+
+            if (! theAttCI.valueTypeMatches (theTypeName))
+               intAbortWmsg (
+                  "   A Java AttSpec was found whose value type does not\n"
+                + "   match that of all of the corresponding C++ Atts.\n"
+                + "\n"
+                + "      AttSpec:         " + theAttID       + "\n"
+                + "      Component Class: " + theCompClassID + "\n"
+                + "      Value Type:      " + theTypeName);
+            }
+         }
+
+      System.out.println (
+           "Verified: The value type of each Java AttSpec\n"
+         + "          matches that of all corresponding C++ Atts.");
+      }
+
+//------------------------------------------------------------------------------
+@
+
+
+1.18
+log
+@AttReps.
+@
+text
+@a39 2
+      setUpInputAttIDs ();
+
+a53 4
+      shutDownAttCIs ();
+
+      inputAttIDs = null;
+
+a56 14
+//------------------------------------------------------------------------------
+// isAnInputAtt (theAttID)
+//
+// Returns true,  if the C++ Atts identified by theAttID are all input
+//                attributes: their values can    be set.
+// Returns false, if the C++ Atts identified by theAttID are all output
+//                attributes: their values cannot be set.
+//------------------------------------------------------------------------------
+
+   boolean isAnInputAtt (AttID theAttID)
+      {
+      return inputAttIDs.contains (theAttID);
+      }
+
+a114 57
+// setUpInputAttIDs ()
+//
+// Constructs and populates inputAttIDs.
+//------------------------------------------------------------------------------
+
+   private void setUpInputAttIDs ()
+      {
+      AttCI theAttCI;
+
+      inputAttIDs = EnumSet.noneOf (AttID.class);
+
+      for (AttID theAttID: AttID.values ())
+         {
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCI = getAttCIFor (theAttID, theCompClassID);
+
+            if (theAttCI != null)
+               {
+               if (theAttCI.isAnInputAtt ())
+                  inputAttIDs.add (theAttID);
+
+               break;
+               }
+            }
+         }
+      }
+
+//------------------------------------------------------------------------------
+// shutDownAttCIs ()
+//
+// Shuts down the AttCIs owned by this AttCIMgr.
+// Removes the references to the AttCIs.
+//------------------------------------------------------------------------------
+
+   private void shutDownAttCIs ()
+      {
+      EnumMap <CompClassID, AttCI> theInnerMap;
+      AttCI                        theAttCI;
+
+      for (AttID theAttID: AttID.values ())
+         {
+         theInnerMap = myAttCIMap.get (theAttID);
+
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCI = theInnerMap.get (theCompClassID);
+
+            if (theAttCI != null)
+               theAttCI.shutDown ();
+            }
+         }
+
+      myAttCIMap = null;
+      }
+
+//------------------------------------------------------------------------------
+a121 1
+      checkInputAtts  ();
+a126 33
+// checkInputAtts ()
+//
+// For each AttID and each Component class to which it applies:
+//    Verifies that the corresponding C++ Att is an input attribute
+//    iff inputAttIDs contains the AttID.
+//------------------------------------------------------------------------------
+
+   private void checkInputAtts ()
+      {
+      AttCI theAttCI;
+
+      System.out.println (
+           "\n"
+         + "Verifying the inputAttIDs set.\n");
+
+      for (AttID theAttID: AttID.values ())
+         {
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCI = getAttCIFor (theAttID, theCompClassID);
+
+            if (theAttCI != null)
+               assert (
+                     inputAttIDs.contains (theAttID)
+                  == theAttCI.isAnInputAtt ());
+            }
+         }
+
+      System.out.println (
+         "Verified: The inputAttIDs set has the correct contents.");
+      }
+
+//------------------------------------------------------------------------------
+a242 17
+// inputAttIDs
+//
+// For each AttID, it is assumed that either:
+//    all corresponding C++ attributes are input  attributes, or
+//    all corresponding C++ attributes are output attributes.
+// This assumption is verified by self-test.
+//
+// If inputAttIDs.contains (theAttID) is true,
+//    then all corresponding C++ attributes are input  attributes.
+//
+// If inputAttIDs.contains (theAttID) is false,
+//    then all corresponding C++ attributes are output attributes.
+//------------------------------------------------------------------------------
+
+   private EnumSet <AttID> inputAttIDs;
+
+//------------------------------------------------------------------------------
+@
+
+
+1.17
+log
+@AttReps.
+@
+text
+@a63 15
+// getAttCIFor (theAttID, theCompClassID)
+//
+// Returns the AttCI that owns the C++ Att that's identified by theAttID and
+// applies to the Component class identified by theCompClassID, or null if none
+// exists.
+//------------------------------------------------------------------------------
+
+   AttCI getAttCIFor (
+         AttID       theAttID,
+         CompClassID theCompClassID)
+      {
+      return myAttCIMap.get (theAttID).get (theCompClassID);
+      }
+
+//------------------------------------------------------------------------------
+d316 15
+@
+
+
+1.16
+log
+@Attributes.
+@
+text
+@a186 1
+      AttBldrCI                    theAttBldrCI;
+@
+
+
+1.15
+log
+@Attributes.
+@
+text
+@d109 1
+a109 1
+      myAttCIMap =
+d256 1
+a256 1
+// Verifies that the value type of each Java Attribute matches that of all
+d267 1
+a267 1
+         + "Verifying that the value type of each Java Attribute\n"
+d272 1
+a272 1
+         theTypeName = theAttID.getAtt ().getValueType ().getSimpleName ();
+d283 2
+a284 2
+                  "   A Java Attribute was found whose value type does not\n"
+                + "   match that of one of the corresponding C++ Atts.\n"
+d286 1
+a286 1
+                + "      Attribute:       " + theAttID       + "\n"
+d293 1
+a293 1
+           "Verified: The value type of each Java Attribute\n"
+@
+
+
+1.14
+log
+@Attributes.
+@
+text
+@d217 1
+d260 1
+a260 1
+   void checkValueTypes ()
+d297 35
+@
+
+
+1.13
+log
+@Attributes.
+@
+text
+@a214 2
+      Attribute.checkAccessors ();
+
+d261 2
+a262 3
+      Attribute theAtt;
+      String    theTypeName;
+      AttCI     theAttCI;
+d271 1
+a271 6
+         theAtt      = theAttID.getAtt ();
+
+         if (theAtt == null)
+            continue;
+
+         theTypeName = theAtt.getValueType ().getSimpleName ();
+@
+
+
+1.12
+log
+@Attributes.
+@
+text
+@a42 3
+         {
+         Attribute.selfTest ();
+
+a43 1
+         }
+d210 1
+a210 4
+// Performs self-test for AttCIs:
+//   For each AttID and each Component class to which it applies:
+//      Verifies that the corresponding C++ Att is an input attribute
+//      iff inputAttIDs contains the AttID.
+d215 16
+d235 1
+a235 1
+         + "Performing self-test for class AttCIMgr.\n");
+d245 51
+a295 1
+                  theAttCI.isAnInputAtt () == inputAttIDs.contains (theAttID));
+d298 4
+@
+
+
+1.11
+log
+@Attributes.
+@
+text
+@a67 30
+// selfTest ()
+//
+// Performs self-test for AttCIs:
+//   For each AttID and each Component class to which it applies:
+//      Verifies that the corresponding C++ Att is an input attribute
+//      iff inputAttIDs contains the AttID.
+//------------------------------------------------------------------------------
+
+   void selfTest ()
+      {
+      AttCI theAttCI;
+
+      System.out.println (
+           "\n"
+         + "Performing self-test for class AttCIMgr.\n");
+
+      for (AttID theAttID: AttID.values ())
+         {
+         for (CompClassID theCompClassID: CompClassID.values ())
+            {
+            theAttCI = getAttCIFor (theAttID, theCompClassID);
+
+            if (theAttCI != null)
+               assert (
+                  theAttCI.isAnInputAtt () == inputAttIDs.contains (theAttID));
+            }
+         }
+      }
+
+//------------------------------------------------------------------------------
+d211 30
+@
+
+
+1.10
+log
+@Attributes.
+@
+text
+@d41 7
+d167 12
+a178 2
+      if (! theAttBldrCI.isEmpty ())
+         theAttBldrCI.print ();
+@
+
+
+1.9
+log
+@Attributes.
+@
+text
+@d63 1
+a63 1
+// Performs self-test for attributes:
+d73 4
+@
+
+
+1.8
+log
+@Attributes.
+@
+text
+@d61 26
+a165 3
+// For each AttID, verifies that either each C++ Att that's identified by
+// theAttID is an input attribute or each C++ Att that's identified by theAttID
+// is not an input attribute .
+d170 1
+a170 3
+      AttCI   theAttCI;
+      boolean theAttCIFound;
+      boolean theAttIsInput;
+a175 2
+         theAttCIFound = false;
+
+d180 1
+a180 4
+            if (theAttCI == null)
+               continue;
+
+            if (! theAttCIFound)
+d184 2
+a186 7
+            else
+               {
+               assert (
+                  theAttCI.isAnInputAtt () == inputAttIDs.contains (theAttID));
+               }
+
+            theAttCIFound = true;
+d245 7
+a251 2
+// If inputAttIDs.contains (theAttID) is true,  then the C++ Atts identified by
+// theAttID are all input  attributes: their values can    be set.
+d253 2
+a254 2
+// If inputAttIDs.contains (theAttID) is false, then the C++ Atts identified by
+// theAttID are all output attributes: their values cannot be set.
+@
+
+
+1.7
+log
+@Attributes.
+@
+text
+@d40 1
+a40 1
+      setUpIsAnInputAttMap ();
+d51 1
+a51 1
+      myProbCoord     = null;
+d55 1
+a55 1
+      isAnInputAttMap = null;
+d86 1
+a86 1
+      return isAnInputAttMap.get (theAttID);
+d137 1
+a137 1
+// setUpIsAnInputAttMap ()
+d139 1
+a139 1
+// Constructs and populates isAnInputAttMap.
+d145 1
+a145 1
+   private void setUpIsAnInputAttMap ()
+d148 2
+a149 1
+      boolean isAnInputAtVal;
+d151 1
+a151 1
+      isAnInputAttMap = new EnumMap <AttID, Boolean> (AttID.class);
+d155 2
+d161 9
+a169 1
+            if (theAttCI != null)
+d171 3
+a173 1
+               isAnInputAtVal = theAttCI.isAnInputAtt ();
+d175 1
+a175 7
+               if (isAnInputAttMap.get (theAttID) == null)
+                  {
+                  isAnInputAttMap.put (theAttID, isAnInputAtVal);
+                  }
+               else
+                  assert (isAnInputAtVal == isAnInputAttMap.get (theAttID));
+               }
+a176 2
+
+         assert (isAnInputAttMap.get (theAttID) != null);
+d232 1
+a232 1
+// isAnInputAttMap.
+d234 1
+a234 1
+// If isAnInputAttMap.get (theAttID) is true,  then the C++ Atts identified by
+d236 2
+a237 1
+// If isAnInputAttMap.get (theAttID) is false, then the C++ Atts identified by
+d241 1
+a241 1
+   private EnumMap <AttID, Boolean> isAnInputAttMap;
+@
+
+
+1.6
+log
+@Attributes.
+@
+text
+@d78 4
+a81 4
+// Returns true,  if each C++ Att that's identified by theAttID is an input
+// attribute.
+// Returns false, if no   C++ Att that's identified by theAttID is an input
+// attribute.
+d229 4
+a232 4
+// If isAnInputAttMap.get (theAttID) is true, then each C++ Att that's
+// identified by theAttID is an input attribute, i.e. its value can be set.
+// If isAnInputAttMap.get (theAttID) is false, then no C++ Att that's
+// identified by theAttID is an input attribute.
+@
+
+
+1.5
+log
+@Attributes.
+@
+text
+@d130 2
+a131 1
+      assert (theAttBldrCI.isEmpty ());
+@
+
+
+1.4
+log
+@Attribute.
+@
+text
+@d75 14
+@
+
+
+1.3
+log
+@Attributes.
+@
+text
+@d39 2
+d51 2
+d55 1
+a55 1
+      myProbCoord = null;
+a60 11
+// selfTest ()
+//
+// Verifies internal consistency of the attribute aspects of WIT-J.
+//------------------------------------------------------------------------------
+
+   void selfTest ()
+      {
+      assert (false);
+      }
+
+//------------------------------------------------------------------------------
+d122 39
+d212 11
+@
+
+
+1.2
+log
+@Attributes.
+@
+text
+@d71 2
+a72 2
+// applies to the Component class identified by theCompClassID.
+// Throws an assert exception is it doesn't exist.
+d79 1
+a79 7
+      AttCI theAttCI;
+
+      theAttCI = myAttCIMap.get (theAttID).get (theCompClassID);
+
+      assert (theAttCI != null);
+
+      return theAttCI;
+@
+
+
+1.1
+log
+@Attributes.
+@
+text
+@d67 21
+d179 1
+a179 1
+// Att that's identified by theAttribute and applies to the Component class
+@
+

@@ -1,0 +1,185 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2004.05.11.18.25.28;	author gresh;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2004.01.13.14.07.17;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@updates for more genearlity in the substitution
+@
+text
+@#ifndef RCPlobSubsFile_h
+#define RCPlobSubsFile_h
+
+#include "scoFile.h"
+#include "CoinFloatEqual.h"
+
+
+class RCPlobSubsFile : public SCOcsvFormatFile {
+public:
+
+  // Fields 
+  getFieldH(fromLob);
+  getFieldH(toLob);
+  getFloatFieldH(cost);
+  getFloatFieldH(leadTime);
+  
+  // preferred constructor
+  RCPlobSubsFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    hasHeaderRecord(4);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & fromLob,
+    const std::string & toLob ) 
+  {
+    //char periodchar[100];
+    //sprintf( periodchar, "%d", period );
+    std::string retVal = fromLob + "!@@#$%" + toLob;
+    return retVal;
+  };
+  
+  // destructor
+  ~RCPlobSubsFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+	CoinRelFltEq eq;
+    RCPlobSubsFile file("../data/example1/lobSubs.csv");
+    
+    // Test reading first record
+
+    std::string e = file.fromLob(0);
+    assert( e=="Lob1");
+    assert( file.toLob(0) == "Lob2" );
+    assert( eq(file.costAsFloat(0),9999.99f) );
+    assert( eq(file.leadTimeAsFloat(0),20.0f) );
+
+    
+    // Test reading record by key    
+    std::string key = file.key("Lob1", "Lob2");
+    assert( eq(file.costAsFloat(key),9999.99f) );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      fromLob(recNum),
+      toLob(recNum));
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPlobSubsFile();
+  
+  // copy constructor  -- don't use!
+  RCPlobSubsFile( const RCPlobSubsFile& source );
+  
+  // assignment operator -- don't use!
+  RCPlobSubsFile&
+  operator=(const RCPlobSubsFile& rhs);
+
+  
+};
+
+
+
+class RCPlobSubsFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  getFieldFileWithIteratorH(fromLob);
+  getFieldFileWithIteratorH(toLob);
+  getFloatFieldFileWithIteratorH(cost);
+  getFloatFieldFileWithIteratorH(leadTime);
+
+  // preferred constructor
+  RCPlobSubsFileIterator(const RCPlobSubsFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPlobSubsFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+	CoinRelFltEq eq;
+    RCPlobSubsFile file("../data/example1/lobSubs.csv");
+    RCPlobSubsFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+                
+      std::string e = fileIter.fromLob();
+      assert( e=="Lob1");
+      assert( fileIter.toLob() == "Lob2" );
+      assert( eq(fileIter.costAsFloat(),9999.99f) );
+      assert( eq(fileIter.leadTimeAsFloat(),20.0f) );
+          
+      }
+      recNo++;
+    }
+    
+    // number of records including comments
+    //assert( fileIter.recNum()==27);
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPlobSubsFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPlobSubsFileIterator( const RCPlobSubsFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPlobSubsFileIterator&
+  operator=(const RCPlobSubsFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.1
+log
+@Added code to read and add substitute arcs for location, lob, and source
+@
+text
+@@
+

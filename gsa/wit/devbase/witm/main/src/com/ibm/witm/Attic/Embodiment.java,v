@@ -1,0 +1,1008 @@
+head	1.19;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.19
+date	2011.07.19.21.13.10;	author rjw;	state dead;
+branches;
+next	1.18;
+
+1.18
+date	2011.07.19.19.21.58;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.07.15.17.42.30;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.07.14.23.40.33;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.07.12.22.39.58;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.07.08.20.45.57;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.07.08.15.44.01;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.07.08.15.11.00;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.07.06.22.29.18;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.07.06.19.22.44;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.07.05.21.15.03;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.05.31.19.26.18;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2011.05.27.23.55.11;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.05.27.22.12.24;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.05.26.18.07.19;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.25.21.39.26;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.24.23.44.41;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.24.18.46.14;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.24.17.56.45;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.19
+log
+@Embodiment ==> ModelInstance
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File Embodiment.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import com.ibm.witj.Problem;
+
+/*******************************************************************************
+ * An Embodiment is the central object representing a concrete embodiment of a
+ * WIT model, i.e., a WIT model as populated with specific data.<br><br>
+ *
+ * The factory method for this class is
+ * Scheme.newEmbodiment (theName).
+ *******************************************************************************
+ */
+public final class Embodiment
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * current is the current Embodiment that will be used by various WIT-M methods,
+ * if any; otherwise null.
+ *******************************************************************************
+ */
+   private static Embodiment current = null;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The Scheme implemented by this Embodiment
+ *******************************************************************************
+ */
+   private final Scheme myScheme;
+   
+/*******************************************************************************
+ * The name of this Embodiment
+ *******************************************************************************
+ */
+   private final String myName;
+   
+/*******************************************************************************
+ * myItemMgrArr[theItemCat.getIndex ()] is the ItemMgr for theItemCat in this
+ * Embodiment.
+ *******************************************************************************
+ */
+   private final ItemMgr <?> [] myItemMgrArr;
+
+/*******************************************************************************
+ * The global Primitive for this Embodiment.
+ *******************************************************************************
+ */
+   private final Primitive myGlobalPrimitive;
+   
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The array of ItemMgrs to which myItemMgrArr is to be set in the ctor.
+ *******************************************************************************
+ */
+   private ItemMgr <?>[] newItemMgrArr ()
+      {
+      int           nCats;
+      ItemMgr <?>[] theItemMgrArr;
+      int           theIdx;
+      
+      nCats         = myScheme.getCategories ().size ();
+      
+      theItemMgrArr = new ItemMgr <?>[nCats];
+
+      for (ItemCategory <?> theItemCat: myScheme.getCategories ())
+         {
+         theIdx                = theItemCat.getIndex   ();
+         
+         theItemMgrArr[theIdx] = theItemCat.newItemMgr (this);
+         }
+      
+      return theItemMgrArr;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   Embodiment (Scheme theScheme, String theName)
+      {
+      PrimitiveCategory theGlobalCat;
+      
+      myScheme          = theScheme;
+      myName            = theName;
+      myItemMgrArr      = newItemMgrArr ();
+
+      theGlobalCat      = theScheme.getGlobalCat ();
+      
+      myGlobalPrimitive = new Primitive (theGlobalCat, "Global", this);
+      
+      current           = this;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return the ItemMgr for theItemCat in this Embodiment.
+ *******************************************************************************
+ */
+                               @@SuppressWarnings("unchecked")
+   <I extends Item> ItemMgr <I> getItemMgr (ItemCategory <I> theItemCat)
+      {
+      ItemMgr <?> theItemMgr;
+      
+      assert (theItemCat.getScheme () == myScheme);
+         
+      theItemMgr = myItemMgrArr[theItemCat.getIndex ()];
+      
+      return (ItemMgr <I>) theItemMgr;
+      }
+  
+/*******************************************************************************
+ * @@return the PrimitiveMgr for thePrimCat in this Embodiment.
+ *******************************************************************************
+ */
+   PrimitiveMgr getPrimitiveMgr (PrimitiveCategory thePrimCat)
+      {
+      return (PrimitiveMgr) getItemMgr (thePrimCat);
+      }
+   
+/*******************************************************************************
+ * @@return the TupleMgr for theTupleCat in this Embodiment.
+ *******************************************************************************
+ */
+   TupleMgr getTupleMgr (TupleCategory theTupleCat)
+      {
+      return (TupleMgr) getItemMgr (theTupleCat);
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Sets the current Embodiment.<br>
+ * Note: The current Embodiment should eventually be set to null, in order to
+ * allow the Embodiment to be garbage collected.
+ * 
+ * @@param theEmb The Embodiment which is to become current. (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentEmbodiment (Embodiment theEmb)
+      {
+      current = theEmb;
+      }
+
+/*******************************************************************************
+ * @@return The current Embodiment, if any; otherwise null.
+ *******************************************************************************
+ */
+   public static Embodiment getCurrentEmbodiment ()
+      {
+      return current;
+      }
+
+/*******************************************************************************
+ * @@return The current Problem, if any; otherwise null.
+ *******************************************************************************
+ *//*
+   public static Problem getCurrentProblem ()
+      {
+      return currentProblem;
+      }
+*/
+/*******************************************************************************
+ * @@return The global Primitive for the current Embodiment.
+ *******************************************************************************
+ */
+   public static Primitive getGlobalPrimitive ()
+      {
+      return current.myGlobalPrimitive;
+      }
+
+/*******************************************************************************
+ * Test for linking in WIT-J.
+ *******************************************************************************
+ */
+   public static Problem newProblem ()
+      {
+      return Problem.newInstance ();
+      }
+  
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The name of this Embodiment
+ *******************************************************************************
+ */
+   public String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * @@return The Scheme of this Embodiment
+ *******************************************************************************
+ */
+   public Scheme getScheme ()
+      {
+      return myScheme;
+      }
+
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */     @@Override
+   public String toString ()
+      {
+      return concatenation ("Embodiment \"", myName, "\"");
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Static initialization block
+//
+// This block contains vacuous code that refers to class InputTable, so that
+// class InputTable and the classes it refers to will be compiled whenever class
+// Embodiment is compiled.
+////////////////////////////////////////////////////////////////////////////////
+
+   static
+      {
+      if (false)
+         InputTable.class.toString ();
+      
+      if (false)
+         ProblemMgr.class.toString ();
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.18
+log
+@Efficient String concatenation.
+@
+text
+@@
+
+
+1.17
+log
+@Category ==> ItemCategory
+@
+text
+@d8 2
+d228 1
+a228 1
+      return "Embodiment \"" + myName + "\"";
+@
+
+
+1.16
+log
+@Signatures with argument names.
+@
+text
+@d48 2
+a49 1
+ * myItemMgrArr[theCat.getIndex ()] is the ItemMgr for theCat in thisEmbodiment.
+d78 1
+a78 1
+      for (Category <?> theCat: myScheme.getCategories ())
+d80 1
+a80 1
+         theIdx                = theCat.getIndex   ();
+d82 1
+a82 1
+         theItemMgrArr[theIdx] = theCat.newItemMgr (this);
+d112 1
+a112 1
+ * @@return the ItemMgr for theCat in this Embodiment.
+d116 1
+a116 1
+   <I extends Item> ItemMgr <I> getItemMgr (Category <I> theCat)
+d120 1
+a120 1
+      assert (theCat.getScheme () == myScheme);
+d122 1
+a122 1
+      theItemMgr = myItemMgrArr[theCat.getIndex ()];
+@
+
+
+1.15
+log
+@Compound ==> Tuple
+@
+text
+@d15 1
+a15 1
+ * Embodiment.newEmbodiment (Scheme, String).
+@
+
+
+1.14
+log
+@Class ProblemMgr.
+@
+text
+@d136 1
+a136 1
+ * @@return the CompoundMgr for theCompCat in this Embodiment.
+d139 1
+a139 1
+   CompoundMgr getCompoundMgr (CompoundCategory theCompCat)
+d141 1
+a141 1
+      return (CompoundMgr) getItemMgr (theCompCat);
+@
+
+
+1.13
+log
+@Current Problem
+@
+text
+@d6 1
+a6 1
+package       com.ibm.witm;
+a30 7
+/*******************************************************************************
+ * currentProblem is the current Problem that will be used by various WIT-M
+ * methods, if any; otherwise null.
+ *******************************************************************************
+ */
+   private static Problem currentProblem = null;
+   
+d149 3
+a151 1
+ * Sets the current Embodiment.
+a170 11
+ * Sets the current Problem
+ * 
+ * @@param theProblem The Problem which is to become current. (Null is allowed.)
+ *******************************************************************************
+ */
+   public static void setCurrentProblem (Problem theProblem)
+      {
+      currentProblem = theProblem;
+      }
+
+/*******************************************************************************
+d173 1
+a173 1
+ */
+d178 1
+a178 1
+
+d240 3
+@
+
+
+1.12
+log
+@Initial invocation of WIT-J.
+@
+text
+@d31 7
+d156 1
+a156 1
+ * Sets the current Embodiment.<br>
+d176 20
+@
+
+
+1.11
+log
+@Removed period index Property.
+@
+text
+@d8 2
+d177 9
+@
+
+
+1.10
+log
+@Moved some responsibility to constructors.
+@
+text
+@d95 1
+a95 1
+      myItemMgrArr      = newItemMgrArr   ();
+d97 1
+a97 1
+      theGlobalCat      = theScheme.getGlobalCategoryInternal ();
+@
+
+
+1.9
+log
+@Implementation ==> Embodiment
+@
+text
+@d100 2
+@
+
+
+1.8
+log
+@Embodiment ==> Implementation
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+a7 4
+import static com.ibm.witm.Utility.*;
+
+import java.util.List;
+
+d9 2
+a10 2
+ * An Embodiment is the central object representing a WIT model as populated
+ * with specific data.<br><br>
+d12 2
+a13 3
+ * Please Note:<br>
+ * The factory method for creating instances of this class is method
+ * newEmbodiment of class Scheme.
+d18 3
+a20 3
+//==============================================================================
+// Public
+//==============================================================================
+d23 2
+a24 4
+ * Sets the current Embodiment in the current Thread.
+ * 
+ * @@param theEmbodiment The Embodiment which is to become current.
+ *                      (Null is allowed.)
+d27 5
+a31 4
+   public static void setCurrentEmbodiment (Embodiment theEmbodiment)
+      {
+      currentEmbodiment = theEmbodiment;
+      }
+d34 1
+a34 1
+ * @@return The current Embodiment in the current Thread, if any; otherwise null.
+d37 5
+a41 8
+   public static Embodiment getCurrentEmbodiment ()
+      {
+      return currentEmbodiment;
+      }
+
+/* *****************************************************************************
+ * Doc comment inherited.
+ * *****************************************************************************
+d43 1
+a43 4
+   @@Override public String toString ()
+      {
+      return "Embodiment \"" + myName + "\"";
+      }
+d46 1
+a46 3
+ * Accessor.
+ * 
+ * @@return The name of this Embodiment
+d49 1
+a49 4
+   public String getName ()
+      {
+      return myName;
+      }
+d52 1
+a52 3
+ * Accessor
+ * 
+ * @@return The Scheme of this Embodiment
+d55 5
+a59 4
+   public Scheme getScheme ()
+      {
+      return myScheme;
+      }
+a60 4
+//==============================================================================
+// Package Internal
+//==============================================================================
+   
+d62 1
+a62 2
+ * Constructor.<br>
+ * The new Embodiment becomes the current Embodiment for the Thread.
+d65 24
+d91 1
+a91 4
+      assert (theScheme != null);
+      assert (theName   != null);
+      
+      assert (theScheme.isFrozen ());
+d95 5
+a99 5
+      myPrimitiveMgrArr = newPrimMgrArr  ();
+      myTupleMgrArr     = newTupleMgrArr ();
+      myStringBuilder   = new StringBuilder (100);
+   
+      currentEmbodiment = this;
+d102 4
+d107 1
+a107 1
+ * @@return the PrimitiveMgr for thePrimType in this Embodiment.
+d110 2
+a111 1
+   PrimitiveMgr getPrimitiveMgr (PrimitiveType thePrimType)
+d113 3
+a115 1
+      assert (thePrimType.getScheme () == myScheme);
+d117 3
+a119 1
+      return myPrimitiveMgrArr[thePrimType.getIndex ()];
+d121 1
+a121 1
+   
+d123 1
+a123 1
+ * @@return the TupleMgr for thePrimType in this Embodiment.
+d126 1
+a126 1
+   TupleMgr getTupleMgr (TupleType theTupleType)
+d128 1
+a128 3
+      assert (theTupleType.getScheme () == myScheme);
+         
+      return myTupleMgrArr[theTupleType.getIndex ()];
+d132 1
+a132 1
+ * Builds and returns the String to be used by theTuple.toString ().
+d135 1
+a135 1
+   String toStringFor (Tuple theTuple)
+d137 1
+a137 28
+      int    nCoords;
+      int    theIdx;
+      String theString;
+      
+      myStringBuilder.setLength (0);
+      
+      myStringBuilder.append (theTuple.getTupleType ().getName ());
+      
+      myStringBuilder.append (" (");
+      
+      myStringBuilder.append (theTuple.getCoordinateList ().get (0));
+      
+      nCoords = theTuple.getCoordinateList ().size ();
+      
+      for (theIdx = 1; theIdx < nCoords; theIdx ++)
+         {
+         myStringBuilder.append (", ");
+      
+         myStringBuilder.append (theTuple.getCoordinateList ().get (theIdx));
+         }
+      
+      myStringBuilder.append (")");
+      
+      theString = myStringBuilder.toString ();
+      
+      myStringBuilder.setLength (0);
+      
+      return theString;
+d140 3
+a142 3
+//==============================================================================
+// Private
+//==============================================================================
+d145 3
+a147 2
+ * @@return The array of PrimitiveMgrs to which myPrimitiveMgrArr is to be set in
+ *         the ctor.
+d150 1
+a150 1
+   private PrimitiveMgr[] newPrimMgrArr ()
+d152 1
+a152 16
+      int            nPrimTypes;
+      PrimitiveMgr[] thePrimMgrArr;
+      int            theIdx;
+      
+      nPrimTypes    = myScheme.getPrimitiveTypes ().size ();
+      
+      thePrimMgrArr = new PrimitiveMgr[nPrimTypes];
+      
+      for (PrimitiveType thePrimType: myScheme.getPrimitiveTypes ())
+         {
+         theIdx                = thePrimType.getIndex ();
+         
+         thePrimMgrArr[theIdx] = new PrimitiveMgr (this, thePrimType);
+         }
+      
+      return thePrimMgrArr;
+d154 1
+a154 1
+   
+d156 1
+a156 2
+ * @@return The array of TupleMgrs to which myTupleMgrArr is to be set in the
+ *         ctor.
+d159 1
+a159 1
+   private TupleMgr[] newTupleMgrArr ()
+d161 1
+a161 16
+      int        nPrimTypes;
+      TupleMgr[] theTupleMgrArr;
+      int        theIdx;
+      
+      nPrimTypes     = myScheme.getTupleTypes ().size ();
+      
+      theTupleMgrArr = new TupleMgr[nPrimTypes];
+      
+      for (TupleType thePrimType: myScheme.getTupleTypes ())
+         {
+         theIdx                 = thePrimType.getIndex ();
+         
+         theTupleMgrArr[theIdx] = new TupleMgr (this, thePrimType);
+         }
+      
+      return theTupleMgrArr;
+d163 1
+a163 1
+   
+d165 1
+a165 2
+ * currentEmbodiment is the current Embodiment that will be used by various
+ * WIT-M methods, if any; otherwise null.
+d168 9
+a176 2
+   private static Embodiment currentEmbodiment = null;
+   
+d178 1
+a178 1
+ * The Scheme of this Embodiment
+d181 5
+a185 2
+   private final Scheme myScheme;
+   
+d187 1
+a187 1
+ * The name of this Embodiment
+d189 6
+a194 3
+*/
+   private final String myName;
+   
+d196 1
+a196 2
+ * myPrimitiveMgrArr[thePrimType.getIndex ()] is the PrimitiveMgr for
+ * thePrimType in this Embodiment.
+d198 5
+a202 15
+*/
+   private final PrimitiveMgr[] myPrimitiveMgrArr;
+   
+/*******************************************************************************
+ * myTupleMgrArr[theTupleType.getIndex ()] is the TupleMgr for thePrimType
+ * in this Embodiment.
+ *******************************************************************************
+*/
+   private final TupleMgr[] myTupleMgrArr;
+   
+/*******************************************************************************
+ * A buffer for building Strings in this Embodiment.
+ *******************************************************************************
+*/
+   private final StringBuilder myStringBuilder;
+d204 1
+a204 1
+//==============================================================================
+d210 1
+a210 1
+//==============================================================================
+d218 1
+a218 1
+//==============================================================================
+@
+
+
+1.7
+log
+@theTupleType.getAll
+@
+text
+@@
+
+
+1.6
+log
+@theTuple.toString.
+@
+text
+@d99 2
+a100 1
+      
+d253 1
+a253 1
+   private final StringBuilder myStringBuilder = new StringBuilder (100);
+@
+
+
+1.5
+log
+@Removed ThreadLocal.
+@
+text
+@d125 36
+d248 6
+@
+
+
+1.4
+log
+@currentEmbodiment
+@
+text
+@d36 1
+a36 1
+      currentEmbodiment.set (theEmbodiment);
+d45 1
+a45 1
+      return currentEmbodiment.get ();
+d100 1
+a100 1
+      currentEmbodiment.set (this);
+d180 2
+a181 2
+ * currentEmbodiment.get () is the current Embodiment in the current Thread, if
+ * any; otherwise null.
+d184 1
+a184 2
+   private static final ThreadLocal <Embodiment> currentEmbodiment =
+     new ThreadLocal <Embodiment> ();
+@
+
+
+1.3
+log
+@newTuple
+@
+text
+@d13 3
+a15 4
+ * A Embodiment is the central object representing a WIT model as populated
+ * with specific data. A Embodiment is said to "fulfill" the Scheme of the WIT
+ * model.<br><br>
+
+d27 21
+d84 2
+a85 1
+ * Constructor.
+a89 4
+      int nPrimTypes;
+      int theIdx;
+      int nTupleTypes;
+      
+d97 2
+d100 1
+a100 21
+      nPrimTypes        = theScheme.getPrimitiveTypes ().size ();
+      
+      myPrimitiveMgrArr = new PrimitiveMgr[nPrimTypes];
+      
+      for (PrimitiveType thePrimType: theScheme.getPrimitiveTypes ())
+         {
+         theIdx                    = thePrimType.getIndex ();
+         
+         myPrimitiveMgrArr[theIdx] = new PrimitiveMgr (this, thePrimType);
+         }
+      
+      nTupleTypes   = theScheme.getTupleTypes ().size ();
+      
+      myTupleMgrArr = new TupleMgr[nTupleTypes];
+      
+      for (TupleType theTupleType: theScheme.getTupleTypes ())
+         {
+         theIdx                = theTupleType.getIndex ();
+         
+         myTupleMgrArr[theIdx] = new TupleMgr (this, theTupleType);
+         }
+d130 58
+@
+
+
+1.2
+log
+@Category ==> Type
+@
+text
+@d29 2
+a30 2
+ * The doc comment is inherited
+ *******************************************************************************
+@
+
+
+1.1
+log
+@Fulfillment ==> Embodiment
+@
+text
+@d69 1
+a69 1
+      int nPrimCats;
+d71 1
+a71 1
+      int nTupleCats;
+d81 1
+a81 1
+      nPrimCats         = theScheme.getPrimitiveCategories ().size ();
+d83 1
+a83 1
+      myPrimitiveMgrArr = new PrimitiveMgr[nPrimCats];
+d85 1
+a85 1
+      for (PrimitiveCategory thePrimCat: theScheme.getPrimitiveCategories ())
+d87 1
+a87 1
+         theIdx                    = thePrimCat.getIndex ();
+d89 1
+a89 1
+         myPrimitiveMgrArr[theIdx] = new PrimitiveMgr (this, thePrimCat);
+d92 1
+a92 1
+      nTupleCats    = theScheme.getTupleCategories ().size ();
+d94 1
+a94 1
+      myTupleMgrArr = new TupleMgr[nTupleCats];
+d96 1
+a96 1
+      for (TupleCategory theTupleCat: theScheme.getTupleCategories ())
+d98 1
+a98 1
+         theIdx                = theTupleCat.getIndex ();
+d100 1
+a100 1
+         myTupleMgrArr[theIdx] = new TupleMgr (this, theTupleCat);
+d105 1
+a105 1
+ * @@return the PrimitiveMgr for thePrimCat in this Embodiment.
+d108 1
+a108 1
+   PrimitiveMgr getPrimitiveMgr (PrimitiveCategory thePrimCat)
+d110 1
+a110 1
+      assert (thePrimCat.getScheme () == myScheme);
+d112 1
+a112 1
+      return myPrimitiveMgrArr[thePrimCat.getIndex ()];
+d116 1
+a116 1
+ * @@return the TupleMgr for thePrimCat in this Embodiment.
+d119 1
+a119 1
+   TupleMgr getTupleMgr (TupleCategory theTupleCat)
+d121 1
+a121 1
+      assert (theTupleCat.getScheme () == myScheme);
+d123 1
+a123 1
+      return myTupleMgrArr[theTupleCat.getIndex ()];
+d143 2
+a144 2
+ * myPrimitiveMgrArr[thePrimCat.getIndex ()] is the PrimitiveMgr for thePrimCat
+ * in this Embodiment.
+d150 1
+a150 1
+ * myTupleMgrArr[theTupleCat.getIndex ()] is the TupleMgr for thePrimCat
+@
+

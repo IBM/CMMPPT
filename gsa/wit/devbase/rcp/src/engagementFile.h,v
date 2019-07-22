@@ -1,0 +1,443 @@
+head	1.8;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2006.05.15.14.07.56;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2005.11.02.16.59.28;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.08.03.15.32.00;	author dpc;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.07.21.17.42.02;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.06.22.19.15.31;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.12.09.14.17.45;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.12.03.19.30.04;	author dpc;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.11.13.14.23.38;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2003.11.13.14.23.38;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@added engagement families for the "portfolio" option.
+@
+text
+@#ifndef RCPengagementFile_h
+#define RCPengagementFile_h
+
+#include "scoFile.h"
+#include "rcpOptCal.h"
+
+class RCPengagementFile : public SCOcsvFormatFile {
+public:
+
+  // Fields 
+  getFieldH(engagementName);
+  getFloatFieldH(revenue);
+  //getIntFieldH(duration);
+  getIntFieldH(startPeriod);
+  getIntFieldH(startMonth);
+  getIntFieldH(startYear);
+  getIntFieldH(lateAllowance);
+  getIntFieldH(family);
+  getIntFieldH(priority);
+  getFloatFieldH(quantity);
+  
+  // preferred constructor
+  RCPengagementFile(std::string filename,
+    RcpOptCalendar::CalendarType calType, bool portfolio )
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+	int num;
+    if (calType==RcpOptCalendar::MONTH_YEAR)
+		num = 7;
+	else
+	    num = 6;
+	if (portfolio) num++;
+    hasHeaderRecord(num);
+    
+       
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & engagementName) 
+  {
+    //char periodchar[100];
+    //sprintf( periodchar, "%d", period );
+    std::string retVal = engagementName ; 
+    return retVal;
+  };
+  
+  // destructor
+  ~RCPengagementFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    RCPengagementFile file("../data/example1/engagement.csv",RcpOptCalendar::PERIOD, false);
+    
+    // Test reading first record
+
+    std::string e = file.engagementName(0);
+    assert( e=="engagement1");
+    assert( file.revenueAsFloat(0) == 2.0 );
+    assert( file.startPeriodAsInt(0) == 2 );
+    //assert( file.durationAsInt(0) == 1 );
+    assert( file.lateAllowanceAsInt(0) == -1 );
+    assert( file.priorityAsInt(0) == 1);
+    assert( file.quantityAsFloat(0) == 1.0 );
+
+    e = file.engagementName(1);
+    assert( e=="engagement2");
+    assert( file.revenueAsFloat(1) == 3.0 );
+    assert( file.startPeriodAsInt(1) == 3 );
+    //assert( file.durationAsInt(1) == 2 );
+    assert( file.lateAllowanceAsInt(1) == -1 );
+    assert( file.priorityAsInt(1) == 1 );
+    assert( file.quantityAsFloat(1) == 1.0 );
+    
+    // Test reading record by key    
+    std::string key = file.key("engagement2");
+    assert( file.revenueAsFloat(key) == 3.0f );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      engagementName(recNum));
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPengagementFile();
+  
+  // copy constructor  -- don't use!
+  RCPengagementFile( const RCPengagementFile& source );
+  
+  // assignment operator -- don't use!
+  RCPengagementFile&
+  operator=(const RCPengagementFile& rhs);
+
+  
+};
+
+
+
+class RCPengagementFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  getFieldFileWithIteratorH(engagementName);
+  getFloatFieldFileWithIteratorH(revenue);
+  //getIntFieldFileWithIteratorH(duration);
+  getIntFieldFileWithIteratorH(startPeriod);
+  getIntFieldFileWithIteratorH(startMonth);
+  getIntFieldFileWithIteratorH(startYear);
+  getIntFieldFileWithIteratorH(lateAllowance);
+  getIntFieldFileWithIteratorH(priority);
+  getFloatFieldFileWithIteratorH(quantity);
+  getFieldFileWithIteratorH(family);
+
+  // preferred constructor
+  RCPengagementFileIterator(const RCPengagementFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPengagementFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    RCPengagementFile file("../data/example1/engagement.csv",RcpOptCalendar::PERIOD, false);
+    RCPengagementFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+                
+      std::string e = fileIter.engagementName();
+      assert( e=="engagement1");
+      assert( fileIter.revenueAsFloat() == 2.0 );
+      assert( fileIter.startPeriodAsInt() == 2 );
+      //assert( fileIter.durationAsInt() == 1 );
+      assert( fileIter.lateAllowanceAsInt() == -1 );
+      assert( fileIter.priorityAsInt() == 1 );
+        //assert( fileIter.recNum() == 11 );
+      assert( fileIter.quantityAsFloat() == 1.0 );
+          
+      }
+      recNo++;
+    }
+    
+    // number of records including comments
+    //assert( fileIter.recNum()==27);
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPengagementFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPengagementFileIterator( const RCPengagementFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPengagementFileIterator&
+  operator=(const RCPengagementFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.7
+log
+@giving some attribute values nice names (such as appDeveloper instead of r1)
+@
+text
+@d18 1
+d24 1
+a24 1
+    RcpOptCalendar::CalendarType calType )
+d29 1
+d31 6
+a36 3
+       hasHeaderRecord(7);
+    else
+       hasHeaderRecord(6);
+d57 1
+a57 1
+    RCPengagementFile file("../data/example1/engagement.csv",RcpOptCalendar::PERIOD);
+d125 1
+d138 1
+a138 1
+    RCPengagementFile file("../data/example1/engagement.csv",RcpOptCalendar::PERIOD);
+@
+
+
+1.6
+log
+@Added quantity to the engagement file.  The BOM or demand file is now more like a description of the offering.  Updated the reporting in engagementO.csv.
+@
+text
+@d57 1
+a57 1
+    assert( e=="e1");
+d66 1
+a66 1
+    assert( e=="e2");
+d75 1
+a75 1
+    std::string key = file.key("e2");
+d141 1
+a141 1
+      assert( e=="e1");
+@
+
+
+1.5
+log
+@remove "duration" from engagement files, along with "engagement location". Also, implement month/year format for engagement start times.
+@
+text
+@d19 1
+a19 1
+
+d29 2
+a31 2
+    else
+       hasHeaderRecord(5);
+d63 1
+d72 1
+d119 1
+d148 1
+@
+
+
+1.4
+log
+@folding together original "engagement" oriented files with new ER5 files
+@
+text
+@d5 1
+a5 1
+
+a11 1
+  getFieldH(engLocationName);
+d13 1
+d15 2
+a16 1
+  getIntFieldH(duration);
+d22 2
+a23 1
+  RCPengagementFile(std::string filename)
+d28 5
+a32 1
+    hasHeaderRecord(7);
+d38 1
+a38 2
+    const std::string & engagementName,
+    const std::string & locName ) 
+d42 1
+a42 2
+    std::string retVal = engagementName + "!@@#$%" + locName; //DLG this location may 
+                                                             //eventually go away??
+d52 1
+a52 1
+    RCPengagementFile file("../data/example1/engagement.csv");
+a57 1
+    assert( file.engLocationName(0) == "Loc1" );
+d60 1
+a60 1
+    assert( file.durationAsInt(0) == 1 );
+a65 1
+    assert( file.engLocationName(1) == "Loc1" );
+d68 1
+a68 1
+    assert( file.durationAsInt(1) == 2 );
+d73 1
+a73 1
+    std::string key = file.key("e2", "Loc1");
+d84 1
+a84 2
+      engagementName(recNum),
+      engLocationName(recNum));
+a109 1
+  getFieldFileWithIteratorH(engLocationName);
+d111 1
+d113 2
+a114 1
+  getIntFieldFileWithIteratorH(duration);
+d129 1
+a129 1
+    RCPengagementFile file("../data/example1/engagement.csv");
+d141 1
+a141 1
+      assert( fileIter.durationAsInt() == 1 );
+@
+
+
+1.3
+log
+@Added engagement location to the model.
+@
+text
+@d17 1
+d26 1
+a26 1
+    hasHeaderRecord(6);
+d37 2
+a38 1
+    std::string retVal = engagementName + "!@@#$%" + locName;
+d59 1
+d68 1
+d114 1
+d141 1
+@
+
+
+1.2
+log
+@Added the concept of lateAllowance to allow us to set the ShipReward for a fixed number of periods following the due date.  The lateAllowance value is stored in the engagementAppData.  The engagementFile was modified to add the new field.  I added a CR/LF to the end of populateRCP.h to avoid the warning message from the Linux compiler.
+@
+text
+@d12 1
+d25 1
+a25 1
+    hasHeaderRecord(5);
+d31 2
+a32 1
+    const std::string & engagementName ) 
+d36 1
+a36 1
+    std::string retVal = engagementName;
+d52 1
+d60 1
+d67 1
+a67 1
+    std::string key = file.key("e2");
+d78 2
+a79 1
+      engagementName(recNum));
+d105 1
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d15 2
+d24 1
+a24 1
+    hasHeaderRecord(4);
+d53 1
+d60 1
+a60 1
+
+d103 1
+d129 1
+@
+
+
+1.1.1.1
+log
+@initial import
+@
+text
+@@

@@ -1,0 +1,85 @@
+#!/bin/sh
+
+#-------------------------------------------------------------------------------
+# Sh Script wit-thread-test.
+#
+# Tests WIT's thread safety features.
+#
+# This script builds a Java program called "ThreadTester", which calls native
+# methods that are implemented in a C++ native library (called "ThreadTester"),
+# which makes API calls to WIT. The testing is done by running ThreadTester
+# several times, once for each test case (indicated by the command line
+# argument). In each test case, the Java code creates a second Thread and uses
+# it to test some aspect of WIT's thread safety features.
+#
+# This script is implemented for the Linux platform only.
+#-------------------------------------------------------------------------------
+
+if [ "$PLATFORM" != "linux" ]
+then
+
+   echo
+   echo "ERROR: Script wit-thread-test was invoked with PLATFORM=$PLATFORM."
+   echo "       This script is implemented for the linux platform only."
+   echo
+   echo "Script aborted."
+   echo
+
+   exit
+
+fi
+
+echo
+echo "Running the WIT Thread test."
+echo
+
+cd $WIT_HOME/wit/thread-test
+
+rm thread-out-new.txt 2> /dev/null
+
+#-------------------------------------------------------------------------------
+
+echo "Compiling the Java code."
+
+$JAVA_HOME/bin/javac ThreadTester.java 2>&1 | cat >> thread-out-new.txt
+
+#-------------------------------------------------------------------------------
+
+echo "Building the native library."
+
+cl-wit-jni-so-c++ ThreadTester         2>&1 | cat >> thread-out-new.txt
+
+#-------------------------------------------------------------------------------
+
+echo "Running the test cases."
+
+export LD_LIBRARY_PATH=.
+
+$JAVA_HOME/bin/java ThreadTester 1     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 2     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 3     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 4     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 5     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 6     2>&1 | cat >> thread-out-new.txt
+$JAVA_HOME/bin/java ThreadTester 7     2>&1 | cat >> thread-out-new.txt
+
+#-------------------------------------------------------------------------------
+
+echo "Comparing to the saved output."
+
+diff                             \
+  -I "^Build Date:"              \
+  -I "^Run Started At:"          \
+  -I "^         Build Date:"     \
+  -I "^         Run Started At:" \
+   thread-out-linux.txt          \
+   thread-out-new.txt            \
+ > thread-out-diff.txt           \
+
+echo
+echo "The WIT Thread test is finished."
+echo
+echo "For differences from the saved output, see:"
+echo
+echo "   $WIT_HOME/wit/thread-test/thread-out-diff.txt"
+echo

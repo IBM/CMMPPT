@@ -1,0 +1,1759 @@
+head	1.30;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.30
+date	2008.02.27.23.19.11;	author rjw;	state dead;
+branches;
+next	1.29;
+
+1.29
+date	2008.02.27.22.49.17;	author rjw;	state Exp;
+branches;
+next	1.28;
+
+1.28
+date	2007.09.10.21.01.34;	author rjw;	state Exp;
+branches;
+next	1.27;
+
+1.27
+date	2007.09.07.15.19.29;	author rjw;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2007.08.15.19.15.33;	author rjw;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2007.08.09.19.30.36;	author rjw;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2007.08.01.22.41.58;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2007.08.01.20.47.55;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2007.06.07.17.08.58;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2007.05.30.21.02.11;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2007.05.11.15.56.45;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2006.12.29.21.45.16;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2006.12.06.19.52.46;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2006.12.01.21.36.35;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2006.12.01.19.55.17;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2006.10.26.20.53.47;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2006.10.26.19.03.15;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.10.19.21.54.29;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.10.13.20.47.03;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.10.12.18.43.51;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.10.12.16.22.12;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.10.11.22.37.21;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.10.09.23.25.23;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.10.04.18.45.07;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.10.03.15.08.59;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.09.29.22.56.40;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.09.29.18.40.59;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.08.18.22.29.01;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.08.18.19.32.52;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.08.18.18.43.39;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.30
+log
+@Stochastic Implosion
+@
+text
+@//----------------------------------------------------------------------------
+// 
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//----------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------
+// Source file: "OptProb.C"
+//
+// Implementation of class OptProb.
+//----------------------------------------------------------------------------
+
+#include <OptProb.h>
+#include <OptSolver.h>
+#include <OptVar.h>
+#include <OptCon.h>
+#include <DetOptImpMgr.h>
+#include <Coeff.h>
+#include <OptObj.h>
+#include <OptComp.h>
+#include <Timing.h>
+#include <MsgFrag.h>
+#include <MsgFac.h>
+#include <Session.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class OptProb.
+//------------------------------------------------------------------------------
+
+inline WitCoeff * & WitOptProb::varLastCoeff (const WitOptVar * theVar)
+   {
+   return varLastCoeff_[theVar->index ()];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::store (WitOptVar * theVar)
+   {
+   myOptVars_.append (theVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::store (WitOptCon * theCon)
+   {
+   myOptCons_.append (theCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::store (WitOptObj * theObj)
+   {
+   myOptObjs_.append (theObj);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::generateFixed ()
+   {
+   generateVariables ();
+
+   countIntVars ();
+
+   generateConstraints ();
+
+   mainObj_ = generateObjectives ();
+
+   generateCoeffs ();
+
+   postGenFixed ();
+
+   if (DEVELOPMENT)
+      {
+      myMsgFac () ("lpMipDimMsg",
+         myMsgFac ().myFrag (
+            myOptComp ()->mipMode ()?
+               "mipFrag":
+               "lpFrag"),
+         nOptVars (),
+         nOptCons (),
+         nOptObjs (),
+         nCoeffs  ());
+
+      if (myOptComp ()->mipMode ())
+         myMsgFac () ("nIntVarsMsg", nIntVars_);
+
+      displayDerived ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::countIntVars ()
+   {
+   WitOptVar * theVar;
+
+   nIntVars_ = 0;
+
+   forEachEl (theVar, myOptVars_)
+      if (theVar->isAnIntVar ())
+         nIntVars_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::incCoeff (WitOptVar * theVar, double delta)
+   {
+   if (fabs (delta) <= FLOAT_EPSILON)
+      return;
+
+   WitCoeff * theCoeff;
+
+   theCoeff = varLastCoeff (theVar);
+
+   if (theCoeff != NULL)
+      if (theCoeff->myCon () == curCon_)
+         {
+         theCoeff->increment (delta);
+
+         return;
+         }
+
+   theCoeff = new WitCoeff (curCon_, theVar, delta);
+
+   varLastCoeff (theVar) = theCoeff;
+
+   curConCoeffs_.push (theCoeff);
+
+   nCoeffs_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::generateFlexible ()
+   {
+   WitOptVar * theOptVar;
+   WitOptCon * theOptCon;
+
+   forEachEl (theOptVar, myOptVars_)
+      theOptVar->compBounds ();
+
+   forEachEl (theOptCon, myOptCons_)
+      theOptCon->compBounds ();
+
+   generateMainObjCoeffs ();
+
+   postGenFlexible ();
+   }
+
+//------------------------------------------------------------------------------
+
+const WitBoundPair & WitOptProb::preScreenBounds (const WitOptVar * theVar)
+   {
+   return varPreScreenBounds_.myElemAt (theVar->index ());
+   }
+
+//------------------------------------------------------------------------------
+
+const WitBoundPair & WitOptProb::preScreenBounds (const WitOptCon * theCon)
+   {
+   return conPreScreenBounds_.myElemAt (theCon->index ());
+   }
+
+//------------------------------------------------------------------------------
+// calcInitSoln calculates an initial solution.
+// First the independent variable are initialized, by calling indepInitValue.
+// Then the dependent variables are initialized with a call to initDepVars.
+//------------------------------------------------------------------------------
+
+void WitOptProb::calcInitSoln ()
+   {
+   WitOptVar * theVar;
+
+   forEachEl (theVar, myOptVars_)
+      theVar->setPrimalValue (theVar->indepInitValue ());
+
+   initDepVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::getMatrixByCols (
+      WitVector <int> &    firstCoeffIdx,
+      WitVector <int> &    rowIdx,
+      WitVector <double> & coeffVal)
+   {
+   WitCoeffItr theItr;
+   WitOptVar * theVar;
+   WitCoeff *  theCoeff;
+   int         idx;
+
+   rowIdx       .resize (nCoeffs_);
+   firstCoeffIdx.resize (nOptVars () + 1);
+   coeffVal     .resize (nCoeffs ());
+
+   idx = 0;
+
+   forEachEl (theVar, myOptVars_)
+      {
+      firstCoeffIdx[theVar->index ()] = idx;
+
+      theVar->attachCoeffItr (theItr);
+
+      while (theItr.advance (theCoeff))
+         {
+         rowIdx  [idx] = theCoeff->myCon ()->index ();
+
+         coeffVal[idx] = theCoeff->myValue ();
+
+         idx ++;
+         }
+      }
+
+   firstCoeffIdx[nOptVars ()] = idx;
+
+   witAssert (idx == nCoeffs ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::print ()
+   {
+   WitTimer::enterSection ("extra");
+
+   myMsgFac () ("writeOptProbMsg");
+
+   optProbFile_ = openFile ("opt-prob.out", "w");
+
+   myProblem ()->mySession ()->writeHeading (optProbFile ());
+
+   if (myOptComp ()->mipMode ())
+      fprintf (optProbFile (),
+         "Mixed Integer Programming Problem\n"
+         "===== ======= =========== =======\n\n\n");
+   else
+      fprintf (optProbFile (),
+         "Linear Programming Problem\n"
+         "====== =========== =======\n\n\n");
+
+   fprintf (optProbFile (), "# Variables:    %8d\n",   nOptVars ());
+
+   if (myOptComp ()->mipMode ())
+      fprintf (optProbFile (), 
+                            "# Integer Vars: %8d\n",   nIntVars_);
+
+   fprintf (optProbFile (), "# Constraints:  %8d\n",   nOptCons ());
+   fprintf (optProbFile (), "# Objectives:   %8d\n",   nOptObjs ());
+   fprintf (optProbFile (), "# Coefficients: %8d\n\n", nCoeffs ());
+
+   fprintf (optProbFile (), "Objective Function:  %s\n", mainObj ()->myText ());
+
+   printVars ();
+   printCons ();
+   printObjs ();
+   printDerived ();
+
+   if (myOptComp ()->printMatByCols ())
+      prtMatrixByCols ();
+
+   fclose (optProbFile ());
+
+   optProbFile_ = NULL;
+
+   WitTimer::leaveSection ("extra");
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptProb::WitOptProb (WitProblem * theProblem):
+
+      WitProbAssoc  (theProblem),
+
+      myOptSolver_  (NULL),
+      nCoeffs_      (0),
+      curCon_       (NULL),
+      curConCoeffs_ (myProblem ()),
+      mainObj_      (NULL),
+      optProbFile_  (NULL)
+   {
+   myOptSolver_ = new WitOptSolver (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptProb::~WitOptProb ()
+   {
+   int idx;
+
+   delete myOptSolver_;
+
+   while (not myOptObjs_.isEmpty ())
+      delete myOptObjs_.get ();
+
+   while (not myOptCons_.isEmpty ())
+      delete myOptCons_.get ();
+
+   while (not myOptVars_.isEmpty ())
+      delete myOptVars_.get ();
+
+   for (idx = 0; idx < conPreScreenBounds_.length (); idx ++)
+      delete conPreScreenBounds_[idx];
+
+   for (idx = 0; idx < varPreScreenBounds_.length (); idx ++)
+      delete varPreScreenBounds_[idx];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::solve ()
+   {
+   if (not myOptComp ()->skipScreening ())
+      doScreening ();
+
+   if (myOptComp ()->printOptProb ())
+      print ();
+
+   checkVarBounds ();
+
+   myOptSolver_->solve ();
+
+   if (needDual ())
+      reconstructDual ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::displayDerived ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::printDerived ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// initDepVars.
+// Initializes the dependent variables, i.e., those variables whose
+// initial value depends on the initial value of other variables.
+//------------------------------------------------------------------------------
+
+void WitOptProb::initDepVars ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::saveBounds ()
+   {
+   WitOptVar * theVar;
+   WitOptCon * theCon;
+
+   varPreScreenBounds_.resize (nOptVars ());
+   conPreScreenBounds_.resize (nOptCons ());
+
+   forEachEl (theVar, myOptVars_)
+      {
+      varPreScreenBounds_          [theVar->index ()] = new WitBoundPair;
+
+      varPreScreenBounds_.myElemAt (theVar->index ()) = theVar->bounds ();
+      }
+
+   forEachEl (theCon, myOptCons_)
+      {
+      conPreScreenBounds_          [theCon->index ()] = new WitBoundPair;
+
+      conPreScreenBounds_.myElemAt (theCon->index ()) = theCon->bounds ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+int WitOptProb::screen (WitOptCon * theCon)
+   {
+   int         nVarsFixed;
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   nVarsFixed = 0;
+
+   if (theCon == NULL)
+      return 0;
+
+   if (not theCon->screenable ())
+      return 0;
+
+   theCon->attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      {
+      if (theCoeff->myValue () <= FLOAT_EPSILON)
+         continue;
+
+      if (theCoeff->myVar ()->bounds ().upper () == 0.0)
+         continue;
+
+      theCoeff->myVar ()->bounds ().upper () = 0.0;
+
+      if (needDual ())
+         screenedCoeffs_.prepend (theCoeff);
+
+      ++ nVarsFixed;
+      }
+
+   return nVarsFixed;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::generateCoeffs ()
+   {
+   buildCoeffs ();
+
+   allocVarCoeffs ();
+
+   storeCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::buildCoeffs ()
+   {
+   WitCoeff * theCoeff;
+
+   nCoeffs_ = 0;
+
+   varLastCoeff_.resize (nOptVars ());
+                
+   forEachEl (curCon_, myOptCons_)
+      {
+      curCon_->generateCoeffs ();
+
+      curCon_->allocMyCoeffs (curConCoeffs_.nElements ());
+
+      while (curConCoeffs_.pop (theCoeff))
+         curCon_->store (theCoeff);
+      }
+
+   varLastCoeff_.clear  ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::allocVarCoeffs ()
+   {
+   WitOptVar * theVar;
+   WitOptCon * theCon;
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   WitVector <int> nCoeffsForVar (nOptVars (), 0);
+      //
+      // nCoeffsForVar[theVar->index ()] is # Coeffs for theVar.
+
+   forEachEl (theCon, myOptCons_)
+      {
+      theCon->attachCoeffItr (theItr);
+
+      while (theItr.advance (theCoeff))
+         ++ nCoeffsForVar[theCoeff->myVar ()->index ()];
+      }
+
+   forEachEl (theVar, myOptVars_)
+      theVar->allocMyCoeffs (nCoeffsForVar[theVar->index ()]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::storeCoeffs ()
+   {
+   WitOptCon * theCon;
+   WitOptVar * theVar;
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   forEachEl (theCon, myOptCons_)
+      {
+      theCon->attachCoeffItr (theItr);
+
+      while (theItr.advance (theCoeff))
+         theCoeff->myVar ()->store (theCoeff);
+
+      theCon->clearMyCoeffs ();
+      }
+
+   forEachEl (theVar, myOptVars_)
+      {
+      theVar->attachCoeffItr (theItr);
+
+      while (theItr.advance (theCoeff))
+         theCoeff->myCon ()->store (theCoeff);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::generateMainObjCoeffs ()
+   {
+   WitOptVar * theVar;
+
+   forEachEl (theVar, myOptVars_)
+      theVar->compMainObjCoeffVal ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::printVars ()
+   {
+   WitOptVar * theVar;
+
+   fprintf (optProbFile (),
+      "\n\n"
+      "Variables\n"
+      "=========\n");
+
+   fprintf (optProbFile (), "Var ");
+
+   printOptVCHeading ();
+
+   fprintf (optProbFile (), " I  Obj Cff Low Bnd  Up Bnd   PS LB   PS UB\n");
+
+   forEachEl (theVar, myOptVars_)
+      theVar->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::printCons ()
+   {
+   WitOptCon * theCon;
+
+   fprintf (optProbFile (),
+      "\n\n"
+      "Constraints\n"
+      "===========\n");
+
+   fprintf (optProbFile (), "Con ");
+
+   printOptVCHeading ();
+
+   fprintf (optProbFile (), " Low Bnd  Up Bnd   PS LB   PS UB\n");
+
+   fprintf (optProbFile (), "Var ");
+
+   printOptVCHeading ();
+
+   fprintf (optProbFile (), "   Coeff\n");
+
+   forEachEl (theCon, myOptCons_)
+      theCon->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::printObjs ()
+   {
+   WitOptObj * theObj;
+
+   fprintf (optProbFile (),
+      "\n\n"
+      "Objectives\n"
+      "==========\n");
+
+   fprintf (optProbFile (), "Var ");
+
+   printOptVCHeading ();
+
+   fprintf (optProbFile (), "    Coeff\n");
+
+   forEachEl (theObj, myOptObjs_)
+      theObj->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::prtMatrixByCols ()
+   {
+   WitVector <int>    firstCoeffIdx;
+   WitVector <int>    rowIdx;
+   WitVector <double> coeffVal;
+   int                theIdx;
+
+   getMatrixByCols (firstCoeffIdx, rowIdx, coeffVal);
+
+   fprintf (optProbFile (),
+      "\n\n\n"
+      "Matrix by Columns\n"
+      "====== == =======\n\n");
+
+   fprintf (optProbFile (), "\nColumn #      Elem #\n");
+
+   for (theIdx = 0; theIdx <= nOptVars (); theIdx ++)
+      fprintf (optProbFile (), "%8d  %8d\n", theIdx, firstCoeffIdx[theIdx]);
+
+   fprintf (optProbFile (), "\n  Elem #     Row #    Coefficient\n");
+
+   for (theIdx = 0; theIdx < nCoeffs (); theIdx ++)
+      fprintf (
+         optProbFile (),
+         "%8d  %8d  %13.3f\n",
+         theIdx,
+         rowIdx  [theIdx],
+         coeffVal[theIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::checkVarBounds ()
+   {
+   WitOptVar * theVar;
+
+   forEachEl (theVar, myOptVars_)
+      if (theVar->bounds ().lower () > theVar->bounds ().upper ())
+         reportInfeasible ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::reconstructDual ()
+   {
+   int        nElim;
+   WitCoeff * theCoeff;
+   double     redReward;
+   double     newDualVal;
+
+   nElim = 0;
+
+   while (not screenedCoeffs_.isEmpty ())
+      {
+      theCoeff  = screenedCoeffs_.get ();
+
+      redReward = theCoeff->myVar ()->reducedReward ();
+
+      if (redReward > FLOAT_EPSILON)
+         {
+         newDualVal = 
+              theCoeff->myCon ()->dualValue ()
+            + (redReward / theCoeff->myValue ());
+
+         theCoeff->myCon ()->setDualValue (newDualVal);
+
+         ++ nElim;
+         }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nDualElimMsg", nElim);
+   }
+@
+
+
+1.29
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.28
+log
+@Stochastic Implosion
+@
+text
+@d522 1
+a522 1
+   printOptProbElHeading ();
+d543 1
+a543 1
+   printOptProbElHeading ();
+d549 1
+a549 1
+   printOptProbElHeading ();
+d570 1
+a570 1
+   printOptProbElHeading ();
+@
+
+
+1.27
+log
+@Stochastic Implosion
+@
+text
+@d149 2
+@
+
+
+1.26
+log
+@Stochastic Implosion
+@
+text
+@d522 1
+a522 1
+   fprintf (optProbFile (), " I Obj Cff Low Bnd  Up Bnd   PS LB   PS UB\n");
+d570 1
+a570 1
+   fprintf (optProbFile (), "   Coeff\n");
+@
+
+
+1.25
+log
+@Stochastic Implosion
+@
+text
+@d139 2
+a140 2
+   generateBounds (
+      reinterpret_cast <const WitList <WitOptProbEl> &> (myOptVars_));
+d142 5
+a146 2
+   generateBounds (
+      reinterpret_cast <const WitList <WitOptProbEl> &> (myOptCons_));
+a508 10
+void WitOptProb::generateBounds (const WitList <WitOptProbEl> & theOptProbEls)
+   {
+   WitOptProbEl * theOptProbEl;
+
+   forEachEl (theOptProbEl, theOptProbEls)
+      theOptProbEl->compBounds ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.24
+log
+@Stochastic Implosion
+@
+text
+@d372 1
+a372 1
+int WitOptProb::screen (const WitOptCon * theCon)
+@
+
+
+1.23
+log
+@Stochastic Implosion
+@
+text
+@d20 1
+a20 1
+#include <OptImp.h>
+@
+
+
+1.22
+log
+@Stochastic Implosion
+@
+text
+@d13 1
+a13 4
+// Implementation of the following classes:
+//
+//    OptProb.
+//    OptSolver.
+a20 1
+#include <CoinSolver.h>
+a657 60
+
+//------------------------------------------------------------------------------
+// OPT_IMPLODE mode implementation of class OptSolver.
+//------------------------------------------------------------------------------
+
+#ifdef OPT_IMPLODE
+
+WitOptSolver::WitOptSolver (WitOptProb * theOptProb):
+
+      WitProbAssoc  (theOptProb->myProblem ()),
+
+      myCoinSolver_ (NULL)
+   {
+   myCoinSolver_ = new WitCoinSolver (theOptProb);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptSolver::~WitOptSolver ()
+   {
+   delete myCoinSolver_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolver::solve ()
+   {
+   myCoinSolver_->solve ();
+   }
+
+#endif // OPT_IMPLODE
+
+//------------------------------------------------------------------------------
+// Non-OPT_IMPLODE mode implementation of class OptSolver.
+//------------------------------------------------------------------------------
+
+#ifndef OPT_IMPLODE
+
+WitOptSolver::WitOptSolver (WitOptProb * theOptProb):
+
+      WitProbAssoc  (theOptProb->myProblem ()),
+
+      myCoinSolver_ (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptSolver::~WitOptSolver ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolver::solve ()
+   {
+   stronglyAssert (false);
+   }
+
+#endif // non-OPT_IMPLODE
+@
+
+
+1.21
+log
+@Stochastic Implosion
+@
+text
+@a43 41
+WitOptProb::WitOptProb (WitOptImploder * theOptImploder):
+
+      WitProbAssoc   (theOptImploder->myProblem ()),
+
+      myOptImploder_ (theOptImploder),
+      myOptSolver_   (NULL),
+      nCoeffs_       (0),
+      curCon_        (NULL),
+      curConCoeffs_  (myProblem ()),
+      mainObj_       (NULL),
+      optProbFile_   (NULL)
+   {
+   myOptSolver_ = new WitOptSolver (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptProb::~WitOptProb ()
+   {
+   int idx;
+
+   delete myOptSolver_;
+
+   while (not myOptObjs_.isEmpty ())
+      delete myOptObjs_.get ();
+
+   while (not myOptCons_.isEmpty ())
+      delete myOptCons_.get ();
+
+   while (not myOptVars_.isEmpty ())
+      delete myOptVars_.get ();
+
+   for (idx = 0; idx < conPreScreenBounds_.length (); idx ++)
+      delete conPreScreenBounds_[idx];
+
+   for (idx = 0; idx < varPreScreenBounds_.length (); idx ++)
+      delete varPreScreenBounds_[idx];
+   }
+
+//------------------------------------------------------------------------------
+
+d271 40
+@
+
+
+1.20
+log
+@Stochastic Implosion
+@
+text
+@d118 2
+@
+
+
+1.19
+log
+@External opt implosion.
+@
+text
+@d195 1
+a195 1
+   return varPreScreenBounds_ (theVar->index ());
+d202 1
+a202 1
+   return conPreScreenBounds_ (theCon->index ());
+d360 1
+a360 1
+      varPreScreenBounds_ [theVar->index ()] = new WitBoundPair;
+d362 1
+a362 1
+      varPreScreenBounds_ (theVar->index ()) = theVar->bounds ();
+d367 1
+a367 1
+      conPreScreenBounds_ [theCon->index ()] = new WitBoundPair;
+d369 1
+a369 1
+      conPreScreenBounds_ (theCon->index ()) = theCon->bounds ();
+@
+
+
+1.18
+log
+@External opt implosion.
+@
+text
+@d29 1
+d120 10
+d131 1
+a131 5
+         myMsgFac () ("mipDimMsg", nOptVars (), nIntVars_);
+      else
+         myMsgFac () ("lpDimMsg", nOptVars ());
+
+      myMsgFac () ("mpDimMsg", nOptCons (), nOptObjs (), nCoeffs ());
+@
+
+
+1.17
+log
+@External opt implosion.
+@
+text
+@d119 1
+a119 1
+      if (myOptComp ()->allowIntCons ())
+d265 1
+a265 1
+   if (myOptComp ()->allowIntCons ())
+d276 1
+a276 1
+   if (myOptComp ()->allowIntCons ())
+@
+
+
+1.16
+log
+@External opt implosion.
+@
+text
+@d119 1
+a119 1
+      if (myOptComp ()->enforceIntCons ())
+d265 1
+a265 1
+   if (myOptComp ()->enforceIntCons ())
+d276 1
+a276 1
+   if (myOptComp ()->enforceIntCons ())
+@
+
+
+1.15
+log
+@External opt implosion.
+@
+text
+@d119 1
+a119 1
+      if (isaMIP ())
+d265 1
+a265 1
+   if (isaMIP ())
+d276 1
+a276 1
+   if (isaMIP ())
+@
+
+
+1.14
+log
+@External opt implosion.
+@
+text
+@a27 1
+#include <IVRealArg.h>
+a320 10
+void WitOptProb::setExtOptColSol (const WitIVRealArg & theVector)
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptVars_)
+      theOptVar->setPrimalValue (theVector[theOptVar->index ()]);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.13
+log
+@External opt implosion.
+@
+text
+@a216 22
+void WitOptProb::getExtOptProb (
+      WitVector <int> &    start,
+      WitVector <int> &    index,
+      WitVector <double> & value,
+      WitVector <double> & collb,
+      WitVector <double> & colub,
+      WitVector <double> & obj,
+      WitVector <double> & rowlb,
+      WitVector <double> & rowub,
+      WitVector <int> &    intIndices,
+      double &             objSense)
+   {
+   getMatrixByCols     (start, index, value);
+   getExtOptColData    (collb, colub, obj);
+   getExtOptRowData    (rowlb, rowub);
+   getExtOptIntIndices (intIndices);
+
+   objSense = -1.0;
+   }
+
+//------------------------------------------------------------------------------
+
+a623 73
+void WitOptProb::getExtOptColData (
+      WitVector <double> & collb,
+      WitVector <double> & colub,
+      WitVector <double> & obj)
+   {
+   WitOptVar * theOptVar;
+   int         theIdx;
+
+   collb.resize (nOptVars ());
+   colub.resize (nOptVars ());
+   obj  .resize (nOptVars ());
+
+   forEachEl (theOptVar, myOptVars_)
+      {
+      theIdx        = theOptVar->index ();
+
+      collb[theIdx] = theOptVar->bounds ().lower ();
+      colub[theIdx] = theOptVar->bounds ().upper ();
+
+      obj  [theIdx] = theOptVar->mainObjCoeffVal ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::getExtOptRowData (
+      WitVector <double> & rowlb,
+      WitVector <double> & rowub)
+   {
+   WitOptCon * theOptCon;
+   int         theIdx;
+
+   rowlb.resize (nOptCons ());
+   rowub.resize (nOptCons ());
+
+   forEachEl (theOptCon, myOptCons_)
+      {
+      theIdx        = theOptCon->index ();
+
+      rowlb[theIdx] = theOptCon->bounds ().lower ();
+      rowub[theIdx] = theOptCon->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::getExtOptIntIndices (WitVector <int> & intIndices)
+   {
+   WitOptVar * theOptVar;
+   int         nIntVars;
+   int         vecIdx;
+
+   nIntVars = 0;
+
+   forEachEl (theOptVar, myOptVars_)
+      if (theOptVar->isAnIntVar ())
+         nIntVars ++;
+
+   intIndices.resize (nIntVars);
+
+   vecIdx = -1;
+
+   forEachEl (theOptVar, myOptVars_)
+      if (theOptVar->isAnIntVar ())
+         {
+         vecIdx ++;
+
+         intIndices[vecIdx] = theOptVar->index ();
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.12
+log
+@External opt implosion.
+@
+text
+@d217 1
+a217 1
+void WitOptProb::getExtOptProblem (
+d344 1
+a344 1
+void WitOptProb::setExtOptColSolution (const WitIVRealArg & theVector)
+@
+
+
+1.11
+log
+@External opt implosion.
+@
+text
+@d28 1
+d177 1
+a177 1
+      reinterpret_cast <const WitList <WitOptProbEl> &> (myOptVars ()));
+d180 1
+a180 1
+      reinterpret_cast <const WitList <WitOptProbEl> &> (myOptCons ()));
+d209 1
+a209 1
+   forEachEl (theVar, myOptVars ())
+d217 1
+a217 1
+void WitOptProb::getOptProbData (
+d229 4
+a232 4
+   getMatrixByCols (start, index, value);
+   getOptColData   (collb, colub, obj);
+   getOptRowData   (rowlb, rowub);
+   getIntIndices   (intIndices);
+d255 1
+a255 1
+   forEachEl (theVar, myOptVars ())
+d344 10
+d384 1
+a384 1
+   forEachEl (theVar, myOptVars ())
+d391 1
+a391 1
+   forEachEl (theCon, myOptCons ())
+d457 1
+a457 1
+   forEachEl (curCon_, myOptCons ())
+d483 1
+a483 1
+   forEachEl (theCon, myOptCons ())
+d491 1
+a491 1
+   forEachEl (theVar, myOptVars ())
+d504 1
+a504 1
+   forEachEl (theCon, myOptCons ())
+d514 1
+a514 1
+   forEachEl (theVar, myOptVars ())
+d529 1
+a529 1
+   forEachEl (theVar, myOptVars ())
+d560 1
+a560 1
+   forEachEl (theVar, myOptVars ())
+d587 1
+a587 1
+   forEachEl (theCon, myOptCons ())
+d646 1
+a646 1
+void WitOptProb::getOptColData (
+d671 1
+a671 1
+void WitOptProb::getOptRowData (
+d692 1
+a692 1
+void WitOptProb::getIntIndices (WitVector <int> & intIndices)
+d723 1
+a723 1
+   forEachEl (theVar, myOptVars ())
+@
+
+
+1.10
+log
+@External opt implosion.
+@
+text
+@d325 1
+a325 1
+void WitOptProb::checkVarBounds ()
+d327 2
+a328 1
+   WitOptVar * theVar;
+d330 2
+a331 4
+   forEachEl (theVar, myOptVars ())
+      if (theVar->bounds ().lower () > theVar->bounds ().upper ())
+         reportInfeasible ();
+   }
+d333 1
+a333 1
+//------------------------------------------------------------------------------
+a334 2
+void WitOptProb::solve ()
+   {
+a335 12
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::reconstructDual ()
+   {
+   int        nElim;
+   WitCoeff * theCoeff;
+   double     redReward;
+   double     newDualVal;
+
+   nElim = 0;
+d337 2
+a338 20
+   while (not screenedCoeffs_.isEmpty ())
+      {
+      theCoeff  = screenedCoeffs_.get ();
+
+      redReward = theCoeff->myVar ()->reducedReward ();
+
+      if (redReward > FLOAT_EPSILON)
+         {
+         newDualVal = 
+              theCoeff->myCon ()->dualValue ()
+            + (redReward / theCoeff->myValue ());
+
+         theCoeff->myCon ()->setDualValue (newDualVal);
+
+         ++ nElim;
+         }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nDualElimMsg", nElim);
+d707 44
+@
+
+
+1.9
+log
+@Assisted opt implosion.
+@
+text
+@a337 2
+   stronglyAssert (WitOptComp::optImpAllowed ());
+
+@
+
+
+1.8
+log
+@Custom opt implosion.
+@
+text
+@a216 2
+      int &                numcols,
+      int &                numrows,
+d224 3
+a226 1
+      WitVector <double> & rowub)
+a227 7
+   WitOptVar * theOptVar;
+   WitOptCon * theOptCon;
+   int         theIdx;
+
+   numcols = nOptVars ();
+   numrows = nOptCons ();
+
+d229 3
+d233 1
+a233 24
+   collb.resize (nOptVars ());
+   colub.resize (nOptVars ());
+   obj  .resize (nOptVars ());
+
+   forEachEl (theOptVar, myOptVars_)
+      {
+      theIdx        = theOptVar->index ();
+
+      collb[theIdx] = theOptVar->bounds ().lower ();
+      colub[theIdx] = theOptVar->bounds ().upper ();
+
+      obj  [theIdx] = theOptVar->mainObjCoeffVal ();
+      }
+
+   rowlb.resize (nOptCons ());
+   rowub.resize (nOptCons ());
+
+   forEachEl (theOptCon, myOptCons_)
+      {
+      theIdx        = theOptCon->index ();
+
+      rowlb[theIdx] = theOptCon->bounds ().lower ();
+      rowub[theIdx] = theOptCon->bounds ().upper ();
+      }
+d669 73
+@
+
+
+1.7
+log
+@App controlled opt implosion.
+@
+text
+@d365 2
+@
+
+
+1.6
+log
+@App controlled opt implosion.
+@
+text
+@d216 53
+a268 4
+void WitOptProb::defMatrixByCols (
+      WitVector <int> &    indexRow,
+      WitVector <int> &    startOfEachColumn,
+      WitVector <double> & elements)
+d275 3
+a277 3
+   indexRow         .resize (nCoeffs_);
+   startOfEachColumn.resize (nOptVars () + 1);
+   elements         .resize (nCoeffs ());
+d283 1
+a283 1
+      startOfEachColumn[theVar->index ()] = idx;
+d289 1
+a289 1
+         indexRow[idx] = theCoeff->myCon ()->index ();
+d291 1
+a291 1
+         elements[idx] = theCoeff->myValue ();
+d297 1
+a297 1
+   startOfEachColumn[nOptVars ()] = idx;
+d665 3
+a667 3
+   WitVector <int>    indexRow;
+   WitVector <int>    startOfEachColumn;
+   WitVector <double> elements;
+d670 1
+a670 1
+   defMatrixByCols (indexRow, startOfEachColumn, elements);
+d680 1
+a680 1
+      fprintf (optProbFile (), "%8d  %8d\n", theIdx, startOfEachColumn[theIdx]);
+d689 2
+a690 2
+         indexRow[theIdx],
+         elements[theIdx]);
+d748 1
+a748 1
+   myMsgFac () ("optImplodeOnlyFmsg", "WitOptSolver::solve");
+@
+
+
+1.5
+log
+@App controlled opt implosion.
+@
+text
+@d53 1
+a53 1
+      modelFile_     (NULL)
+d261 1
+a261 1
+   modelFile_ = openFile ("model.out", "w");
+d263 1
+a263 1
+   myProblem ()->mySession ()->writeHeading (modelFile ());
+d266 3
+a268 3
+      fprintf (modelFile (),
+         "Mixed Integer Programming Model\n"
+         "===== ======= =========== =====\n\n\n");
+d270 3
+a272 3
+      fprintf (modelFile (),
+         "Linear Programming Model\n"
+         "====== =========== =====\n\n\n");
+d274 1
+a274 1
+   fprintf (modelFile (), "# Variables:    %8d\n",   nOptVars ());
+d277 2
+a278 2
+      fprintf (modelFile (), 
+                          "# Integer Vars: %8d\n",   nIntVars_);
+d280 3
+a282 3
+   fprintf (modelFile (), "# Constraints:  %8d\n",   nOptCons ());
+   fprintf (modelFile (), "# Objectives:   %8d\n",   nOptObjs ());
+   fprintf (modelFile (), "# Coefficients: %8d\n\n", nCoeffs ());
+d284 1
+a284 1
+   fprintf (modelFile (), "Objective Function:  %s\n", mainObj ()->myText ());
+d294 1
+a294 1
+   fclose (modelFile ());
+d296 1
+a296 1
+   modelFile_ = NULL;
+d549 1
+a549 1
+   fprintf (modelFile (),
+d554 1
+a554 1
+   fprintf (modelFile (), "Var ");
+d558 1
+a558 1
+   fprintf (modelFile (), " I Obj Cff Low Bnd  Up Bnd   PS LB   PS UB\n");
+d570 1
+a570 1
+   fprintf (modelFile (),
+d575 1
+a575 1
+   fprintf (modelFile (), "Con ");
+d579 1
+a579 1
+   fprintf (modelFile (), " Low Bnd  Up Bnd   PS LB   PS UB\n");
+d581 1
+a581 1
+   fprintf (modelFile (), "Var ");
+d585 1
+a585 1
+   fprintf (modelFile (), "   Coeff\n");
+d597 1
+a597 1
+   fprintf (modelFile (),
+d602 1
+a602 1
+   fprintf (modelFile (), "Var ");
+d606 1
+a606 1
+   fprintf (modelFile (), "   Coeff\n");
+d623 1
+a623 1
+   fprintf (modelFile (),
+d628 1
+a628 1
+   fprintf (modelFile (), "\nColumn #      Elem #\n");
+d631 1
+a631 1
+      fprintf (modelFile (), "%8d  %8d\n", theIdx, startOfEachColumn[theIdx]);
+d633 1
+a633 1
+   fprintf (modelFile (), "\n  Elem #     Row #    Coefficient\n");
+d637 1
+a637 1
+         modelFile (),
+@
+
+
+1.4
+log
+@App controlled opt implosion.
+@
+text
+@d303 11
+d316 11
+a326 1
+   checkVarBounds ();
+d328 19
+a346 1
+   myOptSolver_->solve ();
+d348 2
+a349 2
+   if (needDual ())
+      reconstructDual ();
+a644 44
+
+void WitOptProb::checkVarBounds ()
+   {
+   WitOptVar * theVar;
+
+   forEachEl (theVar, myOptVars ())
+      if (theVar->bounds ().lower () > theVar->bounds ().upper ())
+         reportInfeasible ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProb::reconstructDual ()
+   {
+   int        nElim;
+   WitCoeff * theCoeff;
+   double     redReward;
+   double     newDualVal;
+
+   nElim = 0;
+
+   while (not screenedCoeffs_.isEmpty ())
+      {
+      theCoeff  = screenedCoeffs_.get ();
+
+      redReward = theCoeff->myVar ()->reducedReward ();
+
+      if (redReward > FLOAT_EPSILON)
+         {
+         newDualVal = 
+              theCoeff->myCon ()->dualValue ()
+            + (redReward / theCoeff->myValue ());
+
+         theCoeff->myCon ()->setDualValue (newDualVal);
+
+         ++ nElim;
+         }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nDualElimMsg", nElim);
+   }
+
+//------------------------------------------------------------------------------
+@
+
+
+1.3
+log
+@App controlled opt implode.
+@
+text
+@d261 1
+a261 1
+   modelFile_ = openFile (myOptImploder ()->modelOFName ().myCstring (), "w");
+d291 1
+a291 1
+   if (myOptImploder ()->printMatByCols ())
+@
+
+
+1.2
+log
+@App controlled opt implode.
+@
+text
+@a31 2
+#ifdef OPT_IMPLODE
+
+d650 1
+a650 1
+// Implementation of class OptSolver.
+d653 2
+d679 29
+@
+
+
+1.1
+log
+@App controlled opt implosion.
+@
+text
+@d16 1
+d20 1
+d50 1
+a50 1
+      myCoinSolver_  (NULL),
+d57 1
+a57 1
+   myCoinSolver_ = new WitCoinSolver (this);
+d66 1
+a66 1
+   delete myCoinSolver_;
+d309 1
+a309 1
+   myCoinSolver_->solve ();
+d651 27
+@
+

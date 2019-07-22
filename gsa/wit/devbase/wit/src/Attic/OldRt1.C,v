@@ -1,0 +1,692 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2003.03.03.21.40.07;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2003.03.03.21.07.29;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.02.27.19.20.19;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.02.26.21.42.54;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.02.25.22.17.07;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Continued implementation of proportionate routing.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OldRt1.C"
+//
+// Contains the implementation of the following classes:
+//
+//    OrMgr.
+//    ProdOrMgr.
+//    ConsOrMgr.
+//    OrSite.
+//    ProdOrSite.
+//    ConsOrSite.
+//    OrCand.
+//    ProdOrCand.
+//    ConsOrCand.
+//------------------------------------------------------------------------------
+
+#include <OrMgr1.h>
+#include <ConcOrSite1.h>
+#include <ConcOrCand1.h>
+#include <Part.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Global.h>
+#include <PtrMapI.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class OrMgr.         
+//------------------------------------------------------------------------------
+
+void WitOrMgr::print ()
+   {
+   fprintf (msgFile (),
+      "\n"
+      "Old Routing Element Subsystem (%s Section):\n"
+      "\n"
+      "   # Routing Sites:      %2d\n"
+      "   # Routing Candidates: %2d\n",
+      sectionName (),
+      nOrSites_,
+      nOrCands_);
+   }
+
+//------------------------------------------------------------------------------
+                                          
+WitOrMgr::WitOrMgr (WitProblem * theProblem):
+      WitProbAssoc (theProblem),
+
+      nOrSites_    (0),
+      nOrCands_    (0),
+      myOrSites_   (myProblem ()),
+      myOrCands_   (myProblem ())
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+                                          
+WitOrMgr::~WitOrMgr ()                    
+   {                                      
+   WitOrSiteItr theOrSiteItr;
+
+   theOrSiteItr.attachTo (myOrSites_);
+
+   while (theOrSiteItr.advance ())
+      theOrSiteItr->clearOrCands ();
+
+   deleteContents (myOrCands_);
+   deleteContents (myOrSites_);
+   }                                      
+
+//------------------------------------------------------------------------------
+
+void WitOrMgr::setUp ()
+   {
+   WitOrSiteItr theOrSiteItr;
+
+   buildOrSites ();
+
+   myOrSites_.reverse ();
+
+   buildOrCands ();
+
+   myOrCands_.reverse ();
+
+   theOrSiteItr.attachTo (myOrSites_);
+
+   while (theOrSiteItr.advance ())
+      theOrSiteItr->findOrCands ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOrMgr::store (WitOrSite * theOrSite)
+   {
+   myOrSites_.push (theOrSite);
+
+   nOrSites_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOrMgr::store (WitOrCand * theOrCand)
+   {
+   myOrCands_.push (theOrCand);
+
+   nOrCands_ ++;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ProdOrMgr.         
+//------------------------------------------------------------------------------
+
+WitProdOrMgr * WitProdOrMgr::newInstance (WitProblem * theProblem)
+   {
+   WitProdOrMgr * theProdOrMgr;
+
+   theProdOrMgr = new WitProdOrMgr (theProblem);
+
+   theProdOrMgr->setUp ();
+
+   return theProdOrMgr;
+   }
+
+//------------------------------------------------------------------------------
+                                          
+WitProdOrMgr::~WitProdOrMgr ()                    
+   {                                      
+   myOrCandFor_.clear ();
+   myOrSiteFor_.clear ();
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+const char * WitProdOrMgr::sectionName ()
+   {
+   return "Production";
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrSite * WitProdOrMgr::myOrSiteFor (WitPart * thePart)
+   {
+   return myOrSiteFor_ (thePart);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrCand * WitProdOrMgr::myOrCandFor (WitBopEntry * theBopEnt)
+   {
+   return myOrCandFor_ (theBopEnt);
+   }
+
+//------------------------------------------------------------------------------
+                                          
+WitProdOrMgr::WitProdOrMgr (WitProblem * theProblem):
+      WitOrMgr     (theProblem),
+                                          
+      myOrSiteFor_ (myProblem ()),
+      myOrCandFor_ (myProblem ())
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+void WitProdOrMgr::buildOrSites ()
+   {
+   WitPart *   thePart;
+   WitOrSite * theOrSite;
+
+   forEachPart (thePart, myProblem ())
+      {
+      theOrSite = new WitProdOrSite (thePart, this);
+
+      myOrSiteFor_ (thePart) = theOrSite;
+
+      store (theOrSite);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitProdOrMgr::buildOrCands ()
+   {
+   WitBopEntry * theBopEnt;
+   WitOrCand *   theOrCand;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      theOrCand = new WitProdOrCand (theBopEnt, this);
+
+      myOrCandFor_ (theBopEnt) = theOrCand;
+
+      store (theOrCand);
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ConsOrMgr.         
+//------------------------------------------------------------------------------
+
+WitConsOrMgr * WitConsOrMgr::newInstance (WitProblem * theProblem)
+   {
+   WitConsOrMgr * theConsOrMgr;
+
+   theConsOrMgr = new WitConsOrMgr (theProblem);
+
+   theConsOrMgr->setUp ();
+
+   return theConsOrMgr;
+   }
+
+//------------------------------------------------------------------------------
+                                          
+WitConsOrMgr::~WitConsOrMgr ()                    
+   {                                      
+   myOrCandFor_.clear ();
+   myOrSiteFor_.clear ();
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+const char * WitConsOrMgr::sectionName ()
+   {
+   return "Consumption";
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrSite * WitConsOrMgr::myOrSiteFor (WitBomEntry * theBomEnt)
+   {
+   return myOrSiteFor_ (theBomEnt);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrCand * WitConsOrMgr::myOrCandFor (WitConsEntry * theConsEnt)
+   {
+   return myOrCandFor_ (theConsEnt);
+   }
+
+//------------------------------------------------------------------------------
+                                          
+WitConsOrMgr::WitConsOrMgr (WitProblem * theProblem):
+      WitOrMgr     (theProblem),
+                                          
+      myOrSiteFor_ (myProblem ()),
+      myOrCandFor_ (myProblem ())
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+void WitConsOrMgr::buildOrSites ()
+   {
+   WitBomEntry * theBomEnt;
+   WitOrSite *   theOrSite;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      theOrSite = new WitConsOrSite (theBomEnt, this);
+
+      myOrSiteFor_ (theBomEnt) = theOrSite;
+
+      store (theOrSite);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitConsOrMgr::buildOrCands ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitOrCand *   theOrCand;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      theOrCand = new WitConsOrCand (theBomEnt, this);
+
+      myOrCandFor_ (theBomEnt) = theOrCand;
+
+      store (theOrCand);
+
+      forEachEl (theSub, theBomEnt->mySubEntries ())
+         {
+         theOrCand = new WitConsOrCand (theSub, this);
+
+         myOrCandFor_ (theSub) = theOrCand;
+
+         store (theOrCand);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OrSite.        
+//------------------------------------------------------------------------------
+                                          
+WitOrSite::~WitOrSite ()                  
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+void WitOrSite::findOrCands ()
+   {
+   findOrCands (myOrCands_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOrSite::clearOrCands ()
+   {
+   myOrCands_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+int WitOrSite::nInstances (WitProblem *)
+   {
+   stronglyAssert (false);
+
+   return 0;
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrSite::WitOrSite (WitOrMgr * theOrMgr):
+      WitProbAssoc  (theOrMgr->myProblem ()),
+
+      mappingIndex_ (theOrMgr->nOrSites  ()),
+      myOrCands_    (theOrMgr->myProblem ())
+   {                                      
+   }                                      
+
+//------------------------------------------------------------------------------
+// Implementation of class ProdOrSite.        
+//------------------------------------------------------------------------------
+                                          
+WitProdOrSite::WitProdOrSite (WitPart * thePart, WitProdOrMgr * theProdOrMgr):
+      WitOrSite    (theProdOrMgr),
+                                          
+      myPart_      (thePart),
+      myProdOrMgr_ (theProdOrMgr)
+   {                                      
+   }
+
+//------------------------------------------------------------------------------
+
+WitProdOrSite::~WitProdOrSite ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOrSite::explodeable (WitPeriod expPer)
+   {
+   return myPart_->explodeable (expPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitProdOrSite::propRouting ()
+   {
+   return myPart_->propRouting ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitProdOrSite::findOrCands (WitObjStack <WitOrCand> & theOrCands)
+   {
+   WitBopEntry * theBopEnt;
+
+   theOrCands.clear ();
+
+   forEachEl (theBopEnt, myPart_->producingBopEntries ())
+      theOrCands.push (myProdOrMgr_->myOrCandFor (theBopEnt));
+
+   theOrCands.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ConsOrSite.
+//------------------------------------------------------------------------------
+
+WitConsOrSite::WitConsOrSite (
+         WitBomEntry *  theBomEnt,
+         WitConsOrMgr * theConsOrMgr):
+
+      WitOrSite    (theConsOrMgr),
+
+      myBomEnt_    (theBomEnt),
+      myConsOrMgr_ (theConsOrMgr)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitConsOrSite::~WitConsOrSite ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOrSite::explodeable (WitPeriod execPer)
+   {
+   return myBomEnt_->inEffect (execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOrSite::propRouting ()
+   {
+   return myBomEnt_->propRouting ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitConsOrSite::findOrCands (WitObjStack <WitOrCand> & theOrCands)
+   {
+   WitSubEntry * theSub;
+
+   theOrCands.clear ();
+
+   theOrCands.push (myConsOrMgr_->myOrCandFor (myBomEnt_));
+
+   forEachEl (theSub, myBomEnt_->mySubEntries ())
+      theOrCands.push (myConsOrMgr_->myOrCandFor (theSub));
+
+   theOrCands.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OrCand.        
+//------------------------------------------------------------------------------
+                                          
+WitOrCand::~WitOrCand ()                  
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+
+int WitOrCand::nInstances (WitProblem *)
+   {
+   stronglyAssert (false);
+
+   return 0;
+   }
+
+//------------------------------------------------------------------------------
+
+WitOrCand::WitOrCand (WitOrSite * theOrSite, WitOrMgr * theOrMgr):
+      WitProbAssoc  (theOrMgr->myProblem ()),
+
+      mappingIndex_ (theOrMgr->nOrCands ()),
+      myOrSite_     (theOrSite)
+   {                                      
+   }                                      
+                                          
+//------------------------------------------------------------------------------
+// Implementation of class ProdOrCand.        
+//------------------------------------------------------------------------------
+                                          
+WitProdOrCand::WitProdOrCand (
+         WitBopEntry *  theBopEnt,
+         WitProdOrMgr * theProdOrMgr):
+
+      WitOrCand (
+         theProdOrMgr->myOrSiteFor (theBopEnt->myPart ()),
+         theProdOrMgr),
+                                          
+      myBopEnt_ (theBopEnt)                 
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitProdOrCand::~WitProdOrCand ()
+   {
+   }
+                                          
+//------------------------------------------------------------------------------
+
+bool WitProdOrCand::isEligible (WitPeriod expPer)
+   {
+   return myBopEnt_->expEligible (expPer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBillEntry * WitProdOrCand::myBillEntry ()
+   {
+   return myBopEnt_;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ConsOrCand.        
+//------------------------------------------------------------------------------
+                                          
+WitConsOrCand::WitConsOrCand (
+         WitConsEntry * theConsEnt,
+         WitConsOrMgr * theConsOrMgr):
+
+      WitOrCand  (
+         theConsOrMgr->myOrSiteFor (theConsEnt->myBomEnt ()),
+         theConsOrMgr),
+
+      myConsEnt_ (theConsEnt)                 
+   {                                      
+   }
+
+//------------------------------------------------------------------------------
+
+WitConsOrCand::~WitConsOrCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitConsOrCand::isEligible (WitPeriod execPer)
+   {
+   return myConsEnt_->inEffect (execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBillEntry * WitConsOrCand::myBillEntry ()
+   {
+   return myConsEnt_;
+   }
+
+@
+
+
+1.4
+log
+@Continued implementation of proportionate routing.
+@
+text
+@@
+
+
+1.3
+log
+@Continued implementation of proportionate routing.
+@
+text
+@a379 11
+void WitProdOrSite::prtOpBrPtID (WitPeriod expPer)
+   {
+   fprintf (msgFile (),
+      "   Part:    %s\n"
+      "   Exp Per: %d\n",
+      myPart_->partName ().myCstring (),
+      expPer);
+   }
+
+//------------------------------------------------------------------------------
+
+a428 13
+void WitConsOrSite::prtOpBrPtID (WitPeriod execPer)
+   {
+   fprintf (msgFile (),
+      "   Operation: %s\n"
+      "   Bom Ent #  %d\n"
+      "   Exec Per:  %d\n",
+      myBomEnt_->myOperationName ().myCstring (),
+      myBomEnt_->localIndex (),
+      execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+a493 11
+void WitProdOrCand::prtOpPtID ()
+   {
+   fprintf (msgFile (),
+      "      Operation:      %s\n"
+      "      BOP Entry #:    %d\n",
+      myBopEnt_->myOperationName ().myCstring (),
+      myBopEnt_->localIndex ());
+   }
+
+//------------------------------------------------------------------------------
+
+a525 21
+   }
+
+//------------------------------------------------------------------------------
+
+void WitConsOrCand::prtOpPtID ()
+   {
+   WitSubEntry * theSub;
+
+   myConsEnt_->getSubEntry (theSub);
+
+   if (theSub != NULL)
+      fprintf (msgFile (), 
+         "      Cons Entry:     Sub #%d\n",
+         theSub->localIndex ());
+   else
+      fprintf (msgFile (),
+         "      Cons Entry:     Self\n");
+
+   fprintf (msgFile (),
+         "      Consumed Part:  %s\n",
+         myConsEnt_->myPartName ().myCstring ());
+@
+
+
+1.2
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d380 1
+a380 1
+void WitProdOrSite::prtPrBrPtID (WitPeriod expPer)
+d440 1
+a440 1
+void WitConsOrSite::prtPrBrPtID (WitPeriod execPer)
+d518 1
+a518 1
+void WitProdOrCand::prtPrPtID ()
+d565 1
+a565 1
+void WitConsOrCand::prtPrPtID ()
+@
+
+
+1.1
+log
+@Continued implementation of proportionate routing.
+@
+text
+@d45 1
+a45 1
+      "Routing Element Subsystem (%s Section):\n"
+@
+

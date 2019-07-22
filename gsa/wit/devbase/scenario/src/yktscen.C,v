@@ -1,0 +1,268 @@
+head	1.4;
+access;
+symbols
+	sce_5_01_20080919:1.4
+	latest_sce_4_20_20060523:1.4.0.4
+	sce_4_20_20060523:1.4
+	latest_sce4_20_OSL:1.4.0.2
+	sce_4_20_OSL:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.4
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.8
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.6
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.4
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.2.0.2
+	sce_3_10_20010924:1.2
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2003.08.05.13.00.49;	author dpc;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.48;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.08.10.23.02.06;	author fasano;	state Exp;
+branches
+	1.2.8.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.55;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.55;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.8.1
+date	2003.01.08.17.42.38;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Changed absolute paths to relative paths.
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+/* File yktscen.C
+   created by Joe Huizenga
+   08:40:12 Wed Jan  5 1994. */
+
+/* IBM CONFIDENTIAL */
+
+/* COPYRIGHT IBM CORP 1994
+   LICENSED MATERIAL - PROGRAM PROPERTY OF IBM
+   REFER TO COPYRIGHT INSTRUCTIONS FORM NO. G120-2083 */
+
+/* This file provides an implementation of the LgFrYktScen class. */
+
+/* includes */
+
+#include <stdlib.h>
+#include <iostream.h>
+#include <yktscen.h>
+#include <wit/src/wit.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/inPrFile.h>
+#include <scenario/src/wrkgProb.h>
+
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Important: This class was used to diagnose a problem in Rochesters           !!
+// scenario but is defunct right now.                                           !!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+LgFrYktScenario::LgFrYktScenario(const LgFrInitialProblemAndParameters& initProb, scheduler& )
+:LgFrScenario(initProb)
+{
+
+   // Get reference to Scenario's lastSolvedProblem
+    LgFrLastProblemSolved & lps = lastProblemSolved();
+
+   // Get reference to Scenario's setOfParts
+    LgFrSetOfParts & sop = setOfParts();
+
+   // Get reference to Scenario's setOfDemands
+    LgFrSetOfDemands & sod = setOfDemands();
+
+   // Get reference to Scenario's workingImplosionProblem
+    LgFrWorkingImplosionProblem & wip = workingImplosionProblem();
+
+   fflush(stdout);
+   cout <<"LgFrYktScenario::LgFrYktScenario about to invoke lps.witRun()" <<endl;
+   fflush(stdout);
+
+   WitRun *myrun =lps.witRun();
+
+   fflush(stdout);
+   cout <<"LgFrYktScenario::LgFrYktScenario returned from lps.witRun()" <<endl;
+   fflush(stdout);
+
+    int nP;
+    witGetNPeriods(myrun, &nP );
+    assert (nP == 8);
+    cout << "Problem has " << nP << "periods.";
+
+   // Get number of periods in problem
+    int nPeriods = lps.numberOfPeriods();
+
+   // Set heuristic implosion method (could set to optimize).
+    wip.implosionMethod(LgFrHEURISTIC);
+
+   // Turn on computing critical list
+    lps.computeCriticalList(true);
+
+   // Perform Implosion
+    newImplosionSolution();
+
+#if 0
+   // Get critical list from lps
+    IntGenMat cl(lps.criticalList());
+
+   // Display critical list
+    cout <<endl <<"******Critical List*******" <<endl;
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i<cl.rows(); i++ )
+    {
+      // Print critical partname and critical period
+	cout <<"Part Name: "
+	  <<sop[cl(i,0)].name()
+	  <<"   period: "
+	  <<cl(i,1)
+	  <<endl;
+    }
+#endif
+
+   // Get critical list from lps
+   LgFrSortingPartScheduleFloat cl(lps.criticalList());
+
+   // Display critical list
+   cout <<endl <<"******Critical List*******" <<endl;
+   cout <<cl.format();
+
+
+   fflush(stdout);
+   cout <<"LgFrYktScenario::LgFrYktScenario returned from lps.witRun()" <<endl;
+   fflush(stdout);
+}
+
+LgFrYktScenario::~LgFrYktScenario()
+{
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// Self-test.  This is not a very thourough test.
+void
+LgFrYktScenario::test()
+{
+  // Make objects needed by the tests
+  LgFrInitialProblemFromFile 
+    ip ("../../../../wit/wit-data/standard/obj1.bounds/wit.data");
+  int tmpi = 3;
+
+  // Make a LgFrYktScenario
+  LgFrYktScenario ys (ip, tmpi);
+}
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d119 1
+a119 1
+    ip ("/u/wit/wit-data/standard/obj1.bounds/wit.data");
+@
+
+
+1.2
+log
+@Updated so unitTest reads files from
+  /u/wit/wit-data
+instead of
+  /u/implode/data
+With these changes unitTest is running correctly on Windows
+@
+text
+@d1 3
+d69 1
+a69 1
+    lps.computeCriticalList(TRUE);
+d80 2
+a81 1
+    for ( int i=0; i<cl.rows(); i++ )
+@
+
+
+1.2.8.1
+log
+@Roguewave is gone
+@
+text
+@a0 3
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+d66 1
+a66 1
+    lps.computeCriticalList(true);
+d77 1
+a77 2
+    int i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i<cl.rows(); i++ )
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d115 1
+a115 1
+    ip ("/u/implode/wit/data/standard/obj1.bounds/wit.data");
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

@@ -1,0 +1,2077 @@
+head	1.15;
+access;
+symbols
+	sce_5_01_20080919:1.10;
+locks; strict;
+comment	@ * @;
+
+
+1.15
+date	2011.09.28.23.50.30;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.09.24.00.28.45;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.08.30.20.18.15;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.09.10.22.10.42;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.03.16.22.42.29;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2008.02.13.16.50.44;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2008.02.12.22.04.04;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2008.02.09.00.40.45;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2008.02.09.00.11.58;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2008.02.08.23.33.47;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2008.02.08.21.38.32;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2008.02.08.00.08.09;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2008.02.07.23.30.10;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.02.07.21.49.35;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.02.07.18.41.40;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.15
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "Stage.C"
+//
+// Contains the implementation of the following classes:
+//
+//    Stage
+//    StageMgr
+//    ObjStageMgr
+//    PerStageMgr
+//------------------------------------------------------------------------------
+
+#include <Stage.h>
+#include <ObjStageMgr.h>
+#include <PerStageMgr.h>
+#include <StochImpMgr.h>
+#include <StochModeMgr.h>
+#include <DataWrit.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <Demand.h>
+#include <Operation.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <BoundSet.h>
+#include <CompMgr.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class Stage.
+//------------------------------------------------------------------------------
+
+WitStage::WitStage (int theIdx, WitStochModeMgr * theStochModeMgr):
+
+      WitStochAssoc (theStochModeMgr),
+      myIndex_      (theIdx)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage::~WitStage ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitStage::includes (WitNode * theNode)
+   {
+   return myStageMgr ()->includesNode (this, theNode);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitStage::includes (WitPeriod thePer)
+   {
+   return myStageMgr ()->includesPeriod (this, thePer);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class StageMgr.
+//------------------------------------------------------------------------------
+
+WitStageMgr::~WitStageMgr ()
+   {
+   delete myStageVec_[1];
+   delete myStageVec_[0];
+   }
+
+//------------------------------------------------------------------------------
+
+WitStageMgr * WitStageMgr::newStageMgr (WitStochModeMgr * theStochModeMgr)
+   {
+   if (theStochModeMgr->myStochImpMgr ()->stageByObject ())
+      return new WitObjStageMgr (theStochModeMgr);
+   else
+      return new WitPerStageMgr (theStochModeMgr);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStageMgr::WitStageMgr (WitStochModeMgr * theStochModeMgr):
+
+      WitStochAssoc (theStochModeMgr),
+      myStageVec_   (2)
+   {
+   myStageVec_[0] = new WitStage (0, myStochModeMgr ());
+   myStageVec_[1] = new WitStage (1, myStochModeMgr ());
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ObjStageMgr.
+//------------------------------------------------------------------------------
+
+WitObjStageMgr::WitObjStageMgr (WitStochModeMgr * theStochModeMgr):
+
+      WitStageMgr  (theStochModeMgr),
+      objectStage_ (myProblem ())
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   stronglyAssert (myStochImpMgr ()->stageByObject ());
+
+   forEachPart (thePart, myProblem ())
+      objectStage_ (thePart) = defStage ();
+
+   forEachOperation (theOpn, myProblem ())
+      objectStage_ (theOpn)  = defStage ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjStageMgr::~WitObjStageMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::setObjectStageIdx (WitNode * theNode, int theStageIdx)
+   {
+   myProblem ()->prepSetStochModeAttr ("objectStage");
+
+   objectStage_ (theNode) = myStageFor (theStageIdx);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::setPeriodStageIdx (WitPeriod thePer, int theStageIdx)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitObjStageMgr::objectStage (WitNode * theNode)
+   {
+   return objectStage_ (theNode);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitObjStageMgr::periodStage (WitPeriod)
+   {
+   stronglyAssert (false);
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitObjStageMgr::myStageOf (WitNode * theNode, WitPeriod)
+   {
+   return objectStage_ (theNode);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitObjStageMgr::includesNode (WitStage * theStage, WitNode * theNode)
+   {
+   return (theStage == objectStage_ (theNode));
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitObjStageMgr::includesPeriod (WitStage *, WitPeriod)
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::writeData ()
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   forEachPart (thePart, myProblem ())
+      writeObjectStage (thePart, "part");
+
+   forEachOperation (theOpn, myProblem ())
+      writeObjectStage (theOpn, "operation");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::displayData ()
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   myMsgFac () ("stageHeadingDdMsg");
+
+   myMsgFac () ("partStageHeadingDdMsg");
+
+   forEachPart (thePart, myProblem ())
+      myMsgFac () ("objectStageDdMsg",
+         thePart->partName (),
+         objectStage_ (thePart)->myIndex ());
+
+   myMsgFac () ("opnStageHeadingDdMsg");
+
+   forEachOperation (theOpn, myProblem ())
+      myMsgFac () ("objectStageDdMsg",
+         theOpn->operationName (),
+         objectStage_ (thePart)->myIndex ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::copyAttrsFrom (WitStageMgr * origStageMgr)
+   {
+   WitCompMgr *   origCompMgr;
+   WitPart *      thePart;
+   WitPart *      origPart;
+   int            theIdx;
+   WitOperation * theOpn;
+   WitOperation * origOpn;
+   
+   origCompMgr = origStageMgr->myCompMgr ();
+
+   forEachPart (thePart, myProblem ())
+      {
+      origPart = origCompMgr->findPart (thePart->partName ().myCstring ());
+
+      theIdx   = origStageMgr->objectStage (origPart)->myIndex ();
+
+      objectStage_ (thePart) = myStageFor (theIdx);
+      }
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      origOpn =
+         origCompMgr->findOperation (theOpn->operationName ().myCstring ());
+
+      theIdx  = origStageMgr->objectStage (origOpn)->myIndex ();
+
+      objectStage_ (theOpn) = myStageFor (theIdx);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::validateData ()
+   {
+   validateBomEnts ();
+   validateSubs    ();
+   validateBopEnts ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::issueAttMisMatchHeadMsg ()
+   {
+   myMsgFac () ("stage0ObjAttMisMatchSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::writeObjectStage (
+      WitNode *    theNode,
+      const char * nodeTypeName)
+   {
+   if (objectStage_ (theNode) == defStage ())
+      return;
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      (nodeTypeName);
+   myDataWriter ()->writeStringValue  (theNode->nodeName ());
+
+   myDataWriter ()->writeInt (
+        "objectStage",
+         objectStage_ (theNode)->myIndex (),
+            defStage  ()       ->myIndex ());
+
+   myDataWriter ()->writeEndCommand ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::validateBomEnts ()
+   {
+   WitBomEntry * theBomEnt;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theBomEnt->myOperation ());
+      thePartStage = objectStage_ (theBomEnt->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("bomEntStageConflictSmsg",
+               theBomEnt->myOperationName (),
+               theBomEnt->localIndex (),
+               theBomEnt->myPartName ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::validateSubs ()
+   {
+   WitSubEntry * theSub;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachSubEntry (theSub, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theSub->myOperation ());
+      thePartStage = objectStage_ (theSub->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("subStageConflictSmsg",
+               theSub->myOperationName (),
+               theSub->myBomEntIndex (),
+               theSub->localIndex (),
+               theSub->myPartName ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::validateBopEnts ()
+   {
+   WitBopEntry * theBopEnt;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theBopEnt->myOperation ());
+      thePartStage = objectStage_ (theBopEnt->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("bopEntStageConflictSmsg",
+               theBopEnt->myOperationName (),
+               theBopEnt->localIndex (),
+               theBopEnt->myPartName ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PerStageMgr.
+//------------------------------------------------------------------------------
+
+WitPerStageMgr::WitPerStageMgr (WitStochModeMgr * theStochModeMgr):
+
+      WitStageMgr  (theStochModeMgr),
+      periodStage_ (myProblem ())
+   {
+   WitPeriod thePer;
+
+   stronglyAssert (not myStochImpMgr ()->stageByObject ());
+
+   forEachPeriod (thePer, myProblem ())
+      periodStage_[thePer] = defStage ();
+
+   validateCoreData ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitPerStageMgr::~WitPerStageMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::setObjectStageIdx (WitNode * theNode, int theStageIdx)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::setPeriodStageIdx (WitPeriod thePer, int theStageIdx)
+   {
+   myProblem ()->prepSetStochModeAttr ("periodStage");
+
+   periodStage_[thePer] = myStageFor (theStageIdx);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitPerStageMgr::objectStage (WitNode *)
+   {
+   stronglyAssert (false);
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitPerStageMgr::periodStage (WitPeriod thePer)
+   {
+   return periodStage_[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+WitStage * WitPerStageMgr::myStageOf (WitNode *, WitPeriod thePer)
+   {
+   return periodStage_[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPerStageMgr::includesNode (WitStage *, WitNode *)
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPerStageMgr::includesPeriod (WitStage * theStage, WitPeriod thePer)
+   {
+   return (theStage == periodStage_[thePer]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::writeData ()
+   {
+   WitTVec <int> theIdxVec;
+   WitPeriod     thePer;
+
+   theIdxVec.allocate (myProblem (), -1);
+
+   forEachPeriod (thePer, myProblem ())
+      theIdxVec[thePer] = periodStage_[thePer]->myIndex ();
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("problem");
+
+   myDataWriter ()->writeVector (
+      "periodStage",
+       theIdxVec,
+       defStage ()->myIndex ());
+
+   myDataWriter ()->writeEndCommand ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::displayData ()
+   {
+   WitPeriod thePer;
+
+   myMsgFac () ("stageHeadingDdMsg");
+   myMsgFac () ("periodStageHeadingDdMsg");
+
+   forEachPeriod (thePer, myProblem ())
+      myMsgFac () ("periodStageDdMsg",
+         thePer,
+         periodStage_[thePer]->myIndex ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::copyAttrsFrom (WitStageMgr * origStageMgr)
+   {
+   WitPeriod thePer;
+   int       theIdx;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      theIdx = origStageMgr->periodStage (thePer)->myIndex ();
+
+      periodStage_[thePer] = myStageFor (theIdx);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::validateData ()
+   {
+   WitPeriod thePer;
+
+   if (DEBUG_MODE)
+      forEachPeriod (thePer, myProblem ())
+         if (thePer > 0)
+            if           (periodStage_[thePer    ]->isStage0 ())
+               witAssert (periodStage_[thePer - 1]->isStage0 ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::issueAttMisMatchHeadMsg ()
+   {
+   myMsgFac () ("stage0PerAttMisMatchSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::validateCoreData ()
+   {
+   validateBomEnts ();
+   validateSubs    ();
+   validateBopEnts ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::validateBomEnts ()
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theBomEnt->offset ()[execPer] > 0.0)
+            myMsgFac () ("posBomOffsetInSBPSmsg",
+               theBomEnt->myOperationName (),
+               theBomEnt->localIndex (),
+               theBomEnt->myPartName (),
+               execPer,
+               theBomEnt->offset ()[execPer]);
+
+         checkImpactPeriod (theBomEnt, execPer);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::validateSubs ()
+   {
+   WitSubEntry * theSub;
+   WitPeriod     execPer;
+
+   if (not myGlobalComp ()->independentOffsets ())
+      return;
+
+   forEachSubEntry (theSub, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theSub->offset ()[execPer] > 0.0)
+            myMsgFac () ("posSubOffsetInSBPSmsg",
+               theSub->myOperationName (),
+               theSub->myBomEntIndex (),
+               theSub->localIndex (),
+               theSub->myPartName (),
+               execPer,
+               theSub->offset ()[execPer]);
+
+         checkImpactPeriod (theSub, execPer);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::validateBopEnts ()
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theBopEnt->offset ()[execPer] > 0.0)
+            myMsgFac () ("posBopOffsetInSBPSmsg",
+               theBopEnt->myOperationName (),
+               theBopEnt->localIndex (),
+               theBopEnt->myPartName (),
+               execPer,
+               theBopEnt->offset ()[execPer]);
+
+         checkImpactPeriod (theBopEnt, execPer);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::checkImpactPeriod (
+      WitBillEntry * theBillEnt,
+      WitPeriod      execPer)
+   {
+   if (theBillEnt->inEffect (execPer))
+      stronglyAssert (theBillEnt->impactPeriod ()[execPer] >= execPer);
+   }
+@
+
+
+1.14
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.13
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d43 4
+a46 4
+WitStochAssoc (theStochModeMgr),
+myIndex_      (theIdx)
+{
+}
+d51 2
+a52 2
+{
+}
+d57 3
+a59 3
+{
+return myStageMgr ()->includesNode (this, theNode);
+}
+d64 3
+a66 3
+{
+return myStageMgr ()->includesPeriod (this, thePer);
+}
+d73 4
+a76 4
+{
+delete myStageVec_[1];
+delete myStageVec_[0];
+}
+d81 6
+a86 6
+{
+if (theStochModeMgr->myStochImpMgr ()->stageByObject ())
+return new WitObjStageMgr (theStochModeMgr);
+else
+return new WitPerStageMgr (theStochModeMgr);
+}
+d92 6
+a97 6
+WitStochAssoc (theStochModeMgr),
+myStageVec_   (2)
+{
+myStageVec_[0] = new WitStage (0, myStochModeMgr ());
+myStageVec_[1] = new WitStage (1, myStochModeMgr ());
+}
+d105 14
+a118 14
+WitStageMgr  (theStochModeMgr),
+objectStage_ (myProblem ())
+{
+WitPart *      thePart;
+WitOperation * theOpn;
+
+stronglyAssert (myStochImpMgr ()->stageByObject ());
+
+forEachPart (thePart, myProblem ())
+objectStage_ (thePart) = defStage ();
+
+forEachOperation (theOpn, myProblem ())
+objectStage_ (theOpn)  = defStage ();
+}
+d123 2
+a124 2
+{
+}
+d129 2
+a130 2
+{
+myProblem ()->prepSetStochModeAttr ("objectStage");
+d132 2
+a133 2
+objectStage_ (theNode) = myStageFor (theStageIdx);
+}
+d138 3
+a140 3
+{
+stronglyAssert (false);
+}
+d145 3
+a147 3
+{
+return objectStage_ (theNode);
+}
+d152 2
+a153 2
+{
+stronglyAssert (false);
+d155 2
+a156 2
+return NULL;
+}
+d161 3
+a163 3
+{
+return objectStage_ (theNode);
+}
+d168 3
+a170 3
+{
+return (theStage == objectStage_ (theNode));
+}
+d175 3
+a177 3
+{
+return true;
+}
+d182 10
+a191 10
+{
+WitPart *      thePart;
+WitOperation * theOpn;
+
+forEachPart (thePart, myProblem ())
+writeObjectStage (thePart, "part");
+
+forEachOperation (theOpn, myProblem ())
+writeObjectStage (theOpn, "operation");
+}
+d196 20
+a215 20
+{
+WitPart *      thePart;
+WitOperation * theOpn;
+
+myMsgFac () ("stageHeadingDdMsg");
+
+myMsgFac () ("partStageHeadingDdMsg");
+
+forEachPart (thePart, myProblem ())
+myMsgFac () ("objectStageDdMsg",
+thePart->partName (),
+objectStage_ (thePart)->myIndex ());
+
+myMsgFac () ("opnStageHeadingDdMsg");
+
+forEachOperation (theOpn, myProblem ())
+myMsgFac () ("objectStageDdMsg",
+theOpn->operationName (),
+objectStage_ (thePart)->myIndex ());
+}
+d220 29
+a248 29
+{
+WitCompMgr *   origCompMgr;
+WitPart *      thePart;
+WitPart *      origPart;
+int            theIdx;
+WitOperation * theOpn;
+WitOperation * origOpn;
+
+origCompMgr = origStageMgr->myCompMgr ();
+
+forEachPart (thePart, myProblem ())
+{
+origPart = origCompMgr->findPart (thePart->partName ().myCstring ());
+
+theIdx   = origStageMgr->objectStage (origPart)->myIndex ();
+
+objectStage_ (thePart) = myStageFor (theIdx);
+}
+
+forEachOperation (theOpn, myProblem ())
+{
+origOpn =
+origCompMgr->findOperation (theOpn->operationName ().myCstring ());
+
+theIdx  = origStageMgr->objectStage (origOpn)->myIndex ();
+
+objectStage_ (theOpn) = myStageFor (theIdx);
+}
+}
+d253 5
+a257 5
+{
+validateBomEnts ();
+validateSubs    ();
+validateBopEnts ();
+}
+d262 3
+a264 3
+{
+myMsgFac () ("stage0ObjAttMisMatchSmsg");
+}
+d269 14
+a282 14
+WitNode *    theNode,
+const char * nodeTypeName)
+{
+if (objectStage_ (theNode) == defStage ())
+return;
+
+myDataWriter ()->writeFirstKeyWord ("set");
+myDataWriter ()->writeKeyWord      (nodeTypeName);
+myDataWriter ()->writeStringValue  (theNode->nodeName ());
+
+myDataWriter ()->writeInt (
+"objectStage",
+objectStage_ (theNode)->myIndex (),
+defStage  ()       ->myIndex ());
+d284 2
+a285 2
+myDataWriter ()->writeEndCommand ();
+}
+d290 18
+a307 18
+{
+WitBomEntry * theBomEnt;
+WitStage *    theOpnStage;
+WitStage *    thePartStage;
+
+forEachBomEntry (theBomEnt, myProblem ())
+{
+theOpnStage  = objectStage_ (theBomEnt->myOperation ());
+thePartStage = objectStage_ (theBomEnt->myPart      ());
+
+if    (theOpnStage ->isStage1 ())
+if (thePartStage->isStage0 ())
+myMsgFac () ("bomEntStageConflictSmsg",
+theBomEnt->myOperationName (),
+theBomEnt->localIndex (),
+theBomEnt->myPartName ());
+}
+}
+d312 19
+a330 19
+{
+WitSubEntry * theSub;
+WitStage *    theOpnStage;
+WitStage *    thePartStage;
+
+forEachSubEntry (theSub, myProblem ())
+{
+theOpnStage  = objectStage_ (theSub->myOperation ());
+thePartStage = objectStage_ (theSub->myPart      ());
+
+if    (theOpnStage ->isStage1 ())
+if (thePartStage->isStage0 ())
+myMsgFac () ("subStageConflictSmsg",
+theSub->myOperationName (),
+theSub->myBomEntIndex (),
+theSub->localIndex (),
+theSub->myPartName ());
+}
+}
+d335 18
+a352 18
+{
+WitBopEntry * theBopEnt;
+WitStage *    theOpnStage;
+WitStage *    thePartStage;
+
+forEachBopEntry (theBopEnt, myProblem ())
+{
+theOpnStage  = objectStage_ (theBopEnt->myOperation ());
+thePartStage = objectStage_ (theBopEnt->myPart      ());
+
+if    (theOpnStage ->isStage1 ())
+if (thePartStage->isStage0 ())
+myMsgFac () ("bopEntStageConflictSmsg",
+theBopEnt->myOperationName (),
+theBopEnt->localIndex (),
+theBopEnt->myPartName ());
+}
+}
+d360 4
+a363 4
+WitStageMgr  (theStochModeMgr),
+periodStage_ (myProblem ())
+{
+WitPeriod thePer;
+d365 1
+a365 1
+stronglyAssert (not myStochImpMgr ()->stageByObject ());
+d367 2
+a368 2
+forEachPeriod (thePer, myProblem ())
+periodStage_[thePer] = defStage ();
+d370 2
+a371 2
+validateCoreData ();
+}
+d376 2
+a377 2
+{
+}
+d382 3
+a384 3
+{
+stronglyAssert (false);
+}
+d389 2
+a390 2
+{
+myProblem ()->prepSetStochModeAttr ("periodStage");
+d392 2
+a393 2
+periodStage_[thePer] = myStageFor (theStageIdx);
+}
+d398 2
+a399 2
+{
+stronglyAssert (false);
+d401 2
+a402 2
+return NULL;
+}
+d407 3
+a409 3
+{
+return periodStage_[thePer];
+}
+d414 3
+a416 3
+{
+return periodStage_[thePer];
+}
+d421 3
+a423 3
+{
+return true;
+}
+d428 3
+a430 3
+{
+return (theStage == periodStage_[thePer]);
+}
+d435 3
+a437 3
+{
+WitTVec <int> theIdxVec;
+WitPeriod     thePer;
+d439 1
+a439 1
+theIdxVec.allocate (myProblem (), -1);
+d441 2
+a442 2
+forEachPeriod (thePer, myProblem ())
+theIdxVec[thePer] = periodStage_[thePer]->myIndex ();
+d444 2
+a445 2
+myDataWriter ()->writeFirstKeyWord ("set");
+myDataWriter ()->writeKeyWord      ("problem");
+d447 4
+a450 4
+myDataWriter ()->writeVector (
+"periodStage",
+theIdxVec,
+defStage ()->myIndex ());
+d452 2
+a453 2
+myDataWriter ()->writeEndCommand ();
+}
+d458 2
+a459 2
+{
+WitPeriod thePer;
+d461 2
+a462 2
+myMsgFac () ("stageHeadingDdMsg");
+myMsgFac () ("periodStageHeadingDdMsg");
+d464 5
+a468 5
+forEachPeriod (thePer, myProblem ())
+myMsgFac () ("periodStageDdMsg",
+thePer,
+periodStage_[thePer]->myIndex ());
+}
+d473 11
+a483 11
+{
+WitPeriod thePer;
+int       theIdx;
+
+forEachPeriod (thePer, myProblem ())
+{
+theIdx = origStageMgr->periodStage (thePer)->myIndex ();
+
+periodStage_[thePer] = myStageFor (theIdx);
+}
+}
+d488 2
+a489 2
+{
+WitPeriod thePer;
+d491 6
+a496 6
+if (DEBUG_MODE)
+forEachPeriod (thePer, myProblem ())
+if (thePer > 0)
+if           (periodStage_[thePer    ]->isStage0 ())
+witAssert (periodStage_[thePer - 1]->isStage0 ());
+}
+d501 3
+a503 3
+{
+myMsgFac () ("stage0PerAttMisMatchSmsg");
+}
+d508 5
+a512 5
+{
+validateBomEnts ();
+validateSubs    ();
+validateBopEnts ();
+}
+d517 18
+a534 18
+{
+WitBomEntry * theBomEnt;
+WitPeriod     execPer;
+
+forEachBomEntry (theBomEnt, myProblem ())
+forEachPeriod (execPer, myProblem ())
+{
+if (theBomEnt->offset ()[execPer] > 0.0)
+myMsgFac () ("posBomOffsetInSBPSmsg",
+theBomEnt->myOperationName (),
+theBomEnt->localIndex (),
+theBomEnt->myPartName (),
+execPer,
+theBomEnt->offset ()[execPer]);
+
+checkImpactPeriod (theBomEnt, execPer);
+}
+}
+d539 22
+a560 22
+{
+WitSubEntry * theSub;
+WitPeriod     execPer;
+
+if (not myGlobalComp ()->independentOffsets ())
+return;
+
+forEachSubEntry (theSub, myProblem ())
+forEachPeriod (execPer, myProblem ())
+{
+if (theSub->offset ()[execPer] > 0.0)
+myMsgFac () ("posSubOffsetInSBPSmsg",
+theSub->myOperationName (),
+theSub->myBomEntIndex (),
+theSub->localIndex (),
+theSub->myPartName (),
+execPer,
+theSub->offset ()[execPer]);
+
+checkImpactPeriod (theSub, execPer);
+}
+}
+d565 18
+a582 18
+{
+WitBopEntry * theBopEnt;
+WitPeriod     execPer;
+
+forEachBopEntry (theBopEnt, myProblem ())
+forEachPeriod (execPer, myProblem ())
+{
+if (theBopEnt->offset ()[execPer] > 0.0)
+myMsgFac () ("posBopOffsetInSBPSmsg",
+theBopEnt->myOperationName (),
+theBopEnt->localIndex (),
+theBopEnt->myPartName (),
+execPer,
+theBopEnt->offset ()[execPer]);
+
+checkImpactPeriod (theBopEnt, execPer);
+}
+}
+d587 6
+a592 6
+WitBillEntry * theBillEnt,
+WitPeriod      execPer)
+{
+if (theBillEnt->inEffect (execPer))
+stronglyAssert (theBillEnt->impactPeriod ()[execPer] >= execPer);
+}
+@
+
+
+1.12
+log
+@Heuristic Adjustment
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d43 4
+a46 4
+      WitStochAssoc (theStochModeMgr),
+      myIndex_      (theIdx)
+   {
+   }
+d51 2
+a52 2
+   {
+   }
+d57 3
+a59 3
+   {
+   return myStageMgr ()->includesNode (this, theNode);
+   }
+d64 3
+a66 3
+   {
+   return myStageMgr ()->includesPeriod (this, thePer);
+   }
+d73 4
+a76 4
+   {
+   delete myStageVec_[1];
+   delete myStageVec_[0];
+   }
+d81 6
+a86 6
+   {
+   if (theStochModeMgr->myStochImpMgr ()->stageByObject ())
+      return new WitObjStageMgr (theStochModeMgr);
+   else
+      return new WitPerStageMgr (theStochModeMgr);
+   }
+d92 6
+a97 6
+      WitStochAssoc (theStochModeMgr),
+      myStageVec_   (2)
+   {
+   myStageVec_[0] = new WitStage (0, myStochModeMgr ());
+   myStageVec_[1] = new WitStage (1, myStochModeMgr ());
+   }
+d105 14
+a118 14
+      WitStageMgr  (theStochModeMgr),
+      objectStage_ (myProblem ())
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   stronglyAssert (myStochImpMgr ()->stageByObject ());
+
+   forEachPart (thePart, myProblem ())
+      objectStage_ (thePart) = defStage ();
+
+   forEachOperation (theOpn, myProblem ())
+      objectStage_ (theOpn)  = defStage ();
+   }
+d123 2
+a124 2
+   {
+   }
+d129 2
+a130 2
+   {
+   myProblem ()->prepSetStochModeAttr ("objectStage");
+d132 2
+a133 2
+   objectStage_ (theNode) = myStageFor (theStageIdx);
+   }
+d138 3
+a140 3
+   {
+   stronglyAssert (false);
+   }
+d145 3
+a147 3
+   {
+   return objectStage_ (theNode);
+   }
+d152 2
+a153 2
+   {
+   stronglyAssert (false);
+d155 2
+a156 2
+   return NULL;
+   }
+d161 3
+a163 3
+   {
+   return objectStage_ (theNode);
+   }
+d168 3
+a170 3
+   {
+   return (theStage == objectStage_ (theNode));
+   }
+d175 3
+a177 3
+   {
+   return true;
+   }
+d182 10
+a191 10
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   forEachPart (thePart, myProblem ())
+      writeObjectStage (thePart, "part");
+
+   forEachOperation (theOpn, myProblem ())
+      writeObjectStage (theOpn, "operation");
+   }
+d196 20
+a215 20
+   {
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   myMsgFac () ("stageHeadingDdMsg");
+
+   myMsgFac () ("partStageHeadingDdMsg");
+
+   forEachPart (thePart, myProblem ())
+      myMsgFac () ("objectStageDdMsg",
+         thePart->partName (),
+         objectStage_ (thePart)->myIndex ());
+
+   myMsgFac () ("opnStageHeadingDdMsg");
+
+   forEachOperation (theOpn, myProblem ())
+      myMsgFac () ("objectStageDdMsg",
+         theOpn->operationName (),
+         objectStage_ (thePart)->myIndex ());
+   }
+d220 29
+a248 29
+   {
+   WitCompMgr *   origCompMgr;
+   WitPart *      thePart;
+   WitPart *      origPart;
+   int            theIdx;
+   WitOperation * theOpn;
+   WitOperation * origOpn;
+   
+   origCompMgr = origStageMgr->myCompMgr ();
+
+   forEachPart (thePart, myProblem ())
+      {
+      origPart = origCompMgr->findPart (thePart->partName ().myCstring ());
+
+      theIdx   = origStageMgr->objectStage (origPart)->myIndex ();
+
+      objectStage_ (thePart) = myStageFor (theIdx);
+      }
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      origOpn =
+         origCompMgr->findOperation (theOpn->operationName ().myCstring ());
+
+      theIdx  = origStageMgr->objectStage (origOpn)->myIndex ();
+
+      objectStage_ (theOpn) = myStageFor (theIdx);
+      }
+   }
+d253 5
+a257 5
+   {
+   validateBomEnts ();
+   validateSubs    ();
+   validateBopEnts ();
+   }
+d262 3
+a264 3
+   {
+   myMsgFac () ("stage0ObjAttMisMatchSmsg");
+   }
+d269 14
+a282 14
+      WitNode *    theNode,
+      const char * nodeTypeName)
+   {
+   if (objectStage_ (theNode) == defStage ())
+      return;
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      (nodeTypeName);
+   myDataWriter ()->writeStringValue  (theNode->nodeName ());
+
+   myDataWriter ()->writeInt (
+        "objectStage",
+         objectStage_ (theNode)->myIndex (),
+            defStage  ()       ->myIndex ());
+d284 2
+a285 2
+   myDataWriter ()->writeEndCommand ();
+   }
+d290 18
+a307 18
+   {
+   WitBomEntry * theBomEnt;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theBomEnt->myOperation ());
+      thePartStage = objectStage_ (theBomEnt->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("bomEntStageConflictSmsg",
+               theBomEnt->myOperationName (),
+               theBomEnt->localIndex (),
+               theBomEnt->myPartName ());
+      }
+   }
+d312 19
+a330 19
+   {
+   WitSubEntry * theSub;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachSubEntry (theSub, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theSub->myOperation ());
+      thePartStage = objectStage_ (theSub->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("subStageConflictSmsg",
+               theSub->myOperationName (),
+               theSub->myBomEntIndex (),
+               theSub->localIndex (),
+               theSub->myPartName ());
+      }
+   }
+d335 18
+a352 18
+   {
+   WitBopEntry * theBopEnt;
+   WitStage *    theOpnStage;
+   WitStage *    thePartStage;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      theOpnStage  = objectStage_ (theBopEnt->myOperation ());
+      thePartStage = objectStage_ (theBopEnt->myPart      ());
+
+      if    (theOpnStage ->isStage1 ())
+         if (thePartStage->isStage0 ())
+            myMsgFac () ("bopEntStageConflictSmsg",
+               theBopEnt->myOperationName (),
+               theBopEnt->localIndex (),
+               theBopEnt->myPartName ());
+      }
+   }
+d360 4
+a363 4
+      WitStageMgr  (theStochModeMgr),
+      periodStage_ (myProblem ())
+   {
+   WitPeriod thePer;
+d365 1
+a365 1
+   stronglyAssert (not myStochImpMgr ()->stageByObject ());
+d367 2
+a368 2
+   forEachPeriod (thePer, myProblem ())
+      periodStage_[thePer] = defStage ();
+d370 2
+a371 2
+   validateCoreData ();
+   }
+d376 2
+a377 2
+   {
+   }
+d382 3
+a384 3
+   {
+   stronglyAssert (false);
+   }
+d389 2
+a390 2
+   {
+   myProblem ()->prepSetStochModeAttr ("periodStage");
+d392 2
+a393 2
+   periodStage_[thePer] = myStageFor (theStageIdx);
+   }
+d398 2
+a399 2
+   {
+   stronglyAssert (false);
+d401 2
+a402 2
+   return NULL;
+   }
+d407 3
+a409 3
+   {
+   return periodStage_[thePer];
+   }
+d414 3
+a416 3
+   {
+   return periodStage_[thePer];
+   }
+d421 3
+a423 3
+   {
+   return true;
+   }
+d428 3
+a430 3
+   {
+   return (theStage == periodStage_[thePer]);
+   }
+d435 3
+a437 3
+   {
+   WitTVec <int> theIdxVec;
+   WitPeriod     thePer;
+d439 1
+a439 1
+   theIdxVec.allocate (myProblem (), -1);
+d441 2
+a442 2
+   forEachPeriod (thePer, myProblem ())
+      theIdxVec[thePer] = periodStage_[thePer]->myIndex ();
+d444 2
+a445 2
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("problem");
+d447 4
+a450 4
+   myDataWriter ()->writeVector (
+      "periodStage",
+       theIdxVec,
+       defStage ()->myIndex ());
+d452 2
+a453 2
+   myDataWriter ()->writeEndCommand ();
+   }
+d458 2
+a459 2
+   {
+   WitPeriod thePer;
+d461 2
+a462 2
+   myMsgFac () ("stageHeadingDdMsg");
+   myMsgFac () ("periodStageHeadingDdMsg");
+d464 5
+a468 5
+   forEachPeriod (thePer, myProblem ())
+      myMsgFac () ("periodStageDdMsg",
+         thePer,
+         periodStage_[thePer]->myIndex ());
+   }
+d473 11
+a483 11
+   {
+   WitPeriod thePer;
+   int       theIdx;
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      theIdx = origStageMgr->periodStage (thePer)->myIndex ();
+
+      periodStage_[thePer] = myStageFor (theIdx);
+      }
+   }
+d488 2
+a489 2
+   {
+   WitPeriod thePer;
+d491 6
+a496 6
+   if (DEBUG_MODE)
+      forEachPeriod (thePer, myProblem ())
+         if (thePer > 0)
+            if           (periodStage_[thePer    ]->isStage0 ())
+               witAssert (periodStage_[thePer - 1]->isStage0 ());
+   }
+d501 3
+a503 3
+   {
+   myMsgFac () ("stage0PerAttMisMatchSmsg");
+   }
+d508 5
+a512 5
+   {
+   validateBomEnts ();
+   validateSubs    ();
+   validateBopEnts ();
+   }
+d517 18
+a534 18
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theBomEnt->offset ()[execPer] > 0.0)
+            myMsgFac () ("posBomOffsetInSBPSmsg",
+               theBomEnt->myOperationName (),
+               theBomEnt->localIndex (),
+               theBomEnt->myPartName (),
+               execPer,
+               theBomEnt->offset ()[execPer]);
+
+         checkImpactPeriod (theBomEnt, execPer);
+         }
+   }
+d539 22
+a560 22
+   {
+   WitSubEntry * theSub;
+   WitPeriod     execPer;
+
+   if (not myGlobalComp ()->independentOffsets ())
+      return;
+
+   forEachSubEntry (theSub, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theSub->offset ()[execPer] > 0.0)
+            myMsgFac () ("posSubOffsetInSBPSmsg",
+               theSub->myOperationName (),
+               theSub->myBomEntIndex (),
+               theSub->localIndex (),
+               theSub->myPartName (),
+               execPer,
+               theSub->offset ()[execPer]);
+
+         checkImpactPeriod (theSub, execPer);
+         }
+   }
+d565 18
+a582 18
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (theBopEnt->offset ()[execPer] > 0.0)
+            myMsgFac () ("posBopOffsetInSBPSmsg",
+               theBopEnt->myOperationName (),
+               theBopEnt->localIndex (),
+               theBopEnt->myPartName (),
+               execPer,
+               theBopEnt->offset ()[execPer]);
+
+         checkImpactPeriod (theBopEnt, execPer);
+         }
+   }
+d587 6
+a592 6
+      WitBillEntry * theBillEnt,
+      WitPeriod      execPer)
+   {
+   if (theBillEnt->inEffect (execPer))
+      stronglyAssert (theBillEnt->impactPeriod ()[execPer] >= execPer);
+   }
+@
+
+
+1.11
+log
+@Changed source file names:
+   Global.h ==> GlobalComp.h
+   Global.C ==> GlobalComp.C
+@
+text
+@d30 1
+a30 1
+#include <Opn.h>
+@
+
+
+1.10
+log
+@Stochastic Implosion
+@
+text
+@d27 1
+a27 1
+#include <Global.h>
+@
+
+
+1.9
+log
+@Stochastic Implosion
+@
+text
+@d58 1
+a58 1
+   myStageMgr ()->includesNode (this, theNode);
+d65 1
+a65 1
+   myStageMgr ()->includesPeriod (this, thePer);
+@
+
+
+1.8
+log
+@Stochastic Implosion
+@
+text
+@d282 1
+a282 1
+            defStage  ()      ->myIndex ());
+d300 2
+a301 2
+      if    (theOpnStage ->myIndex () == 1)
+         if (thePartStage->myIndex () == 0)
+d322 2
+a323 2
+      if    (theOpnStage ->myIndex () == 1)
+         if (thePartStage->myIndex () == 0)
+d345 2
+a346 2
+      if    (theOpnStage ->myIndex () == 1)
+         if (thePartStage->myIndex () == 0)
+d494 2
+a495 2
+            if           (periodStage_[thePer    ]->myIndex () == 0)
+               witAssert (periodStage_[thePer - 1]->myIndex () == 0);
+@
+
+
+1.7
+log
+@Stochastic Implosion
+@
+text
+@a89 14
+void WitStageMgr::setObjectStageIdx (WitNode * theNode, int theStageIdx)
+   {
+   setObjectStage (theNode, myStageVec_[theStageIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitStageMgr::setPeriodStageIdx (WitPeriod thePer, int theStageIdx)
+   {
+   setPeriodStage (thePer, myStageVec_[theStageIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+d128 16
+a267 16
+void WitObjStageMgr::setObjectStage (WitNode * theNode, WitStage * theStage)
+   {
+   myProblem ()->prepSetStochModeAttr ("objectStage");
+
+   objectStage_ (theNode) = theStage;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::setPeriodStage (WitPeriod, WitStage *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+d381 16
+a506 16
+void WitPerStageMgr::setObjectStage (WitNode *, WitStage *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::setPeriodStage (WitPeriod thePer, WitStage * theStage)
+   {
+   myProblem ()->prepSetStochModeAttr ("periodStage");
+
+   periodStage_[thePer] = theStage;
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.6
+log
+@Srochastic Implosion
+@
+text
+@d90 14
+a141 20
+void WitObjStageMgr::setObjectStage (WitNode * theNode, WitStage * theStage)
+   {
+   witAssert (theStage != NULL);
+
+   witAssert (theStage->myStochModeMgr () == myStochModeMgr ());
+
+   myProblem ()->prepSetStochModeAttr ("objectStage");
+
+   objectStage_ (theNode) = theStage;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjStageMgr::setPeriodStage (WitPeriod, WitStage *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+d266 16
+a394 20
+void WitPerStageMgr::setObjectStage (WitNode *, WitStage *)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPerStageMgr::setPeriodStage (WitPeriod thePer, WitStage * theStage)
+   {
+   witAssert (theStage != NULL);
+
+   witAssert (theStage->myStochModeMgr () == myStochModeMgr ());
+
+   myProblem ()->prepSetStochModeAttr ("periodStage");
+
+   periodStage_[thePer] = theStage;
+   }
+
+//------------------------------------------------------------------------------
+
+d505 16
+@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@d132 2
+d164 1
+a164 1
+WitStage * WitObjStageMgr::stageOf (WitNode * theNode, WitPeriod)
+d394 4
+d421 1
+a421 1
+WitStage * WitPerStageMgr::stageOf (WitNode *, WitPeriod thePer)
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@d41 1
+a41 1
+WitStage::WitStage (int theIdx, WitStageMgr * theStageMgr):
+d43 2
+a44 2
+      myIndex_    (theIdx),
+      myStageMgr_ (theStageMgr)
+d58 1
+a58 1
+   myStageMgr_->includesNode (this, theNode);
+d65 1
+a65 1
+   myStageMgr_->includesPeriod (this, thePer);
+d80 1
+a80 1
+WitStageMgr * WitStageMgr::newStageMgr (WitProblem * theProblem)
+d82 2
+a83 2
+   if (theProblem->myStochImpMgr ()->stageByObject ())
+      return new WitObjStageMgr (theProblem);
+d85 1
+a85 1
+      return new WitPerStageMgr (theProblem);
+d90 1
+a90 1
+WitStageMgr::WitStageMgr (WitProblem * theProblem):
+d92 2
+a93 2
+      WitProbAssoc (theProblem),
+      myStageVec_  (2)
+d95 2
+a96 2
+   myStageVec_[0] = new WitStage (0, this);
+   myStageVec_[1] = new WitStage (1, this);
+d103 1
+a103 1
+WitObjStageMgr::WitObjStageMgr (WitProblem * theProblem):
+d105 1
+a105 1
+      WitStageMgr  (theProblem),
+d360 1
+a360 1
+WitPerStageMgr::WitPerStageMgr (WitProblem * theProblem):
+d362 2
+a363 2
+      WitStageMgr  (theProblem),
+      periodStage_ (theProblem)
+@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@d139 1
+a139 1
+void WitObjStageMgr::setPeriodStage (const WitPtrTVec <WitStage> &)
+d294 2
+a295 2
+   int           stgIdxForOpn;
+   int           stgIdxForPart;
+d299 2
+a300 2
+      stgIdxForOpn  = objectStage_ (theBomEnt->myOperation ())->myIndex ();
+      stgIdxForPart = objectStage_ (theBomEnt->myPart      ())->myIndex ();
+d302 2
+a303 2
+      if (stgIdxForOpn == 1)
+         if (stgIdxForPart == 0)
+d316 2
+a317 2
+   int           stgIdxForOpn;
+   int           stgIdxForPart;
+d321 2
+a322 2
+      stgIdxForOpn  = objectStage_ (theSub->myOperation ())->myIndex ();
+      stgIdxForPart = objectStage_ (theSub->myPart      ())->myIndex ();
+d324 2
+a325 2
+      if (stgIdxForOpn == 1)
+         if (stgIdxForPart == 0)
+d339 2
+a340 2
+   int           stgIdxForOpn;
+   int           stgIdxForPart;
+d344 2
+a345 2
+      stgIdxForOpn  = objectStage_ (theBopEnt->myOperation ())->myIndex ();
+      stgIdxForPart = objectStage_ (theBopEnt->myPart      ())->myIndex ();
+d347 2
+a348 2
+      if (stgIdxForOpn == 1)
+         if (stgIdxForPart == 0)
+d390 1
+a390 1
+void WitPerStageMgr::setPeriodStage (const WitPtrTVec <WitStage> & theVec)
+a391 8
+   WitPeriod thePer;
+
+   if (DEBUG_MODE)
+      forEachPeriod (thePer, myProblem ())
+         if (thePer > 0)
+            if           (theVec[thePer    ]->myIndex () == 0)
+               witAssert (theVec[thePer - 1]->myIndex () == 0);
+
+d394 1
+a394 1
+   periodStage_ = theVec;
+d491 7
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@d41 1
+a41 1
+WitStage::WitStage (int theIdx):
+d43 2
+a44 1
+      myIndex_ (theIdx)
+d55 14
+d95 2
+a96 2
+   myStageVec_[0] = new WitStage (0);
+   myStageVec_[1] = new WitStage (1);
+d169 1
+a169 1
+bool WitObjStageMgr::stageIncludesNode (WitStage * theStage, WitNode * theNode)
+d176 1
+a176 1
+bool WitObjStageMgr::stageIncludesPeriod (WitStage *, WitPeriod)
+d204 2
+d207 5
+a211 4
+      {
+      myMsgFac () ("partIdDdMsg",    thePart->partName ());
+      myMsgFac () ("stochNodeDdMsg", objectStage_ (thePart)->myIndex ());
+      }
+d214 3
+a216 4
+      {
+      myMsgFac () ("opnIdDdMsg",     theOpn->operationName ());
+      myMsgFac () ("stochNodeDdMsg", objectStage_ (theOpn)->myIndex ());
+      }
+d430 1
+a430 1
+bool WitPerStageMgr::stageIncludesNode (WitStage *, WitNode *)
+d437 1
+a437 1
+bool WitPerStageMgr::stageIncludesPeriod (WitStage * theStage, WitPeriod thePer)
+d469 1
+a469 2
+   WitFlexVec <int> theFlexVec (myProblem (), 0);
+   WitPeriod        thePer;
+d472 1
+d475 3
+a477 3
+      theFlexVec.elemRef (thePer) = periodStage_[thePer]->myIndex ();
+
+   myProblem ()->display ("globalPeriodStageDdMsg", theFlexVec);
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d99 1
+a99 1
+      objectStage_ (thePart) = defObjectStageIdx ();
+d102 1
+a102 1
+      objectStage_ (theOpn)  = defObjectStageIdx ();
+d257 1
+a257 1
+   if (objectStage_ (theNode) == defObjectStageIdx ())
+d267 1
+a267 1
+      defObjectStageIdx  ()    ->myIndex ());
+d353 1
+a353 1
+      periodStage_[thePer] = myStageFor (defPeriodStageIdx ());
+d443 1
+a443 1
+       defPeriodStageIdx ());
+@
+

@@ -1,0 +1,1086 @@
+head	1.14;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.14
+date	2006.01.09.20.02.30;	author rjw;	state dead;
+branches;
+next	1.13;
+
+1.13
+date	2006.01.04.23.07.39;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.01.03.19.00.03;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.01.03.17.12.43;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2005.12.30.23.37.56;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2005.12.30.19.32.04;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2005.12.29.23.22.24;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2005.12.29.20.55.12;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2005.12.28.22.58.58;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2005.12.28.18.57.50;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.12.27.19.43.40;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.12.20.17.09.36;	author rjw;	state dead;
+branches;
+next	1.2;
+
+1.2
+date	2005.12.19.21.11.25;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.12.19.20.10.18;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.14
+log
+@[shared-resource pegging]
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "SrpExpSpec.C"
+//
+// Contains the implementation of the following classes:
+//
+//    SrpExpSpec
+//------------------------------------------------------------------------------
+
+#include <SrpExpSpec.h>
+#include <CompMgr.h>
+#include <Part.h>
+#include <Demand.h>
+#include <BopEntry.h>
+#include <Opn.h>
+#include <BomEntry.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpExpSpec.
+//------------------------------------------------------------------------------
+
+WitSrpExpSpec::WitSrpExpSpec (WitProblem * theProblem):
+
+      WitProbAssoc (theProblem),
+
+      expSpecified_ (false),
+      suppFillVol_  (0.0),
+      suppPrevVol_  (0.0),
+      prodFillVol_  (0.0),
+      prodPrevVol_  (0.0)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpExpSpec::~WitSrpExpSpec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::print ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    incReqVol;
+   bool      firstLine;
+
+   fprintf (solnFile (),
+      "\n\n"
+      "Explosion Specifications:\n");
+
+   fprintf (solnFile (),
+      "\n"
+      "   -------------------------------------------\n"
+      "   Part  Per    FillVol  Fill Method\n"
+      "   -------------------------------------------\n");
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         firstLine = true;
+
+         incReqVol = compReqVol (thePart, thePer);
+
+         specifyExplosion (thePart, thePer, incReqVol, 0.0);
+
+         printFillVol (
+            thePart,
+            thePer,
+            suppFillVol_,
+            "Net Against Supply",
+            firstLine);
+
+         printFillVol (
+            thePart,
+            thePer,
+            prodFillVol_,
+            "Explode To Production",
+            firstLine);
+
+         fprintf (solnFile (),
+            "   -------------------------------------------\n");
+
+         unspecifyExplosion ();
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::specifyExplosion (
+      WitPart * thePart,
+      WitPeriod fillPer,
+      double    incReqVol,
+      double    prevReqVol)
+   {
+   double netReqVol;
+
+   witAssert (not expSpecified_);
+
+   witAssert (incReqVol > NET_TOL);
+
+   netReqVol = prevReqVol + incReqVol;
+
+   netWithSupply (thePart, fillPer, netReqVol);
+
+   if (netReqVol > NET_TOL)
+      expToProd (thePart, fillPer, netReqVol);
+
+   witAssert (netReqVol <= 2 * FEAS_TOL);
+
+   specifyPrevVols (prevReqVol);
+
+   expSpecified_ = true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::unspecifyExplosion ()
+   {
+   witAssert (expSpecified_);
+
+   expSpecified_ = false;
+
+   suppFillVol_ = 0.0;
+   suppPrevVol_ = 0.0;
+   prodFillVol_ = 0.0;
+   prodPrevVol_ = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSrpExpSpec::compReqVol (WitPart * thePart, WitPeriod thePer)
+   {
+   double        theReqVol;
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+
+   theReqVol = 0.0;
+
+   forEachEl (theDemand, thePart->myDemands ())
+      {
+      theReqVol += theDemand->shipVol ()[thePer];
+      }
+
+   forEachEl (theBomEnt, thePart->consumingBomEntries())
+      theReqVol += theBomEnt->myOperation ()->execVol ()[thePer];
+
+   return theReqVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::printFillVol (
+      WitPart *    thePart,
+      WitPeriod    thePer,
+      double       theFillVol,
+      const char * fillMethName,
+      bool &       firstLine)
+   {
+   if (theFillVol == 0.0)
+      return;
+
+   if (firstLine)
+      fprintf (solnFile (),
+         "   %4s  %3d",
+         thePart->partName ().myCstring (),
+         thePer);
+   else
+      fprintf (solnFile (),
+            "            ");
+
+   firstLine = false;
+
+   fprintf (solnFile (),
+      "  %9.3f  %s\n",
+      theFillVol,
+      fillMethName);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::netWithSupply (
+      WitPart * thePart,
+      WitPeriod fillPer,
+      double &  netReqVol)
+   {
+   double consSuppVol;
+
+   witAssert (netReqVol > NET_TOL);
+
+   consSuppVol =
+        thePart->supplyVol ()[fillPer]
+      - positivePart (thePart->residualVol ()[fillPer]);
+
+   consSuppVol = positivePart (consSuppVol);
+
+   if (consSuppVol <= NET_TOL)
+      return;
+
+   suppFillVol_ = min (netReqVol, consSuppVol);
+
+   netReqVol   -= suppFillVol_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::expToProd (
+      WitPart * thePart,
+      WitPeriod fillPer,
+      double &  netReqVol)
+   {
+   WitBopEntry *  theBopEnt;
+   WitOperation * theOpn;
+   WitPeriod      execPer;
+
+   witAssert (netReqVol > NET_TOL);
+
+   if (thePart->producingBopEntries ().isEmpty ())
+      return;
+
+   theBopEnt = thePart->producingBopEntries ().first ();
+
+   stronglyAssert (theBopEnt->expEligible (fillPer));
+
+   theOpn    = theBopEnt->myOperation ();
+
+   execPer   = fillPer;
+
+   if (theOpn->execVol ()[execPer] <= NET_TOL)
+      return;
+
+   prodFillVol_ = min (netReqVol, theOpn->execVol ()[execPer]);
+
+   netReqVol   -= prodFillVol_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::specifyPrevVols (double prevReqVol)
+   {
+   double netPrevVol;
+
+   netPrevVol = prevReqVol;
+
+   if (netPrevVol <= NET_TOL)
+      return;
+
+   convertToPrevVol (suppFillVol_, suppPrevVol_, netPrevVol);
+
+   if (netPrevVol <= NET_TOL)
+      return;
+
+   convertToPrevVol (prodFillVol_, prodPrevVol_, netPrevVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSpec::convertToPrevVol (
+      double & fillVol,
+      double & prevVol,
+      double & netPrevVol)
+   {
+   witAssert (netPrevVol > NET_TOL);
+
+   if (fillVol <= NET_TOL)
+      return;
+
+   prevVol     = min (netPrevVol, fillVol);
+
+   netPrevVol -= prevVol;
+   fillVol    -= prevVol;
+
+   if (fillVol <= NET_TOL)
+      fillVol = 0.0;
+   }
+@
+
+
+1.13
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.12
+log
+@[shared-resource pegging]
+@
+text
+@d19 1
+a19 1
+#include <PairStack.h>
+@
+
+
+1.11
+log
+@[shared-resource pegging]
+@
+text
+@a15 2
+//    SrpOldSpec
+//    SrpFillMeth
+a18 1
+#include <SrpFillMeth.h>
+a284 334
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpOldSpec.
+//------------------------------------------------------------------------------
+
+WitSrpOldSpec::WitSrpOldSpec (WitProblem * theProblem):
+
+      WitProbAssoc     (theProblem),
+      myFillMethPairs_ (myProblem ())
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myFillMethPairs_.myPtrAt (thePart, thePer) =
+            new WitSrpFillMethDblStack (myProblem ());
+
+   buildUp ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpOldSpec::~WitSrpOldSpec ()
+   {
+   WitPart *                thePart;
+   WitPeriod                thePer;
+   WitSrpFillMethDblStack * theSrpFillMethsPtr;
+   WitSrpFillMeth *         theSrpFillMeth;
+   double                   fillVol;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         theSrpFillMethsPtr = myFillMethPairs_.myPtrAt (thePart, thePer);
+
+         while (theSrpFillMethsPtr->pop (theSrpFillMeth, fillVol))
+            delete theSrpFillMeth;
+
+         delete theSrpFillMethsPtr;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::print ()
+   {
+   WitPart *        thePart;
+   WitPeriod        thePer;
+   bool             firstPair;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStItr <WitSrpFillMeth, double> theItr;
+
+   fprintf (solnFile (),
+      "\n\n"
+      "Explosion Specifications:\n"
+      "(Old Version)\n");
+
+   fprintf (solnFile (),
+      "\n"
+      "   ------------------------------------------------\n"
+      "   Part  Per    FillVol  Fill Method\n"
+      "   ------------------------------------------------\n");
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         if (myFillMethPairs_.myElemAt (thePart, thePer).isEmpty ())
+            continue;
+
+         firstPair = true;
+
+         myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+
+         while (theItr.advance (theSrpFillMeth, fillVol))
+            {
+            if (firstPair)
+               fprintf (solnFile (),
+                  "   %4s  %3d  ",
+                  thePart->partName ().myCstring (),
+                  thePer);
+            else
+               fprintf (solnFile (), "              ");
+
+            fprintf (solnFile (), "%9.3f  ", fillVol);
+
+            if (theSrpFillMeth->byNetWithSupp ())
+               fprintf (solnFile (), "By Netting with Supply");
+
+            if (theSrpFillMeth->byExpToProd ())
+               fprintf (solnFile (), "By Exploding to Production");
+
+            fprintf (solnFile (), "\n");
+
+            firstPair = false;
+            }
+
+         fprintf (solnFile (),
+            "   ------------------------------------------------\n");
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::getFillMethPairs (
+      WitPart *                thePart,
+      WitPeriod                thePer,
+      double                   theReqVol,
+      double                   prevReqVol,
+      double &                 prevFillVol,
+      WitSrpFillMethDblStack & theFillMethPairs)
+   {
+   double           netPrevVol;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+   double           netReqVol;
+   bool             advOK;
+
+   WitPairStItr <WitSrpFillMeth, double> theItr;
+
+   witAssert (theReqVol > NET_TOL);
+
+   netPrevVol = prevReqVol;
+
+   myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+
+   while (true)
+      {
+      advOK = theItr.advance (theSrpFillMeth, fillVol);
+
+      stronglyAssert (advOK);
+
+      if (fillVol > netPrevVol + NET_TOL)
+         break;
+
+      netPrevVol = positivePart (netPrevVol - fillVol);
+      }
+
+   prevFillVol = netPrevVol;
+
+   fillVol    -= netPrevVol;
+
+   theFillMethPairs.clear ();
+
+   netReqVol = theReqVol;
+
+   while (true)
+      {
+      setToMin (fillVol, netReqVol);
+
+      netReqVol -= fillVol;
+
+      theFillMethPairs.push (theSrpFillMeth, fillVol);
+
+      if (netReqVol <= NET_TOL)
+         break;
+      
+      advOK = theItr.advance (theSrpFillMeth, fillVol);
+
+      if (not advOK)
+         break;
+      }
+
+   witAssert (netReqVol <= 2.0 * FEAS_TOL);
+
+   theFillMethPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::buildUp ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    theReqVol;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         theReqVol = compReqVol (thePart, thePer);
+
+         if (theReqVol > NET_TOL)
+            findFillMeths (thePart, thePer, theReqVol);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSrpOldSpec::compReqVol (WitPart * thePart, WitPeriod thePer)
+   {
+   double        theReqVol;
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+
+   theReqVol = 0.0;
+
+   forEachEl (theDemand, thePart->myDemands ())
+      {
+      theReqVol += theDemand->shipVol ()[thePer];
+      }
+
+   forEachEl (theBomEnt, thePart->consumingBomEntries())
+      theReqVol += theBomEnt->myOperation ()->execVol ()[thePer];
+
+   return theReqVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::findFillMeths (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    theReqVol)
+   {
+   double netReqVol;
+
+   witAssert (theReqVol > NET_TOL);
+
+   netReqVol = theReqVol;
+
+   netWithSupply (thePart, thePer, netReqVol);
+
+   if (netReqVol > NET_TOL)
+      expToProd (thePart, thePer, netReqVol);
+
+   witAssert (netReqVol <= 2 * FEAS_TOL);
+
+   myFillMethPairs_.myElemAt (thePart, thePer).reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::netWithSupply (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double &  netReqVol)
+   {
+   double           consSuppVol;
+   double           fillVol;
+   WitSrpFillMeth * theSrpFillMeth;
+
+   witAssert (netReqVol > NET_TOL);
+
+   consSuppVol  = thePart->supplyVol ()[thePer];
+
+   consSuppVol -= positivePart (thePart->residualVol ()[thePer]);
+
+   setToMax (consSuppVol, 0.0);
+
+   if (consSuppVol <= NET_TOL)
+      return;
+
+   fillVol        = min (netReqVol, consSuppVol);
+
+   netReqVol     -= fillVol;
+
+   theSrpFillMeth = WitSrpFillMeth::newInstByNetWithSupp ();
+
+   myFillMethPairs_.
+      myElemAt (thePart, thePer).
+         push (theSrpFillMeth, fillVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpOldSpec::expToProd (
+      WitPart * thePart,
+      WitPeriod expPer,
+      double &  netReqVol)
+   {
+   WitBopEntry *    theBopEnt;
+   WitOperation *   theOpn;
+   double           fillVol;
+   WitSrpFillMeth * theSrpFillMeth;
+
+   witAssert (netReqVol > NET_TOL);
+
+   if (thePart->producingBopEntries ().isEmpty ())
+      return;
+
+   theBopEnt = thePart->producingBopEntries ().first ();
+
+   stronglyAssert (theBopEnt->expEligible (expPer));
+
+   theOpn         = theBopEnt->myOperation ();
+
+   if (theOpn->execVol ()[expPer] <= NET_TOL)
+      return;
+
+   fillVol        = min (netReqVol, theOpn->execVol ()[expPer]);
+
+   netReqVol     -= fillVol;
+
+   theSrpFillMeth = WitSrpFillMeth::newInstByExpToProd ();
+
+   myFillMethPairs_.
+      myElemAt (thePart, expPer).
+         push (theSrpFillMeth, fillVol);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpFillMeth.
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth * WitSrpFillMeth::newInstByNetWithSupp ()
+   {
+   return new WitSrpFillMeth (true, false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth * WitSrpFillMeth::newInstByExpToProd ()
+   {
+   return new WitSrpFillMeth (false, true);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth::~WitSrpFillMeth ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth::WitSrpFillMeth (
+         bool byNetWithSuppVal,
+         bool byExpToProdVal):
+
+      byNetWithSupp_ (byNetWithSuppVal),
+      byExpToProd_   (byExpToProdVal)
+   {
+   }
+@
+
+
+1.10
+log
+@[shared-resource pegging]
+@
+text
+@d37 5
+a41 4
+      suppFillVol_ (0.0),
+      suppPrevVol_ (0.0),
+      prodFillVol_ (0.0),
+      prodPrevVol_ (0.0)
+d95 2
+a101 29
+void WitSrpExpSpec::printFillVol (
+      WitPart *    thePart,
+      WitPeriod    thePer,
+      double       theFillVol,
+      const char * fillMethName,
+      bool &       firstLine)
+   {
+   if (theFillVol == 0.0)
+      return;
+
+   if (firstLine)
+      fprintf (solnFile (),
+         "   %4s  %3d",
+         thePart->partName ().myCstring (),
+         thePer);
+   else
+      fprintf (solnFile (),
+            "            ");
+
+   firstLine = false;
+
+   fprintf (solnFile (),
+      "  %9.3f  %s\n",
+      theFillVol,
+      fillMethName);
+   }
+
+//------------------------------------------------------------------------------
+
+d110 2
+a113 2
+   reset ();
+
+d124 16
+d165 6
+a170 1
+void WitSrpExpSpec::reset ()
+d172 18
+a189 4
+   suppFillVol_ = 0.0;
+   suppPrevVol_ = 0.0;
+   prodFillVol_ = 0.0;
+   prodPrevVol_ = 0.0;
+@
+
+
+1.9
+log
+@[shared-resource pegging]
+@
+text
+@d16 1
+d35 251
+d302 1
+a302 1
+WitSrpExpSpec::~WitSrpExpSpec ()
+d324 1
+a324 1
+void WitSrpExpSpec::print ()
+d336 2
+a337 1
+      "Explosion Specifications:\n");
+d385 1
+a385 1
+void WitSrpExpSpec::getFillMethPairs (
+d451 1
+a451 1
+void WitSrpExpSpec::buildUp ()
+d469 1
+a469 1
+double WitSrpExpSpec::compReqVol (WitPart * thePart, WitPeriod thePer)
+d490 1
+a490 1
+void WitSrpExpSpec::findFillMeths (
+d513 1
+a513 1
+void WitSrpExpSpec::netWithSupply (
+d546 1
+a546 1
+void WitSrpExpSpec::expToProd (
+@
+
+
+1.8
+log
+@[shared-resource pegging]
+@
+text
+@d136 2
+a137 1
+      double                   prevVol,
+d150 1
+a150 1
+   netPrevVol = prevVol;
+d154 1
+a154 1
+   while (theItr.advance (theSrpFillMeth, fillVol))
+d156 3
+a158 1
+      net (netPrevVol, fillVol);
+d160 1
+a160 1
+      if (fillVol > NET_TOL)
+d162 2
+d166 3
+a168 1
+   stronglyAssert (fillVol > NET_TOL);
+@
+
+
+1.7
+log
+@[shared-resource pegging]
+@
+text
+@d151 1
+a151 3
+   myFillMethPairs_.
+      myElemAt (thePart, thePer).
+         attach (theItr);
+@
+
+
+1.6
+log
+@[shared-resource pegging]
+@
+text
+@d88 1
+a88 1
+      "   -------------------------------------------------\n"
+d90 1
+a90 1
+      "   -------------------------------------------------\n");
+d126 1
+a126 1
+            "   -------------------------------------------------\n");
+d147 1
+a147 1
+   witAssert (theReqVol >= NET_TOL);
+d159 1
+a159 1
+      if (fillVol >= NET_TOL)
+d163 1
+a163 1
+   stronglyAssert (netPrevVol == 0.0);
+d177 1
+a177 1
+      if (theReqVol < NET_TOL)
+d275 1
+a275 1
+   fillVol      = min (netReqVol, consSuppVol);
+d277 1
+a277 1
+   netReqVol   -= fillVol;
+@
+
+
+1.5
+log
+@[shared-resource peging]
+@
+text
+@d89 2
+a90 1
+      "   Part  Per    FillVol  Fill Method\n");
+a97 3
+         fprintf (solnFile (),
+            "   -------------------------------------------------\n");
+
+d124 3
+d151 3
+a153 1
+   myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+d224 1
+a224 4
+   if (not thePart->consumingBomEntries().isEmpty ())
+      {
+      theBomEnt = thePart->consumingBomEntries().first ();
+
+a225 1
+      }
+@
+
+
+1.4
+log
+@[shared-resource pegging]
+@
+text
+@d43 1
+a43 1
+            new WitPairStack <WitSrpFillMeth, double> (myProblem ());
+d52 5
+a56 6
+   WitPart *        thePart;
+   WitPeriod        thePer;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStack <WitSrpFillMeth, double> * theSrpFillMethsPtr;
+d84 1
+a84 1
+      "Explosion Guide Specifications:\n");
+d132 5
+a136 5
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    theReqVol,
+      double    prevVol,
+      WitPairStack <WitSrpFillMeth, double> & theFillMethPairs)
+d138 1
+a138 1
+   double           netReqVol;
+d141 2
+d148 14
+a163 2
+   stronglyAssert (prevVol == 0.0);
+
+d166 1
+a166 3
+   myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+
+   while (theItr.advance (theSrpFillMeth, fillVol))
+d176 5
+d216 1
+a216 1
+   if (not thePart->myDemands ().isEmpty ())
+a217 2
+      theDemand = thePart->myDemands ().first ();
+
+@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@d32 18
+d62 1
+a62 1
+         theSrpFillMethsPtr = serFillMeths_.myPtrAt (thePart, thePer);
+a72 13
+WitSrpExpSpec * WitSrpExpSpec::newInst (WitProblem * theProblem)
+   {
+   WitSrpExpSpec * theSrpExpSpec;
+
+   theSrpExpSpec = new WitSrpExpSpec (theProblem);
+
+   theSrpExpSpec->buildSpec ();
+
+   return theSrpExpSpec;
+   }
+
+//------------------------------------------------------------------------------
+
+d85 1
+a85 1
+      "Explosion Specification:\n");
+d95 1
+a95 1
+         if (serFillMeths_.myElemAt (thePart, thePer).isEmpty ())
+d103 1
+a103 1
+         serFillMeths_.myElemAt (thePart, thePer).attach (theItr);
+d132 34
+a165 1
+WitSrpExpSpec::WitSrpExpSpec (WitProblem * theProblem):
+d167 1
+a167 5
+      WitProbAssoc  (theProblem),
+      serFillMeths_ (myProblem ())
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+d169 1
+a169 4
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         serFillMeths_.myPtrAt (thePart, thePer) =
+            new WitPairStack <WitSrpFillMeth, double> (myProblem ());
+d174 1
+a174 1
+void WitSrpExpSpec::buildSpec ()
+d237 1
+a237 1
+   serFillMeths_.myElemAt (thePart, thePer).reverse ();
+d247 1
+d253 7
+a259 1
+   if (thePart->supplyVol ()[thePer] <= NET_TOL)
+d262 1
+a262 1
+   fillVol        = min (netReqVol, thePart->supplyVol ()[thePer]);
+d264 1
+a264 1
+   netReqVol     -= fillVol;
+d268 1
+a268 1
+   serFillMeths_.
+d305 1
+a305 1
+   serFillMeths_.
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d34 5
+a38 2
+   WitPart *                               thePart;
+   WitPeriod                               thePer;
+a39 2
+   WitSrpFillMeth *                        theSrpFillMeth;
+   double                                  fillVol;
+d63 60
+a122 1
+   return NULL;
+@
+

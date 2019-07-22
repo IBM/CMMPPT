@@ -1,0 +1,310 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2003.04.01.20.34.27;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2003.03.21.23.36.52;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Continued implementation of proportionate routing.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef MrSecMgrH
+#define MrSecMgrH
+
+//------------------------------------------------------------------------------
+// Header file: "MrSecMgr.h"
+//
+// Contains the declaration of the following classes:
+//
+//    MrSecMgr.
+//    PmrMgr.
+//    CmrMgr.
+//------------------------------------------------------------------------------
+
+#include <SelMgr.h>
+#include <PtrMap.h>
+
+//------------------------------------------------------------------------------
+// Class MrSecMgr
+//
+// "Multi-Route Section Manager"
+// Base class for an interface to a section of the Multi-Route Subsystem.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    SelMgr
+//       MrSecMgr
+//          PmrMgr
+//          CmrMgr
+//
+// Implemented in MrMgr.C.
+//------------------------------------------------------------------------------
+
+class WitMrSecMgr: public WitSelMgr
+   {
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitMrSecMgr (WitMrCoord *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitMrSecMgr ();
+
+      //------------------------------------------------------------------------
+      // Selection splitting functions.
+      //------------------------------------------------------------------------
+
+      void startSplitExpMR (
+            WitRtSite * theRtSite, 
+            WitPeriod   thePer,
+            double      expVol);
+
+      bool findNextSplitMR (WitRtCand * & theRtCand, double & splitExpVol);
+
+      void recExpRtSiteSS (
+            WitRtSite * theRtSite,
+            WitPeriod   thePer,
+            double      incFlowVol);
+         //
+         // Records the fact that incFlowVol additional units are being exploded
+         // through theRtSite in thePer, for sel-split purposes.
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (WitMrCoord *, myMrCoord)
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Overrides from class SelMgr.
+      //------------------------------------------------------------------------
+
+      virtual bool selSplitNeeded ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitMrSecMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitMrCoord * const myMrCoord_;
+         //
+         // The MrCoord that owns this MrSecMgr.
+   };
+
+//------------------------------------------------------------------------------
+// Class PmrMgr
+//
+// "Production Multi-Route Manager"
+// Production case interface to the Multi-Route Subsystem.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    SelMgr
+//       MrSecMgr
+//          PmrMgr
+//
+// Implemented in MrMgr.C.
+//------------------------------------------------------------------------------
+
+class WitPmrMgr: public WitMrSecMgr
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitPmrMgr (WitMrCoord *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitPmrMgr ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      WitBopEntry * selBopEnt (WitPart * thePart, WitPeriod expPer);
+         //
+         // Returns the currently selected BopEnt to be used when exploding thru
+         // thePart in expPer.
+
+      //------------------------------------------------------------------------
+      // Selection splitting functions.
+      //------------------------------------------------------------------------
+
+      void startSplitExp (
+            WitPart * thePart, 
+            WitPeriod expPer,
+            double    expVol);
+
+      bool findNextSplit (WitBopEntry * & theBopEnt, double & splitExpVol);
+
+      bool selIsSplit (WitPart * thePart, WitPeriod expPer);
+
+      void recExpPartSS (
+            WitPart * thePart,
+            WitPeriod expPer,
+            double    expVol);
+         //
+         // Records the fact that expVol units were exploded thru thePart in
+         // expPer.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Overrides from class SelMgr.
+      //------------------------------------------------------------------------
+
+      virtual WitSelPt *   mySelPtForAlt      (WitBopEntry *,
+                                               WitConsEntry *,
+                                               WitPeriod,
+                                               WitPeriod);
+      virtual bool         validForNetting    ();
+      virtual bool         validForExecBounds ();
+      virtual const char * selCaseName        ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitPmrMgr);
+   };
+
+//------------------------------------------------------------------------------
+// Class CmrMgr
+//
+// "Consumption Multi-Route Manager"
+// Consumption case interface to the Multi-Route Subsystem.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    SelMgr
+//       MrSecMgr
+//          CmrMgr
+//
+// Implemented in MrMgr.C.
+//------------------------------------------------------------------------------
+
+class WitCmrMgr: public WitMrSecMgr
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCmrMgr (WitMrCoord *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      virtual ~WitCmrMgr ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      WitConsEntry * selConsEnt (WitBomEntry * theBomEnt, WitPeriod execPer);
+         //
+         // Returns the currently selected ConsEnt to be used when exploding
+         // thru theBomEnt in execPer.
+
+      //------------------------------------------------------------------------
+      // Selection splitting functions.
+      //------------------------------------------------------------------------
+
+      void startSplitExp (
+            WitBomEntry * theBomEnt, 
+            WitPeriod     execPer,
+            double        execVolVal);
+
+      bool findNextSplit (WitConsEntry * & theConsEnt, double & splitExecVol);
+
+      bool selIsSplit (WitBomEntry * theBomEnt, WitPeriod execPer);
+
+      void recExpBomEntSS (
+            WitBomEntry * theBomsEnt, 
+            WitPeriod     execPer, 
+            double        deltaExecVol);
+         //
+         // Records the fact deltaExecVol units were exploded thru theBomEnt in
+         // execPer.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Overrides from class SelMgr.
+      //------------------------------------------------------------------------
+
+      virtual WitSelPt *   mySelPtForAlt      (WitBopEntry *,
+                                               WitConsEntry *,
+                                               WitPeriod,
+                                               WitPeriod);
+      virtual bool         validForNetting    ();
+      virtual bool         validForExecBounds ();
+      virtual const char * selCaseName        ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitCmrMgr);
+   };
+
+#endif
+@
+
+
+1.1
+log
+@Continued implementation of propotionate routing.
+@
+text
+@@
+

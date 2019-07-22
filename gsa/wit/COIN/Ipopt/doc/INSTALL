@@ -1,0 +1,654 @@
+Copyright (C) 2002, Carnegie Mellon University and others.
+All Rights Reserved.
+This code is published under the Common Public License.
+
+This file describes what to do in order to build individual parts of
+the IPOPT package under UNIX.  Successful
+
+
+The package has also successfully
+compiled under Windows (Section 4 and the makefiles might give insight
+regarding which files have to be included in the compilation - make
+sure, the Fortran preprocessor (FPP) is used with the correct macro
+definitions (including WIN32)).
+
+Contents
+========
+
+1.      General remarks
+2.      Preparing the compilation
+ 2.1    Getting the source code for IPOPT
+ 2.2    Preparing the building directories
+ 2.3    Preparing the Makefiles
+  2.3.1 Makefile.defs
+  2.3.2 Makefile.trgs
+ 2.4    Preparing third party components
+  2.4.1 BLAS and LAPACK
+  2.4.2 Harwell Subroutine Library
+  2.4.3 TRON
+  2.4.4 AMPL Solver Library
+  2.4.5 ADOL-C
+  2.4.6 NLEQ1S and DASPK
+3.      Compilation
+ 3.1    IPOPT
+  3.1.1 IPOPT as solver for AMPL
+  3.1.2 IPOPT as solver for CUTEr
+  3.1.3 IPOPT as solver for your problems modeled in Fortran
+  3.1.4 IPOPT library
+ 3.2    DYNOPT
+4.      List of directories and files
+ 4.1    Directories
+ 4.2    Files
+  4.2.1 $SRCROOTDIR/IPOPT/ipopt
+  4.2.2 $SRCROOTDIR/IPOPT/auxil
+  4.2.3 $SRCROOTDIR/IPOPT/AMPL_interface
+  4.2.4 $SRCROOTDIR/IPOPT/CUTEr_interface
+
+
+1. General Remarks:
+===================
+
+Note: You will need GNU make in order to use the provided makefiles.
+      (tested with GNU make version 3.79.1).  You may use the parallel
+      compilation feature of make (the '-j' flag).
+
+The packages has been successfully built on the following UNIX
+platforms (default makefiles are provided):
+
+  - Linux (using GNU compilers or the Portland Group compilers)
+  - AIX
+  - SunOS
+  - OSF1
+  - SGI (IRIX)
+
+Also under Windows, the package has been successfully built using
+Cygwin with MINGW (Makefile provided), as well as using the Mircosoft
+Developer Studio (but projects files and the like are not included in
+this package).  See README.Windows for details.
+
+
+1.1  Content of the package:
+----------------------------
+
+This package contains the source code for
+
+- IPOPT  : The interior point algorithm for large-scale nonlinear
+           optimization itself with interfaces to AMPL and CUTEr, as
+           well as an example showing how to use the IPOPT library
+           with your own code for the NLP problem.
+           More information can be found in README.IPOPT
+- DYNOPT:  A set of routines for automatic discretization of a system
+           of differential and algebraic equations, that can be posed
+           as constraints in the optimization problem to allow the
+           optimization of dynamic systems
+           More information can be found in README.DYNOPT
+- DYNOPC : A user interface for convenient solution of dynamic
+           optimization problems.  (Under construction!)
+
+In order to build components of this package, certain third party code
+(as source code or precompiled) is required - see Section 2.4 below.
+
+
+2. Preparing the compilation
+============================
+
+2.1 Getting the source code for IPOPT
+-------------------------------------
+
+The files of this package are available from the COIN-OR web page at
+http://www.coin-or.org .  They can be obtained via CVS or as tarballs
+(see http://www.coin-or.org/download.html).  If you downloaded the
+files as a tarball ("Ipopt_*.tgz"), you may unpack it by typing
+
+  gunzip Ipopt_*.tgz
+  tar xvf Ipopt_*.tar
+
+NOTE: The tarball of the latest "release" of IPOPT has a name like
+      "Ipopt-2.0.tgz".  However, changes and bug fixes are made
+      continuously, and the latest (possibly unstable) verion is
+      packed into "Ipopt-date.tgz".
+      You can also access certain releases via CVS - each release is
+      tagged; for example, the 2.0 release has the tag 'rel-2-0'.
+
+In the following it is assumed that the source code directory tree is
+rooted in $SRCROOTDIR (e.g. the 'COIN/Ipopt/SOURCES' directory that
+you will see after you unpacked or checked out the code.)
+
+The documentation files (including this file) are located in
+the directory 'COIN/Ipopt/doc' .
+
+2.2 Preparing the builing directories
+-------------------------------------
+
+The source code is kept separately from the compiled object files,
+libraries, and executables, which allows one to use the same source
+files simultaneously on different platforms.  In order to prepare the
+directory tree for the compiled files, type
+
+
+cd $SRCROOTDIR/..     [i.e. change into the directory that contains
+                       the subdirectory 'SOURCES', e.g. 'COIN/Ipopt']
+mkdir OBJECTS
+cd OBJECTS
+cp ../SOURCES/Makefiles/Makefile.install Makefile
+make install
+
+
+This will create subdirectories (symmetric to the ones under
+$SRCROOTDIR) and copy makefiles for the individual components.  In the
+following we will assume that $OBJROOTDIR is the root of the directory
+tree for the object files - if you used the procedure above, this is
+'COIN/Ipopt/OBJECTS' .
+
+NOTE:  With this separation of the source and objects files, the
+       makefiles have to be invoked from within the directories under
+       $OBJROOTDIR; see also "3. Compilation" below.  Typing 'make'
+       within a directory with source files will lead to an error
+       message like:
+
+       Makefile:20: ../../Makefile.defs: No such file or directory
+       Makefile:121: ../../Makefile.trgs: No such file or directory
+       make: *** No rule to make target `../../Makefile.trgs'.  Stop.
+
+
+2.3 Preparing the Makefiles
+---------------------------
+
+At this point you should see the files 'Makefile.defs' and
+'Makefile.trgs' in the directory $OBJROOTDIR.  These are files that
+are included by all other makefiles, and you should mainly only have
+to edit those in order to adapt the definitions and rules for the
+compilation to your needs.  These makefile may try to determine
+default values based on your operating system (the name returned by
+the UNIX command 'uname').
+
+2.3.1 Makefile.defs
+-------------------
+
+In this file, global definitions for all makefiles are defined.  You
+can change the location of the source code (if $SRCROOTDIR <>
+$OBJROOTDIR/../SOURCES), and provide names and flags for compilers,
+linkers, etc.  In addition, you may decide to build all libraries as
+shared objects (instead of static libraries).  In that case set the
+makefile variable SOLIBDIR to the location of a directory, in which
+you want to collect the shared objects.
+
+After this, you can specify how you want to provide the third party
+codes/libraries - here you can specify the name and location of a
+library, or use keywords that tell the makefile to use the operating
+system defaults (if any) or that it should try to build the necessary
+components itself; in the latter case it is assumed that you obtained
+the source code for those components and put it into particular
+locations, see Section 2.4 below.
+
+In Makefile.defs you can also define C-preprocessor macro definitions
+(using the makefile variable 'DEFS'), depending on whether you want to
+include certain third party code or not (see Section 2.4.2).
+
+The directory $SRCROOTDIR/Makefiles contains several files Makedefs.*,
+which contain the default values for certain operating systems and
+compilers.  If you want to change the definitions (or try to compile
+on a new operating system), those files might be helpful.
+
+2.3.2 Makefile.trgs
+-------------------
+
+This file contains (beside some other rules) the implicit rules for
+the Makefiles - in most cases you won't have to change this.
+
+The following file extensions are known:
+
+*.f    FORTRAN 77 source code
+*.F    FORTRAN 77 source code with C-preprocessor directives
+*.c    C source code
+*.cpp  C++ source code
+
+
+2.4 Preparing third party components
+------------------------------------
+
+Some of the following third party software components are required for
+building the IPOPT package components, depending which ones you want
+to build.
+
+You have to set the makefile variable definitions in the section
+"Libraries and third party source code" of Makefiles.defs according to
+whether you want to choose the operation system default (keyword:
+OSDEFAULT), have it build within the IPOPT compilation subdirectory
+tree (keyword: THISDIST), or you may specify the location and name of
+libraries for precompiled components.
+
+If you are building IPOPT under Cygwin/MinGW, please read the
+README.Windows file for directions on how to adapt some of the third
+party components.
+
+2.4.1 BLAS and LAPACK
+---------------------
+
+This is required for ALL components.
+
+Many vendors of compilers provide precompiled libraries for these
+dense linear algebra subroutines, and you may choose in Makefile.defs
+
+BLASLIB   := OSDEFAULT
+LAPACKLIB := OSDEFAULT
+
+to choose default values depending on your operating system (however,
+a default value is not implemented for all operating systems, and it
+may also not be appropriate for your particular OS release...)
+
+If you have precompiled libraries, you can specify the location of
+these libraries (see Makefile.defs for examples).
+
+If you want to have the BLAS and LAPACK libraries build within this
+distribution, follow the instructions in
+
+$SRCROOTDIR/OTHERS/blas/INSTALL.BLAS
+$SRCROOTDIR/OTHERS/lapack/INSTALL.LAPACK
+
+and set
+
+BLASLIB   := THISDIST
+LAPACKLIB := THISDIST
+
+In some cases, the routine D1MACH is not included in precompiled
+libraries; in that case you can either set the variable D1MACHOBJ to
+the location of a precompiled object file, or you can obtain some
+version of the source code (e.g. from
+http://www.netlib.org/blas/d1mach.f) and set D1MACHOBJ := THISDIST .
+
+2.4.2 Harwell Subroutine Library
+--------------------------------
+
+IPOPT requires some subroutines from the Harwell Subroutine Library
+(HSL), depending on what components you want to build and what IPOPT
+options you are intending to use.  Some of those routines are
+available in the 'HSL Archive' and might be accessible to you without
+charge (see http://hsl.rl.ac.uk/archive/hslarchive.html for details).
+
+For example: If you want to use IPOPT to solve problems for which
+second derivatives are provided and you are indending to use the
+full-space verion IPOPT only (e.g. as AMPL or CUTEr solver), you need
+as minimal requirement at least one of the routines MA27, MA47, MA57.
+
+
+MA27:   This is required if you want to use the full space option of
+        IPOPT (IFULL.eq.1) and choose MA27 as the solver for the
+        symmetric linear system.  This routine is available in the HSL
+        archive.
+        Uncomment 'DEFS += -DNO_MA27' if you don't want to include MA27.
+        (Note: You will have to define the macro '-DOLD_MA27' if you are
+         using an old version of MA27 that uses COMMON blocks and not MA27ID
+         to set algorithmic parameters.)
+
+MA47:   This is required if you want to use the full space option of
+        IPOPT (IFULL.eq.1) and choose MA47 as the solver for the
+        symmetric linear system.  This routine is available in the HSL
+        archive.
+        Uncomment 'DEFS += -DNO_MA47' if you don't want to include MA47.
+
+MA57:   This is required if you want to use the full space option of
+        IPOPT (IFULL.eq.1) and choose MA57 as the solver for the
+        symmetric linear system.  This routine is not available in the HSL
+        archive.
+        Uncomment 'DEFS += -DNO_MA57' if you don't want to include MA57.
+
+MA28:   This is required if you want to use the reduced space option of
+        IPOPT (IFULL.eq.0) and choose MA28 to solve the arising linear
+        systems (i.e. if you don't include MA48 into your code).
+        This routine (and its dependencies MA30, MC13, MC20, MC21,
+        MC22, MC23, MC24) are available in the HSL archive.
+        Uncomment 'DEFS += -DNO_MA28' if you don't want to include MA28.
+        Note:  If MA48 is also included into the code (by not specifying
+        'DEFS += -DNO_MA48'), MA48 will used instead.
+
+MA48:   This is required if you want to use the reduced space option of
+        IPOPT (IFULL.eq.0) and choose MA48 to solve the arising linear
+        systems.  MA48 is also required for the DAE2NLP package.
+        This routine is not available in the HSL archive.
+        Uncomment 'DEFS += -DNO_MA48' if you don't want to include MA48.
+	Note that also the routine MA51AD is required if you choose MA48.
+
+MC30:   This is required if you want to scale the KKT system with MC30
+        before factorization (i.e. IKKTSCALE.eq.1).  This routine is
+        not available in the HSL archive.
+        Uncomment 'DEFS += -DNO_MC30' if you don't want to include MC30.
+
+MC19:   This is required if you don't include MC30 into your build but
+        still want to scale the KKT system with MC19 before
+        factorization (i.e. IKKTSCALE.eq.1).  This routine is
+        available in the HSL archive.  We highly recommend to
+        use this routine if MC30 is not available to you.
+        Uncomment 'DEFS += -DNO_MC19' if you don't want to include MC19.
+
+MC35 and MC39:
+        This is required if you want to use the filter line search option
+        (abs(IMERIT).ge.4) and choose the IPOPT option ITRONHESS.ge.1 .
+        If you do not have those routines, you can still use the
+        filter line search options with ITRONHESS.eq.0 for the
+        restoration phase.
+        These routines are not available in the HSL archive.  However, we
+        recommend to use these routines if they are available to you.
+        Uncomment 'DEFS += -DNO_MC35 -DNO_MC39' if you don't want to
+        include MC35 and MC39.
+
+2.4.3 TRON
+----------
+
+IPOPT requires the package TRON (written by Jorge More and Chih-Jen
+Lin).  TRON is an implementation of an algorithm for bound constrained
+optimization, and is used for the restoration phase in the filter line
+search procedure.  If you are intending to use the filter line search
+procedure (default), you need to include this package.
+
+If you do not want to include TRON in your version of IPOPT, set the
+Makefile variable TRONSRCDIR to 'UNAVAILABLE'; in that case you cannot
+choose the IPOPT option IMERIT to be -4,-5,4 and 5.  Otherwise, set
+TRONSRCDIR to 'THISDIST'.
+
+Since the source code for TRON had to be adapted in order to be called
+from IPOPT, the distribution of the IPOPT source files include patch
+files for some of TRON's source files.  See
+$SRCROOTDIR/OTHERS/TRON/INSTALL.TRON 
+for information on where to obtain TRON, and where to put the source
+code.
+
+Note:  At least on our (old) OSF1 Dec Alpha, the patch file required
+       to perform the necessary changes to TRON's source code do not
+       work (the output of 'diff' are not compatible).  You might want
+       to try to compile the code [who knows, it might work on your
+       system], but watch out for message from patch stating no patch
+       is performed (e.g. "Hmm...  I can't seem to find a patch in
+       there anywhere.").  If it does not work for you (or also if it
+       works), we would very much appreciate 
+
+2.4.4 AMPL Solver Library (ASL)
+-------------------------------
+
+If you are intending to build the IPOPT solver executable for the
+AMPL modeling language (see www.ampl.com), you need to obtain and
+compile the AMPL Solver Library.  You may compile the ASL library
+independently, in which case you need to set the variables ASLLIB and
+ASLSRCDIR according to the location of the library and header files.
+Alternative, you may set these variables to 'THISDIST' and follow the
+instructions in $SRCROOTDIR/OTHERS/ASL/INSTALL.ASL to obtain the
+source code and compile it using the IPOPT Makefiles.
+
+IPOPT requires integer and double precision work space.  Since it is
+written in Fortran 77 (oh yeah! ;-) the length of these arrays have to
+be fixed before calling IPOPT.  Depending on the amount of RAM on your
+computer, you may change the default length of the work space arrays by
+adapting the preprocessor definitions for the macros LENGTH_IW and
+LENGTH_RW in Makefile.defs.
+
+2.4.5 ADOL-C
+------------
+
+This is only required if you want to build the DAE2NLP package and
+want to compute derivatives of the DAE model equations via the
+automatic differentiation package ADOL-C (see
+http://www.math.tu-dresden.de/wir/project/adolc/ for more information
+on ADOL-C).  Again, you may choose to compile the library on your own
+(set ADOLCLIB to the location of your library and ADOLCSRCDIR to the
+location of the header files), or to have it compiled within the IPOPT
+OBJECTS tree (then set ADOLCLIB and ADOLCSRCDIR to THISDIST).  In the
+latter case, follow the instructions in
+$SRCROOTDIR/OTHERS/ASL/INSTALL.ADOLC .
+
+NOTE: At this point (when this file has been written), the latest
+      version of ADOL-C is 1.8.7.  This version does not include the
+      latest changes regarding Hessian-vector products, and you have
+      to specify the preprocessor definition -DOLDADOLC in
+      Makefile.defs.
+
+If you are using the included scripts for using ADOL-C for models
+written in Fortran, you also need to obtain and install the
+Fortran-to-C compiler 'f2c' and put this executable somewhere into your
+path.  You may obtain it from
+http://www.netlib.org/f2c/
+if it isn't already installed on your system.
+
+2.4.6 NLEQ1S and DASPK
+----------------------
+
+These packages are only required if you want to build DYNOPC
+(experimental!) - follow instructions in
+
+$SRCROOTDIR/OTHERS/nleq1s/INSTALL.NLEQ1S   and
+$SRCROOTDIR/OTHERS/DASPK/INSTALL.DASPK
+
+
+3.  Compilation
+===============
+
+The makefiles are set up in a way that you may just change into the
+building directory of a particular component of the IPOPT package, and
+all dependencies are compiled automatically (assuming that you
+obtained third party source code and made the correct changes in
+Makefile.defs, see Sections 2.3 and 2.4).
+
+The makefiles support the targets 'clean', 'veryclean', and
+'distclean'.
+
+3.1 IPOPT
+--------- 
+
+3.1.1  IPOPT as solver for AMPL
+-------------------------------
+
+Directory: $OBJROOTDIR/IPOPT/AMPL_interface
+
+Change into the directory $OBJROOTDIR/IPOPT/AMPL_interface and type
+'make'.  After a hopefully successful compilation, you should have an
+executable 'ipopt' in that directory.  You may copy it into any
+convenient location in your path.
+
+3.1.2  IPOPT as solver for CUTEr
+--------------------------------
+
+Directory: $OBJROOTDIR/IPOPT/CUTEr_interface
+
+It is assumed that you already installed CUTEr on your system, and that
+the environment variable MYCUTER is set accoring to the CUTEr
+instructions.
+
+Change into the directory $OBJROOTDIR/IPOPT/CUTEr_interface and type
+'make'.  This will compile the IPOPT library and other necessary
+files, as well as write a file into the directory
+'$MYCUTER/double/lib' which contains information about the location of
+the IPOPT libraries and is required by the CUTEr scripts 'sdipopt' and
+'ipopt'.
+
+If you want to make changes to the CUTEr driver 'ipoptma.f', you may
+modify the source files in $SRCROOTDIR/IPOPT/CUTEr_interface and then
+type 'make ipoptma.f' in $OBJROOTDIR/IPOPT/CUTEr_interface.  In order
+to activate your changes, copy the newly generated file 'ipoptma.f'
+from $OBJROOTDIR/IPOPT/CUTEr_interface to $CUTER/common/src/tools and
+recompile the necessary CUTEr files (e.g. by typing 'make -s all' in
+$MYCUTER).
+
+
+3.1.3  IPOPT as solver for your problems modeled in Fortran
+-----------------------------------------------------------
+
+Directory: $OBJROOTDIR/IPOPT/Fortran_example
+
+See the README.IPOPT file for a description of the Fortran subroutines
+that you have to write.
+
+You will need to link your routines with the IPOPT library (libipopt.a
+or libipopt.so - see 3.1.4), as well as with the routines
+
+$SRCROOTDIR/IPOPT/auxil/constr.F
+                        c_out.f
+                        iter_out.f
+                        ma28_call.F
+                        ma48_call.F
+
+If you don't provide subroutines for certain Hessian operations, you
+may use the dummy routines
+
+$SRCROOTDIR/IPOPT/auxil/eval_h_dummy.f
+                        eval_hesscon_v_dummy.f
+                        eval_hesslag_v_dummy.f
+                        eval_hessobj_v_dummy.f
+
+An example can be found in $SRCROOTDIR/IPOPT/Fortran_example .  You
+may build the example by going into the directory
+$OBJROOTDIR/IPOPT/Fortran_example and typing 'make'.
+
+
+If you want to develop your program within the IPOPT OBJECTS tree (and
+use the provided makefiles), you may make a copy of the example
+directories:
+
+1. cd $SRCROOTDIR/IPOPT
+2. cp -rp Fortran_example MYPROJECT  [where MYPROJECT is the name of
+                                     your project]
+3. cd $OBJROOTDIR/IPOPT
+4. mkdir MYPROJECT
+5. ln -s $SRCROOTDIR/IPOPT/MYPROJECT/Makefile MYPROJECT/Makefile
+
+6. Edit the Makefile in $SRCROOTDIR/IPOPT/MYPROJECT at the places
+   marked by the keyword "CHANGEME"
+7. Write your Fortran routines and put them into
+   $SRCROOTDIR/IPOPT/MYPROJECT
+
+(Note: If the file '._BUILDDIR' exists in your new directory
+ $SRCROOTDIR/IPOPT/MYPROJECT , the corresponding directory in the
+ OBJECTS tree will be created automatically when doing a
+ 'make install' in $OBJROOTDIR .)
+
+
+3.1.4  IPOPT library (libipopt.a or libipopt.so)
+------------------------------------------------
+
+Directory: $OBJROOTDIR/IPOPT/ipopt
+
+If you want to build IPOPT's core library, change into the directory
+$OBJROOTDIR/IPOPT/ipopt and type 'make'.
+
+
+3.2  DYNOPT
+-----------
+
+This component of the IPOPT package is not (yet) well documented.  If
+you would like to use this part, please send a message to the COIN-OR
+mailing.  See also the README.DYNOPT file.
+
+
+
+
+4.   List of directories and files
+==================================
+
+4.1  Directories
+----------------
+
+$SRCROOTDIR -> IPOPT    -> ipopt            core for IPOPT
+                        -> auxil            auxiliary files for IPOPT
+                        -> AMPL_interface   AMPL interface
+                        -> CUTEr_interface  CUTEr interface
+                        -> Fortran_example  example for Fortran NLP
+                                              formulation
+
+            -> DYNOPT   -> dae2nlp          core for decomposition
+                        -> auxil            auxiliary files for
+                                            decomposition
+                        -> Fortran_example  example for Fortran DAE
+                                              model formulation
+                        -> adolc2dae        interface to ADOL-C for
+                                              automatic differentiation
+                                              of Fortran DAE models 
+                        -> ADOLC_example    example for using ADOL-C
+                                              interface
+
+                        -> DYNOPC           source code for DYNOPC
+                                              interface (under construction)
+
+4.2  Files
+----------
+
+4.2.1 $SRCROOTDIR/IPOPT/ipopt
+-----------------------------
+
+The following core files are required for all applications with IPOPT.
+They are compiled into 'libipopt.a' (or 'libipopt.so' resp.):
+
+  armijo.f, aug_lag.f, calc_bar.f, calc_nrm.f, check_basis.f,
+  compute_y.f, cutalpha.f, dasv2f.f, error.f, filter_add.f,
+  filter_check.f, filter.f, find_param.f, get_bb.f, get_c.f, get_d.f,
+  get_exactw.f, get_f.f, get_g.f, get_h.f, get_hv.f, get_ifix.f,
+  get_lambda.f, get_pz_cg.f, get_pz.f, get_rgb.f, get_rg.f, get_rv.f,
+  get_sigma.f, get_step_full.F, get_step_red.f, get_wcorr.f, get_ypy.f,
+  get_zpz.f, get_zwzv.f, init_bnd.f, init_mem.f, initparams.F,
+  initpoint.f, ipopt.f, linesearch.f, ma27_call.F, ma47_call.F,
+  ma57_call.F, mainloop.f, mod_chol.f, new_basis.f, partition.f,
+  read_entry.f, reorder_ib.f, reorder_x.f, res_hv.f, res_ma27.F,
+  resto_kkt.f, resto_tron.F, slen.f, solve_barrier.f, timer.F,
+  update_b.f, update_mu.f, update_nu.f
+
+In addition, one of the following has to be included (finite.c seems to
+work fine on most UNIX systems - you might want to check)
+
+  finite.c, finite_win32_1.f, finite_win32_2.f:
+
+Include files (also required by files in other directories):
+
+  IPOPT.INC, TIMER.INC
+
+
+4.2.2 $SRCROOTDIR/IPOPT/auxil
+-----------------------------
+
+The following files implement routines that are also required by all
+applications of IPOPT, but you may adapt them for your own needs:
+
+c_out.f:       All output of IPOPT is channeled through this routine.
+               You may adapt this file if you have to send output
+               through a special routine (e.g. within a MATLAB mex
+               program)
+
+iter_out.f:    The subroutine ITER_OUT is called once at the end of an
+               iteration.  If you want to change the output of IPOPT
+               (or want to display additional information, such as
+                graphs in the DYNOPC package) you may adapt this file.
+
+constr.F:      All interaction with the constraints is going through
+               a subroutine called 'CONSTR'.  This particular
+               implementation works with files of the form described
+               in README.IPOPT.  An alternative implementation is
+               $SRCROOTDIR/DYNOPT/auxil/constr.f , where the treatment
+               of the constraints is tailored to the particular case
+               of discretized differential-algebraic equations.
+
+ma28_call.F, ma48_call.F:
+               Required by $SRCROOTDIR/IPOPT/auxil/constr.F
+
+eval_h_dummy.f, eval_hesscon_v_dummy.f, eval_hesslag_v_dummy.f,
+eval_hessobj_v.f:
+               You may link with these dummy routines, if you don't
+               implement certain operations with the Hessian(s).
+               For example, if you decide not to write a subroutine
+               EVAL_HESSCON_V for products of constraint Hessians with
+               vectors (see README.IPOPT), you may link with
+               eval_hesscon_v_dummy.f .
+
+4.2.3 $SRCROOTDIR/IPOPT/AMPL_interface
+--------------------------------------
+
+The following files are required by the AMPL solver interface:
+
+  get_amplmu.f, ipoptAMPL.c, ipopt_getdata.f
+
+4.2.4 $SRCROOTDIR/IPOPT/CUTEr_interface
+--------------------------------------
+
+The following files are required if you want to recreate the
+'ipoptma.f' file for the CUTEr interface:
+
+  CUTE.INC, cute_init.F, CUTEr_interface_main.F, eval_a.F, eval_c.F,
+  eval_f.F, eval_g.F, eval_hesscon_v.F, eval_hesslag_v.F,
+  eval_hessobj_v.F, eval_h.F
+
+$Id: INSTALL,v 1.7 2002/09/13 14:26:36 andreasw Exp $

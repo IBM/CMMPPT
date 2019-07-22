@@ -1,0 +1,350 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2003.03.03.21.40.08;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2003.02.25.22.17.07;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Continued implementation of proportionate routing.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+#ifndef OrMgr1H
+#define OrMgr1H
+
+//------------------------------------------------------------------------------
+// Header file: "OrMgr1.h"
+//
+// Contains the declaration of the following classes:
+//
+//    OrMgr.
+//    ProdOrMgr.
+//    ConsOrMgr.
+//------------------------------------------------------------------------------
+
+#include <Assoc.h>
+#include <PtrMap.h>
+#include <ObjStack.h>
+
+//------------------------------------------------------------------------------
+// Class OrMgr
+//
+// "Routing Element Manager"
+// Abstract manager of a section of the Routing Element Subsystem.
+//
+// Class Hierarchy:
+//
+// OrMgr
+//    ProdOrMgr
+//    ConsOrMgr
+//
+// Implemented in OldRt1.C.
+//------------------------------------------------------------------------------
+
+class WitOrMgr: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Public member functions.
+      //------------------------------------------------------------------------
+
+      void print ();
+         //
+         // Prints this OrMgr.
+
+      template <typename RangeEl>
+            inline void allocate1D (
+               WitPtrSched <WitOrSite, RangeEl> & thePtrSched)
+         {
+         thePtrSched.allocate1D (nOrSites_);
+         }
+         //
+         // Similar to PtrSched::allocate1D (Problem *), but uses this OrMgr to
+         // determine # instances.
+
+      template <typename RangeEl>
+            inline void allocate1D (
+               WitPtrSched <WitOrCand, RangeEl> & thePtrSched)
+         {
+         thePtrSched.allocate1D (nOrCands_);
+         }
+         //
+         // Similar to above, but for OrCands.
+
+      virtual const char * sectionName () = 0;
+         //
+         // Returns the name of the section of the Routing Element Subsystem
+         // to which this OrMgr is the interface.
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      accessFunc (int, nOrSites)
+      accessFunc (int, nOrCands)
+
+      accessFunc (const WitObjStack <WitOrSite> &, myOrSites)
+      accessFunc (const WitObjStack <WitOrCand> &, myOrCands)
+
+   protected:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitOrMgr (WitProblem *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitOrMgr ();
+
+      //------------------------------------------------------------------------
+      // Other protected member functions.
+      //------------------------------------------------------------------------
+
+      void setUp ();
+         //
+         // Builds the Routing Element Subsystem for this OrMgr.
+
+      void store (WitOrSite * theOrSite);
+      void store (WitOrCand * theOrCand);
+         //
+         // These functions store theOrSite and theOrCand in this OrMgr.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      virtual void buildOrSites () = 0;
+      virtual void buildOrCands () = 0;
+         //
+         // These functions build the OrSites and OrCands for this OrMgr.
+
+      noCopyCtorAssign (WitOrMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      int nOrSites_;
+      int nOrCands_;
+         //
+         // # OrSites and OrCands owned by this OrMgr.
+
+      WitObjStack <WitOrSite> myOrSites_;
+      WitObjStack <WitOrCand> myOrCands_;
+         //
+         // The OrSites and OrCands owned by this OrMgr.
+   };
+
+//------------------------------------------------------------------------------
+// Class ProdOrMgr
+//
+// "Production Routing Element Manager"
+// Manager of the production section of the Routing Element Subsystem.
+//
+// Class Hierarchy:
+//
+// OrMgr
+//    ProdOrMgr
+//
+// Implemented in OldRt1.C.
+//------------------------------------------------------------------------------
+
+class WitProdOrMgr: public WitOrMgr
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Public member functions.
+      //------------------------------------------------------------------------
+
+      static WitProdOrMgr * newInstance (WitProblem * theProblem);
+         //
+         // Heap-constructs a ProdOrMgr for theProblem and returns it.
+         // To be used instead of the ctor.
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitProdOrMgr ();
+
+      //------------------------------------------------------------------------
+      // Overrides from class OrMgr.
+      //------------------------------------------------------------------------
+
+      virtual const char * sectionName  ();
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      WitOrSite * myOrSiteFor (WitPart *);
+      WitOrCand * myOrCandFor (WitBopEntry *);
+         //
+         // These functions return the OrSite or OrCand owned by this ProdOrMgr
+         // for the argument.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitProdOrMgr (WitProblem *);
+
+      //------------------------------------------------------------------------
+      // Overrides from class OrMgr.
+      //------------------------------------------------------------------------
+
+      virtual void buildOrSites ();
+      virtual void buildOrCands ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitProdOrMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitPtrMap <WitPart, WitOrSite> myOrSiteFor_;
+         //
+         // myOrSiteFor_ (thePart) is the OrSite for thePart owned by this
+         // ProdOrMgr.
+
+      WitPtrMap <WitBopEntry, WitOrCand> myOrCandFor_;
+         //
+         // myOrCandFor_ (theBopEnt) is the OrCand for theBopEnt owned by this
+         // ProdOrMgr.
+   };
+
+//------------------------------------------------------------------------------
+// Class ConsOrMgr
+//
+// "Consumption Routing Element Manager"
+// Manager of the consumption section of the Routing Element Subsystem.
+//
+// Class Hierarchy:
+//
+// OrMgr
+//    ConsOrMgr
+//
+// Implemented in OldRt1.C.
+//------------------------------------------------------------------------------
+
+class WitConsOrMgr: public WitOrMgr
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Public member functions.
+      //------------------------------------------------------------------------
+
+      static WitConsOrMgr * newInstance (WitProblem * theProblem);
+         //
+         // Heap-constructs a ConsOrMgr for theProblem and returns it.
+         // To be used instead of the ctor.
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitConsOrMgr ();
+
+      //------------------------------------------------------------------------
+      // Overrides from class OrMgr.
+      //------------------------------------------------------------------------
+
+      virtual const char * sectionName  ();
+
+      //------------------------------------------------------------------------
+      // Data access functions.
+      //------------------------------------------------------------------------
+
+      WitOrSite * myOrSiteFor (WitBomEntry *);
+      WitOrCand * myOrCandFor (WitConsEntry *);
+         //
+         // These functions return the OrSite or OrCand owned by this ConsOrMgr
+         // for the argument.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitConsOrMgr (WitProblem *);
+
+      //------------------------------------------------------------------------
+      // Overrides from class OrMgr.
+      //------------------------------------------------------------------------
+
+      virtual void buildOrSites ();
+      virtual void buildOrCands ();
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitConsOrMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitPtrMap <WitBomEntry, WitOrSite> myOrSiteFor_;
+         //
+         // myOrSiteFor_ (theBomEnt) is the OrSite for theBomEnt owned by this
+         // ConsOrMgr.
+
+      WitPtrMap <WitConsEntry, WitOrCand> myOrCandFor_;
+         //
+         // myOrCandFor_ (theConsEnt) is the OrCand for theConsEnt owned by this
+         // ConsOrMgr.
+   };
+
+#endif
+@
+
+
+1.1
+log
+@Continued implementation of proportionate routing.
+@
+text
+@@
+

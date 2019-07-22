@@ -1,0 +1,1004 @@
+\documentstyle[11pt]{article}
+\topmargin 0.0in
+\headheight 0.0in
+\headsep 0.0in
+\textwidth 7.5in
+\oddsidemargin -0.5in
+\textheight 9in
+\newcount\hh
+\newcount\mm
+
+% TIME OF DAY
+\mm=\time
+\hh=\time
+\divide\hh by 60
+\divide\mm by 60
+\multiply\mm by 60
+\mm=-\mm
+\advance\mm by \time
+\def\hhmm{\number\hh:\ifnum\mm<10{}0\fi\number\mm}
+
+\begin{document}
+\title{DATA MODEL for Release 1.21  Supply Capability Engine (SCE)}
+\author{Tom Ervolina (ERVOLINA at YKTVMV) \and Dan Connors  (DPC at YKTVMV)}
+\date{March 25, 1996\footnote[2]{This document was 
+formatted on \today\ at \hhmm.}}
+\maketitle
+This document describes the data model and file formats 
+for Release 1.21 of the Supply Capability 
+Engine (SCE).  The following items are important:
+\begin{enumerate}
+
+\item A partNumber is an IBM part number, a planner part number, or a dummy part number that
+represents the aggregation of parts into a higher classification.
+\item The PDF is the location code representing the Production Facility.
+   
+Here are examples of partNumber:
+\begin{center}
+\begin{tabular}{ll}
+  IBM part number  &   00000ABC123 \\
+  Aggregation  &      HardFile2GB 
+\end{tabular}
+\end{center}
+
+\item In any given period, there is a multi to one mapping between a
+Demand/Geography pair (demand at the planner partNumber level and the
+geographic source of the demand) and a manufacturing partNumber/PDF
+pair.  In other words, a geographic demand for a partNumber is always
+single sourced to a specific PDF, but more than one geography's demand
+for the same manufacturing partNumber can be sourced from the same PDF.
+We do allow the source to change
+over time but you can never have multiple sources at a given time.
+
+\item This version of SCE does not allow for off-loading to another PDF.
+ 
+%\item Parts of type 3, that
+%   is, dummy parts that represent sets of parts for selective features or building
+%   blocks, must be children of top-level build parts.
+ 
+\item In this version of the SCE model, profit based or revenue based 
+   optimization only considers the profit or revenue obtained from the
+   top-level build parts and the options and selective features or building blocks
+   that go into these parts.
+
+\item The users should prune their BOMs to capture the important parts of
+   interest.  
+ 
+\end{enumerate}
+
+\noindent
+{\bf File Format Rules:}
+\begin{itemize}
+\item Each record is terminated with a newline character ('$\backslash$n').  This is
+  equivalent to the entire record being on one line.
+\item The fields within each record must be separated by a comma (additional
+  blank space is OK).
+\item Fields of type ``char'' are strings that MUST be inside of quotes, for example,
+  partname ``00000ABC123''
+\item Fields of type string are unquoted strings (these are only used
+  in the Parameters File).
+\item For fields of type boolean, use 1 to represent TRUE and 0 to
+  represent FALSE
+\item For fields of type date, the acceptable formats are mm/dd/yyyy, 
+  dd/mm/yyyy or yyyymmdd.  In the Parameters File, the user will specify which
+  format is used;  U for mm/dd/yyyy, E for dd/mm/yyyy and G for yyyymmdd.
+\item Fields of type floatVec and intVec are comma delimited vectors.
+  The number of elements should be numPeriods.  If the vector is too
+  long, the extra elements are ignored, if too short,  currently set
+  values are assumed.  The nth element of the vector provides the
+  data for the nth period, as defined by the calendar file.
+\item Records whose first non-blank character is an asterisk, *, are 
+  considered to be comments and are ignored.
+\item Within a file, the fields listed below the dotted line are optional and
+ will take on their respective default values if they are not given.  However,
+ if an optional field is specified, all optional fields ``above'' must also be
+ specified.  For example, if in the Manufacturing BOM File you want to set the
+ fallout, you must specify partNumber1, partNumber2, PDF, usage\_rate, 
+ usage\_time, effect\_start, effect\_end and fallout, in that order.
+\item The default values for effect\_start and effect\_end are PAST and FUTURE.
+PAST is assigned the starting date of the planning horizon
+and FUTURE is assigned the date of the end of the 
+planning horizon, as given in the Calendar File.  PAST and FUTURE are valid entries
+for dates.
+\end{itemize}
+
+\clearpage
+\noindent
+{\bf Input File Format Specifications}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Parts Conditioning File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char'' & a part number that is known to be constrained \\
+PDF     &     ``char'' &   PDF location of where the supply of the part is constrained
+                       (use ``WW'' to represent the world wide aggregation)
+\end{tabular}
+ 
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Part Definition File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char''    \\
+PDF        &  ``char''    \\
+partType  &   int  &     \begin{tabular}[t]{lcp{3.5in}}
+                          1 &=& partNumber is an IBM part number \\
+                          2 &=& partNumber is a dummy part number representing an 
+                              aggregation of parts into a higher classification.\\
+%                          3 &=& partNumber is a dummy part number representing a SET 
+%                              of selective features or building blocks. 
+%                              This part number is created
+%                              solely for the WIT interface and may or may not
+%                              exist within EPPS.  However, the name assigned
+%                              to this part must be unique to the MachineType and 
+%                              Geography to which the feature percentages will
+%                              pertain.  The name should also be ``meaningful''
+%                              (eg, HardFile\_NOBEL\_LA means: Building Block
+%                              category is ``HardFile'',  MachineType is ``NOBEL'',
+%                              and the Geography is ``LA'').
+    \end{tabular}
+\end{tabular}
+ 
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing BOM File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char'' &    parent (partNumber1 is of part type 1) \\
+partNumber2 &  ``char'' &    child  (partNumber2 is of part type 1) \\
+PDF     &   ``char'' \\
+\multicolumn{3}{c} \dotfill \\
+usage\_rate     &   float  &    quantity per; default $=$ 1.0 \\
+usage\_time    &    float  &    offset from parent stb date that child
+                             is consumed; default $=$ 0.0 \\
+effect\_start   &   date  &     Date BOM record becomes active, 
+      default $=$ PAST  \\
+effect\_end     &   date  &     Last date BOM record is still active, 
+      default $=$ FUTURE \\
+fallout        &   int   &     Percent of child that is lost during
+                             production of parent (different than
+                             yield); default $=$ 0 \\
+mand\_EC\_flag   &   boolean &   TRUE indicates that inventory of
+                             parent produced prior to effect\_start
+                             date cannot be used after effect\_start
+                             (always TRUE for EPPS); default $=$ 0 \\
+phantom\_flag   &   boolean &   TRUE indicates bill is a phantom  bill.
+                             This field is informational because the
+                             interface will have already ``adjusted''
+                             the usageTime on this Bill record. default $=$ 0 \\
+remove\_flag    &   boolean  &  TRUE indicates bill is a ``remove'' bill.
+                             The interface will NOT adjust the Bill
+                             record.  default $=$ 0 \\
+%mand\_opt\_flag  &   boolean  &  TRUE indicates that the child is a
+%                             mandatory part in the parents BOM.
+%                             FALSE indicates that the child is an
+%                             optional part in the parent's bill.  \\
+%option\_ratio   &   float    &  (Only relevant when mand\_opt\_flag = FALSE)
+%                             Option ratio.  In implosion, this ratio
+%                             multiplied by the total demand for the
+%                             parent represents the total amount of the demand for
+%                             the parent that can be produced WITH
+%                             the child. \\
+%max\_ratio\_without & float   &   Only relevant when mand\_opt\_flag = FALSE
+%                             In implosion, this ratio multiplied by
+%                             the total demand for the parent
+%                             represents the maximum amount of the demand for the parent
+%                             that can be produced WITHOUT the child.
+%                             Default is 1.0.  
+\end{tabular}
+
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing Substitute BOM File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char'' &    parent (partNumber1 is of part type 1) \\
+partNumber2 &  ``char'' &    child to be substituted  
+             (partNumber2 is of part type 1) \\
+partNumber3 & ``char'' &     substitute child (partNumber3 is of 
+              part type 1) \\
+PDF     &   ``char'' \\
+\multicolumn{3}{c} \dotfill \\
+usage\_rate     &   float  &    quantity per; default $=$ 1.0 \\
+effect\_start   &   date  &     Date BOM record becomes active, 
+     default $=$ PAST  \\
+effect\_end     &   date  &     Last date BOM record is still active,
+     default $=$ FUTURE \\
+fallout        &   int   &     Percent of child that is lost during
+                             production of parent (different than
+                             yield); default $=$ 0 \\
+penalty\_cost & float & the penalty for substituting partNumber3 
+    for partNumber2 when building partNumber1; default is set by defaultSubPenalty
+    in the advanced parameters file
+\end{tabular}
+
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Top-level Build to Building Block Category Definition}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char'' &    planner top-level build part number which has selective features
+                             or building blocks \\
+geography &    ``char'' &    Geographic source of the demand for this part. \\
+bbCategory &  ``char'' &    an identifier for the building block category.
+    It must be unique for the (partNumber1, geography) pair. \\
+\multicolumn{3}{c} \dotfill \\
+upper\_bound  &     float    &  the upper limit on the number of selective 
+    features within a set that can be included in the top-level build.
+    If upper\_bound $=$ 1, this is equivalent to choosing exactly
+    one selective feature or building block within the set. 
+    upper\_bound $>=$ 1; default $=$ 1.0
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Top-Level Build/Building Block Category Ratio File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char'' &    planner top-level build part number which has selective features
+                             or building blocks \\
+geography   &    ``char'' &    Geographic source of the demand for partNumber1. \\
+bbCategory &  ``char'' &    an identifier for the building block category  \\
+partNumber2 &  ``char''  &   part number belonging to the selective feature or building block  \\
+usage\_rate    &    float  &    quantity per \\
+\multicolumn{3}{c} \dotfill \\
+%usage\_time    &    float  &    offset from top-level build (parent of selective feature or 
+%                             building block) start build date that partNumber2
+%                             is consumed.  \\
+%effect\_start  &    date   &    Date BOM record becomes active  \\
+%effect\_end    &    date   &    Last date BOM record is still active \\
+feature\_ratio  &   floatVec  &    A time vector of feature ratios.  In implosion, 
+   this ratio multiplied by the total demand for the parent of partNumber1
+   represents the total maximum amount of the parent of partNumber1 that can be 
+   produced with partNumber2. default $=$ 0.0
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Top-Level Build/Optional Feature Ratio File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char'' &    planner top-level build part number which has optional features \\
+geography   &    ``char'' &    Geographic source of the demand partNumber1. \\
+partNumber2 &  ``char''  &   an optional feature for partNumber1  \\
+usage\_rate    &    float  &    quantity per \\
+\multicolumn{3}{c} \dotfill \\
+%usage\_time    &    float  &    offset from top-level build (parent of selective feature or 
+%                             building block) start build date that partNumber2
+%                             is consumed.  \\
+%effect\_start  &    date   &    Date BOM record becomes active  \\
+%effect\_end    &    date   &    Last date BOM record is still active \\
+option\_ratio   &   floatVec    &  A time vector of option ratios.  In implosion, 
+                        this ratio multiplied by the total demand for the
+                        parent represents the total amount of the demand for
+                        the parent that can be produced WITH
+                        the child. default $=$ 0.0 (vector)\\
+max\_ratio\_without & floatVec   & In implosion, this ratio multiplied by
+                             the total demand for the parent
+                             represents the maximum amount of the demand for the parent
+                             that can be produced WITHOUT the child.
+                             default $=$ 1.0 (vector)
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing Part Cycle Time File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' \\
+PDF   & ``char''  \\
+cycleTime    &   float &   number of days to build this  part (time
+                         to assemble single level bill only) \\
+\multicolumn{3}{c} \dotfill \\
+start        &   date &    date at which this data becomes effective; 
+      default $=$ PAST  \\
+end         &    date  &   last date at which this data is effective  
+      default $=$ FUTURE
+\end{tabular} 
+
+\vspace{.5in}
+ 
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing Part Yield File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' &  (assemblies only) \\
+PDF   & ``char''  \\
+yield     &      int  &    1 $<=$ yield $<=$ 100 \\
+\multicolumn{3}{c} \dotfill \\
+start     &      date &    date at which this data becomes effective; 
+        default $=$ PAST \\
+end       &      date &    last date at which this data is effective;
+        default $=$ FUTURE
+\end{tabular}
+
+\vspace{.5in}
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing Lot Size File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' &  (assemblies only) \\
+PDF   & ``char''  \\
+minumum\_lot\_size     &      float  &    0.0 $<=$ minimum\_lot\_size \\
+incremental\_lot\_size     &      float & 1.0 $<=$ incremental\_lot\_size \\
+\multicolumn{3}{c} \dotfill \\
+start     &      date &    date at which this data becomes effective; 
+        default $=$ PAST \\
+end       &      date &    last date at which this data is effective;
+        default $=$ FUTURE
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing Part to Dummy Aggregation Part File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char'' &   Detailed partname (the type of partNumber1 must be 1) \\
+PDF1   & ``char''  \\
+partNumber2  & ``char'' &   Aggregated partname (the type of partNumber2 must be 2) \\
+PDF2   & ``char''  \\
+\multicolumn{3}{c} \dotfill \\
+usage\_rate & float & Units of the aggregate part consumed by one unit of
+               the detailed part.  (This is useful for aggregating hardfiles
+               to a storage quantity.)  default $=$ 1.0  \\
+usage\_time & float & time offset (Useful for modelling aggregation of location
+                  to a central supply.)  default $=$ 0.0 \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Demand Geography to PDF Source File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1  &    ``char''  &   Planner part number being demanded.  This will generally be a
+                           MachineType, or MachineTypeModel. \\
+geography   &    ``char'' &    Geographic source of the demand for this part. \\
+partNumber2 &  ``char'' &  This is the manufacturing part number corresponding to the 
+                           demand from geography for partNumber1 which is produced at PDF. \\
+PDF   & ``char''&       This is where demand for partNumber1 from geography is produced. \\
+\multicolumn{3}{c} \dotfill \\
+effect\_start   &  date  &    date for which this record is effective; 
+     default $=$ PAST  \\
+effect\_end     &  date  &    last date for which this record is effective 
+     default $=$ FUTURE \\
+transitTime & float & The nominal transit time, in days, from the PDF to the
+       geography.  This parameter is optional; default $=$ 0.0 \\
+\end{tabular}
+ 
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Demand Volume File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char''  & Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel \\
+geography &  ``char'' &    Geographic source of the demand for this part. \\
+\multicolumn{3}{c} \dotfill \\
+demVol    &  floatVec  & time-phased demand Volume; default $=$ 0.0 (vector) \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Demand Priority File  (Only used with Priority Based Optimization)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' & Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel \\
+geography  &  ``char'' &    Geographic source of the demand for this part. \\
+\multicolumn{3}{c} \dotfill \\
+priority   & intVec   &  time phased priority (must be integers); default set by
+     defaultPriority in the advanced parameters file \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Demand Revenue  File  (Only used with Revenue Based Optimization)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' & Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. \\
+geography  & ``char'' &    Geographic source of the demand for this part. \\
+\multicolumn{3}{c} \dotfill \\
+revenue    &  floatVec &  Time phased revenue. Note: this revenue should be
+                       the revenue of the BASE machine.  Use the Option 
+                       Revenue File to represent additional machine
+                       revenue associated with options.  default $=$ 0.0 (vector)
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Selective Feature/Building Block Revenue File 
+          (used only with Revenue Based Opt.)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char'' &    Parent: Planner part number for a top-level build manufacturing 
+                           part (typically machine type or machine/type/mod) that has 
+                           partNumber2 as a selective feature/building block or option
+                          in its bill. \\
+geography  & ``char'' &   Geographic source of the demand for partNumber1 \\
+partNumber2 & ``char'' &    Child: The selective feature/building block part. \\
+\multicolumn{3}{c} \dotfill \\
+optionRevenue  & floatVec &  Additional revenue associated with supplying 
+                             the child, partNumber2, with the parent, 
+                             partNumber1, for the source of demand, geography.
+                             Note: make sure that this revenue is not applied twice;
+                             default is set by defaultOptionShipReward in the
+                             advanced parameters file.
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Optional Feature Revenue File 
+          (used only with Revenue Based Opt.)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char'' &    Parent: Planner part number for a top-level build manufacturing 
+                           part that has 
+                           partNumber2 as an optional feature in its bill. \\
+geography  & ``char'' &   Geographic source of the demand for partNumber1 \\
+partNumber2 & ``char'' &    Child: The optional feature. \\
+\multicolumn{3}{c} \dotfill \\
+optionRevenue  & floatVec &  Additional revenue associated with supplying the 
+                             child, partNumber2, with the parent, partNumber1, 
+                             for the source of demand, geography.
+                             Note: make sure that this revenue is not applied twice;
+                             default is set by defaultOptionShipReward in the
+                             advanced paramaters file.
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Demand Profit File  (only used with Profit Based Optimization)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char'' & Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. \\
+geography  & ``char'' &     Geographic source of the demand for this part. \\
+\multicolumn{3}{c} \dotfill \\
+profit     &  floatVec &  Time phased profit.  Note: this profit  should be
+                       the profit  of the BASE machine.  Use the Option
+                       Profit File to represent additional machine
+                       profit associated with options; default $=$ 0.0 (vector)
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Selective Feature/Building Block Profit File 
+                            (only used with Profit Based Opt.)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char'' &    Parent: Planner part number for a top-level build manufacturing 
+                           part (typically machine type or machine/type/mod) that has 
+                           partNumber2 as a selective feature/building block or option
+                           in its bill. \\
+geography  & ``char'' &   Geographic source of the demand for partNumber1 \\
+partNumber2 & ``char'' &    Child: selective feature/building block or option \\
+\multicolumn{3}{c} \dotfill \\
+optionProfit  & floatVec &  Additional profit associated with supplying the child, partNumber2,
+                           with the parent, partNumber2, for the source of demand, geography.
+                           Note: make sure that this profit is not applied twice;
+                           default is set by defaultOptionShipReward in the 
+                           advanced parameters file.
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Optional Feature Profit File 
+                            (only used with Profit Based Opt.)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char'' &    Parent: Planner part number for a top-level build manufacturing 
+                           part (typically machine type or machine/type/mod) that has 
+                           partNumber2 as an optional feature in its bill. \\
+geography  & ``char'' &   Geographic source of the demand for partNumber1 \\
+partNumber2 & ``char'' &    Child: optional feature \\
+\multicolumn{3}{c} \dotfill \\
+optionProfit  & floatVec &  Additional profit associated with supplying the child, partNumber2,
+                           with the parent, partNumber2, for the source of demand, geography.
+                           Note: make sure that this profit is not applied twice;
+                             default is set by defaultOptionShipReward in the
+                             advanced parameters file.
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Minimum Demand Volumes File}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber  & ``char'' & Planner part number being demanded.  This will generally be a
+                        MachineType, or MachineTypeModel. \\
+geography  &  ``char'' &    Geographic source of the demand for this part. \\
+\multicolumn{3}{c} \dotfill \\
+minDemandVol & floatVec &  Lower bounds on demand volume to be met during the period
+                        regardless of priorities or objective; default $=$ 0.0 
+                        (vector)
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Supply Availability File (component,  subassemmbly, and finished good)}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber  &  ``char''  & partNumber is a manufacturing part number\\
+PDF   & ``char''  \\
+\multicolumn{3}{c} \dotfill \\
+SupplyVol        & floatVec &  committed or project supply of partNumber to PDF;
+        default $=$ 0.0 (vector) \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Calendar File}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+periodNum      &   int  &   period number;  0 $<=$ periodNum $<=$ numPeriods \\
+periodStart    &   date  &  start date of period (for periodNum $=$ numPeriods,
+                          periodStart is the date of the end of the horizon) \\
+length         &   float &  The length of the period in working days.
+                          (for periodNum $=$ numPeriods, length is ignored)
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Interplant File}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1  & ``char'' &    destination part number \\
+PDF1   & ``char''    &    destination PDF \\
+partNumber2  & ``char'' &     source part number \\
+PDF2   & ``char''  &         source PDF \\
+\multicolumn{3}{c} \dotfill \\
+transit\_time     & float  &    transit time from source PDF2 to destination PDF1;
+     default $=$ 0.0 \\
+effect\_start & date & Date record becomes active; default $=$ PAST \\
+effect\_end & date & Last date record is still active; default $=$ FUTURE 
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Capacity Definition File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+capacityName &  ``char''    \\
+PDF          &  ``char''    
+\end{tabular}
+ 
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Manufacturing BOC File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char'' &    parent (partNumber is of part type 1) \\
+capacityName &  ``char'' &    child \\
+PDF     &   ``char'' \\
+\multicolumn{3}{c} \dotfill \\
+usage\_rate     &   float  &    quantity per; default $=$ 1.0 \\
+usage\_time    &    float  &    offset from parent stb date that the capacity
+                             is consumed; default $=$ 0.0 \\
+effect\_start   &   date  &     Date BOM record becomes active; 
+      default $=$ PAST  \\
+effect\_end     &   date  &     Last date BOM record is still active;
+      default $=$ FUTURE
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Capacity Availability File}}\\ 
+     \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+capacityName  &  ``char''  & \\
+PDF   & ``char''  \\
+\multicolumn{3}{c} \dotfill \\
+SupplyVol        & floatVec & committed or project availability of capacity at the PDF 
+        (Note: capacity availability must be expressed in units consistent with the
+         usage rate given in the BOC.) default $=$ 0.0 (vector)
+\end{tabular}
+
+\vspace{.5in}
+
+
+%\clearpage
+
+\begin{minipage}{7.5in}
+\begin{tabular}{lllp{3.5in}}
+\multicolumn{4}{c}{{\bf Parameters File}}\\ 
+     \hline\hline
+paramID    &  string &    &  A keyword that defines the parameter code
+                          (see below for a list of legal parameter ID
+                          and their expected types) \\
+parameter  &  string   &  &  The parameter \\ \hline \hline
+ 
+{\bf paramID}  &       {\bf Type} &  {\bf Mand} &   {\bf comment} \\ \hline
+prepForEPPS & boolean & N & Run utility to reformat demand volume for
+                            compatibility with EPPS extraction program. 
+                            This will not run SCE. default $=$ 0 \\
+advancedParameterFileName & string & N & Advanced Parameter File; 
+   $ {\rm default} = {\rm sceModel.params}$ \\
+pdfSeparator & character & N & The separator character is used internally
+   in SCE to create dummy part names.  The default separator character is
+   the underscore character, \_. The pdfSeparator character must be a 
+   character that is not used in any SCE input file.  (Hint:  Likely 
+   candidates for the pdfSeparator include \~{},!,@,\#,\$,\%,\^{},\&, and ?.)\\
+numPeriods   &    int &    Y  &  number of periods in the model \\
+calendarFile     & string &  Y  &  Calendar File \\
+calendarFormat   & ``char''   &  Y  &  
+         \begin{tabular}[t]{lcl}
+                              U& $=$& US Format, mm/dd/yyyy \\
+                              E& $=$& European Format, dd/mm/yyyy \\
+                              G& $=$& General Format, yyyymmdd 
+         \end{tabular} \\
+objectiveType  &  int &    Y  &
+     \begin{tabular}[t]{lcl}
+                              1& $=$& Priority Based Optimization \\
+                              2& $=$& Revenue  Based Optimization \\
+                              3& $=$& Profit   Based Optimization
+      \end{tabular} \\
+fileFormatType   & string &  N  &
+         \begin{tabular}[t]{lcl}
+                              Standard & $=$ & Standard file format \\
+                              EPPS & $=$ & EPPS generated file format 
+         \end{tabular} \\
+partCondFile     & string &  Y  &  Parts Conditioning File \\
+partFile         & string &  Y  &  Part Definition File\\
+capFile          & string &  N  &  Capacity Definition File \\
+bomFile          & string &  Y  &  BOM file\\
+bocFile          & string &  N  &  Manufacturing BOC File \\
+cycleTimeFile    & string &  N  &  CycleTime File\\
+yieldFile        & string &  N  &  Yield File\\
+lotSizeFile      & string &  N  &  Manufacturing Lot Size File \\
+subBomFile       & string &  N  &  substitute BOM file\\
+interPlantFile   & string &  N  &  Inter plant file \\
+aggregationFile  & string &  N  &  Part Aggregation File\\
+topLevelToBBdefFile & string & N & Top Level to Building Block 
+          definition File \\  
+topLevelToBBratioFile & string & N & Top Level to Building Block Ratio File \\ 
+topLevelToOptionFile & string & N & Top Level to Option Ratio File \\ 
+supplyFile       & string &  Y  &  Supply Volumes File\\
+capSupplyFile    & string &  N  &  Capacity Supply File \\
+
+geoSourceFile    & string &  N  &  Demand Geo to PDF Source File
+\end{tabular}
+\end{minipage}
+
+\vspace{0.5in}
+
+\begin{minipage}{7.5in}
+\begin{tabular}{lllp{3.5in}}
+\multicolumn{4}{c}{{\bf Parameters File (Continued)}}\\ 
+     \hline\hline
+paramID    &  string &    &  A keyword that defines the parameter code
+                          (see below for a list of legal parameter ID
+                          and their expected types) \\
+parameter  &  string   &  &  The parameter \\ \hline \hline
+ 
+{\bf paramID}  &       {\bf Type} &  {\bf Mand} &   {\bf comment} \\ \hline
+demandVolFile    & string &  Y  &  Demand Volumes File\\
+priorityFile     & string &  N  &  Demand Priority File (objectiveType $=$ 1)\\
+revenueFile      & string &  Y\footnote[1]{Note: the revenueFile is 
+   mandatory if objectiveType $=$ 2, similarly for profitFile.} &  
+         Demand Revenue File (objectiveType $=$ 2)\\
+featRevFile      & string &  N  &  Feature Revenue File (objectiveType $=$ 2)\\
+optionRevFile    & string &  N  &  Option Revenue File (objectiveType $=$ 2)\\
+profitFile       & string &  Y$^a$ &  Demand Profit File (objectiveType $=$ 3)\\
+featProfitFile   & string &  N  &  Feature Profit File (objectiveType $=$ 3)\\
+optionProfitFile & string &  N  &  Option Profit File (objectiveType $=$ 2)\\
+minDemandVolFile & string &  N  &  Minimum Demand Volumes File\\
+defaultPDF   & string & Y & default PDF name  \\
+outputFilePrefix & string & N &  output file prefix; default $=$ 
+                   ./output \\
+featureFileOutputFormat & string &  N  &
+         \begin{tabular}[t]{lcp{2.5in}}
+                              absolute & $=$ & Report total 
+     amount of features used for the build plan (default) \\
+                              percentage & $=$ & Report percentage usage of
+     features in the build plan
+         \end{tabular} \\
+printFormattedSupplyReportFile & boolean & N & print the formatted 
+      supply report file; default $=$ 0 \\
+printPartDBFile & boolean & N & print the part database file; default $=$ 0 \\
+printCapacityDBFile & boolean & N & print the capacity database file, 
+     default $=$ 0 \\
+printOptEchoFile & boolean & N & print the echo file; default $=$ 0\\
+printHeurEchoFile & boolean & N & print the heuristic 
+      echo file; default $=$ 0\\
+printDebugFile & boolean & N & print the debug file; default $=$ 0\\
+printWitMsgFile & boolean & N & print the WIT message file; default $=$ 0\\
+printWitRolloverMsgFile & boolean & N & print the WIT message file for
+   the rollover heuristic; default $=$ 0\\
+printWitFullExplodeMsgFile & boolean & N & print the WIT message file for the
+   full explosion; default $=$ 0\\ 
+printHeurWitDataFile & boolean & N & print the heuristic WIT data file,
+      default $=$ 0\\ 
+printOptWitDataFile & boolean & N & print the optimization WIT data file,
+      default $=$ 0\\ 
+printCriticalListFile & boolean & N & print the critical list file,
+      default $=$ 0\\ 
+printTotalDemandReport & boolean & N & print the total demand report file, 
+      default $=$ 0
+\end{tabular}
+\end{minipage}
+
+\vspace{0.5in}
+
+\begin{tabular}{lllp{3.5in}}
+\multicolumn{4}{c}{{\bf Parameters File (Continued)}}\\ 
+     \hline\hline
+paramID    &  string &    &  A keyword that defines the parameter code
+                          (see below for a list of legal parameter ID
+                          and their expected types) \\
+parameter  &  string   &  &  The parameter \\ \hline \hline
+ 
+{\bf paramID}  &       {\bf Type} &  {\bf Mand} &   {\bf comment} \\ \hline
+supplyResponseFileExtension & string & N & default $=$ .supplyResp \\
+backlogResponseFileExtension & string & N & default $=$ .backlog \\
+buildSchedFileExtension & string & N & default $=$ .buildSched \\
+selFeatBBratioFileExtension & string & N & default $=$ .bbRatio \\
+optionalFeatRatioFileExtension & string & N & default $=$ .optionRatio \\
+partUsageFileExtension & string & N & default $=$ .partUsage \\
+subUsageFileExtension & string & N & default $=$ .subUsage \\
+capacityUsageFileExtension & string & N & default $=$ .capacityUsage \\
+formattedSupplyReportFileExtension & string & N & default $=$ .supplyReport \\
+interplantOrdersFileExtension & string & N & default $=$ .interplant \\
+problemStatisticsFileExtension & string & N & default $=$ .probStats \\
+objectiveSummaryFileExtension & string & N & default $=$ .optResults \\
+partDBFileExtension & string & N & default $=$ .partDB \\
+capacityDBFileExtension & string & N & default $=$ .capacityDB \\
+criticalListFileExtension & string & N & default $=$ .critList \\
+optEchoFileExtension & string & N & default $=$ .witOpt.echo \\
+heurEchoFileExtension & string & N & default $=$ .witHeur.echo \\
+debugFileExtension & string & N & default $=$ .sce.debug \\
+witMsgFileExtension & string & N & default $=$ .wit.msg \\
+witRolloverMsgFileExtension & string & N & default $=$ .wit.roll.msg \\
+witFullExplodeMsgFileExtension & string & N & default 
+        $=$ .wit.fullExplode.msg \\
+optWitDataFileExtension & string & N & default $=$ .witOpt.data \\
+heurWitDataFileExtension & string & N & default $=$ .witHeur.data \\
+totalDemandReportFileExtension & string & N & default $=$ .totalDemand 
+\end{tabular}
+
+
+\vspace{0.5in}
+\begin{tabular}{lllp{3in}}
+\multicolumn{4}{c}{{\bf Advanced Parameters File}}\\ 
+     \hline\hline
+{\bf ParamID} &  {\bf type}  & {\bf Mand} &  {\bf comment} \\ \hline
+engine & string & Y & Solution Method: optimization or heuristic or rollover \\
+equitability & int & Y &  Equitability factor for heuristic implosion \\
+periodicInterestRate & float & Y & Time value of money factor \\
+optionRatioSupplyStockPenalty & float & Y &     10.0 \\
+defaultoptionShipReward       & float & Y &    5.0  \\
+featureSetStockPenalty        & float & Y & 99999.9  \\
+featureSetScrapPenalty        & float & Y & 99999.9  \\
+featureRatioFlag              & int   & Y &  
+       \begin{tabular}[t]{ll}
+                              1 & Use feature capability \\
+                              0 & Otherwise
+         \end{tabular} \\
+defObj1ProdCostRealParts & float & Y & small obj1ProdCost for all real
+     parts \\
+defObj1ProdCostDiscRateRealParts & float & Y & {\it very small} discount
+    rate for obj1ProdCost for all real parts. (This keeps parts from being
+    built early.) \\
+defaultSubPenalty & float & Y & Used when substitutes are permitted \\
+useFullExplodeUtility & boolean & N & use the full explode utility; default $=$ 0 \\
+defaultShipLateLimit & int & N & This is the heuristic ship late limit and
+   it applies to all demands;  ${\rm default} = {\rm numPeriods} - 1$
+\end{tabular}
+
+\clearpage
+\noindent
+{\bf Output File Format Specifications}
+
+The data elements of the records that make up output files are comma 
+separated.  Data elements of type ``char'' are double quote delimited. 
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Supply Response File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber  & ``char'' &     Part being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. \\
+geography   & ``char''  &    Geographic source of the demand for this part. \\
+supplyVol   & floatVec&  time-phased supply Volume as computed by SCE \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Backlog Response File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber  & ``char'' &     Part being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. \\
+geography   & ``char''  &    Geographic source of the demand for this part. \\
+supplyVol   & floatVec&  time-phased backlog Volume as computed by SCE \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Build Schedule File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char''  \\
+PDF        & ``char''  \\
+prodVol    & floatVec&  Time-phased Vector of Production Volume.  Note
+                      these volumes are with respect to the completion
+                      date of production, not the start-to-build dates.
+                      To get STB volumes by periods, we need to apply
+                      the cycle-time offsets. \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Feasible Selective Feature/Building Block Ratio File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1  & ``char'' &       A planner top-level build part number 
+                            (Machine Type, Machine/type/mod)
+                            with a selective feature/building block in its bill.  \\
+geography   & ``char''    &      Geographic source of the demand for partNumber1 \\
+bbCategory &  ``char'' &    an identifier for the building block category  \\
+partNumber2  & ``char'' &      The selective feature or building block \\
+
+FeasibleRatio    & floatVec &   Feasible ratio for this selective feature or 
+                            building block/feature wrt the top-level build, partNumber1. \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Feasible Optional Feature Ratio File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1  & ``char'' &       A planner top-level build part number 
+                            (Machine Type, Machine/type/mod)
+                            with an optional feature in its bill.  \\
+geography    & ``char'' &      Geographic source of the demand for partNumber1 \\
+partNumber2  & ``char'' &      The optional feature \\
+
+FeasibleRatio    & floatVec &   Feasible ratio for this optional feature wrt
+                        the top-level build, partNumber1. \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Part Usage File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char''     \\ 
+PDF   & ``char''  \\
+uasge          & floatVec &  time-phased usage of this part at PDF\\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Substitute Usage Volume File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 & ``char''  \\
+partNumber2 & ``char''  \\
+partNumber3 & ``char''  \\
+PDF        & ``char''  \\
+prodVol    & floatVec &  Time-phased Vector of the production volume of
+                      partNumber1 using partNumber3 as a substitute for
+                      partNumber2 \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Part Database Dump File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber & ``char''  \\
+PDF & ``char''  \\
+keyword & ``char''  & The keywords are supplyVol, reqVol, mrpExcessVol, excessVol,
+   stockVol, scrapVol, consVol, mrpConsVol, mrpProdVol, prodVol, cycleTime,
+   mrpRequirements.
+   Zero vectors are excluded.\\
+keyword value  & floatVec &  Time-phased Vector of the keyword \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Capacity Database Dump File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+capacityName & ``char''  \\
+PDF & ``char''  \\
+keyword & ``char''  & The keywords are supplyVol, reqVol, mrpExcessVol, excessVol,
+   scrapVol, consVol, mrpConsVol, mrpRequirements.
+   Zero vectors are excluded.\\
+keyword value  & floatVec &  Time-phased Vector of the keyword \\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Capacity Usage File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+capacityName &  ``char''     \\ 
+PDF   & ``char''  \\
+uasge          & floatVec &  time-phased usage of this capacity at PDF\\
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Interplant Orders File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber1 &  ``char''     \\ 
+PDF1   & ``char''  \\
+partNumber2 &  ``char''     \\ 
+PDF2   & ``char'' \\
+orderVol & floatVec &  time-phased volume of orders \\
+\end{tabular}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Critical Parts List File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char''     \\ 
+PDF   & ``char''  \\
+period & int & Period in which partNumber was needed and not available
+\end{tabular}
+
+\vspace{.5in}
+
+\begin{tabular}{llp{4in}}
+\multicolumn{3}{c}{{\bf Total Demand File}}\\ \hline\hline
+{\bf DataElement} &  {\bf type}  &   {\bf comment} \\ \hline
+partNumber &  ``char''     \\ 
+PDF   & ``char''  \\
+totalDemand & int & Total (independent $+$ dependent) demand for this part
+\end{tabular}
+
+
+\clearpage
+\noindent
+{\bf Formatted Output File Specifications}
+
+\vspace{.5in}
+
+\begin{tabular}{rrrrrr}
+\multicolumn{6}{c}{{\bf Formatted Supply Response File}}\\ \hline\hline
+  & Date$_0$ & Date$_1$ & $\cdots$ & Date$_{{\rm numPeriods} - 2}$ 
+             & Date$_{{\rm numPeriods} - 1}$ \\
+partNumber --- geo: \\
+Demand & Demand$_0$ & Demand$_1$ & $\cdots$ & Demand$_{{\rm numPeriods} - 2}$ 
+             & Demand$_{{\rm numPeriods} - 1}$ \\
+Supply & Supply$_0$ & Supply$_1$ & $\cdots$ & Supply$_{{\rm numPeriods} - 2}$ 
+             & Supply$_{{\rm numPeriods} - 1}$ \\
+Delta & Delta$_0$ & Delta$_1$ & $\cdots$ & Delta$_{{\rm numPeriods} - 2}$ 
+             & Delta$_{{\rm numPeriods} - 1}$ \\
+\\
+partNumber --- geo: \\
+Demand & Demand$_0$ & Demand$_1$ & $\cdots$ & Demand$_{{\rm numPeriods} - 2}$ 
+             & Demand$_{{\rm numPeriods} - 1}$ \\
+Supply & Supply$_0$ & Supply$_1$ & $\cdots$ & Supply$_{{\rm numPeriods} - 2}$ 
+             & Supply$_{{\rm numPeriods} - 1}$ \\
+Delta & Delta$_0$ & Delta$_1$ & $\cdots$ & Delta$_{{\rm numPeriods} - 2}$ 
+             & Delta$_{{\rm numPeriods} - 1}$ \\
+\\
+$\vdots $ & $\vdots $ & $\vdots $ & $\vdots $ & $\vdots $ & $\vdots $ \\
+\\
+partNumber --- geo: \\
+Demand & Demand$_0$ & Demand$_1$ & $\cdots$ & Demand$_{{\rm numPeriods} - 2}$ 
+             & Demand$_{{\rm numPeriods} - 1}$ \\
+Supply & Supply$_0$ & Supply$_1$ & $\cdots$ & Supply$_{{\rm numPeriods} - 2}$ 
+             & Supply$_{{\rm numPeriods} - 1}$ \\
+Delta & Delta$_0$ & Delta$_1$ & $\cdots$ & Delta$_{{\rm numPeriods} - 2}$ 
+             & Delta$_{{\rm numPeriods} - 1}$ 
+\end{tabular}
+
+\end{document}

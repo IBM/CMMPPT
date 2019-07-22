@@ -1,0 +1,439 @@
+head	1.10;
+access;
+symbols
+	abandoningEtnParts:1.8
+	beforeEtnParts:1.7
+	eso2InitialFileFormats:1.4;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2005.01.29.18.27.38;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.06.21.14.21.12;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.02.19.19.43.35;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.12.10.22.24.01;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.10.29.19.16.02;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.04.12.01.21.19;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.02.08.23.39.57;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.02.06.20.06.04;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.02.06.18.32.14;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.02.03.52.11;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@changed code to use std::string rather than BCP_string
+@
+text
+@#ifndef ESO2_partDemandData_h
+#define ESO2_partDemandData_h
+
+#include "scoFile.h"
+
+
+class ESO2partDemandData : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(part);
+  getFieldH(custLoc);
+  getFieldH(plantLoc);
+  getIntFieldH(period);
+  getFloatFieldH(demandVol);
+  getFloatFieldH(wac);
+  getIntFieldH(etnFlag);
+  
+  // preferred constructor
+  ESO2partDemandData(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("feature");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(7);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & part, 
+    const std::string & custLoc, 
+    const std::string & plantLoc, 
+    int period ) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = part+"$+&"+custLoc+"$+&"+plantLoc+"$+&"+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ESO2partDemandData(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2partDemandData file("../data/example1/partDemandData.csv");
+    
+    // Test reading first record
+
+    assert( file.part(0)=="p2");
+    assert( file.custLoc(0) == "pok" );
+    assert( file.plantLoc(0) == "pok" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.demandVolAsFloat(0) == 1.5f );
+    assert( file.wacAsFloat(0) == 25.5f );
+    assert( file.etnFlagAsInt(0) == 1 );
+
+    std::string k= file.key("p2","pok","wat",1);
+    assert( file.part(k)=="p2");
+    assert( file.custLoc(k) == "pok" );
+    assert( file.plantLoc(k) == "wat" );
+    assert( file.periodAsInt(k) == 1 );
+    assert( file.demandVolAsFloat(k) == 2.1f );
+    assert( file.wacAsFloat(k) == 20.5f );
+    assert( file.etnFlagAsInt(k) == 1 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      part(recNum),
+      custLoc(recNum),
+      plantLoc(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ESO2partDemandData();
+  
+  // copy constructor  -- don't use!
+  ESO2partDemandData( const ESO2partDemandData& source );
+  
+  // assignment operator -- don't use!
+  ESO2partDemandData&
+  operator=(const ESO2partDemandData& rhs);
+
+  
+};
+
+
+
+class ESO2partDemandDataIterator : public SCOfileIterator {
+public:
+    
+  // Fields
+  getFieldFileWithIteratorH(part);
+  getFieldFileWithIteratorH(custLoc);
+  getFieldFileWithIteratorH(plantLoc);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(demandVol);
+  getFloatFieldFileWithIteratorH(wac);
+  getIntFieldFileWithIteratorH(etnFlag);
+
+  
+  // preferred constructor
+  ESO2partDemandDataIterator(const ESO2partDemandData & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ESO2partDemandDataIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2partDemandData file("../data/example1/partDemandData.csv");
+    ESO2partDemandDataIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.part()=="p2");
+        assert( fileIter.custLoc() == "pok" );
+        assert( fileIter.plantLoc() == "pok" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.demandVolAsFloat() == 1.5f );
+        assert( fileIter.wacAsFloat() == 25.5f );
+        assert( fileIter.etnFlagAsInt() == 1 );
+          
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ESO2partDemandDataIterator();
+  
+  // copy constructor  -- don't use!
+  ESO2partDemandDataIterator( const ESO2partDemandDataIterator& source );
+  
+  // assignment operator -- don't use!
+  ESO2partDemandDataIterator&
+  operator=(const ESO2partDemandDataIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.9
+log
+@Code restored to state before etnParts were added
+@
+text
+@d20 1
+a20 1
+  ESO2partDemandData(BCP_string filename)
+d35 4
+a38 4
+  static BCP_string key( 
+    const BCP_string & part, 
+    const BCP_string & custLoc, 
+    const BCP_string & plantLoc, 
+d43 1
+a43 1
+    BCP_string retVal = part+"$+&"+custLoc+"$+&"+plantLoc+"$+&"+periodchar;
+d65 1
+a65 1
+    BCP_string k= file.key("p2","pok","wat",1);
+d79 1
+a79 1
+  virtual BCP_string key( unsigned int recNum ) const
+d81 1
+a81 1
+    BCP_string retVal = key(
+@
+
+
+1.8
+log
+@Code updated to read new format. (does not yet implement function supported by new format)
+@
+text
+@d17 1
+a17 1
+  //getIntFieldH(etnFlag);
+d30 1
+a30 1
+    hasHeaderRecord(6);
+d63 1
+a63 1
+    //assert( file.etnFlagAsInt(0) == 1 );
+d72 1
+a72 1
+    //assert( file.etnFlagAsInt(k) == 1 );
+d116 1
+a116 1
+  //getIntFieldFileWithIteratorH(etnFlag);
+d144 1
+a144 1
+        //assert( fileIter.etnFlagAsInt() == 1 );
+@
+
+
+1.7
+log
+@moved etn flag from mtmDemanBom to partDemand files
+@
+text
+@d17 1
+a17 1
+  getIntFieldH(etnFlag);
+d30 1
+a30 1
+    hasHeaderRecord(7);
+d63 1
+a63 1
+    assert( file.etnFlagAsInt(0) == 1 );
+d72 1
+a72 1
+    assert( file.etnFlagAsInt(k) == 1 );
+d116 1
+a116 1
+  getIntFieldFileWithIteratorH(etnFlag);
+d144 1
+a144 1
+        assert( fileIter.etnFlagAsInt() == 1 );
+@
+
+
+1.6
+log
+@Replaced std::string with BCP_string to work around VAC compiler problem
+@
+text
+@d17 1
+d30 1
+a30 1
+    hasHeaderRecord(6);
+d63 1
+d72 1
+d116 1
+d144 1
+@
+
+
+1.5
+log
+@Updated to change 1 to be the first period.
+Added additional test to see if objValue has changed
+@
+text
+@d19 1
+a19 1
+  ESO2partDemandData(std::string filename)
+d34 4
+a37 4
+  static std::string key( 
+    const std::string & part, 
+    const std::string & custLoc, 
+    const std::string & plantLoc, 
+d42 1
+a42 1
+    std::string retVal = part+"$+&"+custLoc+"$+&"+plantLoc+"$+&"+periodchar;
+d63 1
+a63 1
+    std::string k= file.key("p2","pok","wat",1);
+d76 1
+a76 1
+  virtual std::string key( unsigned int recNum ) const
+d78 1
+a78 1
+    std::string retVal = key(
+@
+
+
+1.4
+log
+@Added solve
+@
+text
+@d59 1
+a59 1
+    assert( file.periodAsInt(0) == 0 );
+d63 1
+a63 1
+    std::string k= file.key("p2","pok","wat",0);
+d67 1
+a67 1
+    assert( file.periodAsInt(k) == 0 );
+d137 1
+a137 1
+        assert( fileIter.periodAsInt() == 0 );
+@
+
+
+1.3
+log
+@Updated to have 4 periods of data in all data files
+@
+text
+@d61 1
+a61 1
+    assert( file.wacAsFloat(0) == 5.5f );
+d69 1
+a69 1
+    assert( file.wacAsFloat(k) == 4.5f );
+d139 1
+a139 1
+        assert( fileIter.wacAsFloat() == 5.5f );
+@
+
+
+1.2
+log
+@Updated to match current understanding of file formats
+@
+text
+@d63 1
+a63 1
+    std::string k= file.key(1);
+@
+
+
+1.1
+log
+@Added code to read partDemandData file
+@
+text
+@d56 2
+a57 2
+    assert( file.part(0)=="p1");
+    assert( file.custLoc(0) == "nyc" );
+d63 7
+a69 7
+    
+    assert( file.part(key("m1","bos","kgn",1))=="m1");
+    assert( file.custLoc(key("m1","bos","kgn",1)) == "bos" );
+    assert( file.plantLoc(key("m1","bos","kgn",1)) == "kgn" );
+    assert( file.periodAsInt(key("m1","bos","kgn",1)) == 1 );
+    assert( file.demandVolAsFloat(key("m1","bos","kgn",1)) == 2.1f );
+    assert( file.wacAsFloat(key("m1","bos","kgn",1)) == 6.5f );
+d134 2
+a135 2
+        assert( fileIter.part()=="p1");
+        assert( fileIter.custLoc() == "nyc" );
+@
+

@@ -1,0 +1,259 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2006.10.10.19.11.20;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2006.10.10.14.27.30;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Assisted opt implosion.
+@
+text
+@//------------------------------------------------------------------------------
+// Source File: "custOptTest.C".
+//
+// A WIT application program whose purpose is to test WIT's "application
+// controlled optimizing implosion" capability.
+//------------------------------------------------------------------------------
+
+#include <wit.h>
+
+#include <OsiClpSolverInterface.hpp>
+
+#include <stdlib.h>
+#include <stdio.h>
+
+//------------------------------------------------------------------------------
+// Class AppOptTester
+//------------------------------------------------------------------------------
+
+class AppOptTester
+   {
+   public:
+
+   //---------------------------------------------------------------------------
+   // Public Member Functions
+   //---------------------------------------------------------------------------
+
+    AppOptTester ();
+   ~AppOptTester ();
+
+   void testAppOpt ();
+
+   private:
+
+   //---------------------------------------------------------------------------
+   // Private Member Functions
+   //---------------------------------------------------------------------------
+
+   void buildWitRun (WitRun * theWitRun);
+
+   void callCoin ();
+
+   //---------------------------------------------------------------------------
+   // Private Member Data
+   //---------------------------------------------------------------------------
+
+   int      numcols_;
+   int      numrows_;
+   int *    start_;
+   int *    index_;
+   double * value_;
+   double * collb_;
+   double * colub_;
+   double * obj_;
+   double * rowlb_;
+   double * rowub_;
+   };
+
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+int main ()
+   {
+   AppOptTester theTester;
+
+   theTester.testAppOpt ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AppOptTester
+//------------------------------------------------------------------------------
+
+AppOptTester::AppOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+AppOptTester::~AppOptTester ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void AppOptTester::testAppOpt ()
+   {
+   WitRun * theWitRun;
+
+   witNewRun        (& theWitRun);
+
+   buildWitRun        (theWitRun);
+
+   witStartCustOptImp (theWitRun);
+
+   witGetOptProblemDbl (
+        theWitRun,
+      & numcols_,
+      & numrows_,
+      & start_,
+      & index_,
+      & value_,
+      & collb_,
+      & colub_,
+      & obj_,
+      & rowlb_,
+      & rowub_);
+
+   callCoin ();
+
+   free (start_);
+   free (index_);
+   free (value_);
+   free (collb_);
+   free (colub_);
+   free (obj_);
+   free (rowlb_);
+   free (rowub_);
+
+   witFinishCustOptImp (theWitRun);
+
+   witDeleteRun        (theWitRun);
+   }
+
+//------------------------------------------------------------------------------
+
+void AppOptTester::buildWitRun (WitRun * theWitRun)
+   {
+   float consRateD0 [] =  {2.0};
+
+   float supplyVolA [] = {80.0};
+
+   float demandVolF [] = {30.0};
+   float demandVolG [] = {60.0};
+
+   float shipRewardF[] =  {3.0};
+   float shipRewardG[] =  {2.0};
+
+   witInitialize          (theWitRun);
+
+   witSetNPeriods         (theWitRun, 1);
+
+   witAddPart             (theWitRun, "A",      WitCAPACITY);
+   witAddPart             (theWitRun, "B",      WitCAPACITY);
+   witAddPart             (theWitRun, "C",      WitCAPACITY);
+
+   witAddOperation        (theWitRun, "D");
+   witAddOperation        (theWitRun, "E");
+
+   witAddBomEntry         (theWitRun, "D", "A");
+   witAddBomEntry         (theWitRun, "E", "A");
+
+   witAddBopEntry         (theWitRun, "D", "B");
+   witAddBopEntry         (theWitRun, "E", "C");
+
+   witAddDemand           (theWitRun, "B", "F");
+   witAddDemand           (theWitRun, "C", "G");
+
+   witSetBomEntryConsRate (theWitRun, "D",  0,  consRateD0);
+
+   witSetPartSupplyVol    (theWitRun, "A",      supplyVolA);
+
+   witSetDemandDemandVol  (theWitRun, "B", "F", demandVolF);
+   witSetDemandDemandVol  (theWitRun, "C", "G", demandVolG);
+
+   witSetDemandShipReward (theWitRun, "B", "F", shipRewardF);
+   witSetDemandShipReward (theWitRun, "C", "G", shipRewardG);
+   }
+
+//------------------------------------------------------------------------------
+
+void AppOptTester::callCoin ()
+   {
+   CoinMessageHandler *    theCMH;
+   OsiClpSolverInterface * theSI;
+
+   theCMH  = new CoinMessageHandler (stdout);
+
+   theCMH->setLogLevel (4);
+
+   theSI   = new OsiClpSolverInterface;
+
+   theSI->passInMessageHandler (theCMH);
+
+   theSI->getModelPtr ()->passInMessageHandler (theCMH);
+
+   theSI->
+      loadProblem (
+         numcols_,
+         numrows_,
+         start_,
+         index_,
+         value_,
+         collb_,
+         colub_,
+         obj_,
+         rowlb_,
+         rowub_);
+
+   theSI->setObjSense (-1.0);
+
+   theSI->writeMps ("app-opt");
+
+   printf (
+      "\n"
+      "File \"app-opt.mps\":\n"
+      "\n");
+
+   fflush (stdout);
+
+   system ("cat app-opt.mps");
+
+   printf (
+      "\n"
+      "End of file \"app-opt.mps\":\n"
+      "\n");
+
+   remove ("app-opt.mps");
+
+   theSI->getModelPtr ()->dual ();
+
+   delete theSI;
+   }
+@
+
+
+1.1
+log
+@Custom opt implosion.
+@
+text
+@@
+

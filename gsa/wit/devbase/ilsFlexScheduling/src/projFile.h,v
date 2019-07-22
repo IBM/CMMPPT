@@ -1,0 +1,242 @@
+head	1.3;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2002.10.28.03.01.43;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.09.06.17.39.04;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.09.04.20.44.46;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.09.04.20.44.46;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Added ability in ScoFile class to handle SCE like comments
+@
+text
+@#ifndef ILS_PROJFILE_h
+#define ILS_PROJFILE_h
+
+#include "scoFile.h"
+
+
+class ILSprojFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(proj);
+  getFloatFieldH(rateScale);
+  getFloatFieldH(revenue);
+  getFloatFieldH(closeProb);
+  getIntFieldH(startPeriod);
+  getIntFieldH(endPeriod);
+  getIntFieldH(numHours);
+  getIntFieldH(sold);
+
+  
+  // preferred constructor
+  ILSprojFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+#if 0 
+    insertField("proj");
+#else
+    hasHeaderRecord(8);
+#endif
+    commentRecords(true);
+  };
+  
+  // destructor
+  ~ILSprojFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ILSprojFile projFile("../data/example1/proj.csv");
+    
+    // Test reading first record
+    assert( projFile.proj(1) == "p1" );
+    assert( projFile.rateScaleAsFloat(1) == 1.1f );
+    assert( projFile.revenueAsFloat(1) == 1000000.f );
+    assert( projFile.closeProbAsFloat(1) == 0.9f );
+    assert( projFile.startPeriodAsInt(1) == 0 );
+    assert( projFile.endPeriodAsInt(1) == 4 );
+    assert( projFile.numHoursAsInt(1) == 1000 );
+    assert( projFile.soldAsInt(1) == 0 );
+
+    // Test reading second record
+    assert( projFile.proj(2) == "p2" );
+    assert( projFile.rateScaleAsFloat(2) == 0.9f );
+    assert( projFile.revenueAsFloat(2) == 2000000.f );
+    assert( projFile.closeProbAsFloat(2) == 0.5f );
+    assert( projFile.startPeriodAsInt(2) == 1 );
+    assert( projFile.endPeriodAsInt(2) == 6 );
+    assert( projFile.numHoursAsInt(2) == 2000 );
+    assert( projFile.soldAsInt(2) == 0 );
+
+    // Test reading third record
+    assert( projFile.proj(3) == "p3" );
+    assert( projFile.rateScaleAsFloat(3) == 1.0f );
+    assert( projFile.revenueAsFloat(3) == 1500000.f );
+    assert( projFile.closeProbAsFloat(3) == 1.0f );
+    assert( projFile.startPeriodAsInt(3) == 1 );
+    assert( projFile.endPeriodAsInt(3) == 3 );
+    assert( projFile.numHoursAsInt(3) == 500 );
+    assert( projFile.soldAsInt(3) == 1 );
+
+    
+    // Test reading record by key
+    assert( projFile.rateScaleAsFloat("p2") == 0.9f );
+    assert( projFile.revenueAsFloat("p2") == 2000000.f );
+    assert( projFile.closeProbAsFloat("p2") == 0.5f );
+    assert( projFile.startPeriodAsInt("p2") == 1 );
+    assert( projFile.endPeriodAsInt("p2") == 6 );
+    assert( projFile.numHoursAsInt("p2") == 2000 );
+    assert( projFile.soldAsInt("p2") == 0 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = proj(recNum);
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ILSprojFile();
+  
+  // copy constructor  -- don't use!
+  ILSprojFile( const ILSprojFile& source );
+  
+  // assignment operator -- don't use!
+  ILSprojFile&
+  operator=(const ILSprojFile& rhs);
+
+  
+};
+
+
+
+class ILSprojFileIterator : public SCOfileIterator {
+public:
+  
+  // fields
+  
+  getFieldFileWithIteratorH(proj);
+  getFloatFieldFileWithIteratorH(rateScale);
+  getFloatFieldFileWithIteratorH(revenue);
+  getFloatFieldFileWithIteratorH(closeProb);
+  getIntFieldFileWithIteratorH(startPeriod);
+  getIntFieldFileWithIteratorH(endPeriod);
+  getIntFieldFileWithIteratorH(numHours);
+  getIntFieldFileWithIteratorH(sold);
+  
+  // preferred constructor
+  ILSprojFileIterator(const ILSprojFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ILSprojFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ILSprojFile projFile("../data/example1/proj.csv");
+    ILSprojFileIterator projFileIter(projFile);
+      
+    // loop once for each record
+    bool firstRecord = true;
+    for ( projFileIter(); projFileIter()!=NULL; ) {    
+      if ( firstRecord ) {
+        assert( projFileIter.proj() == "p1" );
+        assert( projFileIter.rateScaleAsFloat() == 1.1f );
+        assert( projFileIter.revenueAsFloat() == 1000000.f );
+        assert( projFileIter.closeProbAsFloat() == 0.9f );
+        assert( projFileIter.startPeriodAsInt() == 0 );
+        assert( projFileIter.endPeriodAsInt() == 4 );
+        assert( projFileIter.numHoursAsInt() == 1000 );
+        assert( projFileIter.soldAsInt() == 0 );
+        firstRecord = false;
+      }
+    }
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ILSprojFileIterator();
+  
+  // copy constructor  -- don't use!
+  ILSprojFileIterator( const ILSprojFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ILSprojFileIterator&
+  operator=(const ILSprojFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.2
+log
+@modified so unitTest can be run from the power43 directory
+@
+text
+@d32 1
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d40 1
+a40 1
+    ILSprojFile projFile("proj.csv");
+d135 1
+a135 1
+    ILSprojFile projFile("proj.csv");
+@
+
+
+1.1.1.1
+log
+@initial import
+@
+text
+@@

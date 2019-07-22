@@ -1,0 +1,2046 @@
+head	1.7;
+access;
+symbols
+	sce_5_01_20080919:1.5
+	latest_sce_4_20_20060523:1.5.0.4
+	sce_4_20_20060523:1.5
+	latest_sce4_20_OSL:1.5.0.2
+	sce_4_20_OSL:1.5
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.4
+	nextGenBranch:1.2.0.2
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.1.0.2;
+locks; strict;
+comment	@ * @;
+
+
+1.7
+date	2008.11.19.20.15.51;	author ervolina;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2008.11.13.20.01.23;	author ervolina;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.09.09.19.35.36;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.08.05.21.43.05;	author dpc;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.08.05.12.34.33;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.29;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.01.08.17.40.21;	author rwToStl;	state dead;
+branches
+	1.1.2.1;
+next	;
+
+1.1.2.1
+date	2003.01.08.17.40.21;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.2;
+
+1.1.2.2
+date	2003.01.09.13.54.43;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.3;
+
+1.1.2.3
+date	2003.01.09.19.28.00;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.4;
+
+1.1.2.4
+date	2003.01.09.19.30.35;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.5;
+
+1.1.2.5
+date	2003.01.09.19.42.09;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.6;
+
+1.1.2.6
+date	2003.01.14.19.05.41;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.7;
+
+1.1.2.7
+date	2003.01.14.19.41.09;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.8;
+
+1.1.2.8
+date	2003.01.14.21.11.11;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.9;
+
+1.1.2.9
+date	2003.01.14.21.57.20;	author rwToStl;	state Exp;
+branches;
+next	1.1.2.10;
+
+1.1.2.10
+date	2003.01.14.23.54.09;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@cleaned up dateTime some more
+@
+text
+@
+#include <scenario/src/dateTime.h>
+#include <scenario/src/RWToSTLHelpers.h>
+
+#include <assert.h>
+#include <math.h>
+
+const unsigned int secsPerDay = 86400; // quit saying "sex per day", it's "secs per day"
+// This is used to interpret the 2-digit values passed-in for years as being before or after 2000
+const unsigned jan1st1970JulianDay = 2440587;
+const unsigned int pivotYear = 70;     
+
+
+LgFrDatetime::LgFrDatetime( time_t s )
+ : time_(s) 
+{
+}  
+
+LgFrDatetime::LgFrDatetime( const LgFrDatetime& t )
+ : time_( t.time_ )
+{
+}
+
+LgFrDatetime::LgFrDatetime( const std::string& date, const std::string& time )
+: time_( 0 )
+{ 
+    setDate( date ); 
+    if( !time.empty() )
+        setTime( time );
+}
+
+const struct tm& LgFrDatetime::getAsStruct_tm() const
+{
+    // this function owns a private, static struct tm and the value it is good for.
+    // It prevents it from having to reconvert from time_ to struct tm on every call.
+    // It also allows it to appear as const because the struct tm is not a member.
+    static time_t timeStructtmFor = 0; 
+    static struct tm tm_;
+
+    if( time_ != timeStructtmFor )
+    {
+        memcpy( &tm_, gmtime( &time_ ), sizeof( tm_ ) );
+        timeStructtmFor = time_;
+    }
+
+    return tm_;
+}
+
+// accessors
+std::string LgFrDatetime::getDateAsString( const std::string& format ) const
+{
+    const struct tm& z = getAsStruct_tm();
+
+    char tmp[100];
+    strftime( tmp, sizeof( tmp ), format.c_str(), &z );
+
+    return tmp;
+}
+std::string LgFrDatetime::getTimeAsString( const std::string& format ) const
+{
+    const struct tm& z = getAsStruct_tm();
+
+    char tmp[100];
+    strftime( tmp, sizeof( tmp ), format.c_str(), &z );
+
+    return tmp;
+}
+
+void LgFrDatetime::getDate( int& month, int& day, int& year ) const
+{
+    const struct tm& z = getAsStruct_tm();
+
+    year =  z.tm_year + 1900; // tm_year is 1900-based
+    month = z.tm_mon + 1; // tm_mon is 0-based
+    day =   z.tm_mday;
+}
+
+void LgFrDatetime::getTime( int& hour, int& min, int& sec ) const
+{
+    const struct tm& z = getAsStruct_tm(); 
+
+    hour =  z.tm_hour;
+    min =   z.tm_min;
+    sec =   z.tm_sec;
+}
+
+void LgFrDatetime::getDatetime( int& month, int& day, int& year, int& hour, int& min, int& sec ) const
+{
+    const struct tm& z = getAsStruct_tm();
+
+    year =  z.tm_year + 1900; // tm_year is 1900-based
+    month = z.tm_mon + 1; // tm_mon is 0-based 
+    day =   z.tm_mday;
+    hour =  z.tm_hour;
+    min =   z.tm_min;
+    sec =   z.tm_sec;
+}
+
+int  LgFrDatetime::getHour() const 
+{
+    return getAsStruct_tm().tm_hour;
+}
+
+int  LgFrDatetime::getMin() const
+{
+    return getAsStruct_tm().tm_min;
+}
+
+int  LgFrDatetime::getSec() const
+{
+    return getAsStruct_tm().tm_sec;
+}
+
+int  LgFrDatetime::getDayOfWeek() const
+{
+    return getAsStruct_tm().tm_wday;
+}
+
+int  LgFrDatetime::getDayOfMonth() const
+{
+    return getAsStruct_tm().tm_mday;
+}
+
+int  LgFrDatetime::getDayOfYear() const
+{
+    return getAsStruct_tm().tm_yday;
+}
+
+int  LgFrDatetime::getMonth() const
+{
+    return getAsStruct_tm().tm_mon + 1; // tm_mon is 0-based
+}
+
+int  LgFrDatetime::getYear() const
+{
+    int year = getAsStruct_tm().tm_year;
+    if( year >= 100 )
+        year -= 100;
+
+    return year;
+}
+
+int  LgFrDatetime::getLongYear() const
+{
+    return getAsStruct_tm().tm_year + 1900; // tm_year is 1900-based
+}
+
+// NOTE: This function is trusted to be exact copies of what was once published 
+// in a reliable publication. The only changes that were made are removing code
+// dealing with the pre-gregorian calendar, and updating a few types;
+// date management, computer language, dec. 1990, p 57 */
+// dates are represented as Julian day numbers, stored as long integers (at least 32 bits )
+int  LgFrDatetime::getDayJulian() const
+{
+    return time_ / secsPerDay;
+}
+
+std::ostream& operator<<(std::ostream& s, const LgFrDatetime& d)
+{
+    if( d.isValid() )
+        return s << asctime( &d.getAsStruct_tm() );
+    else
+        return s << "Invalid date!";
+}
+
+
+// modifiers
+void LgFrDatetime::setTime( int h, int m, int s )
+{
+    bool valid = validateTime( h, m, s );
+
+    if( valid )
+    {
+        time_ = time_ - time_ % secsPerDay;
+        time_ += s + 60 * ( m + 60 * h );
+    }
+    else
+    {
+        time_ = 0;
+    }
+}
+
+void LgFrDatetime::setTime( const std::string& hms ) 
+{
+    if( hms.find_first_of( ':' ) == std::string::npos )
+    {
+        time_ = 0; 
+        return;
+    }
+
+    // Must be specified in "HH:MM" or "HH:MM:SS" 24-hour format
+    size_t firstSep = hms.find_first_of( ':' );
+    size_t secondSep = hms.find_first_of( ':', firstSep + 1 );
+    size_t thirdSep = hms.find_first_of( ':', secondSep + 1 );
+
+    // Make sure we have one or two separators placed reasonably
+    bool valid = ( firstSep != std::string::npos && thirdSep == std::string::npos );
+
+    if( valid )
+    {
+        bool longForm = secondSep != std::string::npos;
+        size_t h, m, s = 0;
+        valid &= sce::fromString( hms.substr( 0, firstSep ), h );
+        valid &= sce::fromString( hms.substr( firstSep + 1, secondSep - firstSep - 1 ), m );
+        if( longForm )
+            valid &= sce::fromString( hms.substr( secondSep + 1, hms.length() - secondSep + 1 ), s );
+
+        valid &= ( h < 24 && m < 60 && s < 60 );
+
+        if( valid )
+            setTime( h, m, s );
+    }
+    if( !valid )
+        time_ = 0;
+}
+
+void LgFrDatetime::setDate( int month, int day, int year )
+{
+    if( year < pivotYear )
+        year += 100;
+    if( year < 1900 )
+        year += 1900;
+
+    bool valid = validateDate( month, day, year ); 
+
+    if( valid )
+    {
+        time_ = time_ % secsPerDay; 
+
+        time_ += ( ( julian_date( day, month, year ) - jan1st1970JulianDay ) * secsPerDay );
+    }
+    else
+        time_ = 0;
+
+}
+
+void LgFrDatetime::setDate( const std::string& mdy ) // format: yy/mm/dd OR yyyy/mm/dd (pivot year is 70)
+{
+    if( mdy.find_first_of( '/' ) == std::string::npos && mdy.length() != 8 )
+    {
+        time_ = 0; 
+        return;
+    }
+
+    size_t firstSep = mdy.find_first_of( '/' );
+    size_t secondSep = mdy.find_first_of( '/', firstSep + 1 );
+    size_t thirdSep = mdy.find_first_of( '/', secondSep + 1 );
+
+    // Make sure we have only two separators placed reasonably
+    bool goodSeps = ( firstSep != std::string::npos && secondSep != std::string::npos && thirdSep == std::string::npos );
+    goodSeps &= ( firstSep > 0 && secondSep > firstSep + 1 && secondSep < mdy.length() - 1 );
+
+    bool straight = (firstSep == std::string::npos) && (secondSep == std::string::npos) && (thirdSep == std::string::npos);
+
+    unsigned int m, d, y;
+
+    bool valid = false;
+    if( straight )
+    {
+        valid  = sce::fromString( mdy.substr( 0, 4 ), y );
+        valid &= sce::fromString( mdy.substr( 4, 2 ), m );
+        valid &= sce::fromString( mdy.substr( 6, 2 ), d );
+    }
+    else if( goodSeps )
+    {
+        valid  = sce::fromString( mdy.substr( 0, firstSep ), m );
+        valid &= sce::fromString( mdy.substr( firstSep + 1, secondSep - firstSep - 1 ), d );
+        valid &= sce::fromString( mdy.substr( secondSep + 1, mdy.length() - secondSep + 1 ), y );
+    }
+
+    setDate( m, d, y );
+}
+
+// general services
+bool LgFrDatetime::validateDate( int month, int day, int year )
+{
+     if( year < 1970 || year >= 2038 ) // these are the limitations of the time library routines
+         return false;
+
+	/* validate the specified d/m/y */
+	/* i.e., 2/29/73 and april 31 are not valid */
+
+	int cal_day, cal_month, cal_year;
+	/* convert date to julian day number and back */
+	calendar_date(julian_date(day, month, year), cal_day, cal_month, cal_year);
+
+	/* date is valid if d/m/y did not change */
+	return ((day == cal_day) && (month == cal_month) && (year == cal_year));
+}
+
+bool LgFrDatetime::validateTime( int h, int m, int s )
+{
+	return ( h >= 0 && h < 24 && m >= 0 && m < 60 && s >= 0 && s < 60 );
+}
+  
+LgFrDatetime LgFrDatetime::plusYears( int years ) const
+{
+    LgFrDatetime dt( *this );
+    int m,d,y;
+    dt.getDate( m, d, y );
+    y += years;
+    dt.setDate( m, d, y );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusQuarters( int quarters ) const
+{
+    return plusMonths( 3 * quarters );
+}
+
+LgFrDatetime LgFrDatetime::plusMonths( int months ) const
+{
+    LgFrDatetime dt( *this );
+    int m,d,y;
+    dt.getDate( m, d, y );
+
+    bool lastDayOfMonth = !validateDate( m, d+1, y );
+
+    m += months;
+    while( m <= 0 ) // months may be more than 12, and negative
+    {
+        m += 12;
+        y -= 1;
+    }
+    while( m > 12 )
+    {
+        m -= 12;
+        y += 1;
+    }
+
+    // If we were the last day of the month, make the result also the last day of the month
+    if( lastDayOfMonth )
+    {
+        while( validateDate( m, d+1, y ) ) 
+            d += 1;
+    }
+
+    // we may have an invalid date if the day was near the upper limit for the month
+    while( !validateDate( m, d, y ) ) 
+        d -= 1;
+
+    dt.setDate( m, d, y );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusWeeks( int weeks ) const
+{
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + weeks * 7 * secsPerDay );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusDays( int days ) const
+{
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + days * secsPerDay );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusHours( int hours ) const
+{
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + hours * 3600 );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusMinutes( int minutes ) const
+{
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + minutes * 60 );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusSeconds( int seconds ) const
+{
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + seconds );
+
+    return dt;
+}
+
+// NOTE: These three functions are trusted to be exact copies of what was once published 
+// in a reliable publication. The only changes that were made are removing code
+// dealing with the pre-gregorian calendar, and updating a few types;
+// date management, computer language, dec. 1990, p 57 */
+// dates are represented as Julian day numbers, stored as long integers (at least 32 bits )
+
+long LgFrDatetime::julian_date(int day, int month, int year) // static
+{
+
+    long aa = (14L-(long)month)/12L;
+    long yy = (long)year+4800L-aa;
+    long mm = (long)month+12L*aa-3L;
+
+    long retVal = day;
+    retVal += (153L*(long)mm+2L)/5L;
+    retVal += 365L*(long)yy;
+    retVal += (long)yy/4L;
+
+    retVal -= (long)yy/100L;
+    retVal += (long)yy/400L;
+    retVal -= 32045L;
+
+    retVal -= 1L;
+
+    return retVal;
+
+
+    //    return jd2;
+}
+
+
+void LgFrDatetime::calendar_date(long jdate, int& day, int& month, int& year) // static
+{
+	/* calculate the day, month, year corresponding to julian day number */
+	/* the year will be negative if year is B.C. */
+
+	long a, b, c, d, e, z, alpha;
+	
+	z = jdate + 1;
+	/* cope with Gregorian calendar reform */
+	if (z < 2299161L)
+		a = z;
+	else
+	{
+		alpha = (long) ((z - 1867216.25) / 36524.25);
+		a = z + 1 + alpha - alpha / 4;
+	}
+	b = a + 1524;
+	c = (long) ((b - 122.1) / 365.25);
+	d = (long) (365.25 * c);
+	e = (long) ((b - d) / 30.6001);
+	day = (int) b - d - (long) (30.6001 * e);
+	month = (int) (e < 13.5) ? e - 1 : e - 13;
+	year = (int) (month > 2.5) ? (c - 4716) : c - 4715;
+}
+
+
+bool LgFrDatetime::valid_date( int day, int month, int year ) // static
+{
+	/* validate the specified d/m/y */
+	/* i.e., 2/29/73 and april 31 are not valid */
+
+	int cal_day, cal_month, cal_year;
+	/* convert date to julian day number and back */
+	calendar_date(julian_date(day, month, year), cal_day, cal_month, cal_year);
+
+	/* date is valid if d/m/y did not change */
+	return ((day == cal_day) && (month == cal_month) && (year == cal_year));
+}
+
+
+
+
+bool LgFrDatetime::unitTest()
+{
+    // Formats required by Calendar Unittest: SCETime(SCEDate("12/30/94"), "08:00"),
+   
+    LgFrDatetime tmz ( "1/11/3", "12:02:32" );
+    time_t tt0 = tmz.getValue();
+    assert( tmz.getTimeAsString() == "12:02:32" );
+    tmz.setTime( "12:02:32" );
+    assert( tmz.getTimeAsString() == "12:02:32" );
+    tmz.setDate( "1/11/3" );
+    assert( tmz.getDateAsString() == "01/11/03" );
+
+    LgFrDatetime t0;
+    assert( t0.getValue() == 0 );
+    assert( !t0.isValid() );
+    t0.setValue( 1000 );
+    assert( t0.getValue() == 1000 );
+
+    LgFrDatetime t1 ( "1/11/3", "21:05:56" );
+
+    std::cout << t1;
+
+    LgFrDatetime t2( t1 ); 
+
+    assert( t2.getYear() == 3 );
+    assert( t2.getLongYear() == 2003 );
+    assert( t2.getMonth() == 1 );
+    assert( t2.getDayJulian() == 12063 );
+    assert( t2.getDayOfYear() == 10 ); 
+    assert( t2.getDayOfMonth() == 11 );
+    assert( t2.getDayOfWeek() == 6 );
+    assert( t2.getHour() == 21 );
+    assert( t2.getMin() == 5 );
+    assert( t2.getSec() == 56 );
+
+    assert( t1 == t2 );
+    assert( t1.getValue() > 1041948451 && t1.getValue() < 1141948451 );
+
+    t2 = t1 + 3;
+
+    assert( t2 > t1 && t1 < t2 );
+    assert( t2 >= t1 && t1 <= t2 );
+    
+    //Check that the following is correct on AIX
+    assert( t1.getDateAsString() == "01/11/03" );
+    assert( t1.getTimeAsString() == "21:05:56" );
+
+    t1.setDate( "01/15/03" );
+    assert( t1.getDateAsString() == "01/15/03" );
+    assert( t1.getDateAsStraightString() == "20030115" );
+
+    LgFrDatetime t3( "20030111" );
+    assert( t3.getDateAsString() == "01/11/03" );
+
+    LgFrDatetime t4( "20030131" );
+    t4 = t4.plusMonths( 1 );
+    assert( t4.getDateAsStraightString() == "20030228" );
+    t4 = t4.plusMonths( 1 );
+    assert( t4.getDateAsStraightString() == "20030331" );
+
+    assert( LgFrDatetime::validateTime( -1, 0, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, -1, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, -1 ) == false );
+    assert( LgFrDatetime::validateTime( 24, 0, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 60, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, 60 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, 0 ) == true );
+    assert( LgFrDatetime::validateTime( 23, 59, 59 ) == true );
+
+    assert( LgFrDatetime::validateDate( -1, 0, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, -1, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, 0, -1 ) == false );
+    assert( LgFrDatetime::validateDate( 13, 0, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, 32, 0 ) == false );
+
+    // Boundary testing for month upper dates, considering leap years
+    assert( LgFrDatetime::validateDate( 1, 1, 1969 ) == false );
+    assert( LgFrDatetime::validateDate( 1, 1, 2038 ) == false );
+    for( int y = 1970; y < 2038; y++ )
+    {
+        assert( LgFrDatetime::validateDate( 1, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 2, 28, y ) == true );
+        if( LgFrDatetime::isLeapYear( y ) )
+            assert( LgFrDatetime::validateDate( 2, 29, y ) == true );
+        else
+            assert( LgFrDatetime::validateDate( 2, 29, y ) == false );
+        assert( LgFrDatetime::validateDate( 2, 30, y ) == false );
+        assert( LgFrDatetime::validateDate( 3, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 4, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 4, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 5, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 6, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 6, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 7, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 8, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 9, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 9, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 10, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 11, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 11, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 12, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 13, 1, y ) == false );
+        assert( LgFrDatetime::validateDate( 1, 0, y ) == false );
+        assert( LgFrDatetime::validateDate( 0, 1, y ) == false );
+    }
+
+    LgFrDatetime dt( "11/30/02", "22:58:58" );
+    assert( dt.getTimeAsString() == "22:58:58" ); 
+
+    assert( dt.plusYears( 3 ).getDateAsString() == "11/30/05" );
+
+    assert( dt.plusQuarters( 5 ).getDateAsString() == "02/29/04" ); // 04 is leap
+
+    assert( dt.plusMonths( 3 ).getDateAsString() == "02/28/03" ); // 03 is not
+
+    assert( dt.plusWeeks( 8 ).getDateAsString() == "01/25/03" );
+
+    assert( dt.plusDays( 45 ).getDateAsString() == "01/14/03" );
+    assert( dt.plusDays( -3 ).getDateAsString() == "11/27/02" );
+
+    assert( dt.plusHours( 1 ).getTimeAsString() == "23:58:58" ); 
+    assert( dt.plusHours( 1 ).getDateAsString() == "11/30/02" ); 
+
+    assert( dt.plusHours( 2 ).getTimeAsString() == "00:58:58" ); 
+    assert( dt.plusHours( 2 ).getDateAsString() == "12/01/02" ); 
+
+    assert( dt.plusMinutes( 1 ).getTimeAsString() == "22:59:58" ); 
+    assert( dt.plusMinutes( 2 ).getDateAsString() == "11/30/02" ); 
+
+    assert( dt.plusMinutes( 62 ).getTimeAsString() == "00:00:58" ); 
+    assert( dt.plusMinutes( 62 ).getDateAsString() == "12/01/02" ); 
+
+    assert( dt.plusSeconds( 3 ).getTimeAsString() == "22:59:01" ); 
+    assert( dt.plusSeconds( -3 ).getTimeAsString() == "22:58:55" );
+
+    assert( dt.plusSeconds( secsPerDay ).getTimeAsString() == "22:58:58" ); 
+    assert( dt.plusSeconds( secsPerDay ).getDateAsString() == "12/01/02" ); 
+
+    return true;
+}
+
+@
+
+
+1.6
+log
+@julian date logic was breaking in 64 bit mode
+@
+text
+@a400 25
+#if 1
+	if (month <= 2)
+	{
+		year--;
+		month += 12;
+	}
+
+/* This is an attempt to get this code to work correctly on a 64 bit machine */
+#ifndef __64BIT__
+	unsigned int		a, b;
+#else
+	unsigned long		a, b;
+#endif
+	b = 0;
+    a = year / 100;
+	b = 2 - a + a / 4;
+    long jd = (long) (365.25 * year) + (long) (30.6001 * (month + 1)) + day + 1720994L + b;
+
+	long a2, c2;
+	unsigned long b2;
+	a2 = year / 100;
+	c2  = 2 - a2 + floor((double) a2 / 4);
+	b2 = (c2 >=0 ? c2 : 4294967295 + c2 + 1);
+    long jd2 = (long) (365.25 * year) + (long) (30.6001 * (month + 1)) + day + 1720994L + b2;
+#endif
+@
+
+
+1.5
+log
+@Attempt to fix julian calendar to work in 64 bit.
+@
+text
+@d6 1
+d401 1
+d415 28
+a443 2
+	a = year / 100;
+	b = 2 - a + a / 4;
+d445 1
+a445 2
+    long jd = (long) (365.25 * year) + (long) (30.6001 * (month + 1)) + day + 1720994L + b;
+    return jd;
+@
+
+
+1.4
+log
+@Added a comment to check if output format matches AIX's.
+@
+text
+@d406 2
+d409 3
+d417 2
+a418 1
+    return (long) (365.25 * year) + (long) (30.6001 * (month + 1)) + day + 1720994L + b;
+@
+
+
+1.3
+log
+@Changed some date/time formats of asserts.
+@
+text
+@d500 2
+a501 1
+
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d468 1
+a468 1
+    assert( tmz.getDateAsString() == "1/11/3" );
+d501 1
+a501 1
+    assert( t1.getDateAsString() == "1/11/3" );
+d505 1
+a505 1
+    assert( t1.getDateAsString() == "1/15/3" );
+d509 1
+a509 1
+    assert( t3.getDateAsString() == "1/11/3" );
+d566 1
+a566 1
+    assert( dt.plusYears( 3 ).getDateAsString() == "11/30/5" );
+d568 1
+a568 1
+    assert( dt.plusQuarters( 5 ).getDateAsString() == "2/29/4" ); // 04 is leap
+d570 1
+a570 1
+    assert( dt.plusMonths( 3 ).getDateAsString() == "2/28/3" ); // 03 is not
+d572 1
+a572 1
+    assert( dt.plusWeeks( 8 ).getDateAsString() == "1/25/3" );
+d574 2
+a575 2
+    assert( dt.plusDays( 45 ).getDateAsString() == "1/14/3" );
+    assert( dt.plusDays( -3 ).getDateAsString() == "11/27/2" );
+d578 1
+a578 1
+    assert( dt.plusHours( 1 ).getDateAsString() == "11/30/2" ); 
+d580 2
+a581 2
+    assert( dt.plusHours( 2 ).getTimeAsString() == "0:58:58" ); 
+    assert( dt.plusHours( 2 ).getDateAsString() == "12/1/2" ); 
+d584 1
+a584 1
+    assert( dt.plusMinutes( 2 ).getDateAsString() == "11/30/2" ); 
+d586 2
+a587 2
+    assert( dt.plusMinutes( 62 ).getTimeAsString() == "0:00:58" ); 
+    assert( dt.plusMinutes( 62 ).getDateAsString() == "12/1/2" ); 
+d593 1
+a593 1
+    assert( dt.plusSeconds( secsPerDay ).getDateAsString() == "12/1/2" ); 
+@
+
+
+1.1
+log
+@file dateTime.C was initially added on branch EndRw-branch.
+@
+text
+@d1 597
+@
+
+
+1.1.2.1
+log
+@New files for RWTime & RWDate replacements
+@
+text
+@a0 351
+
+#include <scenario/src/dateTime.h>
+#include <scenario/src/RWToSTLHelpers.h>
+
+#include <assert.h>
+
+const unsigned int secsPerDay = 86400; // quit saying "sex per day", it's "secs per day"
+const unsigned int julian1970 = 2440587;  // SCEDate is in Julian days, SCETime is in seconds since Jan 1 1970.
+const unsigned int pivotYear = 70;
+
+static long julian_date(unsigned int day, unsigned int month, unsigned int year);
+static void calendar_date(long jdate, unsigned int *day, unsigned int *month, unsigned int *year);
+static bool valid_date(unsigned int day, unsigned int month, unsigned int year);
+static unsigned int day_of_week(long date);
+
+
+bool SCETime::unitTest()
+{
+    // Formats required by Calendar Unittest: SCETime(SCEDate("12/30/94"), "08:00"),
+
+    SCEDate d2( 7, 1, 3 );
+
+    SCETime t0( 1000 );
+    assert( t0.isValid() );
+    assert( t0.seconds() == 1000 );
+
+    SCETime t1; // default constructor should give reasonable current time 
+    assert( t1.seconds() > 1041948451 && t1.seconds() < 1141948451 );
+
+    SCETime t2( d2, 23, 59, 59 );
+    assert( t2.seconds() == 1041983999 );
+
+    SCETime t8( d2, 23, 59 );
+    assert( t8.seconds() == 1041983940 );
+
+    SCETime t3( d2, "23:59:59" );
+    assert( t3.seconds() == 1041983999 );
+
+    SCETime t4( t3 );
+    assert( t4 == t3 );
+
+    SCETime t5( 999 );
+    assert( t5 < t0 );
+    assert( t5 <= t0 && t0 <= t0 );
+
+    SCETime t6( 1001 );
+    assert( t6 > t0 );
+    assert( t6 >= t0 && t6 >= t0 );
+
+    SCETime t7 = t0 - 2;
+    assert( t7.seconds() == 998 );
+
+    SCEDate d5( 123456 );
+    assert( d5.julday_ == 123456 );
+
+    SCEDate d4( 7, 2, 3 );
+    assert( d4.day() == 38 );
+    assert( d4.dayOfMonth() == 7 );
+    assert( d4.month() == 2 );
+    assert( d4.year() == 2003 );
+    
+    //assert( d4.asString() == "2/7/3" );
+
+    SCEDate d0( 30, 12, 69 );
+    assert( d0.day() == 364 ); 
+    assert( d0.dayOfMonth() == 30 );
+    assert( d0.month() == 12 ); 
+    assert( d0.year() == 2069 ); // this also tests 1970 pivot year
+
+    SCEDate d1( "12/30/70" );
+    assert( d1.year() == 1970 ); // test other side of 1970 pivot year
+
+    SCEDate d3( 7, 1, 2003 );
+    assert( d3.year() == 2003 ); 
+
+    assert( d3 < d4 );
+    assert( d4 > d3 );
+
+    assert( SCEDate::dayWithinMonth( 2, 29, 1996 ) == true );
+    assert( SCEDate::dayWithinMonth( 2, 30, 1996 ) == false );
+    assert( SCEDate::dayWithinMonth( 2, 29, 1999 ) == false );
+    assert( SCEDate::dayWithinMonth( 2, 30, 1999 ) == false );
+
+    return true;
+}
+
+
+// Formats required by Calendar Unittest: SCETime(SCEDate("12/30/94"), "08:00"),
+
+SCETime::SCETime( const SCEDate& d, unsigned int h, unsigned int m, unsigned int s )
+{
+    bool valid = ( d.isValid() && h < 24 && m < 60 && s < 60 );
+    assert( valid );
+
+    if( valid )
+        secs_ = ( d.julday_ - julian1970 ) * secsPerDay + h * 3600 + m * 60 + s;
+    else
+        secs_ = 0;
+}
+
+SCETime::SCETime( const SCEDate& d, const std::string& str )
+{
+    // Must be specified in "HH:MM" or "HH:MM:SS" 24-hour format
+    bool longForm = str.length() == 8;
+    bool valid = d.isValid();
+    if( longForm )
+        valid = ( str.length() == 8 && str[2] == ':' && str[5] == ':' ); 
+    else
+        valid = ( str.length() == 5 && str[2] == ':' ); 
+
+    size_t h, m, s = 0;
+    valid &= sce::fromString( str.substr( 0, 2 ), h );
+    valid &= sce::fromString( str.substr( 3, 2 ), m );
+    if( longForm )
+        valid &= sce::fromString( str.substr( 6, 2 ), s );
+
+    valid &= ( h < 24 && m < 60 && s < 60 );
+
+    assert( valid );
+    if( valid )
+        secs_ = ( d.julday_ - julian1970 ) * secsPerDay + h * 3600 + m * 60 + s;
+    else
+        secs_ = 0;
+}
+
+// pivot year is 1970
+SCEDate::SCEDate( unsigned int d, unsigned int m, unsigned int y )
+{
+    bool valid = ( d < 32 && m < 13 && y < 2100 );
+    assert( valid );
+
+    if( valid )
+    {
+        int yr = y;
+        if( yr < pivotYear )
+            yr += 2000;
+        else if( yr < 100 )
+            yr += 1900;
+
+        julday_ = julian_date( d, m, yr );
+    }
+    else
+        julday_ = 0;
+}
+
+SCEDate::SCEDate( const std::string& str )
+{
+    size_t firstSep = str.find_first_of( '/' );
+    size_t secondSep = str.find_first_of( '/', firstSep + 1 );
+    size_t thirdSep = str.find_first_of( '/', secondSep + 1 );
+
+    // Make sure we have only two separators placed reasonably
+    bool valid = ( firstSep != std::string::npos && secondSep != std::string::npos && thirdSep == std::string::npos );
+    valid &= ( firstSep > 0 && secondSep > firstSep + 1 && secondSep < str.length() - 1 );
+
+    unsigned int m, d, y;
+    valid &= sce::fromString( str.substr( 0, firstSep ), m );
+    valid &= sce::fromString( str.substr( firstSep + 1, secondSep - firstSep - 1 ), d );
+    valid &= sce::fromString( str.substr( secondSep + 1, str.length() - secondSep + 1 ), y );
+
+    valid &= ( d < 32 && m < 13 && y < 2100 );
+
+    if( valid )
+    {
+        int yr = y;
+        if( yr < pivotYear )
+            yr += 2000;
+        else if( yr < 100 )
+            yr += 1900;
+
+        julday_ = julian_date( d, m, yr );
+    }
+    else
+        julday_ = 0;
+}
+
+SCEDate::SCEDate( const SCETime& t )
+{
+    bool valid = t.isValid();
+
+    // t is number of seconds since jan 1 1970
+    int days = t.seconds() / secsPerDay;
+
+    if( valid )
+        julday_ = julian_date( 1, 1, 1970 ) + days;
+    else
+        julday_ = 0;
+}
+
+unsigned int SCEDate::day() const         // 1-365
+{
+    assert( isValid() );
+
+    unsigned int m, d, y;
+    calendar_date( julday_, &d, &m, &y );
+
+    long jan1stJulday = julian_date( 1, 1, y );
+
+    return julday_ - jan1stJulday + 1; // Add 1 so jan 1st returns 1
+}
+
+unsigned int  SCEDate::dayOfMonth() const  // 1-31
+{
+    assert( isValid() );
+
+    unsigned int m, d, y;
+    calendar_date( julday_, &d, &m, &y );
+
+    return d;
+}
+
+unsigned int SCEDate::month() const
+{
+    assert( isValid() );
+
+    unsigned int m, d, y;
+    calendar_date( julday_, &d, &m, &y );
+
+    return m;
+}
+
+unsigned int  SCEDate::year() const
+{
+    assert( isValid() );
+
+    unsigned int m, d, y;
+    calendar_date( julday_, &d, &m, &y );
+
+    return y;
+}
+
+std::string SCEDate::asString(char format) const
+{
+    assert( isValid() );
+
+    struct tm zedate = toStruct_tm();
+
+    char tmp[100];
+
+    switch( format )
+    {
+    case 'x':
+        strftime( tmp, sizeof( tmp ), "%#m/%#d/%#y", &zedate );
+    break;
+    default:
+        assert( 0 && "Unknown format!" );
+    }
+
+    return tmp;
+}
+
+struct tm SCEDate::toStruct_tm() const
+{
+    struct tm tm0;
+    memset( &tm0, 0, sizeof( tm0 ) );
+
+    unsigned int m, d, y;
+    calendar_date( julday_, &d, &m, &y );
+
+    tm0.tm_mday = d;    /* tm wants day of the month - [1,31] */
+    tm0.tm_mon = m - 1;     /* tm wants months since January - [0,11] */
+    tm0.tm_year = y - 1900;    /* tm wants years since 1900 */
+
+    return tm0;
+}
+
+
+ostream& operator<<( ostream& s, const SCEDate& d )
+{
+    assert( d.isValid() );
+
+    return s << d.asString();
+}
+
+bool SCEDate::dayWithinMonth( unsigned int mon, unsigned int day, unsigned int yr ) //static
+{
+    return valid_date( day, mon, yr);
+}
+
+// NOTE: These 4 functions are trusted to be exact copies of what was once published 
+// in a reliable publication. The only changes that were made are removing code
+// dealing with the pre-gregorian calendar, and updating a few types;
+// date management, computer language, dec. 1990, p 57 */
+// dates are represented as Julian day numbers, stored as long integers (at least 32 bits )
+
+long julian_date(unsigned int day, unsigned int month, unsigned int year)
+{
+	if (month <= 2)
+	{
+		year--;
+		month += 12;
+	}
+
+	unsigned int		a, b;
+	b = 0;
+
+	a = year / 100;
+	b = 2 - a + a / 4;
+
+    return (long) (365.25 * year) + (long) (30.6001 * (month + 1)) + day + 1720994L + b;
+}
+
+
+void calendar_date(long jdate, unsigned int *day, unsigned int *month, unsigned int *year)
+{
+	/* calculate the day, month, year corresponding to julian day number */
+	/* the year will be negative if year is B.C. */
+
+	long		a, b, c, d, e, z, alpha;
+	
+	z = jdate + 1;
+	/* cope with Gregorian calendar reform */
+	if (z < 2299161L)
+		a = z;
+	else
+	{
+		alpha = (long) ((z - 1867216.25) / 36524.25);
+		a = z + 1 + alpha - alpha / 4;
+	}
+	b = a + 1524;
+	c = (long) ((b - 122.1) / 365.25);
+	d = (long) (365.25 * c);
+	e = (long) ((b - d) / 30.6001);
+	*day = (unsigned int) b - d - (long) (30.6001 * e);
+	*month = (unsigned int) (e < 13.5) ? e - 1 : e - 13;
+	*year = (unsigned int) (*month > 2.5) ? (c - 4716) : c - 4715;
+}
+
+
+unsigned int day_of_week(long date)
+{
+	/* calculate the day of the week for the specified Julian day number */
+	/* 1=sunday, 2=monday, ... 7=saturday */	
+
+	return (unsigned int) ((date + 2) % 7 + 1);
+}
+
+
+bool valid_date(unsigned int day, unsigned int month, unsigned int year)
+{
+	/* validate the specified d/m/y */
+	/* i.e., 2/29/73 and april 31 are not valid */
+
+	unsigned int cal_day, cal_month, cal_year;
+	/* convert date to julian day number and back */
+	calendar_date(julian_date(day, month, year), &cal_day, &cal_month, &cal_year);
+
+	/* date is valid if d/m/y did not change */
+	return ((day == cal_day) && (month == cal_month) && (year == cal_year));
+}
+
+@
+
+
+1.1.2.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d268 1
+a268 1
+std::ostream& operator<<( std::ostream& s, const SCEDate& d )
+@
+
+
+1.1.2.3
+log
+@Fixed SCETime streaming problems
+@
+text
+@a125 12
+std::string SCETime::asString() const
+{
+    assert( isValid() );
+
+    struct tm* ptm = localtime( (long*) &secs_ );
+
+    char tmp[100];
+    strftime( tmp, sizeof( tmp ), "%#H:%M:%S", ptm );
+
+    return tmp;
+}
+
+@
+
+
+1.1.2.4
+log
+@Fixed SCETime streaming problems
+@
+text
+@d130 1
+a130 1
+    struct tm* ptm = localtime( (const long*) &secs_ );
+@
+
+
+1.1.2.5
+log
+@SCETime now holds a time_t
+@
+text
+@d130 1
+a130 1
+    struct tm* ptm = localtime( &secs_ );
+@
+
+
+1.1.2.6
+log
+@New LgFrDatetime class
+@
+text
+@a4 2
+#define NDEBUG
+
+d11 4
+a14 8
+// The input year is being normalized in the following way: if two digits 
+// (or a year < 100) are provided, the year meant is assumed to be 1900 +
+// the input value if the input value is greater than pivotYear, and 2000 +
+// the input value if the input value is smaller than pivotYear.
+
+// The year is adjusted to the number of years since 1900 when storing it in
+// or reading it from a struct_tm structure because that is the format the 
+// time routines expect.
+a15 3
+// the time_ member represents, like the time() function, the number of seconds
+// elapsed since midnight Jan 1st 1970. The inconsistency between 1900 and 1970
+// is taken care of by the time routines.
+d17 1
+a17 2
+LgFrDatetime::LgFrDatetime( time_t s )
+ : time_(s) 
+d19 1
+a19 1
+}  
+d21 1
+a21 4
+LgFrDatetime::LgFrDatetime( const LgFrDatetime& t )
+ : time_( t.time_ )
+{
+}
+d23 3
+a25 7
+LgFrDatetime::LgFrDatetime( const std::string& date, const std::string& time )
+: time_( 0 )
+{ 
+    setDate( date ); 
+    if( !time.empty() )
+        setTime( time );
+}
+d27 2
+a28 7
+const struct tm& LgFrDatetime::getAsStruct_tm() const
+{
+    // this function owns a private, static struct tm and the value it is good for.
+    // It prevents it from having to reconvert from time_ to struct tm on every call.
+    // It also allows it to appear as const because the struct tm is not a member.
+    static time_t timeStructtmFor = 0; 
+    static struct tm tm_;
+d30 2
+a31 7
+    if( time_ != timeStructtmFor )
+    {
+        extern long _timezone;
+        _timezone = 0;
+        memcpy( &tm_, localtime( &time_ ), sizeof( tm_ ) );
+        timeStructtmFor = time_;
+    }
+d33 2
+a34 2
+    return tm_;
+}
+d36 2
+a37 4
+// accessors
+std::string LgFrDatetime::getDateAsString( const std::string& format ) const
+{
+    assert( isValid() );
+d39 2
+a40 1
+    const struct tm& z = getAsStruct_tm();
+d42 3
+a44 2
+    char tmp[100];
+    strftime( tmp, sizeof( tmp ), format.c_str(), &z );
+d46 3
+a48 5
+    return tmp;
+}
+std::string LgFrDatetime::getTimeAsString( const std::string& format ) const
+{
+    assert( isValid() );
+d50 2
+a51 1
+    const struct tm& z = getAsStruct_tm();
+d53 2
+a54 2
+    char tmp[100];
+    strftime( tmp, sizeof( tmp ), format.c_str(), &z );
+d56 7
+a62 2
+    return tmp;
+}
+d64 5
+a68 3
+void LgFrDatetime::getDate( int& month, int& day, int& year ) const
+{
+    const struct tm& z = getAsStruct_tm();
+d70 2
+a71 4
+    year =  z.tm_year + 1900; // tm_year is 1900-based
+    month = z.tm_mon + 1; // tm_mon is 0-based
+    day =   z.tm_mday;
+}
+d73 2
+a74 3
+void LgFrDatetime::getTime( int& hour, int& min, int& sec ) const
+{
+    const struct tm& z = getAsStruct_tm();
+d76 2
+a77 4
+    hour =  z.tm_hour;
+    min =   z.tm_min;
+    sec =   z.tm_sec;
+}
+d79 4
+a82 3
+void LgFrDatetime::getDatetime( int& month, int& day, int& year, int& hour, int& min, int& sec ) const
+{
+    const struct tm& z = getAsStruct_tm();
+d84 1
+a84 6
+    year =  z.tm_year + 1900; // tm_year is 1900-based
+    month = z.tm_mon + 1; // tm_mon is 0-based
+    day =   z.tm_mday;
+    hour =  z.tm_hour;
+    min =   z.tm_min;
+    sec =   z.tm_sec;
+a86 5
+int  LgFrDatetime::getHour() const
+{
+    assert( isValid() );
+    return getAsStruct_tm().tm_hour;
+}
+d88 1
+a88 5
+int  LgFrDatetime::getMin() const
+{
+    assert( isValid() );
+    return getAsStruct_tm().tm_min;
+}
+d90 1
+a90 1
+int  LgFrDatetime::getSec() const
+d92 2
+a93 3
+    assert( isValid() );
+    return getAsStruct_tm().tm_sec;
+}
+d95 4
+a98 4
+int  LgFrDatetime::getDayOfWeek() const
+{
+    assert( isValid() );
+    return getAsStruct_tm().tm_wday;
+d101 1
+a101 1
+int  LgFrDatetime::getDayOfMonth() const
+d103 7
+a109 3
+    assert( isValid() );
+    return getAsStruct_tm().tm_mday;
+}
+d111 5
+a115 5
+int  LgFrDatetime::getDayOfYear() const
+{
+    assert( isValid() );
+    return getAsStruct_tm().tm_yday;
+}
+d117 1
+a117 5
+int  LgFrDatetime::getMonth() const
+{
+    assert( isValid() );
+    return getAsStruct_tm().tm_mon + 1; // tm_mon is 0-based
+}
+d119 5
+a123 8
+int  LgFrDatetime::getYear() const
+{
+    assert( isValid() );
+    int year = getAsStruct_tm().tm_year;
+    if( year >= 100 )
+        year -= 100;
+
+    return year;
+d126 1
+a126 1
+int  LgFrDatetime::getLongYear() const
+a128 2
+    return getAsStruct_tm().tm_year + 1900; // tm_year is 1900-based
+}
+d130 1
+a130 9
+// NOTE: This function is trusted to be exact copies of what was once published 
+// in a reliable publication. The only changes that were made are removing code
+// dealing with the pre-gregorian calendar, and updating a few types;
+// date management, computer language, dec. 1990, p 57 */
+// dates are represented as Julian day numbers, stored as long integers (at least 32 bits )
+int  LgFrDatetime::getDayJulian() const
+{
+    return time_ / secsPerDay;
+}
+d132 2
+a133 3
+std::ostream& operator<<(std::ostream& s, const LgFrDatetime& d)
+{
+    assert( d.isValid() );
+d135 1
+a135 1
+    return s << asctime( &d.getAsStruct_tm() );
+d138 2
+a139 3
+
+// modifiers
+void LgFrDatetime::setTime( int h, int m, int s )
+d141 1
+a141 1
+    bool valid = validateTime( h, m, s );
+d146 7
+a152 2
+        time_ = time_ - time_ % secsPerDay;
+        time_ += s + 60 * ( m + 60 * h );
+d155 1
+a155 3
+    {
+        time_ = 0;
+    }
+d158 1
+a158 1
+void LgFrDatetime::setTime( const std::string& hms ) 
+d160 7
+a166 5
+    if( hms.find_first_of( ':' ) == std::string::npos )
+    {
+        time_ = 0; 
+        return;
+    }
+d168 4
+a171 4
+    // Must be specified in "HH:MM" or "HH:MM:SS" 24-hour format
+    size_t firstSep = hms.find_first_of( ':' );
+    size_t secondSep = hms.find_first_of( ':', firstSep + 1 );
+    size_t thirdSep = hms.find_first_of( ':', secondSep + 1 );
+d173 1
+a173 3
+    // Make sure we have one or two separators placed reasonably
+    bool valid = ( firstSep != std::string::npos && thirdSep == std::string::npos );
+    assert( valid );
+d177 7
+a183 12
+        bool longForm = secondSep != std::string::npos;
+        size_t h, m, s = 0;
+        valid &= sce::fromString( hms.substr( 0, firstSep ), h );
+        valid &= sce::fromString( hms.substr( firstSep + 1, secondSep - firstSep - 1 ), m );
+        if( longForm )
+            valid &= sce::fromString( hms.substr( secondSep + 1, hms.length() - secondSep + 1 ), s );
+
+        valid &= ( h < 24 && m < 60 && s < 60 );
+
+        assert( valid );
+        if( valid )
+            setTime( h, m, s );
+d185 2
+a186 2
+    if( !valid )
+        time_ = 0;
+d189 1
+a189 1
+void LgFrDatetime::setDate( int month, int day, int year )
+d191 1
+a191 4
+    if( year > 1900 )
+        year -= 1900;
+    if( year < pivotYear )
+        year += 100;
+d193 2
+a194 2
+    bool valid = validateDate( month, day, year + 1900 ); 
+    assert( valid );
+d197 1
+a197 14
+    {
+        struct tm tm0;
+        memset( &tm0, 0, sizeof( tm0 ) );
+
+        tm0.tm_year = year;
+        tm0.tm_mon =  month - 1; // tm_mon is 0-based
+        tm0.tm_mday = day;
+
+        time_ = time_ % secsPerDay; 
+
+        extern long _timezone;
+        _timezone = 0;
+        time_ += mktime( &tm0 );
+    }
+d199 1
+a199 2
+        time_ = 0;
+
+d202 1
+a202 1
+void LgFrDatetime::setDate( const std::string& mdy ) // format: yy/mm/dd OR yyyy/mm/dd (pivot year is 70)
+d204 1
+a204 15
+    if( mdy.find_first_of( '/' ) == std::string::npos && mdy.length() != 8 )
+    {
+        time_ = 0; 
+        return;
+    }
+
+    size_t firstSep = mdy.find_first_of( '/' );
+    size_t secondSep = mdy.find_first_of( '/', firstSep + 1 );
+    size_t thirdSep = mdy.find_first_of( '/', secondSep + 1 );
+
+    // Make sure we have only two separators placed reasonably
+    bool goodSeps = ( firstSep != std::string::npos && secondSep != std::string::npos && thirdSep == std::string::npos );
+    goodSeps &= ( firstSep > 0 && secondSep > firstSep + 1 && secondSep < mdy.length() - 1 );
+
+    bool straight = (firstSep == std::string::npos) && (secondSep == std::string::npos) && (thirdSep == std::string::npos);
+d207 1
+d209 1
+a209 13
+    bool valid = false;
+    if( straight )
+    {
+        valid  = sce::fromString( mdy.substr( 0, 4 ), y );
+        valid &= sce::fromString( mdy.substr( 4, 2 ), m );
+        valid &= sce::fromString( mdy.substr( 6, 2 ), d );
+    }
+    else if( goodSeps )
+    {
+        valid  = sce::fromString( mdy.substr( 0, firstSep ), m );
+        valid &= sce::fromString( mdy.substr( firstSep + 1, secondSep - firstSep - 1 ), d );
+        valid &= sce::fromString( mdy.substr( secondSep + 1, mdy.length() - secondSep + 1 ), y );
+    }
+d211 1
+a211 1
+    setDate( m, d, y );
+d214 1
+a214 2
+// general services
+bool LgFrDatetime::validateDate( int month, int day, int year )
+d216 1
+a216 2
+     if( year < 1970 || year >= 2038 ) // these are the limitations of the time library routines
+         return false;
+d218 2
+a219 6
+	/* validate the specified d/m/y */
+	/* i.e., 2/29/73 and april 31 are not valid */
+
+	int cal_day, cal_month, cal_year;
+	/* convert date to julian day number and back */
+	calendar_date(julian_date(day, month, year), &cal_day, &cal_month, &cal_year);
+d221 1
+a221 2
+	/* date is valid if d/m/y did not change */
+	return ((day == cal_day) && (month == cal_month) && (year == cal_year));
+d224 1
+a224 6
+bool LgFrDatetime::validateTime( int h, int m, int s )
+{
+	return ( h >= 0 && h < 24 && m >= 0 && m < 60 && s >= 0 && s < 60 );
+}
+  
+LgFrDatetime LgFrDatetime::plusYears( int years ) const
+d228 2
+a229 5
+    LgFrDatetime dt( *this );
+    int m,d,y;
+    dt.getDate( m, d, y );
+    y += years;
+    dt.setDate( m, d, y );
+d231 1
+a231 1
+    return dt;
+d234 1
+a234 1
+LgFrDatetime LgFrDatetime::plusQuarters( int quarters ) const
+d238 2
+a239 14
+    LgFrDatetime dt( *this );
+    int m,d,y;
+    dt.getDate( m, d, y );
+    m += quarters * 3;
+    while( m <= 0 ) // quarters may be negative, and more then 4
+    {
+        m += 12;
+        y -= 1;
+    }
+    while( m > 12 )
+    {
+        m -= 12;
+        y += 1;
+    }
+d241 1
+a241 7
+    // we may have an invalid date if the day was near the upper limit for the month
+    while( !validateDate( m, d, y ) )
+        d -= 1;
+
+    dt.setDate( m, d, y );
+
+    return dt;
+d244 1
+a244 1
+LgFrDatetime LgFrDatetime::plusMonths( int months ) const
+d248 5
+a252 5
+    LgFrDatetime dt( *this );
+    int m,d,y;
+    dt.getDate( m, d, y );
+    m += months;
+    while( m <= 0 ) // quarters may be negative, and more then 4
+d254 5
+a258 7
+        m += 12;
+        y -= 1;
+    }
+    while( m > 12 )
+    {
+        m -= 12;
+        y += 1;
+d261 1
+a261 7
+    // we may have an invalid date if the day was near the upper limit for the month
+    while( !validateDate( m, d, y ) )
+        d -= 1;
+
+    dt.setDate( m, d, y );
+
+    return dt;
+d264 1
+a264 1
+LgFrDatetime LgFrDatetime::plusWeeks( int weeks ) const
+d266 2
+a267 1
+    assert( isValid() );
+d269 2
+a270 1
+    LgFrDatetime dt( *this );
+d272 3
+a274 1
+    dt.setValue( dt.getValue() + weeks * 7 * secsPerDay );
+d276 1
+a276 1
+    return dt;
+a278 3
+LgFrDatetime LgFrDatetime::plusDays( int days ) const
+{
+    assert( isValid() );
+d280 1
+a280 8
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + days * secsPerDay );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusHours( int hours ) const
+d282 1
+a282 5
+    assert( isValid() );
+
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + hours * 3600 );
+d284 1
+a284 1
+    return dt;
+d287 1
+a287 1
+LgFrDatetime LgFrDatetime::plusMinutes( int minutes ) const
+d289 1
+a289 18
+    assert( isValid() );
+
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + minutes * 60 );
+
+    return dt;
+}
+
+LgFrDatetime LgFrDatetime::plusSeconds( int seconds ) const
+{
+    assert( isValid() );
+
+    LgFrDatetime dt( *this );
+
+    dt.setValue( dt.getValue() + seconds );
+
+    return dt;
+d292 1
+a292 1
+// NOTE: These three functions are trusted to be exact copies of what was once published 
+d298 1
+a298 1
+long LgFrDatetime::julian_date(int day, int month, int year) // static
+d316 1
+a316 1
+void LgFrDatetime::calendar_date(long jdate, int *day, int *month, int *year) // static
+d336 3
+a338 3
+	*day = (int) b - d - (long) (30.6001 * e);
+	*month = (int) (e < 13.5) ? e - 1 : e - 13;
+	*year = (int) (*month > 2.5) ? (c - 4716) : c - 4715;
+d342 10
+a351 1
+bool LgFrDatetime::valid_date( int day, int month, int year ) // static
+d356 1
+a356 1
+	int cal_day, cal_month, cal_year;
+a361 130
+}
+
+
+
+
+bool LgFrDatetime::unitTest()
+{
+    // Formats required by Calendar Unittest: SCETime(SCEDate("12/30/94"), "08:00"),
+
+    LgFrDatetime t0;
+    assert( t0.getValue() == 0 );
+    assert( !t0.isValid() );
+    t0.setValue( 1000 );
+    assert( t0.getValue() == 1000 );
+
+    LgFrDatetime t1 ( "1/11/3", "21:05:56" );
+
+    std::cout << t1;
+
+    LgFrDatetime t2( t1 ); 
+
+    assert( t2.getYear() == 3 );
+    assert( t2.getLongYear() == 2003 );
+    assert( t2.getMonth() == 1 );
+    assert( t2.getDayJulian() == 12063 );
+    assert( t2.getDayOfYear() == 10 ); 
+    assert( t2.getDayOfMonth() == 11 );
+    assert( t2.getDayOfWeek() == 6 );
+    assert( t2.getHour() == 21 );
+    assert( t2.getMin() == 5 );
+    assert( t2.getSec() == 56 );
+
+    assert( t1 == t2 );
+    assert( t1.getValue() > 1041948451 && t1.getValue() < 1141948451 );
+
+    t2 = t1 + 3;
+
+    assert( t2 > t1 && t1 < t2 );
+    assert( t2 >= t1 && t1 <= t2 );
+
+    assert( t1.getDateAsString() == "1/11/3" );
+    assert( t1.getTimeAsString() == "21:05:56" );
+
+    t1.setDate( "01/15/03" );
+    assert( t1.getYear() == 3 );
+    assert( t1.getDateAsString() == "1/15/3" );
+    assert( t1.getDateAsStraightString() == "20030115" );
+
+    LgFrDatetime t3( "20030111" );
+    assert( t3.getDateAsString() == "1/11/3" );
+
+    assert( LgFrDatetime::validateTime( -1, 0, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, -1, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, -1 ) == false );
+    assert( LgFrDatetime::validateTime( 24, 0, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 60, 0 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, 60 ) == false );
+    assert( LgFrDatetime::validateTime( 0, 0, 0 ) == true );
+    assert( LgFrDatetime::validateTime( 23, 59, 59 ) == true );
+
+    assert( LgFrDatetime::validateDate( -1, 0, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, -1, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, 0, -1 ) == false );
+    assert( LgFrDatetime::validateDate( 13, 0, 0 ) == false );
+    assert( LgFrDatetime::validateDate( 0, 32, 0 ) == false );
+
+    // Boundary testing for month upper dates, considering leap years
+    assert( LgFrDatetime::validateDate( 1, 1, 1969 ) == false );
+    assert( LgFrDatetime::validateDate( 1, 1, 2038 ) == false );
+    for( int y = 1970; y < 2038; y++ )
+    {
+        assert( LgFrDatetime::validateDate( 1, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 2, 28, y ) == true );
+        if( LgFrDatetime::isLeapYear( y ) )
+            assert( LgFrDatetime::validateDate( 2, 29, y ) == true );
+        else
+            assert( LgFrDatetime::validateDate( 2, 29, y ) == false );
+        assert( LgFrDatetime::validateDate( 2, 30, y ) == false );
+        assert( LgFrDatetime::validateDate( 3, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 4, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 4, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 5, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 6, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 6, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 7, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 8, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 9, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 9, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 10, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 11, 30, y ) == true );
+        assert( LgFrDatetime::validateDate( 11, 31, y ) == false );
+        assert( LgFrDatetime::validateDate( 12, 31, y ) == true );
+        assert( LgFrDatetime::validateDate( 13, 1, y ) == false );
+        assert( LgFrDatetime::validateDate( 1, 0, y ) == false );
+        assert( LgFrDatetime::validateDate( 0, 1, y ) == false );
+    }
+
+    LgFrDatetime dt( "11/30/02", "22:58:58" );
+    assert( dt.getTimeAsString() == "22:58:58" ); 
+
+    assert( dt.plusYears( 3 ).getDateAsString() == "11/30/5" );
+
+    assert( dt.plusQuarters( 5 ).getDateAsString() == "2/29/4" ); // 04 is leap
+
+    assert( dt.plusMonths( 3 ).getDateAsString() == "2/28/3" ); // 03 is not
+
+    assert( dt.plusWeeks( 8 ).getDateAsString() == "1/25/3" );
+
+    assert( dt.plusDays( 45 ).getDateAsString() == "1/14/3" );
+    assert( dt.plusDays( -3 ).getDateAsString() == "11/27/2" );
+
+    assert( dt.plusHours( 1 ).getTimeAsString() == "23:58:58" ); 
+    assert( dt.plusHours( 1 ).getDateAsString() == "11/30/2" ); 
+
+    assert( dt.plusHours( 2 ).getTimeAsString() == "0:58:58" ); 
+    assert( dt.plusHours( 2 ).getDateAsString() == "12/1/2" ); 
+
+    assert( dt.plusMinutes( 1 ).getTimeAsString() == "22:59:58" ); 
+    assert( dt.plusMinutes( 2 ).getDateAsString() == "11/30/2" ); 
+
+    assert( dt.plusMinutes( 62 ).getTimeAsString() == "0:00:58" ); 
+    assert( dt.plusMinutes( 62 ).getDateAsString() == "12/1/2" ); 
+
+    assert( dt.plusSeconds( 3 ).getTimeAsString() == "22:59:01" ); 
+    assert( dt.plusSeconds( -3 ).getTimeAsString() == "22:58:55" );
+
+    assert( dt.plusSeconds( secsPerDay ).getTimeAsString() == "22:58:58" ); 
+    assert( dt.plusSeconds( secsPerDay ).getDateAsString() == "12/1/2" ); 
+
+    return true;
+@
+
+
+1.1.2.7
+log
+@removed the #define NDEBUG
+@
+text
+@d5 2
+@
+
+
+1.1.2.8
+log
+@Cleanup and removed assert statements
+@
+text
+@d8 2
+a9 2
+// This is used to interpret the 2-digit values passed-in for years as being before or after 2000
+const unsigned int pivotYear = 70;     
+d11 12
+d64 2
+d75 2
+d117 1
+d123 1
+d129 1
+d135 1
+d141 1
+d147 1
+d153 1
+d159 1
+d169 1
+d185 3
+a187 4
+    if( d.isValid() )
+        return s << asctime( &d.getAsStruct_tm() );
+    else
+        return s << "Invalid date!";
+d195 1
+d223 1
+d236 1
+d252 1
+d322 1
+a322 1
+	calendar_date(julian_date(day, month, year), cal_day, cal_month, cal_year);
+d335 2
+d348 2
+d376 2
+d404 2
+d415 2
+d426 2
+d437 2
+d448 2
+d481 1
+a481 1
+void LgFrDatetime::calendar_date(long jdate, int& day, int& month, int& year) // static
+d486 1
+a486 1
+	long a, b, c, d, e, z, alpha;
+d501 3
+a503 3
+	day = (int) b - d - (long) (30.6001 * e);
+	month = (int) (e < 13.5) ? e - 1 : e - 13;
+	year = (int) (month > 2.5) ? (c - 4716) : c - 4715;
+d514 1
+a514 1
+	calendar_date(julian_date(day, month, year), cal_day, cal_month, cal_year);
+@
+
+
+1.1.2.9
+log
+@Removed references to _timezone
+@
+text
+@a8 1
+const unsigned jan1st1970JulianDay = 2440587;
+d40 3
+a42 1
+        memcpy( &tm_, gmtime( &time_ ), sizeof( tm_ ) );
+d219 2
+a222 2
+    if( year < 1900 )
+        year += 1900;
+d224 1
+a224 1
+    bool valid = validateDate( month, day, year ); 
+d228 7
+d237 3
+a239 1
+        time_ += ( ( julian_date( day, month, year ) - jan1st1970JulianDay ) * secsPerDay );
+a481 8
+   
+    LgFrDatetime tmz ( "1/11/3", "12:02:32" );
+    time_t tt0 = tmz.getValue();
+    assert( tmz.getTimeAsString() == "12:02:32" );
+    tmz.setTime( "12:02:32" );
+    assert( tmz.getTimeAsString() == "12:02:32" );
+    tmz.setDate( "1/11/3" );
+    assert( tmz.getDateAsString() == "1/11/3" );
+d518 1
+@
+
+
+1.1.2.10
+log
+@Cleanup
+@
+text
+@d312 1
+a312 1
+    while( m <= 0 ) // quarters may be more than 4, and negative
+d338 1
+a338 1
+    while( m <= 0 ) // months may be more than 12, and negative
+@
+
+

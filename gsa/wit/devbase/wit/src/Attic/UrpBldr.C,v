@@ -1,0 +1,1402 @@
+head	1.21;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.21
+date	2006.03.13.19.26.34;	author rjw;	state dead;
+branches;
+next	1.20;
+
+1.20
+date	2006.03.10.23.23.31;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2006.03.08.23.57.12;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2006.03.06.19.59.47;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2006.03.03.22.22.05;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2006.03.03.21.01.02;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2006.03.03.20.46.56;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2006.03.02.21.55.49;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.03.01.19.23.25;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.02.28.19.43.05;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.02.27.23.37.44;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.02.27.23.15.14;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.01.12.22.09.24;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.01.12.21.43.58;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.01.12.20.46.54;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.01.12.20.32.38;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.01.12.20.23.30;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.11.29.16.21.51;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.11.18.17.27.45;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.11.18.17.23.46;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.11.14.20.51.23;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.21
+log
+@GPIP
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "UrpBldr.C"
+//
+// Contains the implementation of class UrpBldr.
+//------------------------------------------------------------------------------
+
+#include <UrpBldr.h>
+#include <PipMgr.h>
+#include <PipPgg.h>
+#include <PipAttPgg.h>
+#include <TripStack.h>
+#include <ExecPerSch.h>
+#include <ReqSched.h>
+#include <Demand.h>
+#include <Material.h>
+#include <Capacity.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Global.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class UrpBldr.
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::buildPegging (WitPipPgg * thePgg)
+   {
+   WitUrpBldr theBldr (thePgg);
+
+   theBldr.build ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitUrpBldr::WitUrpBldr (WitPipPgg * thePgg):
+
+      WitProbAssoc      (thePgg->myProblem ()),
+
+      myPgg_            (thePgg),
+      targDemand_       (NULL),
+      targShipPer_      (-1),
+      expExecPers_      (myProblem ()),
+      myExecPerSched_   (NULL),
+      normShare_        (),
+
+      unpgdCoexVol_     (myProblem (), 0.0),
+      unpgdNonSubVol_   (myProblem (), 0.0),
+      unpgdSubVol_      (myProblem (), 0.0),
+      unpgdStockVol_    (myProblem (), 0.0),
+      unpgdSupplyVol_   (myProblem (), 0.0),
+      unpgdSideVol_     (myProblem (), 0.0),
+
+      maxInfeas_        (0.0),
+      maxInfeasDemand_  (NULL),
+      maxInfeasShipPer_ (-1),
+      maxInfeasPart_    (NULL),
+      maxInfeasPer_     (-1)
+   {              
+   witAssert (not myGlobalComp ()->groupPipMode ());
+
+   myReqSched_     = new WitReqSched     (myProblem ());
+   myExecPerSched_ = new WitExecPerSched (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitUrpBldr::~WitUrpBldr ()
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     expPer;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (expPer, myProblem ())
+         delete expExecPers_.myPtrAt (theBopEnt, expPer);
+
+   delete myExecPerSched_;
+   delete myReqSched_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::build ()
+   {
+   WitDemTripStack theShipSeq (myProblem ());
+   double          incShipVol;
+
+   initUnpeggedScheds ();
+
+   findExecPers ();
+
+   myProblem ()->myPipMgr ()->getShipSeq (theShipSeq);
+
+   while (theShipSeq.pop (targDemand_, targShipPer_, incShipVol))
+      pegShipment (incShipVol);
+
+   targDemand_  = NULL;
+   targShipPer_ = -1;
+
+   myPgg_->consolidatePegging ();
+
+   prtInfeas ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::initUnpeggedScheds ()
+   {
+   WitBopEntry * theBopEnt;
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitMaterial * theMat;
+   WitPart *     thePart;
+   WitPeriod     execPer;
+   WitPeriod     thePer;
+   double        consSuppVol;
+
+   normShare_.allocate (myProblem (), 0.0);
+
+   normalizeShares ();
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      unpgdCoexVol_ (theBopEnt) = 0.0;
+
+      if (theBopEnt->expAllowed ())
+         forEachPeriod (execPer, myProblem ())
+            if (theBopEnt->execPerOKForExp (execPer))
+               unpgdCoexVol_ (theBopEnt)[execPer] =
+                  theBopEnt->myOperation ()->execVol ()[execPer];
+      }
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      unpgdNonSubVol_ (theBomEnt) = theBomEnt->nonSubVol ();
+
+   forEachSubEntry (theSub, myProblem ())
+      unpgdSubVol_ (theSub) = theSub->subVol ();
+
+   forEachMaterial (theMat, myProblem ())
+      unpgdStockVol_ (theMat) = theMat->stockVol ();
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         consSuppVol =
+              thePart->supplyVol   ()[thePer]
+            - thePart->residualVol ()[thePer];
+
+         setToMax (consSuppVol, 0.0);
+
+         setToMin (consSuppVol, thePart->supplyVol ()[thePer]);
+
+         unpgdSupplyVol_ (thePart)[thePer] = consSuppVol;
+         }
+
+   compSideVols ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::normalizeShares ()
+   {
+   WitOperation * theOpn;
+   WitBopEntry *  theBopEnt;
+   WitPeriod      execPer;
+   double         totShare;
+
+   forEachOperation (theOpn, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         totShare = 0.0;
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            if (theBopEnt->expAllowed ())
+               if (theBopEnt->execPerOKForExp (execPer))
+                  totShare += theBopEnt->pipShare ()[execPer];
+
+         if (totShare == 0.0)
+            continue;
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            if (theBopEnt->expAllowed ())
+               if (theBopEnt->execPerOKForExp (execPer))
+                  normShare_ (theBopEnt)[execPer] =
+                     theBopEnt->pipShare ()[execPer] / totShare;
+         }
+
+   if (myGlobalComp ()->selPrintLevel () >= 3)
+      prtNormShares ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::prtNormShares ()
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+
+   fprintf (msgFile (),
+      "\n"
+      "Normalized PIP Shares:\n"
+      "\n"
+      "   Opn  BopEnt  Part  ExecPer  Share\n");
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         fprintf (msgFile (),
+            "   %3s  %6d  %4s  %7d  %5.3f\n",
+            theBopEnt->myOperationName ().myCstring (),
+            theBopEnt->localIndex (),
+            theBopEnt->myPartName ().myCstring (),
+            execPer,
+            normShare_ (theBopEnt)[execPer]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::compSideVols ()
+   {
+   compBopSideVols ();
+   compBomSideVols ();
+
+   if (myGlobalComp ()->selPrintLevel () >= 3)
+      prtSideVols ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::compBopSideVols ()
+   {
+   WitBopEntry * theBopEnt;
+   WitPart *     thePart;
+   WitPeriod     execPer;
+   double        execVolVal;
+   WitPeriod     prodPer;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      thePart = theBopEnt->myPart ();
+
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (not theBopEnt->inEffect (execPer))
+            continue;
+
+         if (theBopEnt->expAllowed ())
+            if (theBopEnt->execPerOKForExp (execPer))
+               continue;
+
+         execVolVal = theBopEnt->myOperation ()->execVol ()[execPer];
+
+         if (execVolVal <= 0.0)
+            continue;
+
+         prodPer = theBopEnt->impactPeriod ()[execPer];
+
+         unpgdSideVol_ (thePart)[prodPer] +=
+            execVolVal * theBopEnt->effProdRate ()[execPer];
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::compBomSideVols ()
+   {
+   WitBomEntry * theBomEnt;
+   WitPeriod     execPer;
+   double        effConsRateVal;
+   double        execVolVal;
+   WitPart *     thePart;
+   WitPeriod     consPer;
+   double        incConsVol;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (not theBomEnt->inEffect (execPer))
+            continue;
+
+         effConsRateVal = theBomEnt->effConsRate ()[execPer];
+
+         if (effConsRateVal >= 0.0)
+            continue;
+
+         execVolVal = theBomEnt->myOperation ()->execVol ()[execPer];
+
+         if (execVolVal <= 0.0)
+            continue;
+
+         thePart    = theBomEnt->myPart ();
+
+         consPer    = theBomEnt->impactPeriod ()[execPer];
+
+         incConsVol = execVolVal * effConsRateVal;
+
+         unpgdSideVol_ (thePart)[consPer] -= incConsVol;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::prtSideVols ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    sideVolVal;
+
+   stronglyAssert (myGlobalComp ()->selPrintLevel () >= 3);
+
+   fprintf (msgFile (),
+      "\n"
+      "Side Effect Volumes:\n"
+      "\n"
+      "   Part Per SideVol\n");
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         sideVolVal = unpgdSideVol_ (thePart)[thePer];
+
+         if (sideVolVal == 0.0)
+            continue;
+
+         fprintf (msgFile (),
+            "   %4s %3d %7.2f\n",
+            thePart->partName ().myCstring (),
+            thePer,
+            sideVolVal);
+         }
+
+   fprintf (msgFile (), "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::findExecPers ()
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+   WitPeriod     expPer;
+   WitTVec <int> nExecPers;
+
+   nExecPers.allocate (myProblem (), 0);
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      {
+      if (not theBopEnt->expAllowed ())
+         continue;
+
+      nExecPers = 0;
+
+      forEachPeriod (execPer, myProblem ())
+         {
+         if (not theBopEnt->execPerOKForExp (execPer))
+            continue;
+
+         expPer = theBopEnt->impactPeriod ()[execPer];
+
+         nExecPers[expPer] ++;
+         }
+
+      forEachPeriod (expPer, myProblem ())
+         {
+         if (nExecPers[expPer] < 2)
+            continue;
+
+         expExecPers_.myPtrAt (theBopEnt, expPer) =
+            new WitVector <WitPeriod> (nExecPers[expPer], -1);
+         }
+
+      nExecPers = 0;
+
+      for (execPer = lastPeriod (); execPer >= 0; execPer --)
+         {
+         if (not theBopEnt->execPerOKForExp (execPer))
+            continue;
+
+         expPer = theBopEnt->impactPeriod ()[execPer];
+
+         if (expExecPers_.myPtrAt (theBopEnt, expPer) == NULL)
+            continue;
+
+         expExecPers_.myElemAt (theBopEnt, expPer)[nExecPers[expPer]] = execPer;
+
+         nExecPers[expPer] ++;
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegShipment (double incShipVol)
+   {
+   WitPart *              topPart;
+   WitPtrVecItr <WitPart> theItr;
+   WitPart *              thePart;
+   WitPeriod              pegPer;
+
+   witAssert (incShipVol > 0.0);
+
+   topPart = targDemand_->demandedPart ();
+
+   myReqSched_->addTo (topPart, targShipPer_, incShipVol);
+
+   topPart->belowList ().attachItr (theItr);
+
+   while (theItr.advance (thePart))
+      for (
+            pegPer =  myReqSched_->lastPer  (thePart);
+            pegPer >= myReqSched_->firstPer (thePart);
+            pegPer --)
+         {
+         pegPart (thePart, pegPer);
+         }
+
+   myReqSched_->clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegPart (WitPart * thePart, WitPeriod pegPer)
+   {
+   double netReqVol;
+
+   netReqVol = myReqSched_->reqVol (thePart, pegPer);
+
+   if (netReqVol <= 0.0)
+      return;
+
+   pegToSupply (thePart, pegPer, netReqVol);
+
+   if (netReqVol <= 0.0)
+      return;
+
+   pegToProd (thePart, pegPer, netReqVol);
+
+   if (netReqVol <= 0.0)
+      return;
+
+   pegToStock (thePart, pegPer, netReqVol);
+
+   if (netReqVol <= 0.0)
+      return;
+
+   pegToSide (thePart, pegPer, netReqVol);
+
+   if (netReqVol <= 0.0)
+      return;
+
+   if (netReqVol > maxInfeas_)
+      {
+      maxInfeas_        = netReqVol;
+      maxInfeasDemand_  = targDemand_;
+      maxInfeasShipPer_ = targShipPer_;
+      maxInfeasPart_    = thePart;
+      maxInfeasPer_     = pegPer;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegToStock (
+      WitPart * thePart,
+      WitPeriod pegPer,
+      double &  netReqVol)
+   {
+   WitMaterial * theMat;
+   double        pegVol;
+
+   witAssert (netReqVol > 0.0);
+
+   theMat = thePart->thisMat ();
+
+   if (theMat == NULL)
+      return;
+
+   if (pegPer == 0)
+      return;
+
+   if (unpgdStockVol_ (theMat)[pegPer - 1] <= 0.0)
+      return;
+
+   pegVol = minAndNet (netReqVol, unpgdStockVol_ (theMat)[pegPer - 1]);
+
+   myReqSched_->addTo (theMat, pegPer - 1, pegVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegToSupply (
+      WitPart * thePart,
+      WitPeriod pegPer,
+      double &  netReqVol)
+   {
+   double pegVol;
+
+   witAssert (netReqVol > 0.0);
+
+   if (unpgdSupplyVol_ (thePart)[pegPer] <= 0.0)
+      return;
+
+   pegVol = minAndNet (netReqVol, unpgdSupplyVol_ (thePart)[pegPer]);
+   
+   myPgg_->
+      supplyVolPgg ()->
+         append (targDemand_, targShipPer_, thePart, pegPer, pegVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegToSide (
+      WitPart * thePart,
+      WitPeriod pegPer,
+      double &  netReqVol)
+   {
+   double pegVol;
+
+   witAssert (netReqVol > 0.0);
+
+   if (unpgdSideVol_ (thePart)[pegPer] <= 0.0)
+      return;
+
+   pegVol = minAndNet (netReqVol, unpgdSideVol_ (thePart)[pegPer]);
+   
+   myPgg_->
+      sideVolPgg ()->
+         append (targDemand_, targShipPer_, thePart, pegPer, pegVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegToProd (
+      WitPart * thePart,
+      WitPeriod expPer,
+      double &  netReqVol)
+   {
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPerFirst;
+   WitPeriod     execPerLast;
+   WitPeriod     execPer;
+
+   witAssert (netReqVol > 0.0);
+
+   if (thePart->prodVol ()[expPer] <= 0.0)
+      return;
+
+   if (not thePart->explodeable (expPer))
+      return;
+
+   forEachEl (theBopEnt, thePart->producingBopEntries ())
+      {
+      myExecPerSched_->getExecPerRange (
+         theBopEnt,
+         expPer,
+         execPerFirst,
+         execPerLast);
+
+      for (execPer = execPerLast; execPer >= execPerFirst; execPer --)
+         {
+         if (not theBopEnt->execPerOKForExp (execPer))
+            continue;
+
+         if (theBopEnt->impactPeriod ()[execPer] != expPer)
+            continue;
+
+         pegBopEnt (theBopEnt, execPer, netReqVol);
+
+         if (netReqVol <= 0.0)
+            return;
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegBopEnt (
+      WitBopEntry * theBopEnt,
+      WitPeriod     execPer,
+      double &      netReqVol)
+   {
+   double         upCoexVolVal;
+   double         theProdRate;
+   double         reqCoexVol;
+   double         pgdCoexVol;
+   double         pgdProdVol;
+   WitPart *      thePart;
+   WitPeriod      prodPer;
+   WitOperation * theOpn;
+   double         pgdExecVol;
+
+   witAssert (netReqVol > 0.0);
+
+   upCoexVolVal = unpgdCoexVol_ (theBopEnt)[execPer];
+
+   if (upCoexVolVal <= 0.0)
+      return;
+
+   theProdRate  = theBopEnt->effProdRate ()[execPer];
+
+   reqCoexVol   = netReqVol / theProdRate;
+
+   pgdCoexVol   = min (reqCoexVol, upCoexVolVal);
+
+   unpgdCoexVol_ (theBopEnt)[execPer] -= pgdCoexVol;
+
+   pgdProdVol   = pgdCoexVol * theProdRate;
+
+   netReqVol   -= pgdProdVol;
+
+   setToMax (netReqVol, 0.0);
+
+   thePart      = theBopEnt->myPart ();
+
+   prodPer      = theBopEnt->impactPeriod ()[execPer];
+
+   myPgg_->
+      prodVolPgg ()->
+         append (targDemand_, targShipPer_, thePart, prodPer, pgdProdVol);
+
+   theOpn       = theBopEnt->myOperation ();
+
+   pgdExecVol   = pgdCoexVol * normShare_ (theBopEnt)[execPer];
+
+   pegOpn (theOpn, execPer, pgdExecVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegOpn (
+      WitOperation * theOpn,
+      WitPeriod      execPer,
+      double         pgdExecVol)
+   {
+   WitBomEntry * theBomEnt;
+
+   if (pgdExecVol == 0.0)
+      return;
+
+   witAssert (pgdExecVol > 0.0);
+
+   myPgg_->
+      execVolPgg ()->
+         append (targDemand_, targShipPer_, theOpn, execPer, pgdExecVol);
+
+   forEachEl (theBomEnt, theOpn->bom ())
+      if (theBomEnt->inEffect (execPer))
+         {
+         if (theBomEnt->hasSubsInEffect ()[execPer])
+            pegBomEntWithSubs (theBomEnt, execPer, pgdExecVol);
+         else
+            pegConsEnt        (theBomEnt, execPer, pgdExecVol);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegBomEntWithSubs (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      double        pgdExecVol)
+   {
+   double        netExecVol;
+   double        pgdNonSubVol;
+   WitSubEntry * theSub;
+   double        pgdSubVol;
+
+   witAssert (pgdExecVol > 0.0);
+   witAssert (theBomEnt->hasSubsInEffect ()[execPer]);
+
+   netExecVol = pgdExecVol;
+
+   if (unpgdNonSubVol_ (theBomEnt)[execPer] > 0.0)
+      {
+      pgdNonSubVol =
+         minAndNet (netExecVol, unpgdNonSubVol_ (theBomEnt)[execPer]);
+
+      pegConsEnt (theBomEnt, execPer, pgdNonSubVol);
+
+      if (netExecVol <= 0.0)
+         return;
+      }
+
+   forEachEl (theSub, theBomEnt->mySubEntries ())
+      if (unpgdSubVol_ (theSub)[execPer] > 0.0)
+         {
+         pgdSubVol = minAndNet (netExecVol, unpgdSubVol_ (theSub)[execPer]);
+
+         myPgg_->
+            subVolPgg ()->
+               append (targDemand_, targShipPer_, theSub, execPer, pgdSubVol);
+
+         pegConsEnt (theSub, execPer, pgdSubVol);
+
+         if (netExecVol <= 0.0)
+            return;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::pegConsEnt (
+      WitConsEntry * theConsEnt,
+      WitPeriod      execPer,
+      double         pgdExecVol)
+   {
+   double    pgdConsVol;
+   WitPart * consPart;
+   WitPeriod consPer;
+
+   witAssert (pgdExecVol > 0.0);
+
+   pgdConsVol = pgdExecVol * theConsEnt->effConsRate ()[execPer];
+
+   if (pgdConsVol <= 0.0)
+      return;
+
+   consPart   = theConsEnt->myPart ();
+
+   consPer    = theConsEnt->impactPeriod ()[execPer];
+
+   myPgg_->
+      consVolPgg ()->
+         append (targDemand_, targShipPer_, consPart, consPer, pgdConsVol);
+
+   myReqSched_->addTo (consPart, consPer, pgdConsVol);
+   }
+
+//------------------------------------------------------------------------------
+
+double WitUrpBldr::minAndNet (double & val1, double & val2)
+   {
+   double minVal;
+
+   if (val1 <= val2)
+      {
+      minVal = val1;
+      val1   = 0.0;
+      val2  -= minVal;
+      }
+   else
+      {
+      minVal = val2;
+      val1  -= minVal;
+      val2   = 0.0;
+      }
+
+   return minVal;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::prtInfeas ()
+   {
+   if (DEVELOPMENT)
+      if (maxInfeas_ > 0.0)
+         myMsgFac () ("blankMsg");
+
+   myMsgFac () ("pipMaxInfeasMsg", maxInfeas_);
+
+   if (maxInfeas_ > 0.0)
+      myMsgFac () ("pipMaxInfDataMsg",
+         maxInfeasDemand_->demandName       (),
+         maxInfeasDemand_->demandedPartName (),
+         maxInfeasShipPer_,
+         maxInfeasPart_->partName (),
+         maxInfeasPer_);
+   }
+@
+
+
+1.20
+log
+@GPIP
+@
+text
+@@
+
+
+1.19
+log
+@[shared-resource pegging]
+@
+text
+@d70 1
+a70 1
+   witAssert (not myGlobalComp ()->srpMode ());
+@
+
+
+1.18
+log
+@[shared-resource pegging]
+@
+text
+@d19 2
+a20 2
+#include <PipTarg.h>
+#include <PipPegList.h>
+d48 1
+a48 1
+      WitProbAssoc    (thePgg->myProblem ()),
+d50 19
+a68 17
+      myPgg_          (thePgg),
+      curTarg_        (NULL),
+      expExecPers_    (myProblem ()),
+      myExecPerSched_ (NULL),
+      normShare_      (),
+
+      unpgdCoexVol_   (myProblem (), 0.0),
+      unpgdNonSubVol_ (myProblem (), 0.0),
+      unpgdSubVol_    (myProblem (), 0.0),
+      unpgdStockVol_  (myProblem (), 0.0),
+      unpgdSupplyVol_ (myProblem (), 0.0),
+      unpgdSideVol_   (myProblem (), 0.0),
+
+      maxInfeas_      (0.0),
+      maxInfeasTarg_  (NULL),
+      maxInfeasPart_  (NULL),
+      maxInfeasPer_   (-1)
+a95 2
+   WitDemand *     theDemand;
+   WitPeriod       shipPer;
+d104 1
+a104 4
+   while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+      {
+      curTarg_ = myPgg_->myTargFor (theDemand, shipPer);
+
+a105 1
+      }
+d107 2
+a108 1
+   curTarg_ = NULL;
+a405 1
+   WitPeriod              shipPer;
+d412 1
+a412 3
+   topPart = curTarg_->myDemand ()->demandedPart ();
+
+   shipPer = curTarg_->myShipPer ();
+d414 1
+a414 1
+   myReqSched_->addTo (topPart, shipPer, incShipVol);
+d463 5
+a467 4
+      maxInfeas_     = netReqVol;
+      maxInfeasTarg_ = curTarg_;
+      maxInfeasPart_ = thePart;
+      maxInfeasPer_  = pegPer;
+d515 3
+a517 3
+   curTarg_->
+      myPartPegList ()[WitPipPartAtt::supplyVol]->
+         append (thePart, pegPer, pegVol);
+d536 3
+a538 3
+   curTarg_->
+      myPartPegList ()[WitPipPartAtt::sideVol]->
+         append (thePart, pegPer, pegVol);
+d627 3
+a629 3
+   curTarg_->
+      myPartPegList ()[WitPipPartAtt::prodVol]->
+         append (thePart, prodPer, pgdProdVol);
+d652 3
+a654 1
+   curTarg_->execVolPegList ()->append (theOpn, execPer, pgdExecVol);
+d699 3
+a701 1
+         curTarg_->subVolPegList ()->append (theSub, execPer, pgdSubVol);
+d732 3
+a734 3
+   curTarg_->
+      myPartPegList ()[WitPipPartAtt::consVol]->
+         append (consPart, consPer, pgdConsVol);
+d773 3
+a775 3
+         maxInfeasTarg_->myDemand ()->demandName       (),
+         maxInfeasTarg_->myDemand ()->demandedPartName (),
+         maxInfeasTarg_->myShipPer (),
+@
+
+
+1.17
+log
+@[shared-resource pegging]
+@
+text
+@d18 1
+a18 1
+#include <PipOwner.h>
+d37 1
+a37 1
+void WitUrpBldr::buildPegging (WitPipOwner * thePipOwner)
+d39 1
+a39 1
+   WitUrpBldr theBldr (thePipOwner);
+d46 1
+a46 1
+WitUrpBldr::WitUrpBldr (WitPipOwner * thePipOwner):
+d48 1
+a48 1
+      WitProbAssoc    (thePipOwner->myProblem ()),
+d50 1
+a50 1
+      myPipOwner_     (thePipOwner),
+d106 1
+a106 1
+      curTarg_ = myPipOwner_->myTargFor (theDemand, shipPer);
+d113 1
+a113 1
+   myPipOwner_->consolidatePegging ();
+@
+
+
+1.16
+log
+@[shared-resource pegging]
+@
+text
+@d18 1
+a18 1
+#include <UrpOwner.h>
+d37 1
+a37 1
+void WitUrpBldr::buildPegging (WitUrpOwner * theUrpOwner)
+d39 1
+a39 1
+   WitUrpBldr theBldr (theUrpOwner);
+d46 1
+a46 1
+WitUrpBldr::WitUrpBldr (WitUrpOwner * theUrpOwner):
+d48 1
+a48 1
+      WitProbAssoc    (theUrpOwner->myProblem ()),
+d50 1
+a50 1
+      myUrpOwner_     (theUrpOwner),
+d68 2
+d106 1
+a106 1
+      curTarg_ = myUrpOwner_->myTargFor (theDemand, shipPer);
+d113 1
+a113 1
+   myUrpOwner_->consolidatePegging ();
+@
+
+
+1.15
+log
+@[shared-resource pegging]
+@
+text
+@d111 1
+a111 1
+   consolidatePegLists ();
+a777 44
+
+//------------------------------------------------------------------------------
+
+void WitUrpBldr::consolidatePegLists ()
+   {
+   WitDemand *  theDemand;
+   WitPeriod    shipPer;
+   WitPipTarg * theTarg;
+
+   WitSchedule <WitOperation, double> workOpnSched;
+   WitSchedule <WitSubEntry,  double> workSubSched; 
+   WitSchedule <WitPart,      double> workPartSched;
+
+   workOpnSched .allocate1D (myProblem ());
+   workSubSched .allocate1D (myProblem ());
+   workPartSched.allocate1D (myProblem ());
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (shipPer, myProblem ())
+         {
+         theTarg = myUrpOwner_->myTargFor (theDemand, shipPer);
+
+         if (theTarg == NULL)
+            continue;
+
+         theTarg->execVolPegList ()->
+            consolidate (workOpnSched);
+
+         theTarg->subVolPegList ()->
+            consolidate (workSubSched);
+
+         theTarg->myPartPegList ()[WitPipPartAtt::supplyVol]->
+            consolidate (workPartSched);
+
+         theTarg->myPartPegList ()[WitPipPartAtt::sideVol]->
+            consolidate (workPartSched);
+
+         theTarg->myPartPegList ()[WitPipPartAtt::prodVol]->
+            consolidate (workPartSched);
+
+         theTarg->myPartPegList ()[WitPipPartAtt::consVol]->
+            consolidate (workPartSched);
+         }
+   }
+@
+
+
+1.14
+log
+@[shared-resource pegging]
+@
+text
+@d19 2
+a20 2
+#include <UrpTarg.h>
+#include <UrpPegList.h>
+d785 1
+a785 1
+   WitUrpTarg * theTarg;
+@
+
+
+1.13
+log
+@[shared-resource pegging]
+@
+text
+@a30 1
+#include <Dense.h>
+@
+
+
+1.12
+log
+@[shared-resource pegging]
+@
+text
+@d407 5
+a411 4
+   WitPart * topPart;
+   WitPeriod shipPer;
+   WitPart * thePart;
+   WitPeriod pegPer;
+d421 8
+a428 4
+   forEachElDense (thePart, topPart->belowList ())
+      for (pegPer =  myReqSched_->lastPer  (thePart); 
+           pegPer >= myReqSched_->firstPer (thePart);
+           pegPer --)
+d430 1
+@
+
+
+1.11
+log
+@[shared-resource pegging]
+@
+text
+@d21 1
+a21 1
+#include <ExecPerSched.h>
+d561 1
+a561 1
+      myExecPerSched_->getData (
+@
+
+
+1.10
+log
+@[shared-resource pegging]
+@
+text
+@d569 3
+@
+
+
+1.9
+log
+@[shared-resource pegging]
+@
+text
+@d21 1
+d54 1
+d69 2
+a70 1
+   myReqSched_ = new WitReqSched (myProblem ());
+d84 1
+d547 2
+a549 2
+   int           nExecPers;
+   int           theIdx;
+d561 5
+a565 2
+      if (not theBopEnt->expEligible (expPer))
+         continue;
+d567 1
+a567 1
+      if (expExecPers_.myPtrAt (theBopEnt, expPer) == NULL)
+d569 2
+a570 1
+         execPer = theBopEnt->expExecPeriod ()[expPer];
+a576 14
+      else
+         {
+         nExecPers = expExecPers_.myElemAt (theBopEnt, expPer).length ();
+
+         for (theIdx = 0; theIdx < nExecPers; theIdx ++)
+            {
+            execPer = expExecPers_.myElemAt (theBopEnt, expPer)[theIdx];
+
+            pegBopEnt (theBopEnt, execPer, netReqVol);
+
+            if (netReqVol <= 0.0)
+               return;
+            }
+         }
+@
+
+
+1.8
+log
+@Modification to the implementation of unshared-resource pegging.
+@
+text
+@d17 1
+a17 1
+#include <PipSeqMgr.h>
+d97 1
+a97 1
+   myUrpOwner_->myPipSeqMgr ()->get (theShipSeq);
+@
+
+
+1.7
+log
+@[shared-resource pegging]
+@
+text
+@a67 4
+
+   workOpnSched_ .allocate1D (myProblem ());
+   workSubSched_ .allocate1D (myProblem ());
+   workPartSched_.allocate1D (myProblem ());
+a103 2
+
+      consolidatePegLists ();
+d108 2
+a759 23
+void WitUrpBldr::consolidatePegLists ()
+   {
+   curTarg_->execVolPegList ()->
+      consolidate (workOpnSched_);
+
+   curTarg_->subVolPegList ()->
+      consolidate (workSubSched_);
+
+   curTarg_->myPartPegList ()[WitPipPartAtt::supplyVol]->
+      consolidate (workPartSched_);
+
+   curTarg_->myPartPegList ()[WitPipPartAtt::sideVol]->
+      consolidate (workPartSched_);
+
+   curTarg_->myPartPegList ()[WitPipPartAtt::prodVol]->
+      consolidate (workPartSched_);
+
+   curTarg_->myPartPegList ()[WitPipPartAtt::consVol]->
+      consolidate (workPartSched_);
+   }
+
+//------------------------------------------------------------------------------
+
+d776 44
+@
+
+
+1.6
+log
+@[shared-resource pegging]
+@
+text
+@d20 1
+a20 1
+#include <PipPegList.h>
+@
+
+
+1.5
+log
+@[shared-resource pegging]
+@
+text
+@d19 1
+a19 1
+#include <PipTarg.h>
+@
+
+
+1.4
+log
+@Fixed a bug in PIP:
+   If the solution was infeasible, the resulting negative residualVol
+   was being pegged as supply.
+@
+text
+@d18 1
+a18 1
+#include <UrpCoord.h>
+d37 1
+a37 1
+void WitUrpBldr::buildPegging (WitUrpCoord * theUrpCoord)
+d39 1
+a39 1
+   WitUrpBldr theBldr (theUrpCoord);
+d46 1
+a46 1
+WitUrpBldr::WitUrpBldr (WitUrpCoord * theUrpCoord):
+d48 1
+a48 1
+      WitProbAssoc    (theUrpCoord->myProblem ()),
+d50 1
+a50 1
+      myUrpCoord_     (theUrpCoord),
+d101 1
+a101 1
+   myUrpCoord_->myPipSeqMgr ()->get (theShipSeq);
+d105 1
+a105 1
+      curTarg_ = myUrpCoord_->myTargFor (theDemand, shipPer);
+@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@d128 1
+d156 11
+a166 4
+         unpgdSupplyVol_ (thePart)[thePer] =
+            positivePart (
+                 thePart->supplyVol   ()[thePer]
+               - thePart->residualVol ()[thePer]);
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@d41 1
+a41 1
+   theBldr.innerBuild ();
+d90 1
+a90 1
+void WitUrpBldr::innerBuild ()
+@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d37 9
+d90 1
+a90 1
+void WitUrpBldr::buildPegging ()
+@
+

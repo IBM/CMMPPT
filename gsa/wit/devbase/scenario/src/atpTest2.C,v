@@ -1,0 +1,727 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	sce_5_01_20080919:1.1.1.1
+	latest_sce_4_20_20060523:1.1.1.1.0.20
+	sce_4_20_20060523:1.1.1.1
+	latest_sce4_20_OSL:1.1.1.1.0.18
+	sce_4_20_OSL:1.1.1.1
+	sce_4_05_20040511:1.1.1.1
+	sce_4_00_20040201:1.1.1.1
+	nextGenBranch:1.1.1.1.0.16
+	nextGenRoot:1.1.1.1
+	sce_3_30_20030627:1.1.1.1
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2000.02.24.15.29.35;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.35;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#include <stdlib.h>
+#include <wit/src/wit.h>
+#include <rw/rstream.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/difImpl.h>
+#include <scenario/src/difPWatp.h>
+#include <scenario/src/scBdATP.h>
+#include <scenario/src/scenATP.h>
+#include <scenario/src/scenDrct.h>
+#include <scenario/src/ipATP.h>
+#include <scenario/src/schFcATP.h>
+#include <scenario/src/outInter.h>
+#include <scenario/src/schdDeSt.h>
+#include <scenario/src/multPSch.h>
+#include <scenario/src/multDSch.h>
+#include <scenario/src/timeVecs.h>
+// #include <scenario/src/sOfPaFS.h>
+// #include <scenario/src/tvElemPC.h>
+// #include <scenario/src/zeroTvFS.h>
+// #include <scenario/src/boolFS.h>
+
+
+  // -----------------------------------------------------------------
+  // The 5 multi schedules:
+  //    Committed Order Window 
+  //    New-op Order Window 
+  //    Forecast Order Window 
+  //    Material Window 
+  //    Capacity Window 
+  // -----------------------------------------------------------------
+
+  // -----------------------------------------------------------------
+  //
+  // Present on the window are:
+  //
+  // Three task buttons.  These are radio buttons and always selectable.
+  // They are:   Committed Orders
+  //             New Op Orders
+  //             Forecast orders
+  //
+  // There is a RecoveryPlan toggle button.  This is only selectable
+  // when the Committed Order Task Button is pressed.
+  // If the RecoveryPlan button is selected when NewOpOrders or 
+  // ForecastOrders is selected, then RecoveryPlan becomes unselected
+  // (ie toggle button pops out) and becomes unselectable (not sensitive)
+  //
+  // There is an implode push button.  This button becomes selectable
+  // (sensitive or lit) when solution for current task is no longer correct.
+  //
+  // -----------------------------------------------------------------
+
+// -----------------------------------------------------------------
+// Define tasks
+// -----------------------------------------------------------------
+typedef enum { COMMITTED, FORECAST, NEWOP } LgFrTasks;
+
+
+// -----------------------------------------------------------------
+// Take required action when implode button is pressed
+// -----------------------------------------------------------------
+void
+implodeButtonPressed(
+   LgFrScenarioForATPSmartPointer s,
+   LgFrTasks taskButtonCurrentlyPressed,   
+   RWBoolean viewingPartOrCapacityMultischedule )
+{
+   if ( viewingPartOrCapacityMultischedule ) {
+
+      assert( taskButtonCurrentlyPressed == COMMITTED );
+      s->changeState(LGFR_ATP_STATE_COMMITTED_IMPLODED_RECOVERY);
+
+   }
+   else {
+
+      if ( taskButtonCurrentlyPressed == COMMITTED ) 
+         s->changeState(LGFR_ATP_STATE_COMMITTED_IMPLODED);
+
+      else if ( taskButtonCurrentlyPressed == FORECAST ) 
+         s->changeState(LGFR_ATP_STATE_ATP_IMPLODED);
+
+      else if ( taskButtonCurrentlyPressed == NEWOP ) 
+         s->changeState(LGFR_ATP_STATE_NEWOPP_IMPLODED);
+
+      else
+         assert( 1==2 && "Unrecognized task button pressed" );
+
+      s->newImplosionSolution();
+   }
+}
+
+
+//-----------------------------------------------------------------------
+// Create committed demand multi schedule
+//-----------------------------------------------------------------------
+LgFrMultiDemandScheduleFloat * 
+committedMultiSched( 
+  LgFrScenarioSmartPointer scenarioPtr )
+{
+  LgFrMultiDemandScheduleFloat * retVal =  
+         new LgFrMultiDemandScheduleFloat(scenarioPtr);
+
+  retVal->newSchedule(      LGFRCommittedDemandVolume               );
+  retVal->newSchedule(      LGFRCommittedCumDemandVolume            );
+  retVal->newSchedule(      LGFRCommittedShipmentVolume             );
+  retVal->newSchedule(      LGFRCommittedCumShipmentVolume          );
+  retVal->newSchedule(      LGFRCommittedBacklog                    );
+
+#if 0
+  // wibni's TO BE ADDED
+  DONT YET HAVE SCHEDULE STRATEGIES
+  retVal->newSchedule(      LGFRCommittedPriority                   );
+  retVal->newSchedule(      LGFRCommittedRevenueTimesDemandVol      );
+  retVal->newSchedule(      LGFRCommittedCumRevenueTimesDemandVol   );
+  retVal->newSchedule(      LGFRCommittedRevenueTimesShipmentVol    );
+  retVal->newSchedule(      LGFRCommittedCumRevenueTimesShipmentVol );
+#endif
+
+  return retVal;
+}
+
+
+//-----------------------------------------------------------------------
+// Create forecast demand multi schedule
+//-----------------------------------------------------------------------
+LgFrMultiDemandScheduleFloat * 
+firmForecastMultiSched( 
+  LgFrScenarioSmartPointer scenarioPtr )
+{
+  LgFrMultiDemandScheduleFloat * retVal =  
+         new LgFrMultiDemandScheduleFloat(scenarioPtr);
+
+  retVal->newSchedule(      LGFRFirmForecastDemandVolume               );
+  retVal->newSchedule(      LGFRFirmForecastCumDemandVolume            );
+  retVal->newSchedule(      LGFRFirmForecastShipmentVolume             );
+  retVal->newSchedule(      LGFRFirmForecastCumShipmentVolume          );
+
+  return retVal;
+}
+
+
+//-----------------------------------------------------------------------
+// Create forecast demand multi schedule
+//-----------------------------------------------------------------------
+LgFrMultiDemandScheduleFloat * 
+newOpportunityMultiSched( 
+  LgFrScenarioSmartPointer scenarioPtr )
+{
+  LgFrMultiDemandScheduleFloat * retVal =  
+         new LgFrMultiDemandScheduleFloat(scenarioPtr);
+
+  retVal->newSchedule(      LGFRNewOpportunityDemandVolume               );
+  retVal->newSchedule(      LGFRNewOpportunityCumDemandVolume            );
+  retVal->newSchedule(      LGFRNewOpportunityShipmentVolume             );
+  retVal->newSchedule(      LGFRNewOpportunityCumShipmentVolume          );
+  retVal->newSchedule(      LGFRNewOpportunityBacklog                    );
+#if 0
+  WIBNI
+  retVal->newSchedule(      LGFRNewOpportunityPriority                   );
+#endif
+  return retVal;
+}
+
+
+//-----------------------------------------------------------------------
+// Create material recovery multi schedule
+//-----------------------------------------------------------------------
+LgFrMultiPartScheduleFloat * 
+materialRecoveryMultiSched( 
+  LgFrScenarioSmartPointer scenarioPtr )
+{
+  LgFrMultiPartScheduleFloat * retVal =  
+         new LgFrMultiPartScheduleFloat(scenarioPtr);
+
+  retVal->newSchedule(      LGFRMaterialSupplyVolume                       );
+  retVal->newSchedule(      LGFRMaterialCumSupplyVolume                    );
+  retVal->newSchedule(      LGFRMaterialFocussedShortageSchedule           );
+  retVal->newSchedule(      LGFRMaterialCumFocussedShortageSchedule        );
+
+  return retVal;
+}
+
+    
+//-----------------------------------------------------------------------
+// Create capacity recovery multi schedule
+//-----------------------------------------------------------------------
+LgFrMultiPartScheduleFloat * 
+capacityRecoveryMultiSched( 
+  LgFrScenarioSmartPointer scenarioPtr )
+{
+  LgFrMultiPartScheduleFloat * retVal =  
+         new LgFrMultiPartScheduleFloat(scenarioPtr);
+
+  retVal->newSchedule(      LGFRCapacitySupplyVolume                       );
+  retVal->newSchedule(      LGFRCapacityFocussedShortageSchedule           );
+  retVal->newSchedule(      LGFRCapacityCumFocussedShortageSchedule        );
+
+  return retVal;
+}
+
+//-----------------------------------------------------------------------
+// Return true if implode button should be lit (sensitive)
+//-----------------------------------------------------------------------
+RWBoolean
+implodeButtonLit(
+   LgFrScenarioForATPSmartPointer s,
+   LgFrTasks taskButtonCurrentlyPressed, 
+   RWBoolean viewingPartOrCapacityMultischedule )
+{
+   RWBoolean retval=FALSE;
+
+   if ( viewingPartOrCapacityMultischedule ) {
+
+      assert( taskButtonCurrentlyPressed == COMMITTED );
+      retval=!s->solutionIsUpToDate(LGFR_ATP_STATE_COMMITTED_IMPLODED_RECOVERY);
+
+   }
+   else {
+
+      if ( taskButtonCurrentlyPressed == COMMITTED ) 
+         retval=!s->solutionIsUpToDate(LGFR_ATP_STATE_COMMITTED_IMPLODED);
+
+      else if ( taskButtonCurrentlyPressed == FORECAST ) 
+         retval=!s->solutionIsUpToDate(LGFR_ATP_STATE_ATP_IMPLODED);
+
+      else if ( taskButtonCurrentlyPressed == NEWOP ) 
+         retval=!s->solutionIsUpToDate(LGFR_ATP_STATE_NEWOPP_IMPLODED);
+
+      else
+         assert( 1==2 && "Unrecognized task button pressed" );
+
+   }
+
+   return retval;
+}
+
+
+//-----------------------------------------------------------------------
+// Change the value of a timeVecFloat entry contained in a multi part
+// schedule.
+//-----------------------------------------------------------------------
+void
+changeMultiScheduleTimeVecEntry(
+  LgFrScenarioForATPSmartPointer s,
+  LgFrMultiScheduleFloat & multiSched,
+  LgFrScheduleDescriptor schedDesc,
+  RWCString partName,
+  size_t period,
+  float newValue )
+{
+
+  // Get set of all parts
+  const LgFrSetOfParts & setOfParts = s->constSetOfParts();
+
+  // Get part with changed timeVec entry
+  const LgFrPart * alteredPartPtr = setOfParts.findValue(partName);
+  assert( alteredPartPtr != NULL );
+  LgFrPart alteredPart = *alteredPartPtr;
+
+  // Get original timeVec
+  const LgFrTimeVecFloat * timeVecPtr =
+     multiSched.getTimeVecFloat(alteredPart, schedDesc);
+  assert( timeVecPtr != NULL );
+  LgFrTimeVecFloat timeVec( *timeVecPtr );
+
+  // Change time vec entry
+  timeVec[period] = newValue;
+
+  // Set the updated timeVec in the schedule
+  RWBoolean result;
+  result = multiSched.changeTimeVecInSchedule(
+                         alteredPart, schedDesc, timeVec );
+  assert( result );
+
+}
+
+
+//-----------------------------------------------------------------------
+//
+// ATP Test Main program
+//
+//-----------------------------------------------------------------------
+int main()
+{
+
+  size_t i;
+
+  LgFrCalendar calendar(8, RWTime(RWDate("8/01/95")));
+
+  // -----------------------------------------------------------------
+  // Create the dataInterfaceObject.
+  // When obtaining data from the AS400 the code will be something like:
+  //    RWCString as400Library="thinair2"  
+  //    LgFrDataInterfaceFromMapics 
+  //        dif("mapics","fasano","htrag7",as400Library)
+  // It would be good to be able to specify/change the AS400 library 
+  // on the command line or in a dialog box.
+  //
+  // -----------------------------------------------------------------
+  // For now use the hard coded dif.
+  // -----------------------------------------------------------------
+  LgFrDataInterfaceImplementation * difPWImpPtr
+      = new LgFrDataInterfaceImplementation("internal data set pw2");
+  // Register all functions
+  registerPWatpDifImpFunctions(difPWImpPtr);
+  LgFrDataInterface dif(difPWImpPtr);
+
+  // Create a scenario using the builder
+  LgFrScenarioBuilderForATP builder;
+  LgFrScenarioDirector director(&builder);  
+  director.construct(dif, calendar);
+  LgFrScenarioForATPSmartPointer scenarioPtr = builder.getScenario();
+
+
+  // -----------------------------------------------------------------
+  // Instantiate the Committed Order Window 
+  // -----------------------------------------------------------------
+  LgFrMultiDemandScheduleFloat * committedMSDptr =  
+         committedMultiSched(scenarioPtr);
+  LgFrMultiDemandScheduleFloat & committedMSD = *committedMSDptr;
+
+  // -----------------------------------------------------------------
+  // Instantiate the Forecast Order Window 
+  // -----------------------------------------------------------------
+  LgFrMultiDemandScheduleFloat * forecastMSDptr =  
+         firmForecastMultiSched( scenarioPtr );
+  LgFrMultiDemandScheduleFloat & forecastMSD = *forecastMSDptr;
+
+  // -----------------------------------------------------------------
+  // Instantiate the NewOp Order Window 
+  // -----------------------------------------------------------------
+  LgFrMultiDemandScheduleFloat * newOpMSDptr =  
+         newOpportunityMultiSched( scenarioPtr );
+  LgFrMultiDemandScheduleFloat & newOpMSD = *newOpMSDptr;
+
+
+  // -----------------------------------------------------------------
+  // Obtain abbreviations of committed multiSchedule window attributes
+  // -----------------------------------------------------------------
+  LgFrVectorRWCString abbr = committedMSD.schedAbbrevVec();
+  for ( i=0; i<abbr.length(); i++ )
+     cout <<"Abbreviation of attribute " <<i <<" is " <<abbr[i] <<endl;
+
+  // -----------------------------------------------------------------
+  // Obtain schedule descriptions from multiSchedule
+  // -----------------------------------------------------------------
+  LgFrVectorScheduleDescriptor sd = committedMSD.schedDescVec();
+  assert( sd.length() == 5 );
+  assert( sd[0] == LGFRCommittedDemandVolume               );
+  assert( sd[1] == LGFRCommittedCumDemandVolume            );
+  assert( sd[2] == LGFRCommittedShipmentVolume             );
+  assert( sd[3] == LGFRCommittedCumShipmentVolume          );
+  assert( sd[4] == LGFRCommittedBacklog                    );
+
+  // ----------------------------------------------------------------- 
+  cout << "Step 0:  Display Committed Multischedule\n";
+  cerr << "Step 0:  Display Committed Multischedule\n";
+  // ----------------------------------------------------------------- 
+
+  // display the commitedMSD
+  committedMSD.printByItemAndAttribute();
+
+  // NOTE: the committed task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be lit and up.
+  assert( implodeButtonLit( scenarioPtr, COMMITTED, FALSE ) );
+
+  // ----------------------------------------------------------------- 
+  cout << "Step 1:  Implode and show implosion result attributes\n";
+  cerr << "Step 1:  Implode and show implosion result attributes\n";
+  // ----------------------------------------------------------------- 
+
+  cout << "Skipped to stimulate bug\n";
+  cerr << "Skipped to stimulate bug\n";
+  
+  // ----------------------------------------------------------------- 
+  cout << "Step 2:  Look at recovery windows \n";
+  cerr << "Step 2:  Look at recovery windows \n";
+  // ----------------------------------------------------------------- 
+
+  // User presses recovery plan button putting it in the down position
+
+  // Bring state machine to recovery plan state
+  scenarioPtr->changeState(LGFR_ATP_STATE_COMMITTED_IMPLODED_RECOVERY);
+
+  // ----------------------------------------------------------------
+  // When changing to state LGFR_ATP_STATE_COMMITTED_IMPLODED_RECOVERY,
+  // the state machine sets the focus to contain every demand
+  // (possibly only those with nonzero backlog) with the horizon being
+  // the last period.
+  // ----------------------------------------------------------------
+
+  // NOTE: the committed task button should be down,
+  //       the Implosion button should be unlit,
+  //       the recovery plan button should be lit and down.
+  assert( !implodeButtonLit( scenarioPtr, COMMITTED, TRUE ) );
+
+  // Create Material & Capacity Recovery Window
+  LgFrMultiPartScheduleFloat * matRecovMSPptr =  
+         materialRecoveryMultiSched( scenarioPtr );
+  LgFrMultiPartScheduleFloat & matRecovMSP = *matRecovMSPptr;
+  LgFrMultiPartScheduleFloat * capRecovMSPptr =  
+         capacityRecoveryMultiSched( scenarioPtr );
+  LgFrMultiPartScheduleFloat & capRecovMSP = *capRecovMSPptr;
+
+  // display the commitedMSD
+  committedMSD.printByItemAndAttribute();
+
+  // display the material and capacity windows
+  matRecovMSP.printByItemAndAttribute();
+  capRecovMSP.printByItemAndAttribute();
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 3:  Change material/capacity supply\n";
+  cerr <<"Step 3:  Change material/capacity supply\n";
+  // ----------------------------------------------------------------- 
+
+  changeMultiScheduleTimeVecEntry( 
+      scenarioPtr, matRecovMSP, LGFRMaterialSupplyVolume, 
+      "RAW_Board_F", 2, 200. );
+  
+  // NOTE: the committed task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be lit and down.
+  assert( implodeButtonLit( scenarioPtr, COMMITTED, TRUE ) );
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 4:  Implode using new supply data\n";
+  cerr <<"Step 4:  Implode using new supply data\n";
+  // ----------------------------------------------------------------- 
+
+  // User presses implode button to get new committed shipment schedule
+  implodeButtonPressed( scenarioPtr, COMMITTED, FALSE );
+
+  // NOTE: the committed task button should be down,
+  //       the Implosion button should be unlit,
+  //       the recovery plan button should be lit and down.
+  assert( ! implodeButtonLit( scenarioPtr, COMMITTED, FALSE ) );
+
+  // display committed demand window
+  committedMSD.printByItemAndAttribute();
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 4.9:  Go to RECOVERY state to see if the bug happens\n";
+  cerr <<"Step 4.9:  Go to RECOVERY state to see if the bug happens\n";
+  // ----------------------------------------------------------------- 
+
+  scenarioPtr->changeState(LGFR_ATP_STATE_COMMITTED_IMPLODED_RECOVERY);
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 5:  Change from Committed to Forecast task\n";
+  cerr <<"Step 5:  Change from Committed to Forecast tasK\n";
+  // ----------------------------------------------------------------- 
+
+  // User presses forecast task button
+  //   This causes the recovery plan button to pop up and not be
+  //   selectable (lit).
+  scenarioPtr->changeState(LGFR_ATP_STATE_ATP_IMPLODED);
+
+  // NOTE: the forecast task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be unlit and up.
+  assert( implodeButtonLit( scenarioPtr, FORECAST, FALSE ) );
+
+  // Since the recovery plan button is no longer selected, the
+  // material and capacity recovery plan windows are removed from
+  // the display and can be deleted.
+  delete matRecovMSPptr;
+  delete capRecovMSPptr;
+
+  // Display the forecast demands.
+  //  forecastMSD.printByItemAndAttribute();  The GUI implodes first
+ 
+  // ----------------------------------------------------------------- 
+  cout <<"Step 6:  Implode to see how much of forecast can be achieved\n";
+  cerr <<"Step 6:  Implode to see how much of forecast can be achieved\n";
+  // ----------------------------------------------------------------- 
+
+  // User presses implode button
+  implodeButtonPressed( scenarioPtr, FORECAST, FALSE );
+
+  // NOTE: the forecast task button should be down,
+  //       the Implosion button should be unlit,
+  //       the recovery plan button should be unlit and up.
+  assert( ! implodeButtonLit( scenarioPtr, FORECAST, FALSE ) );
+
+  // Display ATP shipments.
+  forecastMSD.printByItemAndAttribute();
+
+  // In the GUI, the values in forecastMSD are wrong now (the available
+  // to ship qty's are all 0, but should not be)
+  const LgFrSetOfDemands & setOfForecastDemands =
+    scenarioPtr->constSetOfDemands( LGFR_FIRMFORECAST_DEMANDS );
+  const LgFrDemand * forecastDemandPtr1 = 
+     setOfForecastDemands.findValue("FirmForecast","Computer_1");
+    const LgFrDemand * forecastDemandPtr3 = 
+     setOfForecastDemands.findValue("FirmForecast","Computer_3");
+  assert (forecastDemandPtr1 != NULL);
+  assert (forecastDemandPtr3 != NULL);
+  const LgFrTimeVecFloat * forecastShipPtr1
+    = forecastMSDptr->getTimeVecFloat(*forecastDemandPtr1,
+                                      LGFRFirmForecastShipmentVolume);
+  const LgFrTimeVecFloat * forecastShipPtr3
+    = forecastMSDptr->getTimeVecFloat(*forecastDemandPtr3,
+                                      LGFRFirmForecastShipmentVolume);
+  assert ( (*forecastShipPtr1)[7] > 100 );
+  assert ( (*forecastShipPtr3)[7] < .01 );
+
+  // ----------------------------------------------------------------- 
+
+  cout <<"Step 7:  Change from Forecast to New Opp task\n";
+  cerr <<"Step 7:  Change from Forecast to New Opp tasK\n";
+
+  // ----------------------------------------------------------------- 
+
+  // User presses NewOp task button
+  scenarioPtr->changeState(LGFR_ATP_STATE_NEWOPP_IMPLODED);
+
+  // NOTE: the NewOp task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be unlit and up.
+  assert( implodeButtonLit( scenarioPtr, NEWOP, FALSE ) );
+
+  // Get and display the NewOp demands.
+  newOpMSD.printByItemAndAttribute();
+
+
+#if 0
+  REMOVED BECAUSE NEW OP DEMANDS NO LONGER EXIST PRIOR TO THEIR
+  BEING ADDED.
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 8:  Change new op demand vol\n";
+  cerr <<"Step 8:  Change new op demand vol\n";
+  // ----------------------------------------------------------------- 
+
+  // User changes demand vol of new op demand for Computer_2 to 
+  // 50 in 3rd period.
+
+  // Get sets of newOp demands
+  const LgFrSetOfDemands & setOfNewOpDemands =
+     scenarioPtr->constSetOfDemands( LGFR_NEWOPPOR_DEMANDS );
+
+  // Get demand with changed Volume
+  const LgFrDemand * alteredDemandPtr = 
+     setOfNewOpDemands.findValue("NewOpportunity","Computer_2");
+  assert( alteredDemandPtr != NULL );
+  LgFrDemand alteredDemand = *alteredDemandPtr;
+
+  // Get original demand vol and change to new demand vol
+  LgFrTimeVecFloat  demandVol =
+     *(newOpMSD.getTimeVecFloat(
+                   alteredDemand, 
+                   LGFRNewOpportunityDemandVolume));
+  demandVol[2] = 50.;
+
+  // Set the new new Demand vol in the schedule
+  RWBoolean result;
+  result = newOpMSD.changeTimeVecInSchedule(
+                    alteredDemand, LGFRNewOpportunityDemandVolume, demandVol );
+  assert( result );
+
+  // NOTE: the newOp task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be uplit and up.
+  assert( implodeButtonLit( scenarioPtr, NEWOP, FALSE ) );
+
+  // Display changed newOp demand
+  newOpMSD.printByItemAndAttribute();
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 9:  Implode using new newOp demand data\n";
+  cerr <<"Step 9:  Implode using new newOp demand data\n";
+  // ----------------------------------------------------------------- 
+
+  // User presses implode button to get newOp shipment schedule 
+  implodeButtonPressed( scenarioPtr, NEWOP, FALSE );
+
+  // NOTE: the newOp task button should be down,
+  //       the Implosion button should be unlit,
+  //       the recovery plan button should be unlit and up.
+  assert( ! implodeButtonLit( scenarioPtr, NEWOP, FALSE ) );
+
+
+  // Display newOp shipment schedule
+  newOpMSD.printByItemAndAttribute();
+#endif
+
+  // ----------------------------------------------------------------- 
+  cout <<"Step 11:  This just in ... A new NewOpp -- can we meet it\n";
+  cerr <<"Step 11:  This just in ... A new NewOpp -- can we meet it\n";
+  // ----------------------------------------------------------------- 
+
+  // User presses Add a new NewOpp demand
+
+  // Press/select  Add a new NewOpp demand
+  //    This should induce a dialog box to appear asking for ...
+
+  // Get sets of newOp demands
+  const LgFrSetOfDemands & setOfNewOpDemands =
+     scenarioPtr->constSetOfDemands( LGFR_NEWOPPOR_DEMANDS );
+
+  // a demand name ...
+  RWCString newDemandName("PotentialNewOp");
+
+  // and, via a selection list,  a part.
+  const LgFrPart * demandedPartPtr = scenarioPtr->
+                   constSetOfParts(LGFR_MATERIAL_SET).findValue("Computer_4");
+  assert (demandedPartPtr != NULL);
+
+  // Dialog box closes and we issue the command to add the new demand
+  RWBoolean didItWork = 
+     scenarioPtr->newNewOppDemand(newDemandName, *demandedPartPtr);
+  assert (didItWork == TRUE);
+
+  // The implode button should now light up
+
+  // NOTE: the newOp task button should be down,
+  //       the Implosion button should be lit,
+  //       the recovery plan button should be unlit and up.
+  assert ( implodeButtonLit(scenarioPtr, NEWOP, FALSE) == TRUE);
+  
+  // The user should now edit the demandVol through the multiSched
+  // in a similar manner as step 8.
+
+  // Get demand associated with "PotentialNewOp"
+  const LgFrDemand * newDemandPtr = 
+     setOfNewOpDemands.findValue("PotentialNewOp","Computer_4");
+  assert( newDemandPtr != NULL );
+  LgFrDemand newDemand = *newDemandPtr;
+
+  // Get the  demand vol (which should all be zero) and change to new demand vol
+  // A newop for one of the out-going models comes in, exceeding the projected forcast -oh my.
+  LgFrTimeVecFloat  newDemandVol =
+     *(newOpMSD.getTimeVecFloat(newDemand, LGFRNewOpportunityDemandVolume));
+  newDemandVol[3] = 150.;
+
+  // Set the new new Demand vol in the schedule
+  RWBoolean result;
+  result = newOpMSD.changeTimeVecInSchedule(
+                    newDemand, LGFRNewOpportunityDemandVolume, newDemandVol );
+  assert( result );
+
+  // User Now hits the implode button to see when the demand can be met
+  implodeButtonPressed( scenarioPtr, NEWOP, FALSE );
+
+  // The implode button should go out
+  assert ( implodeButtonLit(scenarioPtr, NEWOP, FALSE) == FALSE);
+
+  // Display new shipment solution
+  newOpMSD.printByItemAndAttribute();
+  
+
+
+  // ATP Application terminating, so free new'ed storage.
+  delete newOpMSDptr;
+  delete forecastMSDptr;
+  delete committedMSDptr;
+
+  cerr << "All tests completed successfully\n";
+  cout << "All tests completed successfully\n";
+  return 0;
+}
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

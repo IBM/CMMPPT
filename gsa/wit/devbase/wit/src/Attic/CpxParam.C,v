@@ -1,0 +1,413 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2011.01.12.23.09.24;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2011.01.11.22.08.25;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.01.10.21.51.14;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.01.08.00.27.10;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.01.08.00.25.43;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.01.07.22.42.18;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.01.07.19.46.03;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.01.06.23.31.24;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@CPX Param Specs
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "CpxParam.C"
+//
+// Contains the implementation of the following classes: 
+//
+//    CpxParamMgr
+//    CpxParam
+//------------------------------------------------------------------------------
+
+#include <CpxParamMgr.h>
+#include <CpxParam.h>
+#include <DataWrit.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class CpxParamMgr.
+//------------------------------------------------------------------------------
+
+WitCpxParamMgr::WitCpxParamMgr (WitProblem * theProblem):
+
+      WitProbAssoc     (theProblem),
+      myCpxParamMap_   (),
+      nameForCpxParam_ (defNameForCpxParam ())
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParamMgr::~WitCpxParamMgr ()
+   {
+   WitCpxParam * theCpxParam;
+
+   while (not myCpxParamMap_.empty ())
+      {
+      theCpxParam = myCpxParamMap_.begin ()->second;
+
+      myCpxParamMap_.erase (myCpxParamMap_.begin ());
+
+      delete theCpxParam;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::setNameForCpxParam (const char * theValue)
+   {
+   witAssert (theValue != NULL);
+
+   myProblem ()->prepSetNonUnpostAttr ();
+
+   nameForCpxParam_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::setIntCpxParam (const char * theName, int theValue)
+   {
+   requiredCpxParamFor (theName)->setIntValue (theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::setDblCpxParam (const char * theName, double theValue)
+   {
+   requiredCpxParamFor (theName)->setDblValue (theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParam * WitCpxParamMgr::myCpxParamFor (const char * theName)
+   {
+   WitCpxParamMap::iterator theItr;
+
+   theItr = myCpxParamMap_.find (theName);
+
+   return
+      (theItr != myCpxParamMap_.end ())?
+         theItr->second:
+         NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::display ()
+   {
+   myMsgFac () ("nameForCpxParamDdMsg",
+      nameForCpxParam_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::copyAttrsFrom (WitCpxParamMgr * theCpxParamMgr)
+   {
+   nameForCpxParam_ = theCpxParamMgr->nameForCpxParam_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::writeDataAttrs ()
+   {
+   myDataWriter ()->writeString (
+        "nameForCpxParam",
+         nameForCpxParam_,
+      defNameForCpxParam ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParam * WitCpxParamMgr::requiredCpxParamFor (const char * theName)
+   {
+   WitCpxParam * theCpxParam;
+   const char *  storedName;
+
+   theCpxParam = myCpxParamFor (theName);
+
+   if (theCpxParam == NULL)
+      {
+      theCpxParam                = new WitCpxParam (theName);
+
+      storedName                 = theCpxParam->myName ().myCstring ();
+
+      myCpxParamMap_[storedName] = theCpxParam;
+      }
+
+   return theCpxParam;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class CpxParam.
+//------------------------------------------------------------------------------
+
+WitCpxParam::WitCpxParam (const char * theName):
+
+      myName_      (theName),
+      myTypeIsInt_ (true),
+      myIntValue_  (0),
+      myDblValue_  (0.0)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpxParam::~WitCpxParam ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+int WitCpxParam::myIntValue () const
+   {
+   witAssert (myTypeIsInt_);
+
+   return myIntValue_;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitCpxParam::myDblValue () const
+   {
+   witAssert (not myTypeIsInt_);
+
+   return myDblValue_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParam::setIntValue (int theValue)
+   {
+   myTypeIsInt_ = true;
+
+   myIntValue_  = theValue;
+   myDblValue_  = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParam::setDblValue (double theValue)
+   {
+   myTypeIsInt_ = false;
+
+   myIntValue_  = 0;
+   myDblValue_  = theValue;
+   }
+@
+
+
+1.7
+log
+@CPX Params
+@
+text
+@@
+
+
+1.6
+log
+@CPX params
+@
+text
+@d21 2
+d30 3
+a32 2
+      WitProbAssoc   (theProblem),
+      myCpxParamMap_ ()
+d54 11
+d93 25
+@
+
+
+1.5
+log
+@Testing CVS.
+@
+text
+@d53 1
+a53 5
+   WitCpxParam * theCpxParam;
+
+   theCpxParam = new WitCpxParam (theName, theValue);
+
+   store (theCpxParam);
+d60 1
+a60 24
+   WitCpxParam * theCpxParam;
+
+   theCpxParam = new WitCpxParam (theName, theValue);
+
+   store (theCpxParam);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCpxParamMgr::clearCpxParam (const char * theName)
+   {
+   WitCpxParamMap::iterator theItr;
+   WitCpxParam *            theCpxParam;
+
+   theItr = myCpxParamMap_.find (theName);
+
+   if (theItr == myCpxParamMap_.end ())
+      return;
+
+   theCpxParam = theItr->second;
+
+   myCpxParamMap_.erase (theItr);
+
+   delete theCpxParam;
+d79 1
+a79 1
+void WitCpxParamMgr::store (WitCpxParam * theCpxParam)
+d81 2
+a82 1
+   const char * theName;
+d84 1
+a84 1
+   theName                 = theCpxParam->myName ().myCstring ();
+d86 3
+a88 1
+   clearCpxParam (theName);
+d90 6
+a95 1
+   myCpxParamMap_[theName] = theCpxParam;
+d102 1
+a102 1
+WitCpxParam::WitCpxParam (const char * theName, int theValue):
+d104 4
+a107 4
+      myName_       (theName),
+      myValueIsInt_ (true),
+      myIntValue_   (theValue),
+      myDblValue_   (0.0)
+d113 3
+a115 1
+WitCpxParam::WitCpxParam (const char * theName, double theValue):
+d117 3
+a119 4
+      myName_       (theName),
+      myValueIsInt_ (false),
+      myIntValue_   (0),
+      myDblValue_   (theValue)
+d121 3
+d128 1
+a128 1
+WitCpxParam::~WitCpxParam ()
+d130 3
+d137 1
+a137 1
+int WitCpxParam::myIntValue () const
+d139 1
+a139 1
+   witAssert (myValueIsInt_);
+d141 2
+a142 1
+   return myIntValue_;
+d147 1
+a147 1
+double WitCpxParam::myDblValue () const
+d149 1
+a149 1
+   witAssert (not myValueIsInt_);
+d151 2
+a152 1
+   return myDblValue_;
+@
+
+
+1.4
+log
+@Testing CVS.
+@
+text
+@a21 2
+#include <wit.h>
+
+@
+
+
+1.3
+log
+@CPX Params
+@
+text
+@d22 2
+@
+
+
+1.2
+log
+@CPX Params
+@
+text
+@d50 68
+@
+
+
+1.1
+log
+@CPX Params
+@
+text
+@d13 4
+a16 1
+// Contains the implementation of class CpxParam.
+d19 1
+d23 27
+@
+

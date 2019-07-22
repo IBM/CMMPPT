@@ -1,0 +1,2311 @@
+head	1.2;
+access;
+symbols
+	sce_5_01_20080919:1.2
+	latest_sce_4_20_20060523:1.2.0.6
+	sce_4_20_20060523:1.2
+	latest_sce4_20_OSL:1.2.0.4
+	sce_4_20_OSL:1.2
+	sce_4_05_20040511:1.2
+	sce_4_00_20040201:1.2
+	nextGenBranch:1.2.0.2
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2003.01.15.19.36.28;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.37;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.37;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.26;	author rwToStl;	state Exp;
+branches;
+next	1.1.1.1.14.2;
+
+1.1.1.1.14.2
+date	2003.01.09.13.54.43;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+#include <math.h>
+
+#include <scenario/src/cumSS.h>
+#include <scenario/src/partSchd.h>
+#include <scenario/src/partSchP.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/demdSchd.h>
+#include <scenario/src/demdSchP.h>
+#include <scenario/src/demdPnPC.h>
+
+//-----------------------------------------------------------------------
+//
+//  Implementation of LgFrCumTimeVecPartScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrCumTimeVecPartScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "Cumulative Schedule Strategy depends on exactly 1 schedule");
+
+  LgFrPart part;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( part, tv );
+
+  const LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+
+  // Loop once for each item in independent schedule
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+
+     // get next itemTimeVec
+     itv = indepSched[i];
+
+     // Form cumulative time vec
+     itv.timeVecFloat( itv.timeVecFloat().scan(LgFrAdd) );
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+  }
+
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumTimeVecPartScheduleStrategy::clone()
+const
+{
+    LgFrCumTimeVecPartScheduleStrategy* temp = 
+	new LgFrCumTimeVecPartScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumTimeVecPartScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{  
+  return new LgFrCumTimeVecPartScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrCumTimeVecPartScheduleStrategy &
+LgFrCumTimeVecPartScheduleStrategy::operator=(
+	  const LgFrCumTimeVecPartScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrPartScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrCumTimeVecPartScheduleStrategy::
+   LgFrCumTimeVecPartScheduleStrategy (
+      const LgFrCumTimeVecPartScheduleStrategy & source)
+:  LgFrPartScheduleSensitiveScheduleStrategy( source ), 
+   id_(__LGFRCUMTIMEVECPARTSCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with newScenario
+LgFrCumTimeVecPartScheduleStrategy::
+   LgFrCumTimeVecPartScheduleStrategy (
+      const LgFrCumTimeVecPartScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrPartScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   id_(__LGFRCUMTIMEVECPARTSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrCumTimeVecPartScheduleStrategy::
+   LgFrCumTimeVecPartScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrPartScheduleSensitiveScheduleStrategy( scenario ),
+   id_(__LGFRCUMTIMEVECPARTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrCumTimeVecPartScheduleStrategy::
+   LgFrCumTimeVecPartScheduleStrategy ()
+:  LgFrPartScheduleSensitiveScheduleStrategy(),
+   id_(__LGFRCUMTIMEVECPARTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrCumTimeVecPartScheduleStrategy::
+   ~LgFrCumTimeVecPartScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+
+//------------------------------------------------------------------------
+//
+//  	Implementation of LgFrCumTimeVecDemandScheduleStrategy
+//
+//------------------------------------------------------------------------
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrCumTimeVecDemandScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "Cumulative Schedule Strategy depends on exactly 1 schedule");
+
+  LgFrDemand part;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( part, tv );
+
+  const LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+
+  // Loop once for each item in independent schedule
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+
+     // get next itemTimeVec
+     itv = indepSched[i];
+
+     // Form cumulative time vec
+     itv.timeVecFloat( itv.timeVecFloat().scan(LgFrAdd) );
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+  }
+
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumTimeVecDemandScheduleStrategy::clone()
+const
+{
+    LgFrCumTimeVecDemandScheduleStrategy* temp = 
+	new LgFrCumTimeVecDemandScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumTimeVecDemandScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{ 
+  return new LgFrCumTimeVecDemandScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrCumTimeVecDemandScheduleStrategy &
+LgFrCumTimeVecDemandScheduleStrategy::operator=(
+	  const LgFrCumTimeVecDemandScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrDemandScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrCumTimeVecDemandScheduleStrategy::
+   LgFrCumTimeVecDemandScheduleStrategy (
+      const LgFrCumTimeVecDemandScheduleStrategy & source)
+:  LgFrDemandScheduleSensitiveScheduleStrategy( source ), 
+   id_(__LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY)
+{
+}
+
+
+// Copy constructor with newScenario
+LgFrCumTimeVecDemandScheduleStrategy::
+   LgFrCumTimeVecDemandScheduleStrategy (
+      const LgFrCumTimeVecDemandScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrDemandScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   id_(__LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrCumTimeVecDemandScheduleStrategy::
+   LgFrCumTimeVecDemandScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrDemandScheduleSensitiveScheduleStrategy( scenario ),
+   id_(__LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrCumTimeVecDemandScheduleStrategy::
+   LgFrCumTimeVecDemandScheduleStrategy ()
+:  LgFrDemandScheduleSensitiveScheduleStrategy(),
+   id_(__LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+
+// Destructor
+LgFrCumTimeVecDemandScheduleStrategy::
+   ~LgFrCumTimeVecDemandScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+//-----------------------------------------------------------------------
+//
+//  Implementation of LgFrCumDemandsPartScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrCumDemandsPartScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "LgFrCumDemandsPartScheduleStrategy depends on exactly 1 schedule");
+
+  size_t i;
+  LgFrSortingScheduleFloat & indepSched = (LgFrSortingScheduleFloat &) *(schedules()[0]);
+  const LgFrSortingScheduleFloat & constIndepSched = indepSched;
+
+  // Sort independent schedule by part name
+  const LgFrPairCompareFloat * const savedPcPtr = indepSched.compareStrategy();
+  LgFrPairCompareFloat * myCopySavedPcPtr = 0;
+  if ( savedPcPtr != 0 ) myCopySavedPcPtr = savedPcPtr->clone();
+
+  LgFrDemandPartNamePairCompare dpnpc;
+  indepSched.sort( &dpnpc );
+   
+  LgFrDemand demandi;
+  LgFrTimeVecFloat tvi;
+  LgFrItemTimeVecPairFloat itvi( demandi, tvi );
+  
+  LgFrPart cumParti;
+  LgFrTimeVecFloat cumTv;
+  LgFrItemTimeVecPairFloat cumItv( cumParti, cumTv );
+
+
+  // Loop once for each item in independent schedule
+  bool lastIter, firstIter, sameParts;
+  for ( i=0;
+        i<constIndepSched.size(); 
+        i++ ) {
+
+     // get i'th
+     itvi = constIndepSched[ i ];
+
+     firstIter = ( i==0 );
+     lastIter = ( i==constIndepSched.size()-1 );
+
+     if (firstIter) {
+        cumItv.item( *( constIndepSched[0].demand().partPtr() ) );
+        cumTv = constIndepSched[0].timeVecFloat();
+        cumTv = 0;
+        cumItv.timeVecFloat( cumTv ); 
+     }
+
+     sameParts = (*(itvi.demand().partPtr()) == cumItv.part()) ? true : false;
+
+     // Check to see if itv should be added to cumItv
+     // (ie parts are the same)
+     if (  sameParts ) {
+        cumItv.timeVecFloat( cumItv.timeVecFloat() + itvi.timeVecFloat() );
+     }
+
+     // Check to see if cumItv should be inserted into schedule
+     // (ie parts different)
+     if (  !sameParts ) {
+        if ( ! schedule.filterStrategy().exclude( cumItv ) ) 
+           schedule.localInsert( cumItv );
+     }
+
+     // Check to see if cumItv should be reinitialized
+     // (ie parts different)
+     if (  !sameParts ) {
+        cumItv.item( *( itvi.demand().partPtr() ) );
+        cumItv.timeVecFloat( itvi.timeVecFloat() );
+     }
+
+     if ( lastIter ) {
+        if ( ! schedule.filterStrategy().exclude( cumItv ) ) 
+           schedule.localInsert( cumItv );
+     }
+
+  }
+
+  // Restore independent schedule to original sort order
+  indepSched.sort( myCopySavedPcPtr );
+  delete myCopySavedPcPtr;
+
+}
+
+// Insert independent Schedule
+void
+LgFrCumDemandsPartScheduleStrategy::insertPartSchedule(
+   LgFrSortingPartScheduleFloatSmartPointer  )
+{
+   std::cerr <<"LgFrCumDemandsPartScheduleStrategy::insertPartSchedule"
+        <<std::endl;
+   std::cerr <<"Class does not allow inserting part schedules" <<std::endl;
+   abort();
+}
+
+void
+LgFrCumDemandsPartScheduleStrategy::insertDemandSchedule(
+   LgFrSortingDemandScheduleFloatSmartPointer schedule )
+{
+   localInsert( schedule );
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumDemandsPartScheduleStrategy::clone()
+const
+{
+    LgFrCumDemandsPartScheduleStrategy* temp = 
+	new LgFrCumDemandsPartScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCumDemandsPartScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{  
+  return new LgFrCumDemandsPartScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrCumDemandsPartScheduleStrategy &
+LgFrCumDemandsPartScheduleStrategy::operator=(
+	  const LgFrCumDemandsPartScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrPartScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrCumDemandsPartScheduleStrategy::
+   LgFrCumDemandsPartScheduleStrategy (
+      const LgFrCumDemandsPartScheduleStrategy & source)
+:  LgFrPartScheduleSensitiveScheduleStrategy( source ), 
+   id_(__LGFRCUMDEMANDSPARTSCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with newScenario
+LgFrCumDemandsPartScheduleStrategy::
+   LgFrCumDemandsPartScheduleStrategy (
+      const LgFrCumDemandsPartScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrPartScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   id_(__LGFRCUMDEMANDSPARTSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrCumDemandsPartScheduleStrategy::
+   LgFrCumDemandsPartScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrPartScheduleSensitiveScheduleStrategy( scenario ),
+   id_(__LGFRCUMDEMANDSPARTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrCumDemandsPartScheduleStrategy::
+   LgFrCumDemandsPartScheduleStrategy ()
+:  LgFrPartScheduleSensitiveScheduleStrategy(),
+   id_(__LGFRCUMDEMANDSPARTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrCumDemandsPartScheduleStrategy::
+   ~LgFrCumDemandsPartScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+
+
+//-----------------------------------------------------------------------
+//
+//  Implementation of LgFrPartSummaryScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrPartSummaryScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "PartSummary Schedule Strategy depends on exactly 1 schedule");
+
+  const LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+
+  // NOTE!! If the dependent schedule is empty, we should return a timeVec
+  // of 0.0's  However, this ASS does not know how many periods there are
+  // in the problem.  So, for now, it just returns an empty schedule.
+  if (indepSched.size() == 0)
+    return;
+
+  LgFrPart part;
+
+  // create a timeVec that has the correct length.  If you don't do this
+  // and you cumulate over an empty Schedule, then you're in trouble.
+  // Assign initial values of 0.0
+//  LgFrTimeVecFloat tv(this->lastProblemSolved().numberOfPeriods(), 0.0);
+  LgFrTimeVecFloat tv((indepSched[0]).timeVecFloat().length(), 0.0);
+  
+  LgFrItemTimeVecPairFloat itv( part, tv );
+  
+  // Loop once for each item in independent schedule
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+
+     // get next itemTimeVec
+     itv = indepSched[i];
+
+     // add the timeVec
+     tv = tv + itv.timeVecFloat();
+  }
+
+  // now that you've cumulated all the timeVecs in the dependent
+  // schedule into one total timeVec, we need to set each
+  // tv in the reultant schedule to that same result
+  size_t j = 0; // Pulled out of the for below by RW2STL
+  for ( j=0; j<setOfParts().size(); j++ ) {
+     part = setOfParts()[j];
+     LgFrItemTimeVecPairFloat itv( part, tv );
+     
+     // Check to see if j'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+   }
+}
+
+
+//estimatedSize
+size_t
+LgFrPartSummaryScheduleStrategy::estimatedSize(
+   const LgFrSortingScheduleFloat& schedule )
+const
+{
+  size_t retVal = setOfParts().size();
+
+  if (  schedule.filterStrategy().GetFSType() != __LGFRFILTERSTRATEGY )
+     retVal = retVal / 2 + 1;
+
+  retVal = size_tMax(
+                    retVal,
+                    LgFrAttributeScheduleStrategy::estimatedSize( schedule )
+                    );
+
+  return retVal;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrPartSummaryScheduleStrategy::clone()
+const
+{
+    LgFrPartSummaryScheduleStrategy* temp = 
+	new LgFrPartSummaryScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrPartSummaryScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{  
+  return new LgFrPartSummaryScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrPartSummaryScheduleStrategy &
+LgFrPartSummaryScheduleStrategy::operator=(
+	  const LgFrPartSummaryScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrPartScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrPartSummaryScheduleStrategy::
+   LgFrPartSummaryScheduleStrategy (
+      const LgFrPartSummaryScheduleStrategy & source)
+:  LgFrPartScheduleSensitiveScheduleStrategy( source ), 
+   id_(__LGFRPARTSUMMARYSCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with newScenario
+LgFrPartSummaryScheduleStrategy::
+   LgFrPartSummaryScheduleStrategy (
+      const LgFrPartSummaryScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrPartScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   id_(__LGFRPARTSUMMARYSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrPartSummaryScheduleStrategy::
+   LgFrPartSummaryScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrPartScheduleSensitiveScheduleStrategy( scenario ),
+   id_(__LGFRPARTSUMMARYSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrPartSummaryScheduleStrategy::
+   LgFrPartSummaryScheduleStrategy ()
+:  LgFrPartScheduleSensitiveScheduleStrategy(),
+   id_(__LGFRPARTSUMMARYSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrPartSummaryScheduleStrategy::
+   ~LgFrPartSummaryScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+
+
+//-----------------------------------------------------------------------
+//
+//  Implementation of LgFrDemandSummaryScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrDemandSummaryScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "DemandSummary Schedule Strategy depends on exactly 1 schedule");
+
+  const LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+
+  // NOTE!! If the dependent schedule is empty, we should return a timeVec
+  // of 0.0's  However, this ASS does not know how many periods there are
+  // in the problem.  So, for now, it just returns an empty schedule.
+  if (indepSched.size() == 0)
+    return;
+
+  LgFrDemand demand;
+
+  // create a timeVec that has the correct length.  If you don't do this
+  // and you cumulate over an empty Schedule, then you're in trouble.
+  // Assign initial values of 0.0
+//  LgFrTimeVecFloat tv(this->lastProblemSolved().numberOfPeriods(), 0.0);
+  LgFrTimeVecFloat tv((indepSched[0]).timeVecFloat().length(), 0.0);
+  
+  LgFrItemTimeVecPairFloat itv( demand, tv );
+  
+  // Loop once for each item in independent schedule
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+
+     // get next itemTimeVec
+     itv = indepSched[i];
+
+     // add the timeVec
+     tv = tv + itv.timeVecFloat();
+  }
+
+  // now that you've cumulated all the timeVecs in the dependent
+  // schedule into one total timeVec, we need to set each
+  // tv in the reultant schedule to that same result
+  size_t j = 0; // Pulled out of the for below by RW2STL
+  for ( j=0; j<setOfDemands().size(); j++ ) {
+     demand = setOfDemands()[j];
+     LgFrItemTimeVecPairFloat itv( demand, tv );
+     
+     // Check to see if j'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+   }
+}
+
+
+//estimatedSize
+size_t
+LgFrDemandSummaryScheduleStrategy::estimatedSize(
+   const LgFrSortingScheduleFloat& schedule )
+const
+{
+  size_t retVal = setOfDemands().size();
+
+  if (  schedule.filterStrategy().GetFSType() != __LGFRFILTERSTRATEGY )
+     retVal = retVal / 2 + 1;
+
+  retVal = size_tMax(
+                    retVal,
+                    LgFrAttributeScheduleStrategy::estimatedSize( schedule )
+                    );
+
+  return retVal;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrDemandSummaryScheduleStrategy::clone()
+const
+{
+    LgFrDemandSummaryScheduleStrategy* temp = 
+	new LgFrDemandSummaryScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrDemandSummaryScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{  
+  return new LgFrDemandSummaryScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrDemandSummaryScheduleStrategy &
+LgFrDemandSummaryScheduleStrategy::operator=(
+	  const LgFrDemandSummaryScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrDemandScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrDemandSummaryScheduleStrategy::
+   LgFrDemandSummaryScheduleStrategy (
+      const LgFrDemandSummaryScheduleStrategy & source)
+:  LgFrDemandScheduleSensitiveScheduleStrategy( source ), 
+   id_(__LGFRDEMANDSUMMARYSCHEDULESTRATEGY)
+{
+}
+
+// Copy constructor with newScenario
+LgFrDemandSummaryScheduleStrategy::
+   LgFrDemandSummaryScheduleStrategy (
+      const LgFrDemandSummaryScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrDemandScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   id_(__LGFRDEMANDSUMMARYSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrDemandSummaryScheduleStrategy::
+   LgFrDemandSummaryScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrDemandScheduleSensitiveScheduleStrategy( scenario ),
+   id_(__LGFRDEMANDSUMMARYSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrDemandSummaryScheduleStrategy::
+   LgFrDemandSummaryScheduleStrategy ()
+:  LgFrDemandScheduleSensitiveScheduleStrategy(),
+   id_(__LGFRDEMANDSUMMARYSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrDemandSummaryScheduleStrategy::
+   ~LgFrDemandSummaryScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+//-----------------------------------------------------------------------
+//
+//  Implementation of LgFrCompoundInterestScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrCompoundInterestScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  assert( schedules().size() == 1 && 
+          "Cumulative Schedule Strategy depends on exactly 1 schedule");
+
+  LgFrPart part;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( part, tv );
+
+  const LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+
+  // Loop once for each item in independent schedule
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+
+     // get next itemTimeVec from dependent schedule
+     // NOTE: dependent schedule should represent a dollar savings schedule
+     itv = indepSched[i];
+     
+     // Form cumulative compound interest time vec
+     // initial tv of zero's
+     LgFrTimeVecFloat ciTV(itv.timeVecFloat().length(), 0.0);
+
+     
+     size_t t = 0; // Pulled out of the for below by RW2STL
+     for (t=0; t<itv.timeVecFloat().length(); t++) {
+       if (t == 0)  {
+          // interest earned in period 0
+          ciTV[t] = (itv.timeVecFloat())[t] * interestRate_ / 52.0f;
+        }
+        else  {
+#define COMPOUND_INTEREST
+#ifdef COMPOUND_INTEREST
+          // interest earned in period t > 0 is the interest on whatever savings
+          // were in period t plus the interest on the interest earned in period
+          // t-1.  
+          ciTV[t] = ((itv.timeVecFloat())[t] + ciTV[t-1]) * interestRate_ / 52.0f;
+          // now cum the interest
+          ciTV[t] += ciTV[t-1];
+#else
+          ciTV[t] = ((itv.timeVecFloat())[t]) * interestRate_ / 52.0;
+#endif
+        }
+      }     
+#ifndef COMPOUND_INTEREST
+     // now cum the interest
+     for (t=1; t<itv.timeVecFloat().length(); t++) {
+       ciTV[t] += ciTV[t-1];
+     }
+#endif
+
+     itv.timeVecFloat(ciTV);
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+  }
+
+}
+
+
+// set/get the interest rate
+void
+LgFrCompoundInterestScheduleStrategy::interestRate(float theRate)
+{
+  interestRate_ = theRate;
+}
+
+float
+LgFrCompoundInterestScheduleStrategy::interestRate()
+     const
+{
+  return interestRate_;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCompoundInterestScheduleStrategy::clone()
+const
+{
+    LgFrCompoundInterestScheduleStrategy* temp = 
+	new LgFrCompoundInterestScheduleStrategy(*this);
+    assert( schedules().size() == 1 );
+    // hack up the schedules
+    // need to deep copy the independent schedules
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+      // cast away const here to get subscription stuff to work
+	temp->independentSchedules_[i]->removeDependentFromHeterogeneousList(temp );
+	temp->independentSchedules_[i] = independentSchedules_[i].deepCopy();
+	temp->independentSchedules_[i]->addDependent(temp );
+    }
+    return temp;
+}
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrCompoundInterestScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{
+  return new LgFrCompoundInterestScheduleStrategy(*this, newScenario);
+}
+
+
+// Assignment operator
+LgFrCompoundInterestScheduleStrategy &
+LgFrCompoundInterestScheduleStrategy::operator=(
+	  const LgFrCompoundInterestScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrPartScheduleSensitiveScheduleStrategy::operator= ) (rhs);
+    this->interestRate_ = rhs.interestRate_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrCompoundInterestScheduleStrategy::
+   LgFrCompoundInterestScheduleStrategy (
+      const LgFrCompoundInterestScheduleStrategy & source)
+:  LgFrPartScheduleSensitiveScheduleStrategy( source ),
+   interestRate_(source.interestRate_),
+   id_(__LGFRCOMPOUNDINTERESTSCHEDULESTRATEGY)
+{
+}
+
+
+// Copy constructor with newScenario
+LgFrCompoundInterestScheduleStrategy::
+   LgFrCompoundInterestScheduleStrategy (
+      const LgFrCompoundInterestScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrPartScheduleSensitiveScheduleStrategy( 
+         source, 
+         newScenario ),
+   interestRate_(source.interestRate_),
+   id_(__LGFRCOMPOUNDINTERESTSCHEDULESTRATEGY)
+{
+}
+
+// Constructor
+LgFrCompoundInterestScheduleStrategy::
+   LgFrCompoundInterestScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrPartScheduleSensitiveScheduleStrategy( scenario ),
+   interestRate_(0.10f),
+   id_(__LGFRCOMPOUNDINTERESTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrCompoundInterestScheduleStrategy::
+   LgFrCompoundInterestScheduleStrategy ()
+:  LgFrPartScheduleSensitiveScheduleStrategy(),
+   interestRate_(0.10f),
+   id_(__LGFRCOMPOUNDINTERESTSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrCompoundInterestScheduleStrategy::
+   ~LgFrCompoundInterestScheduleStrategy ()
+{
+   // Nothing to do here
+}
+
+
+//-------------------------------------------------------------------------
+//
+//		Test Methods
+//
+//-------------------------------------------------------------------------
+
+
+//-----------------------------------------------------------------------
+//
+//  Test of LgFrCumTimeVecPartScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrCumTimeVecPartScheduleStrategy methods.
+
+void
+LgFrCumTimeVecPartScheduleStrategy::test()
+{
+  LgFrCumTimeVecPartScheduleStrategy cs1;
+  assert( cs1.schedules().size() == 0 );
+}
+
+
+// test LgFrCumTimeVecPartScheduleStrategy methods.
+// Expects testScenario to contain data from
+// /u/implode/wit/data/examples/diner12/wit.data
+// Expects supplySchedule to be a supply schedule for testScenario
+// (containing a LgFrSupplyScheduleStrategy)
+void
+LgFrCumTimeVecPartScheduleStrategy::contextTest
+    (
+     LgFrScenario & testScenario,
+     LgFrSortingPartScheduleFloatSmartPointer supplySchedule    
+     )
+{
+std::cerr << "entering LgFrCumTimeVecPartScheduleStrategy::contextTest" << std::endl;
+  int i;
+  LgFrCumTimeVecPartScheduleStrategy cs1;
+
+  // Test inserting single dependent schedule
+  cs1.insertPartSchedule( supplySchedule );
+  assert( cs1.schedules()[0] == supplySchedule );
+
+  // Test copy constructor - shallow copy
+  LgFrCumTimeVecPartScheduleStrategy cs2(cs1);
+  assert( cs2.schedules()[0] == supplySchedule );
+
+  // Test assignment operator - shallow copy
+  LgFrCumTimeVecPartScheduleStrategy cs3;
+  cs3 = cs2;
+  assert( cs3.schedules()[0] == supplySchedule );
+
+
+  // Test clone method
+  {
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+    assert( (  (LgFrCumTimeVecPartScheduleStrategy *) cs4Ptr)
+            ->schedules().size() == 1 );
+    assert( (  (LgFrCumTimeVecPartScheduleStrategy *) cs4Ptr)
+            ->schedules()[0] 
+            != supplySchedule );
+    assert( *( (  (LgFrCumTimeVecPartScheduleStrategy *) cs4Ptr)
+            ->schedules()[0])
+            == *supplySchedule );
+    
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+
+  // Test Kernal of populate
+  const LgFrSortingPartScheduleFloat & constSupplySchedule = *supplySchedule;
+  LgFrSortingPartScheduleFloat cumSup;
+  const LgFrSortingPartScheduleFloat & constCumSup = cumSup;
+  cumSup.attributeScheduleStrategy( cs1 );
+  cumSup.populate();
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+     assert(         constCumSup[i].timeVecFloat() == 
+             constSupplySchedule[i].timeVecFloat().scan(LgFrAdd) );
+
+
+  // Test subscription mechanism
+  LgFrPart part2 = constSupplySchedule[2].part();
+  supplySchedule->insertKeyAndValue( part2, LgFrTimeVecFloat(2, 3.1415f) );
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+     assert(         constCumSup[i].timeVecFloat() == 
+             constSupplySchedule[i].timeVecFloat().scan(LgFrAdd) );
+
+  // Test scenario copy constructor - deep copy
+  LgFrCumTimeVecPartScheduleStrategy scenCtor(cs1,testScenario);
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+
+  // Test cloning w/scenario - deep copy
+  LgFrAttributeScheduleStrategy *cs6Ptr = cs1.clone(testScenario);
+  assert( ((LgFrCumTimeVecPartScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != supplySchedule );
+  assert( ((LgFrCumTimeVecPartScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != cs1.schedules()[0] );
+  // schedules have the same content but are deep copies
+  assert( *(((LgFrCumTimeVecPartScheduleStrategy *)cs6Ptr)->schedules()[0])
+          == *(cs1.schedules()[0]) );
+  delete cs6Ptr;
+}
+
+//-----------------------------------------------------------------------
+//
+//  Test of LgFrCumTimeVecDemandScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+// test LgFrCumTimeVecDemandScheduleStrategy methods.
+
+void
+LgFrCumTimeVecDemandScheduleStrategy::test()
+{
+  LgFrCumTimeVecDemandScheduleStrategy cs1;
+  assert( cs1.schedules().size() == 0 );
+}
+
+
+// test LgFrCumTimeVecDemandScheduleStrategy methods.
+// Expects testScenario to contain data from
+// /u/implode/wit/data/examples/diner12/wit.data
+// Expects supplySchedule to be a supply schedule for testScenario
+// (containing a LgFrSupplyScheduleStrategy)
+void
+LgFrCumTimeVecDemandScheduleStrategy::contextTest
+    (
+     LgFrScenario & testScenario,
+     LgFrSortingDemandScheduleFloatSmartPointer supplySchedule    
+     )
+{
+std::cerr << "entering LgFrCumTimeVecDemandScheduleStrategy::contextTest" << std::endl;
+  int i;
+  LgFrCumTimeVecDemandScheduleStrategy cs1;
+
+  // Test inserting single dependent schedule
+  cs1.insertDemandSchedule( supplySchedule );
+  assert( cs1.schedules()[0] == supplySchedule );
+
+  // Test copy constructor - shallow copy of schedules
+  LgFrCumTimeVecDemandScheduleStrategy cs2(cs1);
+  assert( cs2.schedules()[0] == supplySchedule );
+
+  // Test assignment operator - shallow copy of schedules
+  LgFrCumTimeVecDemandScheduleStrategy cs3;
+  cs3 = cs2;
+  assert( cs3.schedules()[0] == supplySchedule );
+
+  // Test clone method - deep copy of schedules
+  {
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+    assert( (  (LgFrCumTimeVecDemandScheduleStrategy *) cs4Ptr)
+            ->schedules().size() == 1 );
+    assert( (  (LgFrCumTimeVecDemandScheduleStrategy *) cs4Ptr)
+            ->schedules()[0] 
+            != supplySchedule );
+    assert( *( (  (LgFrCumTimeVecDemandScheduleStrategy *) cs4Ptr)
+            ->schedules()[0])
+            == *supplySchedule );
+    
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+
+  // Test Kernal of populate
+  const LgFrSortingDemandScheduleFloat & constSupplySchedule = *supplySchedule;
+  LgFrSortingDemandScheduleFloat cumSup;
+  const LgFrSortingDemandScheduleFloat & constCumSup = cumSup;
+  cumSup.attributeScheduleStrategy( cs1 );
+  cumSup.populate();
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+     assert(         constCumSup[i].timeVecFloat() == 
+             constSupplySchedule[i].timeVecFloat().scan(LgFrAdd) );
+
+  // Test subscription mechanism
+  LgFrDemand part2 = constSupplySchedule[2].demand();
+  supplySchedule->insertKeyAndValue( part2, LgFrTimeVecFloat(2, 3.1415f) );
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+     assert(         constCumSup[i].timeVecFloat() == 
+             constSupplySchedule[i].timeVecFloat().scan(LgFrAdd) );
+
+  // Test scenario copy constructor
+  LgFrCumTimeVecDemandScheduleStrategy scenCtor(cs1,testScenario);
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+
+
+  // Test cloning w/scenario 
+  LgFrAttributeScheduleStrategy *cs6Ptr = cs1.clone(testScenario);
+  assert( ((LgFrCumTimeVecDemandScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != supplySchedule );
+  assert( ((LgFrCumTimeVecDemandScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != cs1.schedules()[0] );
+  assert( *(((LgFrCumTimeVecDemandScheduleStrategy *)cs6Ptr)->schedules()[0])
+          == *(cs1.schedules()[0]) );
+
+  delete cs6Ptr;
+}
+
+//-----------------------------------------------------------------------
+//
+//  Test of LgFrCumDemandsPartScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrCumDemandsPartScheduleStrategy methods.
+void
+LgFrCumDemandsPartScheduleStrategy::test()
+{
+  LgFrCumDemandsPartScheduleStrategy cs1;
+  assert( cs1.schedules().size() == 0 );
+}
+
+
+// test LgFrCumDemandsPartScheduleStrategy methods.
+// Expects testScenario to contain data from
+// /u/implode/wit/data/brenda/denise/wit.data
+// Expects supplySchedule to be a supply schedule for testScenario
+// (containing a LgFrSupplyScheduleStrategy)
+void
+LgFrCumDemandsPartScheduleStrategy::contextTest
+    (
+     LgFrScenario & testScenario,
+     LgFrSortingDemandScheduleFloatSmartPointer demandSchedule    
+     )
+{
+std::cerr << "entering LgFrCumDemandsPartScheduleStrategy::contextTest" << std::endl;
+  LgFrCumDemandsPartScheduleStrategy cs1;
+
+
+  // Test inserting single dependent schedule
+  cs1.insertDemandSchedule( demandSchedule );
+  assert( cs1.schedules()[0] == demandSchedule );
+
+  // Test copy constructor
+  LgFrCumDemandsPartScheduleStrategy cs2(cs1);
+  assert( cs2.schedules()[0] == demandSchedule );
+
+  // Test assignment operator
+  LgFrCumDemandsPartScheduleStrategy cs3;
+  cs3 = cs2;
+  assert( cs3.schedules()[0] == demandSchedule );
+
+  // Test clone method
+  {
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+    assert( (  (LgFrCumDemandsPartScheduleStrategy *) cs4Ptr)
+            ->schedules().size() == 1 );
+    assert( (  (LgFrCumDemandsPartScheduleStrategy *) cs4Ptr)
+            ->schedules()[0] 
+            != demandSchedule );
+
+    assert( *( (  (LgFrCumDemandsPartScheduleStrategy *) cs4Ptr)
+            ->schedules()[0])
+            == *demandSchedule );
+    
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+
+  // Test Kernal of populate
+  const LgFrSortingDemandScheduleFloat & constDemandSchedule = *demandSchedule;
+  LgFrSortingPartScheduleFloat cum;
+  const LgFrSortingPartScheduleFloat & constCum = cum;
+  cum.attributeScheduleStrategy( cs1 );
+  cum.populate();
+
+  assert( demandSchedule->size() > cum.size() );
+
+
+  // Test scenario copy constructor
+  LgFrCumDemandsPartScheduleStrategy scenCtor(cs1,testScenario);
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+
+
+  // Test cloning w/scenario 
+  LgFrAttributeScheduleStrategy *cs6Ptr = cs1.clone(testScenario);
+  assert( ((LgFrCumDemandsPartScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != demandSchedule );
+  assert( ((LgFrCumDemandsPartScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != cs1.schedules()[0] );
+  assert( *(((LgFrCumDemandsPartScheduleStrategy *)cs6Ptr)->schedules()[0])
+          == *(cs1.schedules()[0]) );
+
+  delete cs6Ptr;
+}
+
+
+//-----------------------------------------------------------------------
+//
+//  Test of LgFrPartSummaryScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrPartSummaryScheduleStrategy methods.
+
+void
+LgFrPartSummaryScheduleStrategy::test()
+{
+  LgFrPartSummaryScheduleStrategy cs1;
+  assert( cs1.schedules().size() == 0 );
+}
+
+
+// test LgFrPartSummaryScheduleStrategy methods.
+// Expects testScenario to contain data from
+// /u/implode/wit/data/examples/diner12/wit.data
+// Expects supplySchedule to be a supply schedule for testScenario
+// (containing a LgFrSupplyScheduleStrategy)
+void
+LgFrPartSummaryScheduleStrategy::contextTest
+    (
+     LgFrScenario & testScenario,
+     LgFrSortingPartScheduleFloatSmartPointer supplySchedule    
+     )
+{
+std::cerr << "entering LgFrPartSummaryScheduleStrategy::contextTest" << std::endl;
+  int i;
+  float fltEps = 0.0001f;
+  LgFrPartSummaryScheduleStrategy cs1(testScenario);
+
+  // Test inserting single dependent schedule
+  cs1.insertPartSchedule( supplySchedule );
+  assert( cs1.schedules()[0] == supplySchedule );
+
+  // Test copy constructor
+  LgFrPartSummaryScheduleStrategy cs2(cs1);
+  assert( cs2.schedules()[0] == supplySchedule );
+
+  // Test assignment operator
+  LgFrPartSummaryScheduleStrategy cs3(testScenario);
+  cs3 = cs2;
+  assert( cs3.schedules()[0] == supplySchedule );
+
+  // Test clone method
+  {
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+    assert( (  (LgFrPartSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules().size() == 1 );
+    assert( (  (LgFrPartSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules()[0] 
+            != supplySchedule );
+    assert( *( (  (LgFrPartSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules()[0])
+            == *supplySchedule );
+    
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+
+  // Test Kernal of populate
+  const LgFrSortingPartScheduleFloat & constSupplySchedule = *supplySchedule;
+  LgFrSortingPartScheduleFloat cumSup;
+  const LgFrSortingPartScheduleFloat & constCumSup = cumSup;
+  cumSup.attributeScheduleStrategy( cs1 );
+  cumSup.populate();
+  for ( i=0; i<cumSup.size(); i++ ) {
+    assert( fabs( (constCumSup[i].timeVecFloat())[0] - 158.0) < fltEps);
+    assert( fabs( (constCumSup[i].timeVecFloat())[1] - 137.0) < fltEps);
+   }
+
+  // Test subscription mechanism
+  LgFrPart part00 = constSupplySchedule[0].part();
+  supplySchedule->insertKeyAndValue( part00, LgFrTimeVecFloat(2, "5.0 10.0") );
+  for ( i=0; i<cumSup.size(); i++ )   {
+    assert( fabs( (constCumSup[i].timeVecFloat())[0] - 148.0) < fltEps);
+    assert( fabs( (constCumSup[i].timeVecFloat())[1] - 127.0) < fltEps);
+  }
+
+  // Test scenario copy constructor
+  LgFrPartSummaryScheduleStrategy scenCtor(cs1,testScenario);
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+
+  // Test cloning w/scenario 
+  LgFrAttributeScheduleStrategy *cs6Ptr = cs1.clone(testScenario);
+  assert( ((LgFrPartSummaryScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != supplySchedule );
+  assert( ((LgFrPartSummaryScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != cs1.schedules()[0] );
+  assert( *(((LgFrPartSummaryScheduleStrategy *)cs6Ptr)->schedules()[0])
+          == *(cs1.schedules()[0]) );
+
+  delete cs6Ptr;
+
+  // test creating the sum over an empty schedule
+  LgFrSortingPartScheduleFloatSmartPointer emptySched;
+  assert(emptySched->size() == 0);
+  LgFrPartSummaryScheduleStrategy cs8(testScenario);
+
+  // Test inserting single dependent schedule
+  cs8.insertPartSchedule( emptySched );
+
+  LgFrSortingPartScheduleFloat sumOfNothing;
+  sumOfNothing.attributeScheduleStrategy( cs8 );
+  sumOfNothing.populate();
+  assert(sumOfNothing.size() == 0);
+
+
+}
+
+//-----------------------------------------------------------------------
+//
+//  Test of LgFrDemandSummaryScheduleStrategy
+//
+//-----------------------------------------------------------------------
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrDemandSummaryScheduleStrategy methods.
+
+void
+LgFrDemandSummaryScheduleStrategy::test()
+{
+  LgFrDemandSummaryScheduleStrategy cs1;
+  assert( cs1.schedules().size() == 0 );
+}
+
+
+// test LgFrDemandSummaryScheduleStrategy methods.
+// Expects testScenario to contain data from
+// /u/implode/wit/data/examples/diner12/wit.data
+// Expects demandVolSchedule to be a demandVol schedule for testScenario
+// (containing a LgFrDemandVolScheduleStrategy)
+void
+LgFrDemandSummaryScheduleStrategy::contextTest
+    (
+     LgFrScenario & testScenario,
+     LgFrSortingDemandScheduleFloatSmartPointer demandVolSchedule    
+     )
+{
+std::cerr << "entering LgFrDemandSummaryScheduleStrategy::contextTest" << std::endl;
+  int i;
+  float fltEps = 0.0001f;
+  LgFrDemandSummaryScheduleStrategy cs1(testScenario);
+
+  // Test inserting single dependent schedule
+  cs1.insertDemandSchedule( demandVolSchedule );
+  assert( cs1.schedules()[0] == demandVolSchedule );
+
+  // Test copy constructor
+  LgFrDemandSummaryScheduleStrategy cs2(cs1);
+  assert( cs2.schedules()[0] == demandVolSchedule );
+
+  // Test assignment operator
+  LgFrDemandSummaryScheduleStrategy cs3(testScenario);
+  cs3 = cs2;
+  assert( cs3.schedules()[0] == demandVolSchedule );
+
+  // Test clone method
+  {
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+    assert( (  (LgFrDemandSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules().size() == 1 );
+    assert( (  (LgFrDemandSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules()[0] 
+            != demandVolSchedule );
+    assert( *( (  (LgFrDemandSummaryScheduleStrategy *) cs4Ptr)
+            ->schedules()[0])
+            == *demandVolSchedule );
+    
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+
+  // Test Kernal of populate
+  const LgFrSortingDemandScheduleFloat & constDemandVolSchedule = *demandVolSchedule;
+  LgFrSortingDemandScheduleFloat cumDem;
+  const LgFrSortingDemandScheduleFloat & constCumDem = cumDem;
+  cumDem.attributeScheduleStrategy( cs1 );
+  cumDem.populate();
+  for ( i=0; i<cumDem.size(); i++ ) {
+    assert( fabs( (constCumDem[i].timeVecFloat())[0] - 25.0) < fltEps);
+    assert( fabs( (constCumDem[i].timeVecFloat())[1] - 29.0) < fltEps);
+   }
+
+  // Test subscription mechanism
+  LgFrDemand demand00 = constDemandVolSchedule[0].demand();
+  demandVolSchedule->insertKeyAndValue( demand00, LgFrTimeVecFloat(2, "3.0 6.0") );
+  for ( i=0; i<cumDem.size(); i++ )   {
+    assert( fabs( (constCumDem[i].timeVecFloat())[0] - 28.0) < fltEps);
+    assert( fabs( (constCumDem[i].timeVecFloat())[1] - 35.0) < fltEps);
+  }
+
+  // Test scenario copy constructor
+  LgFrDemandSummaryScheduleStrategy scenCtor(cs1,testScenario);
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+
+  // Test cloning w/scenario 
+  LgFrAttributeScheduleStrategy *cs6Ptr = cs1.clone(testScenario);
+  assert( ((LgFrDemandSummaryScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != demandVolSchedule );
+  assert( ((LgFrDemandSummaryScheduleStrategy *)cs6Ptr)->schedules()[0] 
+          != cs1.schedules()[0] );
+  assert( *(((LgFrDemandSummaryScheduleStrategy *)cs6Ptr)->schedules()[0])
+          == *(cs1.schedules()[0]) );
+
+  delete cs6Ptr;
+
+  // test creating the sum over an empty schedule
+  LgFrSortingDemandScheduleFloatSmartPointer emptySched;
+  assert(emptySched->size() == 0);
+  LgFrDemandSummaryScheduleStrategy cs8(testScenario);
+
+  // Test inserting single dependent schedule
+  cs8.insertDemandSchedule( emptySched );
+
+  LgFrSortingDemandScheduleFloat sumOfNothing;
+  sumOfNothing.attributeScheduleStrategy( cs8 );
+  sumOfNothing.populate();
+  assert(sumOfNothing.size() == 0);
+
+
+}
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+d28 1
+a28 1
+  assert( schedules().length() == 1 && 
+d38 2
+a39 1
+  for ( size_t i=0; i<indepSched.entries(); i++ ) {
+d64 1
+a64 1
+    assert( schedules().length() == 1 );
+d67 2
+a68 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a85 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrCumTimeVecPartScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a90 1
+  assert( id_ == rhs.id_ );
+a104 1
+  assert( id_ == source.id_ );
+a116 1
+  assert( id_ == source.id_ );
+d159 1
+a159 1
+  assert( schedules().length() == 1 && 
+d169 2
+a170 1
+  for ( size_t i=0; i<indepSched.entries(); i++ ) {
+d195 1
+a195 1
+    assert( schedules().length() == 1 );
+d198 2
+a199 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a216 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrCumTimeVecDemandScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a221 1
+  assert( id_ == rhs.id_ );
+a235 1
+  assert( id_ == source.id_ );
+a248 1
+  assert( id_ == source.id_ );
+d292 1
+a292 1
+  assert( schedules().length() == 1 && 
+d296 1
+a296 1
+  LgFrSortingScheduleFloat & indepSched = *(schedules()[0]);
+d301 2
+a302 2
+  LgFrPairCompareFloat * myCopySavedPcPtr = NULL;
+  if ( savedPcPtr != NULL ) myCopySavedPcPtr = savedPcPtr->clone();
+d317 1
+a317 1
+  RWBoolean lastIter, firstIter, sameParts;
+d319 1
+a319 1
+        i<constIndepSched.entries(); 
+d326 1
+a326 1
+     lastIter = ( i==constIndepSched.entries()-1 );
+d335 1
+a335 1
+     sameParts = (*(itvi.demand().partPtr()) == cumItv.part());
+d375 4
+a378 4
+   cerr <<"LgFrCumDemandsPartScheduleStrategy::insertPartSchedule"
+        <<endl;
+   cerr <<"Class does not allow inserting part schedules" <<endl;
+   abort;
+d395 1
+a395 1
+    assert( schedules().length() == 1 );
+d398 2
+a399 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a416 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrCumDemandsPartScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a421 1
+  assert( id_ == rhs.id_ );
+a435 1
+  assert( id_ == source.id_ );
+a447 1
+  assert( id_ == source.id_ );
+d492 1
+a492 1
+  assert( schedules().length() == 1 && 
+d500 1
+a500 1
+  if (indepSched.entries() == 0)
+d514 2
+a515 1
+  for ( size_t i=0; i<indepSched.entries(); i++ ) {
+d527 2
+a528 1
+  for ( size_t j=0; j<setOfParts().entries(); j++ ) {
+d547 1
+a547 1
+  size_t retVal = setOfParts().entries();
+d549 1
+a549 1
+  if (  schedule.filterStrategy().isA() != __LGFRFILTERSTRATEGY )
+d567 1
+a567 1
+    assert( schedules().length() == 1 );
+d570 2
+a571 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a588 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrPartSummaryScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a593 1
+  assert( id_ == rhs.id_ );
+a607 1
+  assert( id_ == source.id_ );
+a619 1
+  assert( id_ == source.id_ );
+d664 1
+a664 1
+  assert( schedules().length() == 1 && 
+d672 1
+a672 1
+  if (indepSched.entries() == 0)
+d686 2
+a687 1
+  for ( size_t i=0; i<indepSched.entries(); i++ ) {
+d699 2
+a700 1
+  for ( size_t j=0; j<setOfDemands().entries(); j++ ) {
+d719 1
+a719 1
+  size_t retVal = setOfDemands().entries();
+d721 1
+a721 1
+  if (  schedule.filterStrategy().isA() != __LGFRFILTERSTRATEGY )
+d739 1
+a739 1
+    assert( schedules().length() == 1 );
+d742 2
+a743 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a760 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrDemandSummaryScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a765 1
+  assert( id_ == rhs.id_ );
+a779 1
+  assert( id_ == source.id_ );
+a791 1
+  assert( id_ == source.id_ );
+d834 1
+a834 1
+  assert( schedules().length() == 1 && 
+d844 2
+a845 1
+  for ( size_t i=0; i<indepSched.entries(); i++ ) {
+d856 2
+a857 1
+     for (size_t t=0; t<itv.timeVecFloat().length(); t++) {
+d916 1
+a916 1
+    assert( schedules().length() == 1 );
+d919 2
+a920 1
+    for ( size_t i=0; i< temp->independentSchedules_.entries(); i++ )  {
+a937 8
+// Return comparison strategy identifier
+isAReturnType
+LgFrCompoundInterestScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a942 1
+  assert( id_ == rhs.id_ );
+a958 1
+  assert( id_ == source.id_ );
+a972 1
+  assert( id_ == source.id_ );
+d1028 1
+a1028 3
+  assert( cs1.id_ == __LGFRCUMTIMEVECPARTSCHEDULESTRATEGY );
+  assert( cs1.schedules().length() == 0 );
+  assert( cs1.isA() == __LGFRCUMTIMEVECPARTSCHEDULESTRATEGY );
+d1044 1
+a1044 1
+cerr << "entering LgFrCumTimeVecPartScheduleStrategy::contextTest" << endl;
+a1053 1
+  assert( cs2.isA() == __LGFRCUMTIMEVECPARTSCHEDULESTRATEGY );
+a1058 1
+  assert( cs3.isA() == cs2.isA() );
+a1064 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d1066 1
+a1066 1
+            ->schedules().length() == 1 );
+d1085 1
+a1085 1
+  for ( i=0; i<supplySchedule->entries(); i++ ) 
+d1093 1
+a1093 1
+  for ( i=0; i<supplySchedule->entries(); i++ ) 
+d1099 2
+a1100 3
+  assert( scenCtor.id_ == __LGFRCUMTIMEVECPARTSCHEDULESTRATEGY );
+  assert( scenCtor.schedules().length() ==  
+               cs1.schedules().length() );
+a1103 1
+  assert( cs6Ptr->isA() == cs1.isA() );
+d1127 1
+a1127 3
+  assert( cs1.id_ == __LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY );
+  assert( cs1.schedules().length() == 0 );
+  assert( cs1.isA() == __LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY );
+d1143 1
+a1143 1
+cerr << "entering LgFrCumTimeVecDemandScheduleStrategy::contextTest" << endl;
+a1152 1
+  assert( cs2.isA() == __LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY );
+a1157 1
+  assert( cs3.isA() == cs2.isA() );
+a1162 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d1164 1
+a1164 1
+            ->schedules().length() == 1 );
+d1183 1
+a1183 1
+  for ( i=0; i<supplySchedule->entries(); i++ ) 
+d1190 1
+a1190 1
+  for ( i=0; i<supplySchedule->entries(); i++ ) 
+d1196 2
+a1197 3
+  assert( scenCtor.id_ == __LGFRCUMTIMEVECDEMANDSCHEDULESTRATEGY );
+  assert( scenCtor.schedules().length() ==  
+               cs1.schedules().length() );
+a1201 1
+  assert( cs6Ptr->isA() == cs1.isA() );
+d1227 1
+a1227 3
+  assert( cs1.id_ == __LGFRCUMDEMANDSPARTSCHEDULESTRATEGY );
+  assert( cs1.schedules().length() == 0 );
+  assert( cs1.isA() == __LGFRCUMDEMANDSPARTSCHEDULESTRATEGY );
+d1243 1
+a1243 1
+cerr << "entering LgFrCumDemandsPartScheduleStrategy::contextTest" << endl;
+a1252 1
+  assert( cs2.isA() == __LGFRCUMDEMANDSPARTSCHEDULESTRATEGY );
+a1257 1
+  assert( cs3.isA() == cs2.isA() );
+a1262 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d1264 1
+a1264 1
+            ->schedules().length() == 1 );
+d1285 1
+a1285 1
+  assert( demandSchedule->entries() > cum.entries() );
+d1290 2
+a1291 3
+  assert( scenCtor.id_ == __LGFRCUMDEMANDSPARTSCHEDULESTRATEGY );
+  assert( scenCtor.schedules().length() ==  
+               cs1.schedules().length() );
+a1295 1
+  assert( cs6Ptr->isA() == cs1.isA() );
+d1323 1
+a1323 3
+  assert( cs1.id_ == __LGFRPARTSUMMARYSCHEDULESTRATEGY );
+  assert( cs1.schedules().length() == 0 );
+  assert( cs1.isA() == __LGFRPARTSUMMARYSCHEDULESTRATEGY );
+d1339 1
+a1339 1
+cerr << "entering LgFrPartSummaryScheduleStrategy::contextTest" << endl;
+a1349 1
+  assert( cs2.isA() == __LGFRPARTSUMMARYSCHEDULESTRATEGY );
+a1354 1
+  assert( cs3.isA() == cs2.isA() );
+a1359 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d1361 1
+a1361 1
+            ->schedules().length() == 1 );
+d1380 1
+a1380 1
+  for ( i=0; i<cumSup.entries(); i++ ) {
+d1388 1
+a1388 1
+  for ( i=0; i<cumSup.entries(); i++ )   {
+d1395 2
+a1396 3
+  assert( scenCtor.id_ == __LGFRPARTSUMMARYSCHEDULESTRATEGY );
+  assert( scenCtor.schedules().length() ==  
+               cs1.schedules().length() );
+a1399 1
+  assert( cs6Ptr->isA() == cs1.isA() );
+d1411 1
+a1411 1
+  assert(emptySched->entries() == 0);
+d1420 1
+a1420 1
+  assert(sumOfNothing.entries() == 0);
+d1441 1
+a1441 3
+  assert( cs1.id_ == __LGFRDEMANDSUMMARYSCHEDULESTRATEGY );
+  assert( cs1.schedules().length() == 0 );
+  assert( cs1.isA() == __LGFRDEMANDSUMMARYSCHEDULESTRATEGY );
+d1457 1
+a1457 1
+cerr << "entering LgFrDemandSummaryScheduleStrategy::contextTest" << endl;
+a1467 1
+  assert( cs2.isA() == __LGFRDEMANDSUMMARYSCHEDULESTRATEGY );
+a1472 1
+  assert( cs3.isA() == cs2.isA() );
+a1477 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d1479 1
+a1479 1
+            ->schedules().length() == 1 );
+d1498 1
+a1498 1
+  for ( i=0; i<cumDem.entries(); i++ ) {
+d1506 1
+a1506 1
+  for ( i=0; i<cumDem.entries(); i++ )   {
+d1513 2
+a1514 3
+  assert( scenCtor.id_ == __LGFRDEMANDSUMMARYSCHEDULESTRATEGY );
+  assert( scenCtor.schedules().length() ==  
+               cs1.schedules().length() );
+a1517 1
+  assert( cs6Ptr->isA() == cs1.isA() );
+d1529 1
+a1529 1
+  assert(emptySched->entries() == 0);
+d1538 1
+a1538 1
+  assert(sumOfNothing.entries() == 0);
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d25 1
+a25 1
+  assert( schedules().size() == 1 && 
+d35 1
+a35 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+d60 1
+a60 1
+    assert( schedules().size() == 1 );
+d63 1
+a63 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d81 8
+d94 1
+d109 1
+d122 1
+d165 1
+a165 1
+  assert( schedules().size() == 1 && 
+d175 1
+a175 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+d200 1
+a200 1
+    assert( schedules().size() == 1 );
+d203 1
+a203 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d221 8
+d234 1
+d249 1
+d263 1
+d307 1
+a307 1
+  assert( schedules().size() == 1 && 
+d311 1
+a311 1
+  LgFrSortingScheduleFloat & indepSched = (LgFrSortingScheduleFloat &) *(schedules()[0]);
+d316 2
+a317 2
+  LgFrPairCompareFloat * myCopySavedPcPtr = 0;
+  if ( savedPcPtr != 0 ) myCopySavedPcPtr = savedPcPtr->clone();
+d332 1
+a332 1
+  bool lastIter, firstIter, sameParts;
+d334 1
+a334 1
+        i<constIndepSched.size(); 
+d341 1
+a341 1
+     lastIter = ( i==constIndepSched.size()-1 );
+d350 1
+a350 1
+     sameParts = (*(itvi.demand().partPtr()) == cumItv.part()) ? true : false;
+d393 1
+a393 1
+   abort();
+d410 1
+a410 1
+    assert( schedules().size() == 1 );
+d413 1
+a413 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d431 8
+d444 1
+d459 1
+d472 1
+d517 1
+a517 1
+  assert( schedules().size() == 1 && 
+d525 1
+a525 1
+  if (indepSched.size() == 0)
+d539 1
+a539 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+d551 1
+a551 2
+  size_t j = 0; // Pulled out of the for below by RW2STL
+  for ( j=0; j<setOfParts().size(); j++ ) {
+d570 1
+a570 1
+  size_t retVal = setOfParts().size();
+d572 1
+a572 1
+  if (  schedule.filterStrategy().GetFSType() != __LGFRFILTERSTRATEGY )
+d590 1
+a590 1
+    assert( schedules().size() == 1 );
+d593 1
+a593 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d611 8
+d624 1
+d639 1
+d652 1
+d697 1
+a697 1
+  assert( schedules().size() == 1 && 
+d705 1
+a705 1
+  if (indepSched.size() == 0)
+d719 1
+a719 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+d731 1
+a731 2
+  size_t j = 0; // Pulled out of the for below by RW2STL
+  for ( j=0; j<setOfDemands().size(); j++ ) {
+d750 1
+a750 1
+  size_t retVal = setOfDemands().size();
+d752 1
+a752 1
+  if (  schedule.filterStrategy().GetFSType() != __LGFRFILTERSTRATEGY )
+d770 1
+a770 1
+    assert( schedules().size() == 1 );
+d773 1
+a773 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d791 8
+d804 1
+d819 1
+d832 1
+d875 1
+a875 1
+  assert( schedules().size() == 1 && 
+d885 1
+a885 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<indepSched.size(); i++ ) {
+d896 1
+a896 2
+     size_t t = 0; // Pulled out of the for below by RW2STL
+     for (t=0; t<itv.timeVecFloat().length(); t++) {
+d955 1
+a955 1
+    assert( schedules().size() == 1 );
+d958 1
+a958 2
+    size_t i = 0; // Pulled out of the for below by RW2STL
+    for ( i=0; i< temp->independentSchedules_.size(); i++ )  {
+d976 8
+d989 1
+d1006 1
+d1021 1
+d1077 3
+a1079 1
+  assert( cs1.schedules().size() == 0 );
+d1105 1
+d1111 1
+d1118 1
+d1120 1
+a1120 1
+            ->schedules().size() == 1 );
+d1139 1
+a1139 1
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+d1147 1
+a1147 1
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+d1153 3
+a1155 2
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+d1159 1
+d1183 3
+a1185 1
+  assert( cs1.schedules().size() == 0 );
+d1211 1
+d1217 1
+d1223 1
+d1225 1
+a1225 1
+            ->schedules().size() == 1 );
+d1244 1
+a1244 1
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+d1251 1
+a1251 1
+  for ( i=0; i<supplySchedule->size(); i++ ) 
+d1257 3
+a1259 2
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+d1264 1
+d1290 3
+a1292 1
+  assert( cs1.schedules().size() == 0 );
+d1318 1
+d1324 1
+d1330 1
+d1332 1
+a1332 1
+            ->schedules().size() == 1 );
+d1353 1
+a1353 1
+  assert( demandSchedule->size() > cum.size() );
+d1358 3
+a1360 2
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+d1365 1
+d1393 3
+a1395 1
+  assert( cs1.schedules().size() == 0 );
+d1422 1
+d1428 1
+d1434 1
+d1436 1
+a1436 1
+            ->schedules().size() == 1 );
+d1455 1
+a1455 1
+  for ( i=0; i<cumSup.size(); i++ ) {
+d1463 1
+a1463 1
+  for ( i=0; i<cumSup.size(); i++ )   {
+d1470 3
+a1472 2
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+d1476 1
+d1488 1
+a1488 1
+  assert(emptySched->size() == 0);
+d1497 1
+a1497 1
+  assert(sumOfNothing.size() == 0);
+d1518 3
+a1520 1
+  assert( cs1.schedules().size() == 0 );
+d1547 1
+d1553 1
+d1559 1
+d1561 1
+a1561 1
+            ->schedules().size() == 1 );
+d1580 1
+a1580 1
+  for ( i=0; i<cumDem.size(); i++ ) {
+d1588 1
+a1588 1
+  for ( i=0; i<cumDem.size(); i++ )   {
+d1595 3
+a1597 2
+  assert( scenCtor.schedules().size() ==  
+               cs1.schedules().size() );
+d1601 1
+d1613 1
+a1613 1
+  assert(emptySched->size() == 0);
+d1622 1
+a1622 1
+  assert(sumOfNothing.size() == 0);
+@
+
+
+1.1.1.1.14.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d375 3
+a377 3
+   std::cerr <<"LgFrCumDemandsPartScheduleStrategy::insertPartSchedule"
+        <<std::endl;
+   std::cerr <<"Class does not allow inserting part schedules" <<std::endl;
+d1044 1
+a1044 1
+std::cerr << "entering LgFrCumTimeVecPartScheduleStrategy::contextTest" << std::endl;
+d1143 1
+a1143 1
+std::cerr << "entering LgFrCumTimeVecDemandScheduleStrategy::contextTest" << std::endl;
+d1243 1
+a1243 1
+std::cerr << "entering LgFrCumDemandsPartScheduleStrategy::contextTest" << std::endl;
+d1339 1
+a1339 1
+std::cerr << "entering LgFrPartSummaryScheduleStrategy::contextTest" << std::endl;
+d1457 1
+a1457 1
+std::cerr << "entering LgFrDemandSummaryScheduleStrategy::contextTest" << std::endl;
+@
+
+

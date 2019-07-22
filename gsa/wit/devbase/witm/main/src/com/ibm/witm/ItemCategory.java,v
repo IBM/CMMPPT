@@ -1,0 +1,1227 @@
+head	1.22;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.22
+date	2011.10.07.23.01.55;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2011.10.05.23.07.34;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2011.10.04.22.57.13;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2011.09.14.19.02.09;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2011.09.09.21.17.39;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.09.08.22.43.38;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.09.07.23.15.39;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.09.07.22.26.21;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.08.10.23.25.06;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.07.22.23.47.21;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.07.20.18.38.43;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.07.19.21.37.03;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.07.19.21.13.11;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.07.15.17.42.30;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.06.17.18.23.03;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2011.06.16.23.36.12;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.06.11.00.15.39;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.06.10.21.13.46;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.06.07.21.16.28;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.06.07.20.14.10;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.06.07.19.47.02;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.06.06.20.33.29;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.22
+log
+@TemporalVariable ==> VariableByPeriod, etc.
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File ItemCategory.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/*******************************************************************************
+ * An ItemCategory {@@literal<I>} represents a conceptual grouping of similar
+ * Items of the I class. Each Item belongs to a particular ItemCategory and all
+ * Items that belong to a given ItemCategory are treated uniformly by WIT-M.
+ * Each ItemCategory belongs to a specific ModelScheme and is considered to be a
+ * defining aspect of the ModelScheme.
+ * 
+ * @@param <I> The type of Item that will belong to this
+ *            ItemCategory {@@literal<I>}: either Primitive or Tuple
+ *******************************************************************************
+ */
+public abstract class ItemCategory <I extends Item>
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * The ModelScheme of the WIT model to which this ItemCategory belongs
+ *******************************************************************************
+ */
+   private final ModelScheme myModelScheme;
+   
+/*******************************************************************************
+ * The name of this ItemCategory
+ *******************************************************************************
+ */
+   private final String myName;
+   
+/*******************************************************************************
+ * A list of all Properties that belong to this ItemCategory.
+ *******************************************************************************
+ */
+   private final ArrayList <Property <?>> myProperties;
+
+/*******************************************************************************
+ * An unmodifiable view of myProperties.
+ *******************************************************************************
+ */
+   private final List <Property <?>> unmodProperties;
+
+/*******************************************************************************
+ * A unique index for this ItemCategory: the # of Categories in the ModelScheme
+ * created before this one.
+ *******************************************************************************
+ */
+   private final int myIndex;
+
+/*******************************************************************************
+ * True, iff this is the GLOBAL ItemCategory for its ModelScheme.
+ *******************************************************************************
+ */
+   private final boolean amGlobalCategory;
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Verifies that the value type being passed to newProperty is not
+ * VariableByPeriod.
+ *******************************************************************************
+ */
+   private void rejVarByPeriod (String theName, Class <?> theValueType)
+      {
+      if (theValueType == VariableByPeriod.class)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to ItemCategory.newProperty (theName, theValueType)\n"
+             + "   with VariableByPeriod as the value type.\n"
+             + "\n"
+             + "      Property Name: " + theName + "\n");
+      }
+  
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+   
+   ItemCategory (ModelScheme theScheme, String theName)
+      {
+      assert (theScheme != null);
+      assert (theName   != null);
+      
+      myModelScheme    = theScheme;
+      myName           = theName;
+      
+      myProperties     = new ArrayList <Property    <?>> ();
+      
+      unmodProperties  = Collections.unmodifiableList (myProperties);
+      
+      myIndex          = theScheme.getItemCategories ().size ();
+      
+      amGlobalCategory = theName.equals ("GLOBAL");
+      
+      theScheme.store (this);
+      
+      theScheme.storeName (theName);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Performs actions to be taken by this ItemCategory when the ModelScheme is being
+ * frozen.
+ *******************************************************************************
+ */
+   abstract void freeze ();
+   
+/*******************************************************************************
+ * @@return True, iff this ItemCategory is the GLOBAL ItemCategory for its
+ *         ModelScheme.
+ *******************************************************************************
+ */
+   boolean isGlobalCategory ()
+      {
+      return amGlobalCategory;
+      }
+   
+/*******************************************************************************
+ * Verifies that myModelScheme is not frozen.
+ *******************************************************************************
+ */
+   void rejFrozenScheme (String signature)
+      {
+      if (myModelScheme.isFrozen ())
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to " + signature + ",\n"
+             + "   on an ItemCategory whose ModelScheme is frozen.\n"
+             + "\n"
+             + "      ItemCategory: " + myName                   + "\n"
+             + "      ModelScheme:  " + myModelScheme.getName () + "\n");
+      }
+
+/*******************************************************************************
+ * Verifies that the ModelScheme of this ItemCategory matches the ModelScheme of the
+ * current ModelInstance.
+ *******************************************************************************
+ */
+   void reqSchemeMatchesCurModelInst ()
+      {
+      if (myModelScheme != curModelInst ().getModelScheme ())
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   A method was called on an ItemCategory that belongs to a\n"
+             + "   ModelScheme that does not match the ModelScheme of the\n"
+             + "   current ModelInstance.\n"
+             + "\n"
+             + "      ItemCategory:          " + myName                     + "\n"
+             + "         ModelScheme:        " + myModelScheme  .getName () + "\n"
+             + "      Current ModelInstance: " + curModelInst ().getName () + "\n"
+             + "         ModelScheme:        " + curModelInst ().getModelScheme ().
+                                                                 getName () + "\n");
+      }
+
+/*******************************************************************************
+ * Stores theProp (a newly created Property) in this ItemCategory.
+ *******************************************************************************
+ */
+   void store (Property <?> theProp)
+      {
+      myProperties.add (theProp);
+      }
+
+/*******************************************************************************
+ * Prints this ItemCategory to theStream.
+ *******************************************************************************
+ */
+   final void print (PrintStream theStream)
+      {
+      printConcrete (theStream);
+      
+      theStream.printf ("%n");
+      
+      for (Property <?> theProp: myProperties)
+         theProp.print (theStream);
+      }
+
+/*******************************************************************************
+ * Prints the subclass-specific aspects of this ItemCategory to theStream.
+ *******************************************************************************
+ */
+   abstract void printConcrete (PrintStream theStream);
+
+/*******************************************************************************
+ * @@return An unmodifiable view of a List of the Properties that belong to this
+ *         ItemCategory.
+ *******************************************************************************
+ */
+   final List <Property <?>> getProperties ()
+      {
+      return unmodProperties;
+      }
+
+/*******************************************************************************
+ * @@return The unique index for this ItemCategory.
+********************************************************************************
+ */
+   final int getIndex ()
+      {
+      return myIndex;
+      }
+
+/*******************************************************************************
+ * Creates a new ItemMgr for this ItemCategory in theInst.
+ * @@return The new ItemMgr
+********************************************************************************
+ */
+   abstract ItemMgr <?> newItemMgr (ModelInstance theInst);
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The name of this ItemCategory
+ *******************************************************************************
+ */
+   public final String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * @@return The ModelScheme to which this ItemCategory belongs
+ *******************************************************************************
+ */
+   public final ModelScheme getModelScheme ()
+      {
+      return myModelScheme;
+      }
+
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new Property {@@literal<V>} that will belong to this
+ * ItemCategory.
+ * 
+ * @@param <V>          The value type of the Property (compile time)
+ * @@param theName      The name of the Property
+ * @@param theValueType The value type of the Property (run time)
+ * @@return             The new Property {@@literal<V>}
+ * 
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If theName duplicates the name of an 
+ *                                  existing schematic object in the
+ *                                  ModelScheme of this ItemCategory
+ * @@throws IllegalStateException    If the ModelScheme of this ItemCategory is
+ *                                  frozen
+ *******************************************************************************
+ */
+   public <V> Property <V> newProperty (String theName, Class <V> theValueType)
+      {
+      rejNull        (theName,      "theName");
+      rejNull        (theValueType, "theValueType");
+      rejVarByPeriod (theName,       theValueType);
+      myModelScheme.
+         rejDupName (
+            theName,
+            "ItemCategory.newProperty (theName, theValueType)");
+      rejFrozenScheme (
+            "ItemCategory.newProperty (theName, theValueType)");
+      
+      return new Property <V> (theName, theValueType, this);
+      }
+
+/*******************************************************************************
+ * Item list retrieval method.
+ * 
+ * @@return  An unmodifiable view of an ArrayList of all of the I instances of
+ *          this ItemCategory in in current ModelInstance, listed in the order
+ *          in which they were created.
+ * 
+ * @@throws IllegalStateException    If the current ModelInstance is null
+ * @@throws IllegalArgumentException If the ModelScheme of this ItemCategory does
+ *                                  not match the ModelScheme of the current
+ *                                  ModelInstance
+ *******************************************************************************
+ */
+   public List <I> getAll ()
+      {
+      reqCurModelInst              ();
+      reqSchemeMatchesCurModelInst ();
+      
+      return curModelInst ().getItemMgr (this).getAll ();
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.21
+log
+@ban ==> rej
+@
+text
+@d75 1
+a75 1
+ * TemporalVariable.
+d78 1
+a78 1
+   private void rejTemporalVar (String theName, Class <?> theValueType)
+d80 1
+a80 1
+      if (theValueType == TemporalVariable.class)
+d85 1
+a85 1
+             + "   with TemporalVariable as the value type.\n"
+d274 1
+a274 1
+      rejTemporalVar (theName,       theValueType);
+@
+
+
+1.20
+log
+@bar ==> ban
+@
+text
+@d78 1
+a78 1
+   private void banTemporalVar (String theName, Class <?> theValueType)
+d140 1
+a140 1
+   void banFrozenScheme (String signature)
+d272 3
+a274 3
+      banNull        (theName,      "theName");
+      banNull        (theValueType, "theValueType");
+      banTemporalVar (theName,       theValueType);
+d276 1
+a276 1
+         banDupName (
+d279 1
+a279 1
+      banFrozenScheme (
+@
+
+
+1.19
+log
+@PeriodValue  ==> TemporalVariable
+PeriodDouble ==> TemporalDouble
+@
+text
+@d78 1
+a78 1
+   private void barTemporalVar (String theName, Class <?> theValueType)
+d140 1
+a140 1
+   void barFrozenScheme (String signature)
+d272 3
+a274 3
+      barNull        (theName,      "theName");
+      barNull        (theValueType, "theValueType");
+      barTemporalVar (theName,       theValueType);
+d276 1
+a276 1
+         barDupName (
+d279 1
+a279 1
+      barFrozenScheme (
+@
+
+
+1.18
+log
+@Class renaming:
+   ValueByPeriod  ==> PeriodValue
+   DoubleByPeriod ==> PeriodDouble
+@
+text
+@d74 2
+a75 1
+ * Verifies that the value type being passed to newProperty is not PeriodValue.
+d78 1
+a78 1
+   private void barPeriodValue (String theName, Class <?> theValueType)
+d80 1
+a80 1
+      if (theValueType == PeriodValue.class)
+d85 1
+a85 1
+             + "   with PeriodValue as the value type.\n"
+d274 1
+a274 1
+      barPeriodValue (theName,       theValueType);
+@
+
+
+1.17
+log
+@ValueByPeriod
+@
+text
+@d74 1
+a74 2
+ * Verifies that the value type being passed to newProperty is not
+ * ValueByPeriod.
+d77 1
+a77 1
+   private void barValueByPeriod (String theName, Class <?> theValueType)
+d79 1
+a79 1
+      if (theValueType == ValueByPeriod.class)
+d84 1
+a84 1
+             + "   with ValueByPeriod as the value type.\n"
+d271 3
+a273 3
+      barNull          (theName,      "theName");
+      barNull          (theValueType, "theValueType");
+      barValueByPeriod (theName,       theValueType);
+@
+
+
+1.16
+log
+@ValueByPeriod
+@
+text
+@d106 1
+a106 1
+      myIndex          = theScheme.getCategories ().size ();
+@
+
+
+1.15
+log
+@ValueByPeriod.
+@
+text
+@d12 1
+d51 6
+d104 2
+d205 2
+a206 1
+ * @@return The number of Properties that belong to this ItemCategory.
+d209 1
+a209 1
+   final int nProperties ()
+d211 1
+a211 1
+      return myProperties.size ();
+@
+
+
+1.14
+log
+@Removed generic class PeriodTrait <V>.
+@
+text
+@d63 21
+d262 3
+a264 2
+      barNull       (theName,      "theName");
+      barNull       (theValueType, "theValueType");
+@
+
+
+1.13
+log
+@Class PeriodTrait
+@
+text
+@a49 6
+ * A list of all PeriodTraits that belong to this ItemCategory.
+ *******************************************************************************
+ */
+   private final ArrayList <PeriodTrait <?>> myPeriodTraits;
+
+/*******************************************************************************
+a74 1
+      myPeriodTraits   = new ArrayList <PeriodTrait <?>> ();
+a154 9
+ * Stores theTrait (a newly created PeriodTrait) in this ItemCategory.
+ *******************************************************************************
+ */
+   void store (PeriodTrait <?> theTrait)
+      {
+      myPeriodTraits.add (theTrait);
+      }
+
+/*******************************************************************************
+a165 3
+      
+      for (PeriodTrait <?> theTrait: myPeriodTraits)
+         theTrait.print (theStream);
+a253 32
+ * Factory method:<br>
+ * Constructs a new PeriodTrait {@@literal<V>} that will belong to this
+ * ItemCategory.
+ * 
+ * @@param <V>          The value type of the PeriodTrait (compile time)
+ * @@param theName      The name of the PeriodTrait
+ * @@param theValueType The value type of the PeriodTrait (run time)
+ * @@return             The new PeriodTrait {@@literal<V>}
+ * 
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If theName duplicates the name of an 
+ *                                  existing schematic object in the
+ *                                  ModelScheme of this ItemCategory
+ * @@throws IllegalStateException    If the ModelScheme of this ItemCategory is
+ *                                  frozen
+ *******************************************************************************
+ */
+   public <V> PeriodTrait <V> newPeriodTrait (
+         String    theName,
+         Class <V> theValueType)
+      {
+      barNull         (theName,      "theName");
+      barNull         (theValueType, "theValueType");
+      myModelScheme.
+         barDupName   (theName,
+                       "ItemCategory.newPeriodTrait (theName, theValueType)");
+      barFrozenScheme ("ItemCategory.newPeriodTrait (theName, theValueType)");
+      
+      return new PeriodTrait <V> (theName, theValueType, this);
+      }
+
+/*******************************************************************************
+@
+
+
+1.12
+log
+@Some renaming.
+@
+text
+@d50 6
+d80 2
+a81 1
+      myProperties     = new ArrayList <Property <?>> ();
+d162 9
+d182 3
+d252 2
+a253 2
+ *                                  existing Property in the ModelScheme of this
+ *                                  ItemCategory
+d273 32
+@
+
+
+1.11
+log
+@Scheme ==> ModelScheme
+@
+text
+@d66 1
+a66 1
+   ItemCategory (ModelScheme theModelScheme, String theName)
+d68 1
+a68 1
+      assert (theModelScheme != null);
+d71 1
+a71 1
+      myModelScheme         = theModelScheme;
+d76 1
+a76 1
+      myIndex          = theModelScheme.getCategories ().size ();
+d80 1
+a80 1
+      theModelScheme.store (this);
+d82 1
+a82 1
+      theModelScheme.storeName (theName);
+d110 1
+a110 1
+   void prohibitFrozenModelScheme (String signature)
+d119 2
+a120 2
+             + "      ItemCategory: " + myName              + "\n"
+             + "      ModelScheme:       " + myModelScheme.getName () + "\n");
+d128 1
+a128 1
+   void requireSchemeMatchesCurModelInst ()
+d135 2
+a136 2
+             + "   ModelScheme that does not match the ModelScheme of the current\n"
+             + "   ModelInstance.\n"
+d138 5
+a142 7
+             + "      ItemCategory:       " + myName              + "\n"
+             + "         ModelScheme:          " + myModelScheme.getName () + "\n"
+             + "      Current ModelInstance: " + curModelInst ().
+                                                    getName ()    + "\n"
+             + "         ModelScheme:          " + curModelInst ().
+                                                 getModelScheme ().
+                                                    getName ()    + "\n");
+d235 2
+a236 1
+ * @@throws IllegalStateException    If the ModelScheme of this ItemCategory is frozen
+d241 2
+a242 2
+      prohibitNull         (theName,      "theName");
+      prohibitNull         (theValueType, "theValueType");
+d244 5
+a248 3
+         prohibitDupName   (theName,
+                            "ItemCategory.newProperty (theName, theValueType)");
+      prohibitFrozenModelScheme ("ItemCategory.newProperty (theName, theValueType)");
+d261 2
+a262 2
+ * @@throws IllegalArgumentException If the ModelScheme of this ItemCategory does not
+ *                                  match the ModelScheme of the current
+d268 2
+a269 2
+      requireCurModelInst              ();
+      requireSchemeMatchesCurModelInst ();
+@
+
+
+1.10
+log
+@Embodiment ==> ModelInstance
+@
+text
+@d18 2
+a19 2
+ * Each ItemCategory belongs to a specific Scheme and is considered to be a
+ * defining aspect of the Scheme.
+d32 1
+a32 1
+ * The Scheme of the WIT model to which this ItemCategory belongs
+d35 1
+a35 1
+   private final Scheme myScheme;
+d50 1
+a50 1
+ * A unique index for this ItemCategory: the # of Categories in the Scheme
+d57 1
+a57 1
+ * True, iff this is the GLOBAL ItemCategory for its Scheme.
+d66 1
+a66 1
+   ItemCategory (Scheme theScheme, String theName)
+d68 1
+a68 1
+      assert (theScheme != null);
+d71 1
+a71 1
+      myScheme         = theScheme;
+d76 1
+a76 1
+      myIndex          = theScheme.getCategories ().size ();
+d80 1
+a80 1
+      theScheme.store (this);
+d82 1
+a82 1
+      theScheme.storeName (theName);
+d90 1
+a90 1
+ * Performs actions to be taken by this ItemCategory when the Scheme is being
+d98 1
+a98 1
+ *         Scheme.
+d107 1
+a107 1
+ * Verifies that myScheme is not frozen.
+d110 1
+a110 1
+   void prohibitFrozenScheme (String signature)
+d112 1
+a112 1
+      if (myScheme.isFrozen ())
+d117 1
+a117 1
+             + "   on an ItemCategory whose Scheme is frozen.\n"
+d120 1
+a120 1
+             + "      Scheme:       " + myScheme.getName () + "\n");
+d124 1
+a124 1
+ * Verifies that the Scheme of this ItemCategory matches the Scheme of the
+d130 1
+a130 1
+      if (myScheme != curModelInst ().getScheme ())
+d135 1
+a135 1
+             + "   Scheme that does not match the Scheme of the current\n"
+d139 1
+a139 1
+             + "         Scheme:          " + myScheme.getName () + "\n"
+d142 2
+a143 2
+             + "         Scheme:          " + curModelInst ().
+                                                 getScheme ().
+d215 1
+a215 1
+ * @@return The Scheme to which this ItemCategory belongs
+d218 1
+a218 1
+   public final Scheme getScheme ()
+d220 1
+a220 1
+      return myScheme;
+d235 1
+a235 1
+ *                                  existing Property in the Scheme of this
+d237 1
+a237 1
+ * @@throws IllegalStateException    If the Scheme of this ItemCategory is frozen
+d244 1
+a244 1
+      myScheme.
+d247 1
+a247 1
+      prohibitFrozenScheme ("ItemCategory.newProperty (theName, theValueType)");
+d260 2
+a261 2
+ * @@throws IllegalArgumentException If the Scheme of this ItemCategory does not
+ *                                  match the Scheme of the current
+d267 1
+a267 1
+      requireCurModelInst       ();
+@
+
+
+1.9
+log
+@Category ==> ItemCategory
+@
+text
+@d125 1
+a125 1
+ * current Embodiment.
+d128 1
+a128 1
+   void requireSchemeMatchesCurEmb ()
+d130 1
+a130 1
+      if (myScheme != curEmbodiment ().getScheme ())
+d136 1
+a136 1
+             + "   Embodiment.\n"
+d140 3
+a142 3
+             + "      Current Embodiment: " + curEmbodiment ().
+                                                 getName ()       + "\n"
+             + "         Scheme:          " + curEmbodiment ().
+d195 1
+a195 1
+ * Creates a new ItemMgr for this ItemCategory in theEmb.
+d199 1
+a199 1
+   abstract ItemMgr <?> newItemMgr (Embodiment theEmb);
+d256 2
+a257 2
+ *          this ItemCategory in in current Embodiment, listed in the order in
+ *          which they were created.
+d259 1
+a259 1
+ * @@throws IllegalStateException    If the current Embodiment is null
+d261 2
+a262 1
+ *                                  match the Scheme of the current Embodiment
+d267 2
+a268 2
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+d270 1
+a270 1
+      return curEmbodiment ().getItemMgr (this).getInstances ();
+@
+
+
+1.8
+log
+@Replaced ItemCategory with Category <?>.
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d6 1
+a6 1
+package       com.ibm.witm;
+d12 1
+d15 8
+a22 4
+ * An ItemCategory represents a conceptual grouping of similar Items. Each Item
+ * belongs to a particular ItemCategory and all Items that belong to a given
+ * ItemCategory are treated uniformly by WIT-M. An ItemCategory will belong to a
+ * Scheme and is considered to be a defining aspect of the Scheme.
+d25 1
+a25 1
+public abstract class ItemCategory
+d27 16
+a42 4
+//==============================================================================
+// Public
+//==============================================================================
+
+d44 1
+a44 3
+ * Accessor.
+ * 
+ * @@return The name of this ItemCategory
+d47 1
+a47 4
+   public final String getName ()
+      {
+      return myName;
+      }
+d50 2
+a51 3
+ * Accessor.
+ * 
+ * @@return The Scheme to which this ItemCategory belongs
+d54 1
+a54 4
+   public final Scheme getScheme ()
+      {
+      return myScheme;
+      }
+a55 4
+//==============================================================================
+// Package-Internal
+//==============================================================================
+   
+d57 1
+a57 1
+ * Constructor.
+d60 6
+d71 6
+a76 2
+      myScheme     = theScheme;
+      myName       = theName;
+d78 1
+a78 1
+      myProperties = new ArrayList <Property <?>> ();
+d80 41
+a120 2
+      myIndex      =   theScheme.getPrimitiveCategories ().size ()
+                     + theScheme.getTupleCategories     ().size ();
+d124 25
+a148 1
+ * Stores theProp in this ItemCategory.
+d157 1
+a157 1
+ * Prints the Properties of this ItemCategory to theStream.
+d160 1
+a160 1
+   final void printProperties (PrintStream theStream)
+d162 4
+d171 7
+a177 1
+ * @@return The # of Properties associated with this ItemCategory.
+d180 1
+a180 1
+   final int getNProperties ()
+a193 4
+//==============================================================================
+// Private
+//==============================================================================
+   
+d195 12
+a206 1
+ * The Scheme of the WIT model to which this ItemCategory belongs
+d209 5
+a213 2
+   private final Scheme myScheme;
+   
+d215 1
+a215 1
+ * The name of this ItemCategory
+d218 5
+a222 2
+   private final String myName;
+   
+d224 14
+a237 1
+ * A list of all Properties that belong to this ItemCategory.
+d240 11
+a250 1
+   private final ArrayList <Property <?>> myProperties;
+d253 9
+a261 2
+ * A unique index for this ItemCategory: the # of ItemCategories in the Scheme
+ * created before this one.
+d264 7
+a270 1
+   private final int myIndex;
+d272 1
+a272 1
+//==============================================================================
+@
+
+
+1.7
+log
+@ItemMgr <I>
+@
+text
+@@
+
+
+1.6
+log
+@Dimension index.
+@
+text
+@d61 2
+a62 2
+      myScheme       = theScheme;
+      myName         = theName;
+d64 1
+a64 1
+      myProperties   = new ArrayList <Property <?>> ();
+d66 1
+a66 1
+      myItemCatIndex = theScheme.getPrimitiveCategories ().size ()
+d102 1
+a102 1
+   final int getItemCatIndex ()
+d104 1
+a104 1
+      return myItemCatIndex;
+d134 1
+a134 1
+   private final int myItemCatIndex;
+@
+
+
+1.5
+log
+@Moved newProperty from ItemCategory to Scheme.
+@
+text
+@d61 7
+a67 3
+      myScheme     = theScheme;
+      myName       = theName;
+      myProperties = new ArrayList <Property <?>> ();
+d98 9
+d129 7
+@
+
+
+1.4
+log
+@Removed some unneeded mathods.
+@
+text
+@a26 35
+ * Factory method:<br>
+ * Constructs a new Property <V> that will be associated with this ItemCategory.
+ * 
+ * @@param theValueType The value type of the Property
+ * @@param theName      The name       of the Property
+ * @@return             The new Property <V>
+ * 
+ * @@throws NullPointerException  If any argument is null
+ * @@throws IllegalStateException If the Scheme to which this ItemCategory
+ *                               belongs is frozen
+ *******************************************************************************
+ */
+   public final <V> Property <V> newProperty (
+         Class <V> theValueType,
+         String    theName)
+      {
+      prohibitNull (theValueType, "theValueType");
+      prohibitNull (theName,      "theName");
+      
+      myScheme.prohibitFrozen ();
+      
+      for (ItemCategory theItemCat: myScheme.getPrimitiveCategories ())
+         {
+         theItemCat.prohibitDupPropName (theName);
+         }
+      
+      for (ItemCategory theItemCat: myScheme.getTupleCategories ())
+         {
+         theItemCat.prohibitDupPropName (theName);
+         }
+      
+      return new Property <V> (this, theValueType, theName);
+      }
+
+/*******************************************************************************
+d70 1
+a70 1
+   <V> void store (Property <V> theProp)
+a98 24
+ * Verifies that theName does not duplicate the name of an existing Property in
+ * this ItemCategory.<br>
+ * To be called by newProperty (...).
+ *******************************************************************************
+ */
+   private final void prohibitDupPropName (String theName)
+      {
+      for (Property <?> theProp: myProperties)
+         {
+         if (theProp.getName ().equals (theName))
+            {
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to ItemCategory.newProperty (Class <V>, String),\n"
+                + "   where the String duplicates the name of an existing\n"
+                + "   Property in the Scheme of the ItemCategory.\n"
+                + "\n"
+                + "      Duplicate Name: \"" + theName + "\"\n");
+            }
+         }
+      }
+
+/*******************************************************************************
+@
+
+
+1.3
+log
+@Renaming
+@
+text
+@a128 28
+/*******************************************************************************
+ * Verifies that the Scheme of this ItemCategory matches the Scheme of the
+ * current Implementation.
+ *******************************************************************************
+ */
+   void requireSchemeMatchesCurImp ()
+      {
+      if (getScheme () != curImplementation ().getScheme ())
+         {
+         throw
+            new IllegalStateException (
+               "\n\n"
+             + "   Call to an ItemCategory method where the Scheme of the\n"
+             + "   ItemCategory does not match the Scheme of the current\n"
+             + "   Implementation.\n"
+             + "\n"
+             + "      ItemCategory:           "
+             +                                                 myName    + "\n"
+             + "         Scheme:              "
+             +                                   getScheme ().getName () + "\n"
+             + "      Current Implementation: "
+             +              curImplementation ()             .getName () + "\n"
+             + "         Scheme:              "
+             +              curImplementation ().getScheme ().getName () + "\n"
+               );
+         }
+      }
+
+@
+
+
+1.2
+log
+@Revised some messsages.
+@
+text
+@d102 1
+a102 1
+ * Stores theProperty in this ItemCategory.
+d105 1
+a105 1
+   <V> void store (Property <V> theProperty)
+d107 1
+a107 1
+      myProperties.add (theProperty);
+@
+
+
+1.1
+log
+@Type ==> Category
+@
+text
+@d176 3
+a178 3
+                + "   theItemCategory.newProperty (theValueType, theName) was\n"
+                + "   called where theName duplicates the name of an\n"
+                + "   existing Property in the Scheme.\n"
+@
+

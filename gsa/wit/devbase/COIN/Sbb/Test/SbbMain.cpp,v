@@ -1,0 +1,1190 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	beforeInforms:1.1.1.1
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.1
+date	2004.12.22.18.52.44;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2004.12.22.18.52.44;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@// copyright (C) 2002, International Business Machines
+// Corporation and others.  All Rights Reserved.
+#if defined(_MSC_VER)
+// Turn off compiler warning about long names
+#  pragma warning(disable:4786)
+#endif
+
+#include <cassert>
+#include <typeinfo>
+#include <cstdio>
+#include <cmath>
+#include <cfloat>
+#include <string>
+#include <iostream>
+
+#define SBBVERSION "0.60"
+
+#include "CoinMpsIO.hpp"
+#include "CoinPackedMatrix.hpp"
+#include "CoinPackedVector.hpp"
+#include "CoinWarmStartBasis.hpp"
+#include "CoinTime.hpp"
+
+#include "OsiSolverInterface.hpp"
+#include "OsiCuts.hpp"
+#include "OsiRowCut.hpp"
+#include "OsiColCut.hpp"
+
+#include "CglCutGenerator.hpp"
+#include "CglGomory.hpp"
+#include "CglProbing.hpp"
+#include "CglKnapsackCover.hpp"
+#include "CglOddHole.hpp"
+
+#include "SbbModel.hpp"
+#include "SbbHeuristic.hpp"
+#include "SbbCompareActual.hpp"
+#include  "SbbParam.hpp"
+
+#ifdef COIN_USE_CLP
+#include "OsiClpSolverInterface.hpp"
+#endif
+#ifdef COIN_USE_DYLP
+#include "OsiDylpSolverInterface.hpp"
+#endif
+
+
+
+
+/* Before first solution do depth first,
+   then it is computed to hit first solution less 2%
+*/
+class SbbCompareUser  : public SbbCompareBase {
+public:
+  // Weight for each infeasibility
+  double weight_;
+  // Number of solutions
+  int numberSolutions_;
+  // Default Constructor 
+  SbbCompareUser () : weight_(-1.0), numberSolutions_(0) {test_=this;};
+
+  ~SbbCompareUser() {};
+
+  /* 
+     Return true if y better than x
+     Node y is better than node x if y has fewer unsatisfied (greater depth on tie) or
+     after solution weighted value of y is less than weighted value of x
+  */
+  virtual bool test (SbbNode * x, SbbNode * y) {
+    if (weight_<0.0) {
+      // before solution
+      /* printf("x %d %d %g, y %d %d %g\n",
+	     x->numberUnsatisfied(),x->depth(),x->objectiveValue(),
+	     y->numberUnsatisfied(),y->depth(),y->objectiveValue()); */
+      if (x->numberUnsatisfied() > y->numberUnsatisfied())
+	return true;
+      else if (x->numberUnsatisfied() < y->numberUnsatisfied())
+	return false;
+      else
+	return x->depth() < y->depth();
+    } else {
+      // after solution
+      return x->objectiveValue()+ weight_*x->numberUnsatisfied() > 
+	y->objectiveValue() + weight_*y->numberUnsatisfied();
+    }
+  }
+  // This allows method to change behavior as it is called
+  // after each solution
+  virtual void newSolution(SbbModel * model,
+			   double objectiveAtContinuous,
+			   int numberInfeasibilitiesAtContinuous) 
+  {
+    if (model->getSolutionCount()==model->getNumberHeuristicSolutions())
+      return; // solution was got by rounding
+    // set to get close to this solution
+    double costPerInteger = 
+      (model->getObjValue()-objectiveAtContinuous)/
+      ((double) numberInfeasibilitiesAtContinuous);
+    weight_ = 0.98*costPerInteger;
+    numberSolutions_++;
+    if (numberSolutions_>5)
+      weight_ =0.0; // this searches on objective
+  }
+  // This allows method to change behavior 
+  virtual void every1000Nodes(SbbModel * model, int numberNodes)
+  {
+    if (numberNodes>10000)
+      weight_ =0.0; // this searches on objective
+  }
+};
+
+
+#define MAXPARAMETERS 100
+
+namespace {
+
+void establishParams (int &numberParameters, SbbParam *const parameters)
+/*
+  Subroutine to establish the sbb parameter array. See the description of
+  class SbbParam for details. Pulled from main() for clarity. 
+*/
+{ numberParameters = 0 ;
+
+  parameters[numberParameters++]=
+      SbbParam("?","For help",GENERALQUERY);
+  parameters[numberParameters++]=
+      SbbParam("dualT!olerance",
+	       "For an optimal solution no dual infeasibility may "
+	       "exceed this value",
+	       1.0e-20,1.0e12,DUALTOLERANCE);
+  parameters[numberParameters++]=
+      SbbParam("primalT!olerance",
+	       "For an optimal solution no primal infeasibility may "
+	       " exceed this value",
+	      1.0e-20,1.0e12,PRIMALTOLERANCE);
+    parameters[numberParameters++]=
+      SbbParam("inf!easibilityWeight","Each integer infeasibility is expected \
+to cost this much",
+	      0.0,1.0e20,INFEASIBILITYWEIGHT);
+    parameters[numberParameters++]=
+      SbbParam("integerT!olerance","For an optimal solution \
+no integer variable may be this away from an integer value",
+	      1.0e-20,0.5,INTEGERTOLERANCE);
+    parameters[numberParameters++]=
+      SbbParam("inc!rement","A valid solution must be at least this \
+much better than last integer solution",
+	      -1.0e20,1.0e20,INCREMENT);
+    parameters[numberParameters++]=
+      SbbParam("allow!ableGap","Stop when gap between best possible and \
+best less than this",
+	      0.0,1.0e20,ALLOWABLEGAP);
+    parameters[numberParameters++]=
+      SbbParam("ratio!Gap","Stop when gap between best possible and \
+best less than this fraction of continuous optimum",
+	      0.0,1.0e20,GAPRATIO);
+    parameters[numberParameters++]=
+      SbbParam("fix!OnDj","Try heuristic based on fixing variables with \
+reduced costs greater than this",
+	      -1.0e20,1.0e20,DJFIX);
+    parameters[numberParameters++]=
+      SbbParam("tighten!Factor","Tighten bounds using this times largest \
+activity at continuous solution",
+	      1.0,1.0e20,TIGHTENFACTOR);
+    parameters[numberParameters++]=
+      SbbParam("log!Level","Level of detail in BAB output",
+	      0,63,LOGLEVEL);
+    parameters[numberParameters++]=
+      SbbParam("slog!Level","Level of detail in Solver output",
+	      0,63,SOLVERLOGLEVEL);
+    parameters[numberParameters++]=
+      SbbParam("maxN!odes","Maximum number of nodes to do",
+	      1,999999,MAXNODES);
+    parameters[numberParameters++]=
+      SbbParam("strong!Branching","Number of variables to look at in strong branching",
+	      0,999999,STRONGBRANCHING);
+    parameters[numberParameters++]=
+      SbbParam("direction","Minimize or Maximize",
+	      "min!imize",DIRECTION);
+    parameters[numberParameters-1].append("max!imize");
+    parameters[numberParameters++]=
+      SbbParam("error!sAllowed","Whether to allow import errors",
+	      "off",ERRORSALLOWED);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("gomory!Cuts","Whether to use Gomory cuts",
+	      "off",GOMORYCUTS);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("probing!Cuts","Whether to use Probing cuts",
+	      "off",PROBINGCUTS);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("knapsack!Cuts","Whether to use Knapsack cuts",
+	      "off",KNAPSACKCUTS);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("oddhole!Cuts","Whether to use Oddhole cuts",
+	      "off",ODDHOLECUTS);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("round!ingHeuristic","Whether to use Rounding heuristic",
+	      "off",ROUNDING);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("keepN!ames","Whether to keep names from import",
+	      "on",KEEPNAMES);
+    parameters[numberParameters-1].append("off");
+    parameters[numberParameters++]=
+      SbbParam("scaling","Whether to do scaling",
+	      "on",SCALING);
+    parameters[numberParameters-1].append("off");
+    parameters[numberParameters++]=
+      SbbParam("directory","Set Default import directory",
+	      DIRECTORY);
+    parameters[numberParameters++]=
+      SbbParam("solver!","Set the solver used by sbb",
+	       SOLVER) ;
+    parameters[numberParameters++]=
+      SbbParam("import","Import model from mps file",
+	      IMPORT);
+    parameters[numberParameters++]=
+      SbbParam("export","Export model as mps file",
+	      EXPORT);
+    parameters[numberParameters++]=
+      SbbParam("save!Model","Save model to binary file",
+	      SAVE);
+    parameters[numberParameters++]=
+      SbbParam("restore!Model","Restore model from binary file",
+	      RESTORE);
+    parameters[numberParameters++]=
+      SbbParam("presolve","Whether to use integer presolve - be careful",
+	      "off",PRESOLVE);
+    parameters[numberParameters-1].append("on");
+    parameters[numberParameters++]=
+      SbbParam("initialS!olve","Solve to continuous",
+	      SOLVECONTINUOUS);
+    parameters[numberParameters++]=
+      SbbParam("branch!AndBound","Do Branch and Bound",
+	      BAB);
+    parameters[numberParameters++]=
+      SbbParam("sol!ution","Prints solution to file",
+	      SOLUTION);
+    parameters[numberParameters++]=
+      SbbParam("max!imize","Set optimization direction to maximize",
+	      MAXIMIZE);
+    parameters[numberParameters++]=
+      SbbParam("min!imize","Set optimization direction to minimize",
+	      MINIMIZE);
+    parameters[numberParameters++] =
+      SbbParam("time!Limit","Set a time limit for solving this problem",
+	      1.0,(double)(60*60*24*365*10),TIMELIMIT) ;
+    parameters[numberParameters++]=
+      SbbParam("exit","Stops sbb execution",
+	      EXIT);
+    parameters[numberParameters++]=
+      SbbParam("stop","Stops sbb execution",
+	      EXIT);
+    parameters[numberParameters++]=
+      SbbParam("quit","Stops sbb execution",
+	      EXIT);
+    parameters[numberParameters++]=
+      SbbParam("-","From stdin",
+	      STDIN);
+    parameters[numberParameters++]=
+      SbbParam("stdin","From stdin",
+	      STDIN);
+    parameters[numberParameters++]=
+      SbbParam("unitTest","Do unit test",
+	      UNITTEST);
+    parameters[numberParameters++]=
+      SbbParam("miplib","Do some of miplib test set",
+	      MIPLIB);
+    parameters[numberParameters++]=
+      SbbParam("ver!sion","Print out version",
+	      VERSION);
+
+    assert(numberParameters<MAXPARAMETERS);
+
+  return ; }
+
+#ifdef COIN_USE_READLINE     
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
+
+// Returns next valid field
+
+int read_mode=1;
+char line[1000];
+char * where=NULL;
+
+std::string
+nextField()
+{
+  std::string field;
+  if (!where) {
+    // need new line
+#ifdef COIN_USE_READLINE     
+    // Get a line from the user. 
+    where = readline ("Sbb:");
+     
+    // If the line has any text in it, save it on the history.
+    if (where) {
+      if ( *where)
+	add_history (where);
+      strcpy(line,where);
+    }
+#else
+    fprintf(stdout,"Sbb:");
+    fflush(stdout);
+    where = fgets(line,1000,stdin);
+#endif
+    if (!where)
+      return field; // EOF
+    where = line;
+    // clean image
+    char * lastNonBlank = line-1;
+    while ( *where != '\0' ) {
+      if ( *where != '\t' && *where < ' ' ) {
+	break;
+      } else if ( *where != '\t' && *where != ' ') {
+	lastNonBlank = where;
+      }
+      where++;
+    }
+    where=line;
+    *(lastNonBlank+1)='\0';
+  }
+  // munch white space
+  while(*where==' '||*where=='\t')
+    where++;
+  char * saveWhere = where;
+  while (*where!=' '&&*where!='\t'&&*where!='\0')
+    where++;
+  if (where!=saveWhere) {
+    char save = *where;
+    *where='\0';
+    //convert to string
+    field=saveWhere;
+    *where=save;
+  } else {
+    where=NULL;
+    field="EOL";
+  }
+  return field;
+}
+
+std::string
+getCommand(int argc, const char *argv[])
+{
+  std::string field="EOL";
+  while (field=="EOL") {
+    if (read_mode>0) {
+      if (read_mode<argc) {
+	field = argv[read_mode++];
+	if (field=="-") {
+	  std::cout<<"Switching to line mode"<<std::endl;
+	  read_mode=-1;
+	  field=nextField();
+	} else if (field[0]!='-') {
+	  if (read_mode!=2) {
+	    std::cout<<"skipping non-command "<<field<<std::endl;
+	    field="EOL"; // skip
+	  } else {
+	    // special dispensation - taken as -import name
+	    read_mode--;
+	    field="import";
+	  }
+	} else {
+	  if (field!="--") {
+	    // take off -
+	    field = field.substr(1);
+	  } else {
+	    // special dispensation - taken as -import --
+	    read_mode--;
+	    field="import";
+	  }
+	}
+      } else {
+	field="";
+      }
+    } else {
+      field=nextField();
+    }
+  }
+  //std::cout<<field<<std::endl;
+  return field;
+}
+std::string
+getString(int argc, const char *argv[])
+{
+  std::string field="EOL";
+  if (read_mode>0) {
+    if (read_mode<argc) {
+      if (argv[read_mode][0]!='-') { 
+	field = argv[read_mode++];
+      } else if (!strcmp(argv[read_mode],"--")) {
+	field = argv[read_mode++];
+	// -- means import from stdin
+	field = "-";
+      }
+    }
+  } else {
+    field=nextField();
+  }
+  //std::cout<<field<<std::endl;
+  return field;
+}
+
+// valid = 0 okay, 1 bad, 2 not there
+int
+getIntField(int argc, const char *argv[],int * valid)
+{
+  std::string field="EOL";
+  if (read_mode>0) {
+    if (read_mode<argc) {
+      // may be negative value so do not check for -
+      field = argv[read_mode++];
+    }
+  } else {
+    field=nextField();
+  }
+  int value=0;
+  //std::cout<<field<<std::endl;
+  if (field!="EOL") {
+    // how do I check valid
+    value =  atoi(field.c_str());
+    *valid=0;
+  } else {
+    *valid=2;
+  }
+  return value;
+}
+
+
+// valid = 0 okay, 1 bad, 2 not there
+double
+getDoubleField(int argc, const char *argv[],int * valid)
+{
+  std::string field="EOL";
+  if (read_mode>0) {
+    if (read_mode<argc) {
+      // may be negative value so do not check for -
+      field = argv[read_mode++];
+    }
+  } else {
+    field=nextField();
+  }
+  double value=0.0;
+  //std::cout<<field<<std::endl;
+  if (field!="EOL") {
+    // how do I check valid
+    value = atof(field.c_str());
+    *valid=0;
+  } else {
+    *valid=2;
+  }
+  return value;
+}
+
+/// For run timing
+
+double totalTime=0.0;
+
+}	/* end unnamed namespace */
+
+
+int main (int argc, const char *argv[])
+{
+  // next {} is just to make sure all memory should be freed - for debug
+  {
+    std::ios::sync_with_stdio() ;
+/*
+  Create a vector of solver prototypes and establish a default solver. After
+  this the code is solver independent.
+
+  Creating multiple solvers is moderately expensive. If you don't want to
+  make use of this feature, best to define just one. The businesss with
+  SBB_DEFAULT_SOLVER will select the first available solver as the default,
+  unless overridden at compile time.
+
+  NOTE that processing of string parameters is case-independent, but maps are
+       case-sensitive. The solver name given here must contain only lower case
+       letters.
+*/
+    typedef std::map<std::string,OsiSolverInterface*> solverMap_t ;
+    typedef solverMap_t::const_iterator solverMapIter_t ;
+
+    solverMap_t solvers ;
+
+#   ifdef COIN_USE_CLP
+#     ifndef SBB_DEFAULT_SOLVER
+#       define SBB_DEFAULT_SOLVER "clp"
+#     endif
+      solvers["clp"] = new OsiClpSolverInterface ;
+#   else
+      solvers["clp"] = 0 ;
+#   endif
+#   ifdef COIN_USE_DYLP
+#     ifndef SBB_DEFAULT_SOLVER
+#       define SBB_DEFAULT_SOLVER "dylp"
+#     endif
+      solvers["dylp"] = new OsiDylpSolverInterface  ;
+#   else
+      solvers["dylp"] = 0 ;
+#   endif
+/*
+  If we don't have a default solver, we're deeply confused.
+*/
+    OsiSolverInterface *dflt_solver = solvers[SBB_DEFAULT_SOLVER] ;
+    if (dflt_solver)
+    { std::cout << "Default solver is " << SBB_DEFAULT_SOLVER << std::endl ; }
+    else
+    { std::cerr << "No solvers! Aborting." << std::endl ;
+      return (1) ; }
+/*
+  For calculating run time.
+*/
+    double time1 = CoinCpuTime() ;
+    double time2;
+/*
+  Establish the command line interface: parameters, with associated info
+  messages, ranges, defaults. See SbbParam for details. Scan the vector of
+  solvers and add the names to the parameter object.
+*/
+    SbbParam parameters[MAXPARAMETERS];
+    int numberParameters ;
+    establishParams(numberParameters,parameters) ;
+
+    { int iSolver = 0 ;
+      for ( ; iSolver < numberParameters ; iSolver++)
+      { int match = parameters[iSolver].matches("solver") ;
+	if (match==1) break ; }
+      for (solverMapIter_t solverIter = solvers.begin() ;
+	   solverIter != solvers.end() ;
+	   solverIter++)
+      { if (solverIter->second)
+	  parameters[iSolver].append(solverIter->first) ; }
+      int iKwd = parameters[iSolver].parameterOption(SBB_DEFAULT_SOLVER) ;
+      parameters[iSolver].setCurrentOption(iKwd) ; }
+/*
+  The rest of the default setup: establish a model, instantiate cut generators
+  and heuristics, set various default values.
+*/
+    dflt_solver->messageHandler()->setLogLevel(0) ;
+    SbbModel *model = new SbbModel(*dflt_solver) ;
+    model->messageHandler()->setLogLevel(1);
+    bool goodModel=false;
+    
+// Set up likely cut generators and defaults
+
+    CglGomory gomoryGen;
+
+    CglProbing probingGen;
+    probingGen.setUsingObjective(true);
+    probingGen.setMaxPass(3);
+    probingGen.setMaxProbe(100);
+    probingGen.setMaxLook(50);
+    probingGen.setRowCuts(3);
+
+    CglKnapsackCover knapsackGen;
+
+    CglOddHole oddholeGen;
+    oddholeGen.setMinimumViolation(0.005);
+    oddholeGen.setMinimumViolationPer(0.0002);
+    oddholeGen.setMaximumEntries(100);
+
+    bool useRounding=false;
+   
+    int allowImportErrors=0;
+    int keepImportNames=1;	// not implemented
+    int doScaling=1;
+    int preSolve=0;
+    double djFix=1.0e100;
+    double gapRatio=1.0e100;
+    double tightenFactor=0.0;
+
+    std::string directory ="./";
+    std::string field;
+/*
+  The main command parsing loop.
+*/
+    // total number of commands read
+    int numberGoodCommands=0;
+    
+    while (1) {
+      // next command
+      field=getCommand(argc,argv);
+      
+      // exit if null or similar
+      if (!field.length()) {
+	if (numberGoodCommands==1&&goodModel) {
+	  // we just had file name
+	  model->initialSolve();
+	  model->solver()->messageHandler()->setLogLevel(0);
+	  model->branchAndBound();
+	  time2 = CoinCpuTime();
+	  totalTime += time2-time1;
+	  std::cout<<"Result "<<model->getObjValue()<<
+	    " iterations "<<model->getIterationCount()<<
+	    " nodes "<<model->getNodeCount()<<
+	    " took "<<time2-time1<<" seconds - total "<<totalTime<<std::endl;
+	} else if (!numberGoodCommands) {
+	  // let's give the sucker a hint
+	  std::cout
+	    <<"Sbb takes input from arguments ( - switches to stdin)"
+	    <<std::endl
+	    <<"Enter ? for list of commands or (-)unitTest or -miplib"
+	    <<" for tests"<<std::endl;
+	}
+	break;
+      }
+      
+      // see if ? at end
+      int numberQuery=0;
+      if (field!="?") {
+	int length = field.length();
+	int i;
+	for (i=length-1;i>0;i--) {
+	  if (field[i]=='?') 
+	    numberQuery++;
+	  else
+	    break;
+	}
+	field=field.substr(0,length-numberQuery);
+      }
+      // find out if valid command
+      int iParam;
+      int numberMatches=0;
+      for ( iParam=0; iParam<numberParameters; iParam++ ) {
+	int match = parameters[iParam].matches(field);
+	if (match==1) {
+	  numberMatches = 1;
+	  break;
+	} else {
+	  numberMatches += match>>1;
+	}
+      }
+      if (iParam<numberParameters&&!numberQuery) {
+	// found
+	SbbParam found = parameters[iParam];
+	SbbParameterType type = found.type();
+	int valid;
+	numberGoodCommands++;
+	if (type==GENERALQUERY) {
+	  std::cout<<"In argument list keywords have leading - "
+	    ", -stdin or just - switches to stdin"<<std::endl;
+	  std::cout<<"One command per line (and no -)"<<std::endl;
+	  std::cout<<"abcd? gives list of possibilities, if only one + explanation"<<std::endl;
+	  std::cout<<"abcd?? adds explanation, if only one fuller help(LATER)"<<std::endl;
+	  std::cout<<"abcd without value (where expected) gives current value"<<std::endl;
+	  std::cout<<"abcd value or abcd = value sets value"<<std::endl;
+	  std::cout<<"Commands are:"<<std::endl;
+	  for ( iParam=0; iParam<numberParameters; iParam+=4 ) {
+	    int i;
+	    for (i=iParam;i<min(numberParameters,iParam+4);i++) 
+	      std::cout<<parameters[i].matchName()<<"  ";
+	    std::cout<<std::endl;
+	  }
+	} else if (type<81) {
+	  // get next field as double
+	  double value = getDoubleField(argc,argv,&valid);
+	  if (!valid) {
+	    parameters[iParam].setDoubleParameter(*model,value);
+	  } else if (valid==1) {
+	    abort();
+	  } else {
+	    std::cout<<parameters[iParam].name()<<" has value "<<
+	      parameters[iParam].doubleParameter(*model)<<std::endl;
+	  }
+	} else if (type<101) {
+	  // get next field as double for local use
+	  double value = getDoubleField(argc,argv,&valid);
+	  if (!valid) {
+	    if (!parameters[iParam].checkDoubleParameter(value)) {
+	      switch(type) {
+	      case DJFIX:
+		djFix=value;
+		preSolve=5;
+		break;
+	      case GAPRATIO:
+		gapRatio=value;
+		break;
+	      case TIGHTENFACTOR:
+		tightenFactor=value;
+		break;
+	      default:
+		abort();
+	      }
+	    }
+	  } else if (valid==1) {
+	    abort();
+	  } else {
+	    switch(type) {
+	    case DJFIX:
+	      value = djFix ;
+	      break;
+	    case GAPRATIO:
+	      value = gapRatio ;
+	      break;
+	    case TIGHTENFACTOR:
+	      value = tightenFactor ;
+	      break;
+	    default:
+	      abort();
+	    }
+	    std::cout << parameters[iParam].name() << " has value " <<
+			 value << std::endl ;
+	  }
+	} else if (type<201) {
+	  // get next field as int
+	  int value = getIntField(argc,argv,&valid);
+	  if (!valid) {
+	    parameters[iParam].setIntParameter(*model,value);
+	  } else if (valid==1) {
+	    abort();
+	  } else {
+	    std::cout<<parameters[iParam].name()<<" has value "<<
+	      parameters[iParam].intParameter(*model)<<std::endl;
+	  }
+	} else if (type<301) {
+	  // one of several strings
+	  std::string value = getString(argc,argv);
+	  int action = parameters[iParam].parameterOption(value);
+	  if (action<0) {
+	    if (value!="EOL") {
+	      // no match
+	      parameters[iParam].printOptions();
+	    } else {
+	      // print current value
+	      std::cout<<parameters[iParam].name()<<" has value "<<
+		parameters[iParam].currentOption()<<std::endl;
+	    }
+	  } else {
+	    parameters[iParam].setCurrentOption(action);
+	    // for now hard wired
+	    switch (type) {
+	    case DIRECTION:
+	      if (action==0)
+		model->solver()->setObjSense(1);
+	      else
+		model->solver()->setObjSense(-1);
+	      break;
+	    case ERRORSALLOWED:
+	      allowImportErrors = action;
+	      break;
+	    case KEEPNAMES:
+	      keepImportNames = 1-action;
+	      break;
+	    case SCALING:
+	      doScaling = 1-action;
+	      break;
+	    case GOMORYCUTS:
+	      model->addCutGenerator(&gomoryGen,-1,"Gomory");
+	      break;
+	    case PROBINGCUTS:
+	      model->addCutGenerator(&probingGen,-1,"Probing");
+	      break;
+	    case KNAPSACKCUTS:
+	      model->addCutGenerator(&knapsackGen,-1,"Knapsack");
+	      break;
+	    case ODDHOLECUTS:
+	      model->addCutGenerator(&oddholeGen,-1,"OddHole");
+	      break;
+	    case ROUNDING:
+	      useRounding = action;
+	      break;
+	    case PRESOLVE:
+	      preSolve = action*5;
+	      break;
+	    case SOLVER:
+	    { for (int i = 0 ; i < (int) value.length() ; i++)
+		value[i] = tolower(value[i]) ;
+	      OsiSolverInterface *newSolver = solvers[value]->clone() ;
+	      model->assignSolver(newSolver) ;
+	      std::cout << "Solver set to " << value << "." << std::endl ;
+	      break ; }
+	    default:
+	    { std::cerr << "Unrecognized action. Aborting." << std::endl ;
+	      abort(); }
+	    }
+	  }
+	} else {
+	  // action
+	  if (type==EXIT)
+	    break; // stop all
+	  switch (type) {
+	  case SOLVECONTINUOUS:
+	    if (goodModel) {
+	      model->initialSolve();
+	      time2 = CoinCpuTime();
+	      totalTime += time2-time1;
+	      std::cout<<"Result "<<model->solver()->getObjValue()<<
+		" iterations "<<model->solver()->getIterationCount()<<
+		" took "<<time2-time1<<" seconds - total "<<totalTime<<std::endl;
+	      time1=time2;
+	    } else {
+	      std::cout<<"** Current model not valid"<<std::endl;
+	    }
+	    break;
+/*
+  Run branch-and-cut. First set a few options -- node comparison, scaling. If
+  the solver is Clp, consider running some presolve code (not yet converted
+  this to generic OSI) with branch-and-cut. If presolve is disabled, or the
+  solver is not Clp, simply run branch-and-cut. Print elapsed time at the end.
+*/
+	  case BAB: // branchAndBound
+	  { if (goodModel)
+	    { SbbCompareUser compare; // Definition of node choice
+	      model->setNodeComparison(compare);
+	      OsiSolverInterface * solver = model->solver();
+	      if (!doScaling)
+		solver->setHintParam(OsiDoScale,false,OsiHintTry);
+#ifdef COIN_USE_CLP
+	      OsiClpSolverInterface * si =
+		dynamic_cast<OsiClpSolverInterface *>(solver) ;
+	      if (preSolve&&si != NULL) {
+		// get clp itself
+		ClpSimplex * modelC = si->getModelPtr();
+		if (si->messageHandler()->logLevel())
+		  si->messageHandler()->setLogLevel(1);
+		if (modelC->tightenPrimalBounds()!=0) {
+		  std::cout<<"Problem is infeasible!"<<std::endl;
+		  break;
+		}
+		model->initialSolve();
+		// bounds based on continuous
+		if (tightenFactor) {
+		  if (modelC->tightenPrimalBounds(tightenFactor)!=0) {
+		    std::cout<<"Problem is infeasible!"<<std::endl;
+		    break;
+		  }
+		}
+		if (gapRatio<1.0e100) {
+		  double value = si->getObjValue();
+		  double value2 = gapRatio*(1.0e-5+fabs(value));
+		  model->setAllowableGap(value2);
+		  std::cout<<"Continuous "<<value
+			   <<", so allowable gap set to "<<value2<<std::endl;
+		}
+		if (djFix<1.0e20) {
+		  // do some fixing
+		  int numberColumns = modelC->numberColumns();
+		  int i;
+		  const char * type = modelC->integerInformation();
+		  double * lower = modelC->columnLower();
+		  double * upper = modelC->columnUpper();
+		  double * solution = modelC->primalColumnSolution();
+		  double * dj = modelC->dualColumnSolution();
+		  for (i=0;i<numberColumns;i++) {
+		    if (type[i]) {
+		      double value = solution[i];
+		      if (value<lower[i]+1.0e-5&&dj[i]>djFix) {
+			solution[i]=lower[i];
+			upper[i]=lower[i];
+		      } else if (value>upper[i]-1.0e-5&&dj[i]<-djFix) {
+			solution[i]=upper[i];
+			lower[i]=upper[i];
+		      }
+		    }
+		  }
+		}
+		{
+		  // integer presolve
+		  SbbModel * model2 = model->integerPresolve();
+		  if (model2) {
+		    // Do complete search
+		    
+		    SbbRounding heuristic1(*model2);
+		    if (useRounding)
+		      model2->addHeuristic(&heuristic1);
+		    model2->branchAndBound();
+		    // get back solution
+		    model->originalModel(model2,false);
+		  } else {
+		    // infeasible
+		    exit(1);
+		  }
+		}
+	      } else
+#endif
+	      { if (model->solver()->messageHandler()->logLevel())
+		  model->solver()->messageHandler()->setLogLevel(1) ;
+		model->initialSolve() ;
+		if (gapRatio < 1.0e100)
+		{ double value = model->solver()->getObjValue() ;
+		  double value2 = gapRatio*(1.0e-5+fabs(value)) ;
+		  model->setAllowableGap(value2) ;
+		  std::cout << "Continuous " << value
+			    << ", so allowable gap set to "
+			    << value2 << std::endl ; }
+		SbbRounding heuristic1(*model) ;
+		if (useRounding)
+		  model->addHeuristic(&heuristic1) ;
+		model->branchAndBound() ; }
+	      if (model->bestSolution())
+	      { std::cout << "Optimal solution "
+			  << model->solver()->getObjValue() << std::endl ; }
+	      else
+	      { std::cout << "No integer solution found." << std::endl ; }
+			
+	      time2 = CoinCpuTime() ;
+	      totalTime += time2-time1 ;
+	      std::cout << "Result " << model->solver()->getObjValue()
+			<< " took " << time2-time1 << " seconds - total "
+			<< totalTime << std::endl ;
+	      time1 = time2 ; }
+	    else
+	    { std::cout << "** Current model not valid" << std::endl ; }
+	    break ; }
+	  case IMPORT:
+	    {
+	      // get next field
+	      field = getString(argc,argv);
+	      std::string fileName;
+	      bool canOpen=false;
+	      if (field=="-") {
+		// stdin
+		canOpen=true;
+		fileName = "-";
+	      } else {
+		if (field[0]=='/'||field[0]=='~')
+		  fileName = field;
+		else
+		  fileName = directory+field;
+		FILE *fp=fopen(fileName.c_str(),"r");
+		if (fp) {
+		  // can open - lets go for it
+		  fclose(fp);
+		  canOpen=true;
+		} else {
+		  std::cout<<"Unable to open file "<<fileName<<std::endl;
+		}
+	      }
+	      if (canOpen) {
+		model->gutsOfDestructor();
+		int status =model->solver()->readMps(fileName.c_str(),"");
+		if (!status||(status>0&&allowImportErrors)) {
+		  // I don't think there is any need for this but ..
+		  //OsiWarmStartBasis allSlack;
+		  goodModel=true;
+		  //model->setBasis(allSlack);
+		  time2 = CoinCpuTime();
+		  totalTime += time2-time1;
+		  time1=time2;
+		} else {
+		  // errors
+		  std::cout<<"There were "<<status<<
+		    " errors on input"<<std::endl;
+		}
+	      }
+	    }
+	    break;
+	  case EXPORT:
+	    {
+	      // get next field
+	      field = getString(argc,argv);
+	      std::string fileName;
+	      bool canOpen=false;
+	      if (field[0]=='/'||field[0]=='~')
+		fileName = field;
+	      else
+		fileName = directory+field;
+	      FILE *fp=fopen(fileName.c_str(),"w");
+	      if (fp) {
+		// can open - lets go for it
+		fclose(fp);
+		canOpen=true;
+	      } else {
+		std::cout<<"Unable to open file "<<fileName<<std::endl;
+	      }
+	      if (canOpen) {
+		model->solver()->writeMps(fileName.c_str(),"");
+		time2 = CoinCpuTime();
+		totalTime += time2-time1;
+		time1=time2;
+	      }
+	    }
+	    break;
+	  case MAXIMIZE:
+	    model->solver()->setObjSense(-1);
+	    break;
+	  case MINIMIZE:
+	    model->solver()->setObjSense(1);
+	    break;
+	  case DIRECTORY:
+	  { directory = getString(argc,argv);
+	    if (directory[directory.length()-1] != '/')
+	      directory += '/' ;
+	    break ; }
+	  case STDIN:
+	    read_mode=-1;
+	    break;
+	  case VERSION:
+	    std::cout<<"Coin LP version "<<SBBVERSION
+		     <<", build "<<__DATE__<<std::endl;
+	    break;
+	  case UNITTEST:
+	    {
+	      // okay so there is not a real unit test
+
+	      int status =model->solver()->readMps("../Mps/Sample/p0033.mps",
+						   "");
+	      assert(!status);
+	      model->branchAndBound();
+	      model->solver()->resolve();
+	      std::cout<<"Optimal solution "<<model->solver()->getObjValue()<<std::endl;
+	      assert(fabs(model->solver()->getObjValue()-3089.0)<1.0e-5);
+	      fprintf(stderr,"Test was okay\n");
+	      status =model->solver()->readMps("../Mps/Sample/p0033.mps",
+						   "");
+	      assert(!status);
+	      model->setCutoff(1.0e20);
+	      model->setMaximumSolutions(1);
+	      model->setSolutionCount(0);
+	      // Switch off strong branching to give better chance of NOT finding best
+	      model->setNumberStrong(0);
+	      // Definition of node choice
+	      SbbCompareDefault compare(100.0);
+	      model->setNodeComparison(compare);
+	      model->solver()->resolve();
+	      model->branchAndBound();
+	      model->solver()->resolve();
+	      std::cout<<"partial solution "<<model->solver()->getObjValue()<<std::endl;
+	      if (model->solver()->getObjValue()<3090.0) {
+		std::cout<<"Got optimal solution by mistake!"<<std::endl;
+	      }
+	    }
+	    break;
+	  case MIPLIB:
+	    {
+	      int mainTest (int argc, const char *argv[]);
+	      // create fields for test
+	      const char * fields[3];
+	      int nFields=1;
+	      fields[0]="fake main for miplib";
+	      if (directory!="./") {
+		fields[1]=("-miplibDir="+directory).c_str();
+		nFields=2;
+	      }
+	      mainTest(nFields,fields);
+	    }
+	    break;
+	  case SOLUTION:
+	    if (goodModel) {
+	      // get next field
+	      field = getString(argc,argv);
+	      std::string fileName;
+	      FILE *fp=NULL;
+	      if (field=="-"||field=="EOL") {
+		// stdout
+		fp=stdout;
+	      } else {
+		if (field[0]=='/'||field[0]=='~')
+		  fileName = field;
+		else
+		  fileName = directory+field;
+		fp=fopen(fileName.c_str(),"w");
+	      }
+	      if (fp) {
+		// make fancy later on
+		int iRow;
+		int numberRows=model->solver()->getNumRows();
+		const double * dualRowSolution = model->getRowPrice();
+		const double * primalRowSolution =  model->getRowActivity();
+		for (iRow=0;iRow<numberRows;iRow++) {
+		  fprintf(fp,"%7d ",iRow);
+		  fprintf(fp,"%15.8g        %15.8g\n",primalRowSolution[iRow],
+			  dualRowSolution[iRow]);
+		}
+		int iColumn;
+		int numberColumns=model->solver()->getNumCols();
+		const double * dualColumnSolution = 
+		  model->getReducedCost();
+		const double * primalColumnSolution = 
+		  model->getColSolution();
+		for (iColumn=0;iColumn<numberColumns;iColumn++) {
+		  fprintf(fp,"%7d ",iColumn);
+		  fprintf(fp,"%15.8g        %15.8g\n",
+			  primalColumnSolution[iColumn],
+			  dualColumnSolution[iColumn]);
+		}
+		if (fp!=stdout)
+		  fclose(fp);
+	      } else {
+		std::cout<<"Unable to open file "<<fileName<<std::endl;
+	      }
+	    } else {
+	      std::cout<<"** Current model not valid"<<std::endl;
+	      
+	    }
+	    break;
+	  default:
+	    abort();
+	  }
+	} 
+      } else if (!numberMatches) {
+	std::cout<<"No match for "<<field<<" - ? for list of commands"
+		 <<std::endl;
+      } else if (numberMatches==1) {
+	if (!numberQuery) {
+	  std::cout<<"Short match for "<<field<<" possible completion:"
+		   <<std::endl;
+	  for ( iParam=0; iParam<numberParameters; iParam++ ) {
+	    int match = parameters[iParam].matches(field);
+	    if (match) 
+	      std::cout<<parameters[iParam].matchName()<<std::endl;
+	  }
+	} else if (numberQuery) {
+	  std::cout<<"Short match for "<<field<<" completion:"
+		   <<std::endl;
+	  for ( iParam=0; iParam<numberParameters; iParam++ ) {
+	    int match = parameters[iParam].matches(field);
+	    if (match) {
+	      std::cout<<parameters[iParam].matchName()<<" : ";
+	      std::cout<<parameters[iParam].shortHelp()<<std::endl;
+	    }
+	  }
+	}
+      } else {
+	if (!numberQuery) 
+	  std::cout<<"Multiple matches for "<<field<<" - possible completions:"
+		   <<std::endl;
+	else
+	  std::cout<<"Completions of "<<field<<":"<<std::endl;
+	for ( iParam=0; iParam<numberParameters; iParam++ ) {
+	  int match = parameters[iParam].matches(field);
+	  if (match) {
+	    std::cout<<parameters[iParam].matchName();
+	    if (numberQuery>=2) 
+	      std::cout<<" : "<<parameters[iParam].shortHelp();
+	    std::cout<<std::endl;
+	  }
+	}
+      }
+    }
+/*
+  Final cleanup. Delete the model and the vector of available solvers.
+*/
+    delete model;
+
+    for (solverMapIter_t solverIter = solvers.begin() ;
+	 solverIter != solvers.end() ;
+	 solverIter++)
+    { if (solverIter->second) delete solverIter->second ; }
+  }
+  return 0;
+}    
+@
+
+
+1.1.1.1
+log
+@COIN code from IBM hosted repository (before move to informs)
+@
+text
+@@

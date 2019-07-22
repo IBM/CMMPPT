@@ -1,0 +1,123 @@
+               FORMAL SYNTAX FOR WIT INPUT DATA FILE
+               =====================================
+
+Following is a list of BNF (Backus-Nauer Form) rules or "productions"
+which formally describe the syntax of the Wit input-data language.
+Nonterminal symbols are enclosed in <> while terminal symbols are not. 
+Terminal symbols in lower case (e.g., add, part, material) must be 
+written exactly as shown.  Symbols in upper case (e.g., STRING, INTEGER) 
+are atomic elements or lexical tokens defined in the lexical analyzer
+(also known as the scanner or the lexer).  
+
+The syntactic rules described here are very similar to the rules 
+specified to the parser (in the file witParse.y).  Together with
+corresponding semantic actions they form the input to yacc.  However,
+in some	cases, additional productions have been added to the yacc
+input to make it easier to program the semantic actions.  
+
+
+<data_specification> :: <release_specification> <command_list>
+
+<command_list> ::  <empty>    
+    | <command_list> <command>
+
+<command> :: <add_command> 
+    | <set_command> 
+    | <read_command>
+
+<release_specification> :: release <release_num>;
+
+<release_num> :: STRING 
+
+<add_command> :: add <add_clause> <entity_specification>;
+
+<add_clause> :: <settable_entity_name> | partWithOperation
+
+<set_command> :: set problem <global_specification>;
+    | set <set_clause> <entity_specification>;
+
+<set_clause> :: <settable_entity_name> 
+
+<read_command> :: read <file_name>;
+
+<settable_entity_name> :: part | operation
+    | bomEntry | subEntry
+    | bopEntry | demand
+
+<global_specification> :: <attribute_list>
+
+<entity_specification> :: <argument_list> <attribute_list>
+
+<argument_list> :: <argument>
+    | <argument_list> <argument>
+
+<attribute_list> ::  <empty>
+    | <attribute_list> <attribute>
+
+<argument> :: <simple_value> | <category>
+
+<category> :: capacity | material
+
+<attribute> :: <simple_attribute>
+    | <bound_set_attribute>
+
+<simple_attribute> :: <attribute_name> <attribute_value>
+
+<attribute_name> :: IDENTIFIER
+
+<attribute_value> :: <simple_value>
+    | <vector_format>
+
+<simple_value> :: STRING | INTEGER | FLOAT | BOOLEAN
+
+<vector_format> :: single (<vector_value>)
+    | sparse (<sparse_list>)
+    | dense (<value_list>)
+
+<sparse_list> ::  <empty>
+    | <sparse_list> <period_value>
+
+<period_value> :: <period> : <vector_value>
+
+<value_list> :: <vector_value>
+    | <value_list> <vector_value>
+
+<period> :: INTEGER
+
+<vector_value> :: INTEGER | FLOAT
+
+<bound_set_attribute> :: <bound_set_type> <bounds_specification> endBounds
+
+<bound_set_type> :: execBounds | stockBounds | cumShipBounds
+
+<bounds_specification> :: <empty>
+    | <bounds_specification> <bound_item>
+
+<bound_item> :: <bound_type> <vector_format>
+
+<bound_type> :: hardLB | softLB | hardUB
+
+<file_name> :: STRING
+
+ 	
+There are some semantic constraints imposed on the above grammar:
+
+  1.  A <release_num> must specify a valid release (e.g., "4.0").
+  
+  2.  A <file_name> must be a valid path specification in the	
+      appropriate platform.
+
+  3.  An IDENTIFIER must be a valid attribute name, as defined 	
+      elsewhere in this document.   
+
+  4.  A <period> is a valid nonnegative integer.
+
+  5.  A <bound_type> (i.e., hardLB, softLB, hardUB) in <bounds_  
+      specification> must not be specified more than once in the same
+      attribute specification.
+
+  6.  The number and type of arguments in <argument_list> are 
+      restricted to those defined in the symbol table for each	
+      entity name.  Similarly, the <simple_value> in <attribute_value>
+      must be of the type specified in the symbol table for the
+      associated <attribute_name>.

@@ -1,0 +1,1936 @@
+head	1.23;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.23
+date	2002.10.18.16.10.32;	author fasano;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2002.09.25.15.38.15;	author fasano;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2002.09.17.19.19.13;	author fasano;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2002.09.17.13.25.38;	author fasano;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2002.09.16.21.35.23;	author fasano;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2002.09.16.16.33.30;	author fasano;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2002.09.13.19.54.41;	author sanjeebd;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2002.09.13.02.34.02;	author fasano;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2002.09.11.23.11.48;	author sanjeebd;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2002.09.11.13.07.52;	author fasano;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2002.09.11.11.42.25;	author fasano;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2002.09.10.22.19.06;	author sanjeebd;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2002.09.10.01.50.33;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2002.09.10.01.47.05;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.09.09.23.26.54;	author sanjeebd;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.09.07.12.02.28;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.09.06.21.43.42;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2002.09.06.20.34.03;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2002.09.06.20.10.20;	author sanjeebd;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.09.06.20.07.53;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.09.06.20.05.41;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.09.06.19.53.51;	author sanjeebd;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.09.06.18.15.33;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.23
+log
+@Updated to set cost of substituting contractors to ensure IBMers are used first.
+Updated to set wit's shipReward to be 10 times revenue.
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <numeric>
+#include <set>
+
+#include <assert.h>
+#include <iostream.h>
+#include <float.h>
+#include <stdio.h>
+
+#include <wit.h>
+
+//#include "OsiFloatEqual.h"
+#include "ilsProblem.h"
+#include "projAppData.h"
+#include "resrcAppData.h"
+#include "probAppData.h"
+
+  //----------------------
+  // Methods for projects. To be added.
+  //----------------------
+void ILSproblem::addProject(const std::string & project )
+{
+  // wit part name is same as project name
+
+  // Add project to list of all project names
+  projectNames_.push_back (project);
+
+  //----------------------------------------------
+  // Create Wit Objects which model a project
+  //----------------------------------------------
+  witAddPart (witRun(), project.c_str(), WitCAPACITY);
+  ILSprojAppData * projAppData = new ILSprojAppData;
+  witSetPartAppData (mutableWitRun(), project.c_str(), projAppData);
+
+  witAddOperation (witRun(), project.c_str());
+  witAddBopEntry (witRun(), project.c_str(), project.c_str());
+
+  witAddDemand (witRun(), project.c_str(), project.c_str());
+
+  int np=getNPeriods();
+  float * tv=new float[np];
+  int t=0;
+  for(t=0;t<np;t++) tv[t]=0.0;
+  tv[0]=1.0;
+  witSetOperationIncLotSize(witRun(), project.c_str(),tv);
+  witSetOperationYieldRate(witRun(), project.c_str(),tv);
+  delete [] tv;
+}
+
+
+// Get list of all projects
+void ILSproblem::getProjects(std::vector<std::string> & projects ) const
+{
+#if 0
+  int nProjs = projectNames_.size();
+  int r;
+
+  projects.clear();
+  for (r=0; r<nProjs; r++) {
+    projects.push_back(projectNames_[r]);
+  }
+#endif
+  projects = projectNames_;
+}
+
+void ILSproblem::setProjectCloseProb(const std::string & project, float closingProbability){
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(), (void**)&appData);
+  appData->setCloseProb (closingProbability);
+}
+
+float ILSproblem::getProjectCloseProb(const std::string & project) const
+{
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(), (void**)&appData);
+  float retVal = appData->getCloseProb();
+  return retVal;
+}
+
+void ILSproblem::setProjectRateScale(const std::string & project, float rateScale)
+{
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(), (void**)&appData);
+  appData->setRateScale (rateScale);
+}
+
+float ILSproblem::getProjectRateScale(const std::string & project) const
+{
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(), (void**)&appData);
+  float retVal = appData->getRateScale();
+  return retVal;
+}
+
+void ILSproblem::setProjectStartPeriod(const std::string & project, int startPeriod)
+{
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(), (void**)&appData);
+  appData->setStartPeriod (startPeriod);
+}
+
+int ILSproblem::getProjectStartPeriod(const std::string & project ) const
+{
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(),(void**)&appData);
+  int retVal = appData->getStartPeriod();
+  return retVal;
+}
+
+void ILSproblem::setProjectRevenue(const std::string & project, float revenue)
+{
+  int i;
+  int nP = getNPeriods ();
+  float *revVector = new float[nP];
+
+  // Set wit shipReward to be 10 times revenue.
+  // This ensures that only grossly unprofitable projects will not be done
+  // and accomodates the aritifical cost added to model when substituting
+  // contractor for ibmer.
+  for (i=0; i<nP; i++) revVector[i] = 10.0f*revenue;
+
+  witSetDemandObj1ShipReward (witRun(), project.c_str(), project.c_str(), revVector);
+  delete[] revVector;
+}
+
+float ILSproblem::getProjectRevenue(const std::string & project ) const
+{
+  float retVal;
+  float *revVector;
+
+  witGetDemandObj1ShipReward (mutableWitRun(), project.c_str(), project.c_str(), &revVector);
+  retVal = revVector[0]/10.f;
+  witFree (revVector);
+  return retVal;
+}
+
+std::vector<float> ILSproblem::getProjectExecVol(const std::string & project ) const
+{
+#if 0
+  float retVal;
+  float *execVolVector;
+
+  witGetOperationExecVol(mutableWitRun(), project.c_str(), &execVolVector);
+  retVal = execVolVector[0];
+  witFree(execVolVector);
+  return retVal;
+#endif
+  ILSprojAppData * appData;
+
+  witGetPartAppData(mutableWitRun(), project.c_str(),(void**)&appData);
+  std::vector<float> retVal = appData->getExecVol();
+  return retVal;
+}
+
+//-------------------------------------------------------------------------
+// Resource Methods
+//-------------------------------------------------------------------------
+void ILSproblem::addResource(const std::string & role, int band )
+{
+  // create wit part name from role and band
+  std::string ibmBRN = ibmBenchResourceName(role,band);
+  std::string contrBRN = contrBenchResourceName(role,band);
+  std::string rn = resourceName(role,band);
+
+  // Add resource to list of all resource names
+  resourceNames_.push_back(rn);
+
+  //----------------------------------------------
+  // Create Wit Objects which model a resource
+  //----------------------------------------------
+  witAddPart(witRun(),ibmBRN.c_str(),WitCAPACITY);
+  witAddPart(witRun(),contrBRN.c_str(),WitCAPACITY);
+  
+  ILSresrcAppData * ibmAppData = new ILSresrcAppData;
+  witSetPartAppData(mutableWitRun(),ibmBRN.c_str(),ibmAppData);
+
+  ILSresrcAppData * contrAppData = new ILSresrcAppData;
+  witSetPartAppData(mutableWitRun(),contrBRN.c_str(),contrAppData);
+}
+
+void ILSproblem::getResources(
+    std::vector<std::string> & roles,
+    std::vector<int> & bands ) const
+{
+  roles.clear();
+  bands.clear();
+  int nResrcs = resourceNames_.size();
+  int r;
+  for ( r=0; r<nResrcs; r++ ) {
+    roles.push_back( roleFromResourceName(resourceNames_[r]) );
+    bands.push_back( bandFromResourceName(resourceNames_[r]) );
+  }
+}
+
+// Sanjeeb: Add resource costs
+void ILSproblem::setResourceIbmCost( const std::string & role, int band, float ibmCost)
+{
+  std::string resrcName   = ibmBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  appData->setCost(ibmCost);
+}
+
+void ILSproblem::setResourceContrCost(const std::string & role, int band, float contrCost)
+{
+  std::string resrcName   = contrBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  appData->setCost(contrCost);
+}
+
+// Sanjeeb: Get resource costs
+float ILSproblem::getResourceIbmCost(const std::string & role, int band)
+{
+  std::string resrcName   = ibmBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  float retVal = appData->getCost();
+  return retVal;
+}
+
+float ILSproblem::getResourceContrCost (const std::string & role, int band)
+{
+  std::string resrcName   = contrBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  float retVal = appData->getCost();
+  return retVal;
+}
+
+void ILSproblem::setResourceIbmSupplyVol (const std::string & role, int band, std::vector<float> supplyVol)
+{
+  float *vol = stlVecToFloatStar (supplyVol);
+  std::string resrcName = ibmBenchResourceName(role, band);
+
+  witSetPartSupplyVol (witRun(), resrcName.c_str(), vol);
+  free (vol);
+}
+
+std::vector<float> ILSproblem::getResourceIbmSupplyVol (const std::string & role, int band)
+{
+  float *vol;
+  std::string resrcName = ibmBenchResourceName(role, band);
+  std::vector<float> svol;
+
+  witGetPartSupplyVol (witRun(), resrcName.c_str(), &vol);
+  svol = witFloatStarToStlVec (vol);
+  witFree (vol);
+  return svol;
+}
+
+void ILSproblem::setResourceContrSupplyVol (const std::string & role, int band, std::vector<float> supplyVol)
+{
+  float *vol = stlVecToFloatStar (supplyVol);
+  std::string resrcName = contrBenchResourceName(role, band);
+
+  witSetPartSupplyVol (witRun(), resrcName.c_str(), vol);
+  free (vol);
+}
+
+std::vector<float> ILSproblem::getResourceContrSupplyVol (const std::string & role, int band)
+{
+  float *vol;
+  std::string resrcName = contrBenchResourceName(role, band);
+  std::vector<float> svol;
+
+  witGetPartSupplyVol (witRun(), resrcName.c_str(), &vol);
+  svol = witFloatStarToStlVec (vol);
+  witFree (vol);
+  return svol;
+}
+
+std::vector< std::vector<float> > ILSproblem::getResourceIbmConsVol (const std::string & role, int band)
+{
+#if 0
+  float *vol;
+  std::string resrcName = ibmBenchResourceName(role, band);
+  std::vector<float> svol;
+
+  witGetPartConsVol (witRun(), resrcName.c_str(), &vol);
+  svol = witFloatStarToStlVec (vol);
+  witFree (vol);
+  return svol;
+#endif
+  
+  std::string resrcName   = ibmBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  std::vector< std::vector<float> > retVal = appData->getConsVol();
+  return retVal;
+}
+std::vector< std::vector<float> > ILSproblem::getResourceContrConsVol (const std::string & role, int band)
+{
+
+  std::string resrcName   = contrBenchResourceName(role, band);
+  ILSresrcAppData * appData;
+  witGetPartAppData(mutableWitRun(),resrcName.c_str(),(void**)&appData);
+  std::vector< std::vector<float> > retVal = appData->getConsVol();
+  return retVal;
+}
+
+//-------------------------------------------------------------------------
+// Resource Name Methods
+//-------------------------------------------------------------------------
+std::string ILSproblem::ibmBenchResourceName(const std::string & role,int band)
+{
+  return "ibmBench "+resourceName(role,band);
+}
+std::string ILSproblem::contrBenchResourceName(const std::string & role,int band)
+{
+  return "contractor "+resourceName(role,band);
+}
+
+
+std::string ILSproblem::resourceName(const std::string & role,int band)
+{
+  char bandchar[100];
+  sprintf( bandchar, "%d", band );
+  std::string retVal = "role:"+role + " band:"+bandchar;
+  return retVal;
+}
+
+
+std::string ILSproblem::roleFromResourceName(const std::string & resName )
+{  
+  std::string begMark = "role:";
+  std::string endMark = " band:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = resName.substr(begPos,len);
+  return retVal;
+}
+
+int ILSproblem::bandFromResourceName(const std::string & resName )
+{  
+  std::string begMark = " band:";
+
+  int begPos = resName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = resName.size();
+
+  int len = endPos-begPos;
+  std::string bandName = resName.substr(begPos,len);
+  int retVal=atoi(bandName.c_str());
+  return retVal;
+}
+
+std::string ILSproblem::ibmProjectResourceLinkName(const std::string & proj,const std::string & role,int band)
+{
+  return "ibm "+projectResourceLinkName(proj,role,band);
+}
+std::string ILSproblem::contrProjectResourceLinkName(const std::string & proj,const std::string & role,int band)
+{
+  return "contractor "+projectResourceLinkName(proj,role,band);
+}
+std::string ILSproblem::projectResourceLinkName(const std::string & proj,const std::string & role,int band)
+{
+  std::string retVal = "proj:"+proj + " " + resourceName(role,band);
+  return retVal;
+}
+
+std::string ILSproblem::roleFromProjectResourceLinkName(const std::string & projResrcLinkName )
+{  
+  return roleFromResourceName(projResrcLinkName);
+}
+int ILSproblem::bandFromProjectResourceLinkName(const std::string & projResrcLinkName )
+{  
+  return bandFromResourceName(projResrcLinkName);
+}
+std::string ILSproblem::projectFromProjectResourceLinkName(const std::string & projResrcLinkName )
+{  
+  std::string begMark = "proj:";
+  std::string endMark = " role:";
+
+  int begPos = projResrcLinkName.find(begMark);
+  assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = projResrcLinkName.find(endMark);
+  assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = projResrcLinkName.substr(begPos,len);
+  return retVal;
+}
+//-------------------------------------------------------------------------
+// Project Resource Link Methods
+//-------------------------------------------------------------------------
+void ILSproblem::addProjectResourceLink(
+    const std::string & project,
+    const std::string & role, int band)
+{
+  int nP=getNPeriods();
+
+  std::string ibmLinkName   =   ibmProjectResourceLinkName(project,role,band);
+  std::string contrLinkName = contrProjectResourceLinkName(project,role,band);
+  std::string      linkName =      projectResourceLinkName(project,role,band);
+  projectResourceLinkNames_.push_back(linkName);
+
+  std::string   ibmResrcName =   ibmBenchResourceName(role,band);
+  std::string contrResrcName = contrBenchResourceName(role,band);
+
+  witAddOperation(witRun(),  ibmLinkName.c_str());
+  witAddOperation(witRun(),contrLinkName.c_str());
+
+  witAddBomEntry(witRun(),  ibmLinkName.c_str(),  ibmResrcName.c_str());
+  witAddBomEntry(witRun(),contrLinkName.c_str(),contrResrcName.c_str());
+
+  float   ibmCost =   getResourceIbmCost(role,band);
+  float contrCost = getResourceContrCost(role,band);
+  float rateScale = getProjectRateScale(project);
+
+  int np = getNPeriods();
+  float *   ibmExecCost = new float[np];
+  float * contrExecCost = new float[np];
+  float * subsCost = new float[np];
+
+  int t;
+  for ( t=0; t<np; t++ ) {
+      ibmExecCost[t] =   ibmCost * rateScale;
+    contrExecCost[t] = contrCost * rateScale;
+    if ( ibmExecCost[t] > contrExecCost[t] ) {
+      // set cost of substituting contractor to be 1% higher then the cost of using IBM
+      float ibmCostUplifted = ibmExecCost[t] * 1.01f;
+      subsCost[t] = ibmCostUplifted - contrExecCost[t];
+    }
+    else {
+      subsCost[t]=0.0f;
+    }
+  }
+
+  witSetOperationObj1ExecCost(witRun(),  ibmLinkName.c_str(),  ibmExecCost);
+  witSetOperationObj1ExecCost(witRun(),contrLinkName.c_str(),contrExecCost);
+
+  delete []   ibmExecCost;
+  delete [] contrExecCost;
+
+  witAddPart(witRun(),  ibmLinkName.c_str(),WitCAPACITY);
+  witAddPart(witRun(),contrLinkName.c_str(),WitCAPACITY);
+  
+  witAddBopEntry(witRun(),  ibmLinkName.c_str(),  ibmLinkName.c_str());
+  witAddBopEntry(witRun(),contrLinkName.c_str(),contrLinkName.c_str());
+
+  witAddOperation(witRun(),linkName.c_str());
+  witAddBomEntry(witRun(),linkName.c_str(),ibmLinkName.c_str());
+  witAddSubsBomEntry(witRun(),linkName.c_str(),0,contrLinkName.c_str());
+
+  // This is were cost of using a contractor is set in a way to ensure
+  // that IBMers are selected over contractors
+  witSetSubsBomEntryObj1SubCost(witRun(),linkName.c_str(),0,0,subsCost);
+  delete []   subsCost;
+    
+  witAddPart(witRun(),linkName.c_str(),WitCAPACITY);  
+  witAddBopEntry(witRun(),  linkName.c_str(),  linkName.c_str());
+
+  float * offset = new float[nP];
+  for( t=0; t<nP; t++ ) offset[t]=0.0f;
+
+  float * consRate = new float[nP];
+  for( t=0; t<nP; t++ ) consRate[t]=0.0f;
+
+  // Add one bomEntry for each period
+  for ( t=0; t<np; t++ ) {
+    witAddBomEntry(witRun(),project.c_str(),linkName.c_str());
+    
+    int nBoms;
+    witGetOperationNBomEntries(witRun(),project.c_str(),&nBoms);
+
+    // set the offset to -period number
+    offset[0]=-t;
+    witSetBomEntryOffset(witRun(),project.c_str(),nBoms-1,offset);
+
+    // set the consRate to zero (default value maybe 1).
+    witSetBomEntryConsRate(witRun(),project.c_str(),nBoms-1,consRate);
+  }
+
+  delete [] consRate;
+  delete [] offset;
+
+}
+
+void ILSproblem::getProjectResourceLinks(
+    std::vector<std::string> & projects,
+    std::vector<std::string> & roles, std::vector<int> & bands) const
+{
+  projects.clear();
+  roles.clear();
+  bands.clear();
+  int nLinks = projectResourceLinkNames_.size();
+  int l;
+  for ( l=0; l<nLinks; l++ ) {
+    projects.push_back( projectFromProjectResourceLinkName(projectResourceLinkNames_[l]) );
+    roles.push_back( roleFromProjectResourceLinkName(projectResourceLinkNames_[l]) );
+    bands.push_back( bandFromProjectResourceLinkName(projectResourceLinkNames_[l]) );
+  }
+}
+
+// Return the range of bomEntry indices connecting the operation and part
+void ILSproblem::getOperationBomEntryIndices(
+                                 const std::string & opName,
+                                 const std::string & consPartName,
+                                 int & bomEntryIndexFirst,
+                                 int & bomEntryIndexLast )
+{
+  bomEntryIndexFirst=-1;
+  bomEntryIndexLast=-1;
+  int nBoms;
+  witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms);
+
+  int b;
+  for ( b=0; b<nBoms; b++ ){
+    char * thisConsPart;
+    witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),b,&thisConsPart);
+    if ( consPartName==thisConsPart ) bomEntryIndexFirst=b;
+    witFree(thisConsPart);
+    if( bomEntryIndexFirst != -1 ) break;
+  }
+
+  if ( bomEntryIndexFirst != -1 ) {
+    int nP=getNPeriods();
+    bomEntryIndexLast = bomEntryIndexFirst + nP-1;
+    
+    char * thisConsPart;
+    witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),bomEntryIndexLast,&thisConsPart);
+    assert( consPartName==thisConsPart );
+    witFree(thisConsPart);
+  }
+}
+
+void ILSproblem::setProjectResourceLinkConsRate(
+                                                const std::string & project,
+                                                const std::string & role, int band,
+                                                const std::vector<float> & consRate)
+{
+  int nP=getNPeriods();
+  assert(consRate.size()==nP);
+
+  float * consRateVec = new float[nP];
+  
+  std::string      linkName =      projectResourceLinkName(project,role,band);
+
+  int bomEntryIndexFirst;
+  int bomEntryIndexLast;
+  getOperationBomEntryIndices(project,linkName,bomEntryIndexFirst,bomEntryIndexLast);
+
+  // Loop once for each bomEntry
+  int b;
+  for ( b=bomEntryIndexFirst; b<=bomEntryIndexLast; b++ ) {
+    
+    int t;
+    for ( t=0; t<nP; t++ ) consRateVec[t]=consRate[b-bomEntryIndexFirst];
+    
+    witSetBomEntryConsRate(witRun(),project.c_str(),b,consRateVec);
+  }
+
+  delete [] consRateVec;
+}
+
+std::vector<float>  ILSproblem::getProjectResourceLinkConsRate(
+    const std::string & project,
+    const std::string & role, int band)
+{
+  std::vector<float> retVal;
+
+  int nP=getNPeriods();
+
+  float * consRateVec;
+  float * offsetVec;
+  
+  std::string      linkName =      projectResourceLinkName(project,role,band);
+
+  int bomEntryIndexFirst;
+  int bomEntryIndexLast;
+  getOperationBomEntryIndices(project,linkName,bomEntryIndexFirst,bomEntryIndexLast);
+
+  // Loop once for each bomEntry
+  int b;
+  for ( b=bomEntryIndexFirst; b<=bomEntryIndexLast; b++ ) {
+
+    witGetBomEntryConsRate(mutableWitRun(),project.c_str(),b,&consRateVec);
+    
+    retVal.push_back(consRateVec[0]);
+    assert(consRateVec[0]==consRateVec[nP-1]);
+    witFree(consRateVec);
+    
+    witGetBomEntryOffset(mutableWitRun(),project.c_str(),b,&offsetVec);
+    assert( offsetVec[0]==-(b-bomEntryIndexFirst) );
+    witFree(offsetVec);
+  }
+
+  assert(retVal.size()==nP);
+  return retVal;
+}
+
+//---------------------------------------------
+// Get resource shortage list
+//---------------------------------------------
+
+void ILSproblem::getResourceShortages(     
+    std::vector<std::string> & resourceDescriptions,
+    std::vector<int> & periods,
+    std::vector<float> & shortageVols ) const
+{
+  resourceDescriptions.clear();
+  periods.clear();
+  shortageVols.clear();
+
+  std::vector<std::string> projects;
+  getProjects(projects);
+  int np = getNPeriods();
+  
+  // Set Focus
+  for ( int p=0; p<projects.size(); p++ ) {
+    float *dv;
+    witGetDemandDemandVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),&dv);
+    witSetDemandFssShipVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),dv);
+    witFree(dv);
+  }
+
+  int lenList;
+  char **partList;
+  float ** shortageVolList;  
+  //OsiRelFltEq eq;
+  witGetFocusShortageVol ( mutableWitRun(), &lenList, &partList, &shortageVolList );
+  for ( int i=0; i<lenList; i++ ) {
+    for ( int t=0; t<np; t++ ) {
+      if ( shortageVolList[i][t]==0.0 ) continue;
+      resourceDescriptions.push_back(partList[i]);
+      periods.push_back(t);
+      shortageVols.push_back(shortageVolList[i][t]);
+    }
+    witFree(partList[i]);
+    witFree(shortageVolList[i]);
+  }
+  witFree(partList);
+  witFree(shortageVolList);
+}
+//--------------------------------------------------------
+
+void ILSproblem::setTitle( const std::string & title)
+{
+  witSetTitle(witRun(),title.c_str());
+}
+
+std::string ILSproblem::getTitle() const
+{
+  char * t;
+  witGetTitle(mutableWitRun(),&t);
+  std::string retVal(t);
+  witFree(t);
+  return retVal;
+}
+
+void ILSproblem::setNPeriods( int nP )
+{
+  witSetNPeriods(witRun(),nP);
+}
+
+int ILSproblem::getNPeriods() const
+{
+  int retVal;
+  witGetNPeriods(mutableWitRun(),&retVal);
+  return retVal;
+}
+
+void ILSproblem::writeWitData( std::string filename ) const
+{
+  witWriteData(mutableWitRun(), filename.c_str() );
+}
+
+WitRun * ILSproblem::mutableWitRun() const { return wr_; }
+WitRun * ILSproblem::witRun() { return wr_; }
+
+
+// default constructor
+ILSproblem::ILSproblem()
+:
+wr_(NULL),
+resourceNames_(),
+projectNames_(),
+projectResourceLinkNames_()
+{
+  witNewRun( &wr_ );
+  witInitialize( witRun() );
+  //witSetOslMesgFileName(witRun(),WitSTDOUT);
+  
+  // Turn off WIT informational messages
+  witSetMesgTimesPrint( witRun(), WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+  // Turn off warning msg about long names.
+  witSetMesgTimesPrint( witRun(), WitTRUE, 338, 0);
+  /* Turn off warning msg:
+  WIT0749W One or more BOP entries have been rejected for possible explosion,
+         because they had positive effective production rates (= yieldRate *
+         productRate) that were below the value of expCutoff. The largest
+         effective production rate that was rejected and the corresponding BOP
+         entry and execution period are given below:
+
+            expCutoff:             0.01
+            Largest Rejected Rate: 0.008
+            Operation:             "disassemble_26353AU"
+            BOP Entry Index:       4
+            Exec. Period:          0
+  */
+  //witSetMesgTimesPrint( witRun(), WitTRUE, 749, 0);
+  
+  
+  //witSetTitle( witRun(), "DaimlerChrysler" );
+  //witSetNPeriods( witRun(), 1 );
+  witSetObjChoice( witRun(), 1 );
+  witSetUseFocusHorizons( witRun(), WitFALSE );
+
+  witSetExecEmptyBom( witRun(), WitFALSE );
+  witSetMultiRoute( witRun(), WitTRUE );
+
+  ILSprobAppData * problemAppData = new ILSprobAppData;
+  witSetAppData(witRun(),problemAppData);
+ 
+}
+
+// destructor
+ILSproblem::~ILSproblem()
+{
+  gutsOfDestructor();
+}
+
+// copy constructor
+ILSproblem::ILSproblem( const ILSproblem& source ):
+wr_(NULL),
+resourceNames_(),
+projectNames_(),
+projectResourceLinkNames_()
+{
+  gutsOfCopy(source);
+}
+
+// assignment operator
+ILSproblem&
+ILSproblem::operator=(const ILSproblem& rhs)
+{  
+  if (this != &rhs) { 
+    if ( wr_ != NULL ) gutsOfDestructor();
+    wr_ = NULL;
+    gutsOfCopy(rhs);
+  }
+  return *this;
+}
+
+// copy object
+void ILSproblem::gutsOfCopy( const ILSproblem& source )
+{
+  // Copy Wit Run
+  assert(wr_==NULL);
+  witNewRun( &wr_ );
+
+  // Turn off WIT informational messages
+  witSetMesgTimesPrint( wr_, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+  // Turn off warning msg about long names.
+  witSetMesgTimesPrint( wr_, WitTRUE, 338, 0);
+
+  witCopyData(wr_,source.wr_);
+  projectNames_  = source.projectNames_;
+  resourceNames_ = source.resourceNames_;
+  projectResourceLinkNames_ = source.projectResourceLinkNames_;
+
+  // Copy global app data
+  {      
+    ILSprobAppData * srcAppData;  
+    ILSprobAppData * sinkAppData;
+    witGetAppData(source.mutableWitRun(), (void**)&srcAppData);
+    sinkAppData = new ILSprobAppData(*srcAppData);    
+    witSetAppData(witRun(), sinkAppData);
+  }
+
+  // copy project app data
+  std::vector<std::string> projects;
+  getProjects (projects);
+  int p;
+  for(p=0; p<projectNames_.size(); p++) {    
+    ILSprojAppData * srcAppData;  
+    ILSprojAppData * sinkAppData;
+
+    witGetPartAppData(source.mutableWitRun(), projects[p].c_str(), (void**)&srcAppData);
+    sinkAppData = new ILSprojAppData(*srcAppData);    
+    witSetPartAppData(witRun(), projects[p].c_str(), sinkAppData);
+  }
+
+  // copy resource app data
+  std::vector<std::string> roles;
+  std::vector<int> bands;
+  getResources(roles,bands);
+  int r;
+  for( r=0; r<resourceNames_.size(); r++ ) {    
+    ILSresrcAppData * srcAppData;  
+    ILSresrcAppData * sinkAppData;
+    std::string resrcName;
+
+    resrcName = ibmBenchResourceName(roles[r], bands[r]);
+    witGetPartAppData(source.mutableWitRun(),resrcName.c_str(),(void**)&srcAppData);
+    sinkAppData = new ILSresrcAppData(*srcAppData);    
+    witSetPartAppData(witRun(),resrcName.c_str(),sinkAppData);
+
+    resrcName = contrBenchResourceName(roles[r], bands[r]);
+    witGetPartAppData(source.mutableWitRun(),resrcName.c_str(),(void**)&srcAppData);
+    sinkAppData = new ILSresrcAppData(*srcAppData);  
+    witSetPartAppData(witRun(),resrcName.c_str(),sinkAppData);
+  }
+}
+
+// destructor
+void ILSproblem::gutsOfDestructor()
+{
+
+  // Delete global app data
+  {  
+    ILSprobAppData * probAppData;  
+    witGetAppData(mutableWitRun(),  (void**)&probAppData);
+    delete probAppData;
+  }
+
+  // Delete project app data
+  std::vector<std::string> projects;
+  getProjects (projects);
+  int p;
+  for(p=0; p<projectNames_.size(); p++) {    
+    ILSprojAppData * projAppData;  
+
+    witGetPartAppData(mutableWitRun(), projects[p].c_str(), (void**)&projAppData);
+    delete projAppData;
+  }
+
+  // Delete resource appData
+  std::vector<std::string> roles;
+  std::vector<int> bands;
+  getResources(roles,bands);
+  int r;
+  for( r=0; r<resourceNames_.size(); r++ ) {
+    ILSresrcAppData * appData;
+    witGetPartAppData(
+      mutableWitRun(),
+      ibmBenchResourceName(roles[r], bands[r]).c_str(),
+      (void**)&appData);
+    delete appData;
+    witGetPartAppData(
+      mutableWitRun(),
+      contrBenchResourceName(roles[r], bands[r]).c_str(),
+      (void**)&appData);
+    delete appData;
+  }
+
+  // delete the witRun
+  witDeleteRun(witRun());
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+//------------------------------------------------------------------------------
+// Test function
+//------------------------------------------------------------------------------
+void
+ILSproblem::test()
+{
+  //OsiRelFltEq eq(1e-05);
+  {
+    ILSproblem prob;
+    
+    prob.setNPeriods(12);
+    assert( prob.getNPeriods() == 12 );
+    
+    prob.setTitle("wittitle");
+    assert( prob.getTitle() == "wittitle");
+    
+    // test resource name methods
+    assert( roleFromResourceName(resourceName("Role X Y Z",9))=="Role X Y Z" );
+    assert( bandFromResourceName(resourceName("Role X Y Z",9))==9 );
+
+    // test projectResourceLinkName name methods
+    assert( projectFromProjectResourceLinkName(projectResourceLinkName("P1","Role X Y Z",9))=="P1" );
+    assert( roleFromProjectResourceLinkName(projectResourceLinkName("P1","Role X Y Z",9))=="Role X Y Z" );
+    assert( bandFromProjectResourceLinkName(projectResourceLinkName("P1","Role X Y Z",9))==9 );
+    
+    prob.addResource("role1",6);
+  }
+  
+  // Test getResources method
+  {
+    ILSproblem p;
+    std::vector<std::string> roles;
+    std::vector<int> bands;
+    p.getResources(roles,bands);
+    assert(roles.size()==0);
+    assert(bands.size()==0);
+    p.addResource("plumber",5);
+    p.addResource("teacher",6);
+    p.addResource("fireman",9);
+    p.getResources(roles,bands);
+    assert(roles.size()==3);
+    assert(bands.size()==roles.size());
+    assert(roles[0]=="plumber");
+    assert(roles[1]=="teacher");
+    assert(roles[2]=="fireman");
+    assert(bands[0]==5);
+    assert(bands[1]==6);
+    assert(bands[2]==9);
+  }
+
+  // Test add costs & get costs fns for projects
+  {    
+    ILSproblem p0;
+    {      
+      ILSproblem p;
+      p.addProject("plumbing");
+
+      p.setProjectCloseProb ("plumbing", .75f); // check for 0 <= <= 1 ?
+      assert(p.getProjectCloseProb ("plumbing") == .75f);
+      p.setProjectRateScale ("plumbing", 1.5f); // check for 0 <= <= 1 ?
+      assert(p.getProjectRateScale ("plumbing") == 1.5f);
+      p.setProjectStartPeriod ("plumbing", 1);
+      assert(p.getProjectStartPeriod ("plumbing") == 1);
+      p.setProjectRevenue ("plumbing", 7.5f);
+      assert(p.getProjectRevenue ("plumbing") == 7.5f);
+      p0=p;
+    }
+    assert(p0.getProjectCloseProb ("plumbing") == .75f);
+    assert(p0.getProjectRateScale ("plumbing") == 1.5f);
+    assert(p0.getProjectStartPeriod ("plumbing") == 1);
+    assert(p0.getProjectRevenue ("plumbing") == 7.5f);
+    assert(p0.getProjectExecVol ("plumbing").size() == 0);
+  }
+
+  // Test resource methods
+  {    
+    ILSproblem p0;
+    {
+      ILSproblem p;
+      float co;
+      
+      p.addResource("plumber",5);
+      p.setResourceIbmCost ("plumber", 5, 7.0f);
+      co = p.getResourceIbmCost ("plumber", 5);
+      assert(co == 7.0f);
+      p.setResourceContrCost ("plumber", 5, 4.0f);
+      co = p.getResourceContrCost ("plumber", 5);
+      assert(co == 4.0f);
+      p0=p;
+    }
+    assert(p0.getResourceIbmCost("plumber", 5)==7.0f);
+    assert(p0.getResourceContrCost("plumber", 5)==4.0f);
+
+    {
+      ILSproblem p;
+      p.setNPeriods(3);
+      std::vector<float> v(3), u;
+      v[0] = 1.0f; v[1] = 2.5f; v[2] = 3.5f;
+
+      p.addResource("plumber",5);
+      p.setResourceContrSupplyVol ("plumber",5,v);
+      u = p.getResourceContrSupplyVol ("plumber", 5);
+      assert(u[0] == 1.0f);
+      assert(u[1] == 2.5f);
+      assert(u[2] == 3.5f);
+
+      p.setResourceIbmSupplyVol ("plumber",5,v);
+      u = p.getResourceIbmSupplyVol ("plumber", 5);
+      assert(u[0] == 1.0f);
+      assert(u[1] == 2.5f);
+      assert(u[2] == 3.5f);
+
+      std::vector< std::vector<float> > cv;
+      cv=p.getResourceIbmConsVol("plumber",5);
+      assert(cv.size()==0.0);
+
+      cv=p.getResourceContrConsVol("plumber",5);
+      assert(cv.size()==0.0);
+
+    }
+  }
+
+  // Test projectResourceLink methods
+  {
+    ILSproblem p0;
+    std::vector<std::string> projects;
+    std::vector<std::string> roles;
+    std::vector<int> bands;
+    {
+      ILSproblem p;
+      p.setNPeriods(4);
+      p.addProject("p1");
+      p.addProject("p2");
+      p.addResource("r1",7);
+      p.addResource("r2",8);
+
+      p.getProjectResourceLinks(projects,roles,bands);
+      assert(projects.size()==0);
+      assert(projects.size()==roles.size());
+      assert(projects.size()==bands.size());
+
+      p.addProjectResourceLink("p1","r1",7);
+      p.addProjectResourceLink("p2","r1",7);
+      p.addProjectResourceLink("p1","r2",8);
+      p.addProjectResourceLink("p2","r2",8);
+
+      p.getProjectResourceLinks(projects,roles,bands);
+      assert(projects.size()==4);
+      assert(projects.size()==roles.size());
+      assert(projects.size()==bands.size());
+      assert( projects[0]=="p1" );
+      assert( roles[0]=="r1" );
+      assert( bands[0]==7 );
+      assert( projects[3]=="p2" );
+      assert( roles[3]=="r2" );
+      assert( bands[3]==8 );
+
+      std::vector<float> cr;
+      cr = p.getProjectResourceLinkConsRate("p1","r1",7);
+      assert(cr.size()==4);
+      assert( cr[0]==0.0f);
+      assert( cr[1]==0.0f);
+      assert( cr[2]==0.0f);
+      assert( cr[3]==0.0f);
+
+      cr[1]=4.0f;
+      p.setProjectResourceLinkConsRate("p1","r1",7,cr);
+      cr = p.getProjectResourceLinkConsRate("p1","r1",7);
+      assert(cr.size()==4);
+      assert( cr[0]==0.0f);
+      assert( cr[1]==4.0f);
+      assert( cr[2]==0.0f);
+      assert( cr[3]==0.0f);
+
+      cr[3]=6.0f;
+      p.setProjectResourceLinkConsRate("p1","r1",7,cr);
+      cr = p.getProjectResourceLinkConsRate("p1","r1",7);
+      assert(cr.size()==4);
+      assert( cr[0]==0.0f);
+      assert( cr[1]==4.0f);
+      assert( cr[2]==0.0f);
+      assert( cr[3]==6.0f);
+
+      cr[0]=8.0f;
+      p.setProjectResourceLinkConsRate("p1","r2",8,cr);
+      cr = p.getProjectResourceLinkConsRate("p1","r2",8);
+      assert(cr.size()==4);
+      assert( cr[0]==8.0f);
+      assert( cr[1]==4.0f);
+      assert( cr[2]==0.0f);
+      assert( cr[3]==6.0f);
+
+      p0 = p;
+    }
+    p0.getProjectResourceLinks(projects,roles,bands);
+    assert(projects.size()==4);
+    assert(projects.size()==roles.size());
+    assert(projects.size()==bands.size());
+    assert( projects[0]=="p1" );
+    assert( roles[0]=="r1" );
+    assert( bands[0]==7 );
+    assert( projects[3]=="p2" );
+    assert( roles[3]=="r2" );
+    assert( bands[3]==8 );
+    
+    std::vector<float> cr;
+    cr = p0.getProjectResourceLinkConsRate("p1","r1",7);
+    assert(cr.size()==4);
+    assert( cr[0]==0.0f);
+    assert( cr[1]==4.0f);
+    assert( cr[2]==0.0f);
+    assert( cr[3]==6.0f);
+    
+    cr = p0.getProjectResourceLinkConsRate("p1","r2",8);
+    assert(cr.size()==4);
+    assert( cr[0]==8.0f);
+    assert( cr[1]==4.0f);
+    assert( cr[2]==0.0f);
+    assert( cr[3]==6.0f);
+  }
+  
+}
+
+
+void ILSproblem::setProbabilityGrid(const std::vector<float> & probGrid)
+{
+  // set global app data to probability Grid
+  ILSprobAppData * appData;
+  witGetAppData(mutableWitRun(),(void**)&appData);
+  appData->setProbGrid(probGrid);
+}
+std::vector<float> ILSproblem::getProbabilityGrid()
+{
+  ILSprobAppData * appData;
+  witGetAppData(mutableWitRun(), (void**)&appData);
+  std::vector<float> retVal = appData->getProbGrid();
+  return retVal;
+}
+
+
+// Optimization function
+void ILSproblem::solve()
+{
+
+  std::vector<float> probGrid = getProbabilityGrid();
+
+  // create demandVol vector and zero vector
+  int np=getNPeriods();
+  float * tv=new float[np];
+  float * zero=new float[np];
+  float * projExecVolHLB=new float[np];
+  int t=0;
+  for(t=0;t<np;t++) {tv[t]=0.0; zero[t]=0.0; projExecVolHLB[t]=0.0;}
+  tv[0]=1.0;
+
+  // Get list of all projects
+  std::vector<std::string> projects;
+  getProjects(projects);
+
+  // Get list of all resources
+  std::vector<std::string> roles;
+  std::vector<int>  bands;
+  getResources(roles,bands);
+
+  // loop once for each point in grid
+  int g;
+  for( g=0; g<probGrid.size(); g++ ) {
+
+    // set demandVol
+    int p;
+    for(p=0; p<projects.size(); p++) {
+      float projProb = getProjectCloseProb(projects[p]);
+      if ( projProb>=probGrid[g] ) {
+        witSetDemandDemandVol(witRun(),projects[p].c_str(),projects[p].c_str(),tv);
+      }
+      else {
+        witSetDemandDemandVol(witRun(),projects[p].c_str(),projects[p].c_str(),zero);
+      }
+    }
+
+    witOptImplode (witRun());
+
+    // Loop once for each resource
+    // Get the resource's consVol and save it in appData
+    int r;
+    for(r=0; r<roles.size(); r++) {
+
+      // get consVol for prob<=gridProb[g] and save in app date
+      ILSresrcAppData * appData;
+      float * cv;
+      std::string resrcName;
+
+      // IBM Resource Cons Vol
+      resrcName = ibmBenchResourceName(roles[r],bands[r]);
+      witGetPartConsVol(mutableWitRun(),resrcName.c_str(),&cv);
+      witGetPartAppData(mutableWitRun(), resrcName.c_str(), (void**)&appData);
+      appData->pushConsVol(witFloatStarToStlVec(cv));
+      witFree(cv);
+
+      // Contractor Resource Cons Vol
+      resrcName = contrBenchResourceName(roles[r],bands[r]);
+      witGetPartConsVol(mutableWitRun(),resrcName.c_str(),&cv);
+      witGetPartAppData(mutableWitRun(), resrcName.c_str(), (void**)&appData);
+      appData->pushConsVol(witFloatStarToStlVec(cv));
+      witFree(cv);
+    }
+    
+    // Ensure that the projects presently executed,
+    // will again be executed on next iteration of g for loop.
+    for(p=0; p<projects.size(); p++) {
+      float * ev;
+      witGetOperationExecVol(mutableWitRun(),projects[p].c_str(),&ev);
+      
+      // if this is the last g loop iteration, then don't set
+      // ExecBounds so FSS will work.
+      if ( g+1<probGrid.size() ) {
+        projExecVolHLB[0] = ev[0];
+        witSetOperationExecBounds(witRun(),projects[p].c_str(),
+          projExecVolHLB,projExecVolHLB,NULL);
+      }
+      
+      ILSprojAppData * appData;
+      witGetPartAppData(mutableWitRun(), projects[p].c_str(), (void**)&appData);
+      appData->pushExecVol(ev[0]);
+      witFree(ev);
+    }
+  }
+
+  delete [] projExecVolHLB;
+  delete [] tv;
+  delete [] zero;
+}
+
+
+@
+
+
+1.22
+log
+@Updated to get fss working
+@
+text
+@d126 6
+a131 1
+  for (i=0; i<nP; i++) revVector[i] = revenue;
+d142 1
+a142 1
+  retVal = revVector[0];
+d435 1
+d441 8
+d466 5
+@
+
+
+1.21
+log
+@plugged memory leak
+@
+text
+@d1165 1
+a1165 1
+
+d1171 9
+a1179 4
+      projExecVolHLB[0] = ev[0];
+      witSetOperationExecBounds(witRun(),projects[p].c_str(),
+        projExecVolHLB,projExecVolHLB,NULL);
+
+@
+
+
+1.20
+log
+@Added so solve does optImplode multiple times.
+The demandVols are set based on probability of project occuring.
+@
+text
+@d51 1
+@
+
+
+1.19
+log
+@Added methods to return focussedShortages and added code to call method in main program.
+Also fixed bug where DemandVol was never set to 1.
+@
+text
+@d20 1
+d141 1
+a141 1
+float ILSproblem::getProjectExecVol(const std::string & project ) const
+d143 1
+d151 6
+d277 1
+a277 1
+std::vector<float> ILSproblem::getResourceIbmConsVol (const std::string & role, int band)
+d279 1
+d288 7
+d296 1
+a296 1
+std::vector<float> ILSproblem::getResourceContrConsVol (const std::string & role, int band)
+a297 3
+  float *vol;
+  std::string resrcName = contrBenchResourceName(role, band);
+  std::vector<float> svol;
+d299 5
+a303 4
+  witGetPartConsVol (witRun(), resrcName.c_str(), &vol);
+  svol = witFloatStarToStlVec (vol);
+  witFree (vol);
+  return svol;
+d713 3
+d764 9
+d812 7
+d929 1
+a929 1
+    assert(p0.getProjectExecVol ("plumbing") == 0.0f);
+d970 6
+a975 9
+      u=p.getResourceIbmConsVol("plumber",5);
+      assert(u[0] == 0.0f);
+      assert(u[1] == 0.0f);
+      assert(u[2] == 0.0f);
+
+      u=p.getResourceContrConsVol("plumber",5);
+      assert(u[0] == 0.0f);
+      assert(u[1] == 0.0f);
+      assert(u[2] == 0.0f);
+d1081 17
+d1101 4
+a1104 1
+  // Set demand all project to 1
+d1107 2
+d1110 1
+a1110 1
+  for(t=0;t<np;t++) tv[t]=0.0;
+d1113 1
+d1116 63
+a1178 3
+  int p;
+  for(p=0; p<projects.size(); p++) {
+    witSetDemandDemandVol(witRun(),projects[p].c_str(),projects[p].c_str(),tv);
+d1181 3
+a1183 1
+  witOptImplode (witRun());
+@
+
+
+1.18
+log
+@Added methods to get execVol and consVol.
+Updated to write csv files.
+@
+text
+@d42 8
+d580 12
+d593 11
+d605 18
+d1054 14
+@
+
+
+1.17
+log
+@added the Optimize() method to ILSproblem
+@
+text
+@d132 11
+d261 23
+d847 1
+d887 11
+d1003 1
+a1003 1
+void ILSproblem::Optimize()
+@
+
+
+1.16
+log
+@Fixed ::test code bug.
+Added reading more of the files to ils.cpp
+@
+text
+@a572 1
+
+d954 6
+@
+
+
+1.15
+log
+@Added methods for ResourceSupplyVol
+@
+text
+@d837 1
+@
+
+
+1.14
+log
+@implemented [s,g]etProjectResourceLinkConsRate
+@
+text
+@d199 1
+a199 1
+float ILSproblem::getResourceContrCost(const std::string & role, int band)
+d208 42
+d816 1
+a816 1
+  // Test add costs & get costs fns for resources
+d834 19
+@
+
+
+1.13
+log
+@started implementing projectResourceLink methods.
+slightly modified some of the project methods.
+@
+text
+@d399 32
+d443 3
+a445 3
+  // Loop once for each element of consRate
+  int t;
+  for ( t=0; t<nP; t++ ) {
+d447 8
+a454 15
+#if 0
+    NEED TO DO SOMETHING DIFFERENT HERE
+    // don't bother adding bomEntry if consRate is 0
+    if ( consRate[t]==0.0f ) continue;
+
+    witAddBomEntry(witRun(),project.c_str(),linkName.c_str());
+
+    int nBoms;
+    witGetOperationNBomEntries(witRun(),project.c_str(),&nBoms);
+
+    int t1;
+    for ( t1=0; t1<nP; t1++ ) consRateVec[t1]=consRate[t];
+
+    witSetBomEntryConsRate(witRun(),project.c_str(),nBoms-1,consRateVec);
+#endif
+d464 2
+d468 2
+a469 3
+  std::vector<float> retVal;
+  int t;
+  for ( t=0; t<nP; t++ ) retVal.push_back(0.0);
+d473 3
+a475 2
+  int nBoms;
+  witGetOperationNBomEntries(witRun(),project.c_str(),&nBoms);
+d479 1
+a479 1
+  for ( b=0; b<nBoms; b++ ) {
+d481 9
+d492 1
+d497 1
+d830 17
+a846 4
+      cr.push_back(0.0f);
+      cr.push_back(4.0f);
+      cr.push_back(0.0f);
+      cr.push_back(5.0f);
+d848 15
+d866 25
+d892 1
+a892 1
+ 
+@
+
+
+1.12
+log
+@Added functionality for projects
+@
+text
+@d48 1
+d56 2
+d140 1
+a140 3
+  std::string ibmWRN = ibmWorkingResourceName(role,band);
+  std::string contrWRN = contrWorkingResourceName(role,band);
+  std::string rn = contrWorkingResourceName(role,band);
+a155 14
+
+#if 0
+  witAddOperation(witRun(),ibmWRN.c_str());
+  witAddOperation(witRun(),contrWRN.c_str());
+
+  witAddBomEntry(witRun(),ibmWRN.c_str(),ibmBRN.c_str());
+  witAddBomEntry(witRun(),contrWRN.c_str(),contrBRN.c_str());
+
+  witAddPart(witRun(),ibmWRN.c_str(),WitCAPACITY);
+  witAddPart(witRun(),contrWRN.c_str(),WitCAPACITY);
+  
+  witAddBopEntry(witRun(),ibmWRN.c_str(),ibmWRN.c_str());
+  witAddBopEntry(witRun(),contrWRN.c_str(),contrWRN.c_str());
+#endif
+d217 1
+a217 9
+  return "contractorBench "+resourceName(role,band);
+}
+std::string ILSproblem::ibmWorkingResourceName(const std::string & role,int band)
+{
+  return "ibmWorking "+resourceName(role,band);
+}
+std::string ILSproblem::contrWorkingResourceName(const std::string & role,int band)
+{
+  return "contractorWorking "+resourceName(role,band);
+d219 2
+d229 1
+d263 199
+d502 3
+a504 1
+resourceNames_()
+d549 3
+a551 1
+resourceNames_()
+d583 1
+d682 5
+d716 2
+a717 2
+    ILSproblem p;
+    {
+a738 1
+    ILSproblem p;
+d740 1
+d756 46
+@
+
+
+1.11
+log
+@Modifed addResource method to only add single wit capacity
+@
+text
+@d18 1
+d21 107
+d129 3
+a170 1
+
+a187 11
+#if 0
+  int i;
+  int nP = getNPeriods ();
+  float *costArray     = new float[nP];
+  std::string ibmWRN   = ibmWorkingResourceName(role, band);
+
+  for (i=0; i<nP; i++) costArray[i] = ibmCost;
+  witSetOperationObj1ExecCost (witRun(), ibmWRN.c_str(), costArray);
+  delete [] costArray;
+#endif
+  
+a191 1
+
+a195 11
+#if 0
+  int i;
+  int nP = getNPeriods ();
+  float *costArray     = new float[nP];
+  std::string contrWRN = contrWorkingResourceName(role, band);
+
+  for (i=0; i<nP; i++) costArray[i] = contrCost;
+  witSetOperationObj1ExecCost (witRun(), contrWRN.c_str(), costArray);  
+  delete [] costArray;
+#endif
+  
+a199 1
+
+a204 12
+#if 0
+  float cost;
+  float *costArray;
+  std::string ibmWRN = ibmWorkingResourceName(role, band);
+
+  witGetOperationObj1ExecCost (mutableWitRun(), ibmWRN.c_str(), &costArray);
+  cost = costArray[0];
+  witFree(costArray);
+  return cost;
+#endif
+
+  
+a209 1
+
+a213 11
+#if 0
+  float cCost;
+  float *costArray;
+  std::string contrWRN = contrWorkingResourceName(role, band);
+
+  witGetOperationObj1ExecCost (mutableWitRun(), contrWRN.c_str(), &costArray);
+  cCost = costArray[0];
+  witFree(costArray);
+  return cCost;
+#endif
+  
+a218 1
+
+d264 1
+a280 1
+
+d285 1
+a315 1
+  
+d320 2
+a321 1
+wr_(NULL)
+a362 2
+
+
+d394 1
+a394 1
+  
+d396 1
+d399 13
+d438 11
+d522 1
+a522 1
+  // Test add costs & get costs fns.
+d525 24
+a549 1
+      ILSproblem p;
+d564 1
+@
+
+
+1.10
+log
+@added use of resrcApp data for storing cost
+@
+text
+@d45 1
+a45 2
+
+  
+d57 1
+@
+
+
+1.9
+log
+@Added functions for setting and getting cost of resources
+@
+text
+@d18 1
+d39 8
+d78 1
+d81 1
+a81 1
+  float *CostArray     = new float[nP];
+d84 10
+a93 2
+  for (i=0; i<nP; i++) CostArray[i] = ibmCost;
+  witSetOperationObj1ExecCost (witRun(), ibmWRN.c_str(), CostArray);
+d98 1
+d101 1
+a101 1
+  float *CostArray     = new float[nP];
+d104 10
+a113 2
+  for (i=0; i<nP; i++) CostArray[i] = contrCost;
+  witSetOperationObj1ExecCost (witRun(), contrWRN.c_str(), CostArray);
+d119 3
+a121 2
+  float iCost;
+  float *CostArray;
+d124 13
+a136 4
+  witGetOperationObj1ExecCost (mutableWitRun(), ibmWRN.c_str(), &CostArray);
+  iCost = CostArray[0];
+  delete[] CostArray;
+  return iCost;
+d141 1
+d143 1
+a143 1
+  float *CostArray;
+d146 3
+a148 3
+  witGetOperationObj1ExecCost (mutableWitRun(), contrWRN.c_str(), &CostArray);
+  cCost = CostArray[0];
+  delete[] CostArray;
+d150 8
+d337 21
+d363 20
+a384 1
+  
+d399 15
+a413 1
+  ILSproblem prob;
+a414 12
+  prob.setNPeriods(12);
+  assert( prob.getNPeriods() == 12 );
+
+  prob.setTitle("wittitle");
+  assert( prob.getTitle() == "wittitle");
+
+  // test resource name methods
+  assert( roleFromResourceName(resourceName("Role X Y Z",9))=="Role X Y Z" );
+  assert( bandFromResourceName(resourceName("Role X Y Z",9))==9 );
+
+  prob.addResource("role1",6);
+
+d438 17
+a454 8
+  {
+    ILSproblem p;
+    float co;
+
+    p.addResource("plumber",5);
+    p.setResourceIbmCost ("plumber", 5, 7.0);
+    co = p.getResourceIbmCost ("plumber", 5);
+    assert(co == 7.0f);
+@
+
+
+1.8
+log
+@Added some comments and fixed function prototypes for getting resourceCost
+@
+text
+@d66 48
+d348 11
+a358 1
+    
+@
+
+
+1.7
+log
+@Added method getResources.
+Correctly implemented method resourceName(band,role)
+@
+text
+@d28 2
+d32 3
+d279 1
+a279 1
+  // Test get resources
+d292 1
+a292 1
+    assert(bands.size()==3);
+@
+
+
+1.6
+log
+@now have code to addResources and prototypes for setting costs
+@
+text
+@d12 1
+d27 2
+d47 17
+d82 36
+a117 2
+  //JPF must add band as string to returned value
+  return role;
+d206 2
+a207 1
+wr_(NULL)
+d237 1
+d268 4
+d273 22
+@
+
+
+1.5
+log
+@removed extra comment
+@
+text
+@d22 4
+a25 2
+  std::string ibmRN = /*ibmResourceName(role,band);*/ "ibm"+role;
+  std::string contrRN = /*contrResourceName(role,band);*/ "contr"+role;
+d27 20
+a46 2
+  witAddPart(witRun(),ibmRN.c_str(),WitCAPACITY);
+  witAddPart(witRun(),contrRN.c_str(),WitCAPACITY);
+d48 18
+@
+
+
+1.4
+log
+@learning about cvs
+@
+text
+@a14 1
+// JP's comment
+@
+
+
+1.3
+log
+@started working on adding resources
+@
+text
+@d15 1
+a15 1
+
+@
+
+
+1.2
+log
+@Changed the test method
+@
+text
+@d20 10
+d171 1
+d174 2
+@
+
+
+1.1
+log
+@adding ilsProblem class
+@
+text
+@d161 2
+a162 1
+    
+@
+

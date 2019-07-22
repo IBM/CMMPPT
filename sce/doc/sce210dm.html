@@ -1,0 +1,2945 @@
+<HTML>
+<HEAD>
+
+<TITLE>
+DATA MODEL for Release 2.10  Supply Capability Engine (SCE)
+</TITLE>
+
+</HEAD>
+
+<BODY>
+
+<h1 align="center">DATA MODEL for Release 2.10  Supply Capability Engine (SCE)
+<br> <br>
+Tom Ervolina (ERVOLINA at YKTVMV) <br>
+Robin Lougee-Heimer (RLH at YKTVMV)  <br>
+Dan Connors  (DPC at YKTVMV) <br>
+<br>
+December 17, 1997
+</h1>
+
+<p>
+This document describes the data model and file formats 
+for Release 2.10 of the Supply Capability 
+Engine (SCE).  The following items are important:
+
+<ol>
+<li> A partNumber is an manufacturing part number, a planner part number, or a dummy part number that
+represents the aggregation of parts into a higher classification.
+<li> The PDF is the location code representing the Production Facility.
+Here are examples of partNumber:
+<table>
+<tr> <td>Manufacturing part number</td> <td>00000ABC123</td> </tr>
+<tr> <td>Aggregation</td> <td>HardFile2GB</td> </tr>
+</table> 
+<li> In any given period, there is a multi to one mapping between a
+Demand/Geography pair (demand at the planner partNumber level and the
+geographic source of the demand) and a manufacturing partNumber/PDF
+pair.  In other words, a geographic demand for a partNumber is always
+single sourced to a specific PDF, but more than one geography's demand
+for the same manufacturing partNumber can be sourced from the same PDF.
+We do allow the source to change
+over time but you can never have multiple sources at a given time.
+<li> In this version of the SCE model, profit based or revenue based 
+   optimization only considers the profit or revenue obtained from the
+   top-level build parts and the options and selective 
+   features or building blocks
+   that go into these parts.
+<li> The users should prune their BOMs to capture the important parts of
+   interest.  
+<li> Demands in the same FSS set should appear together in a contiguous
+   block in the FSS input file.
+</ol>
+
+<b> File Format Rules: </b>
+<ul>
+<li> Each record is terminated with a newline character `\n').  This is
+  equivalent to the entire record being on one line.
+<li> The fields within each record must be separated by a comma (additional
+  blank space is OK).
+<li> Fields of type ``char'' are strings that MUST be inside of quotes, for example,
+  partname ``00000ABC123''
+<li> Fields of type string are unquoted strings (these are only used
+  in the Parameters File).
+<li> For fields of type boolean, use 1 to represent TRUE and 0 to
+  represent FALSE
+<li> For fields of type date, the acceptable formats are mm/dd/yyyy, 
+  dd/mm/yyyy or yyyymmdd.  In the Parameters File, the user will specify which
+  format is used;  U for mm/dd/yyyy, E for dd/mm/yyyy and G for yyyymmdd.
+<li> Fields of type floatVec and intVec are comma delimited vectors.
+  The number of elements should be numPeriods.  If the vector is too
+  long, the extra elements are ignored, if too short,  currently set
+  values are assumed.  The nth element of the vector provides the
+  data for the nth period, as defined by the calendar file.
+<li> Records whose first non-blank character is an asterisk, *, are 
+  considered to be comments and are ignored.
+<li> Within a file, the fields listed below the dotted line are optional and
+ will take on their respective default values if they are not given.  
+However,  if an optional field is specified, all optional fields ``above'' 
+must also be  specified.  For example, if in the Manufacturing BOM File 
+you want to set the
+ fallout, you must specify partNumber1, partNumber2, PDF, usage_rate, 
+ usage_time, effect_start, effect_end and fallout, in that order.
+<li> The default values for effect_start and effect_end are PAST and FUTURE.
+PAST is assigned the starting date of the planning horizon
+and FUTURE is assigned the date of the end of the 
+planning horizon, as given in the Calendar File.  PAST and FUTURE are valid entries
+for dates.
+<li> If you set a hard upper-bound production quantity lower than 
+the corresponding soft lower-bound production quantity, SCE will issue
+a warning and set the hard upper-bound equal to the soft lower-bound.
+<li> A negative hard upper-bound production quantity is interpreted to
+mean <math> +&inf; </math>.  An upper bound of <math> +&inf; </math> indicates that the value
+does not have an upper bound and can be as large as needed.
+<li> For default file names and default file extenstions, there are two
+names given;  the first is the AIX name and the second is DOS name.  
+Typically, the AIX extension is more verbose, whereas the DOS 
+extension is limited to three characters.
+<li> The pairs part/pdf, capacity/pdf and operation/pdf must be unique.
+</ul>
+
+<b> Input File Format Specifications </b>
+<ul>
+<li><a href="#Parts Conditioning File">Parts Conditioning File</a>
+<li><a href="#Part Definition File">Part Definition File</a>
+<li><a href="#Manufacturing BOM File">Manufacturing BOM File</a>
+<li><a href="#Manufacturing Substitute BOM File">Manufacturing Substitute BOM File</a>
+<li><a href="#Top-Level Build/Building Block Category Ratio File">Top-Level Build/Building Block Category Ratio File</a>
+<li><a href="#Top-Level Build/Optional Feature Ratio File">Top-Level Build/Optional Feature Ratio File</a>
+<li><a href="#Manufacturing Part Cycle Time File">Manufacturing Part Cycle Time File</a>
+<li><a href="#Manufacturing Part Yield File">Manufacturing Part Yield File</a>
+<li><a href="#Manufacturing Lot Size File">Manufacturing Lot Size File</a>
+<li><a href="#Manufacturing Part to Dummy Aggregation Part File">Manufacturing Part to Dummy Aggregation Part File</a>
+<li><a href="#Demand Geography to PDF Source File">Demand Geography to PDF Source File</a>
+<li><a href="#Demand Volume File">Demand Volume File</a>
+<li><a href="#Demand Priority File  (Only used with Priority Based Optimization)">Demand Priority File  (Only used with Priority Based Optimization)</a>
+<li><a href="#Demand Revenue  File  (Only used with Revenue Based Optimization)">Demand Revenue  File  (Only used with Revenue Based Optimization)</a>
+<li><a href="#Selective Feature/Building Block Revenue File 
+          (used only with Revenue Based Opt.)">
+   Selective Feature/Building Block Revenue File 
+    (used only with Revenue Based Opt.)</a>
+<li><a href="#Optional Feature Revenue File 
+          (used only with Revenue Based Opt.)">Optional Feature Revenue File 
+          (used only with Revenue Based Opt.)</a>
+<li><a href="#Demand Profit File  (only used with Profit Based Optimization)">Demand Profit File  (only used with Profit Based Optimization)</a>
+<li><a href="#Selective Feature/Building Block Profit File 
+                            (only used with Profit Based Opt.)">               Selective Feature/Building Block Profit File 
+  (only used with Profit Based Opt.)</a>
+<li><a href="#Optional Feature Profit File 
+                            (only used with Profit Based Opt.)">
+   Optional Feature Profit File (only used with Profit Based Opt.)</a>
+<li><a href="#Minimum Demand Volumes File">Minimum Demand Volumes File</a>
+<li><a href="#Supply Availability File (component,  subassemmbly, and finished good)">Supply Availability File (component,  subassemmbly, and finished good)</a>
+<li><a href="#Calendar File">Calendar File</a>
+<li><a href="#Interplant File">Interplant File</a>
+<li><a href="#Capacity Definition File">Capacity Definition File</a>
+<li><a href="#Manufacturing BOC File">Manufacturing BOC File</a>
+<li><a href="#Capacity Availability File">Capacity Availability File</a>
+<li><a href="#Upper Bound Production Schedule File">Upper Bound Production Schedule File</a>
+<li><a href="#Lower Bound Production Schedule File">Lower Bound Production Schedule File</a>
+<li><a href="#Demand Backlog Yield File (Perishability Factor)">Demand Backlog Yield File (Perishability Factor)</a>
+<li><a href="#FSS General Set Scheme Input File">FSS General Set Scheme Input File</a>
+<li><a href="#FSS Machine Scheme Input File">FSS Machine Scheme Input File</a>
+<li><a href="#Operation Definition File">Operation Definition File</a>
+<li><a href="#Operation Lot Size File">Operation Lot Size File</a>
+<li><a href="#Operation Yield File">Operation Yield File</a>
+<li><a href="#Upper Bound Operation Schedule File">Upper Bound Operation Schedule File</a>
+<li><a href="#Lower Bound Operation Schedule File">Lower Bound Operation Schedule File</a>
+<li><a href="#Operation BOM File">Operation BOM File</a>
+<li><a href="#Operation Substitute BOM File">Operation Substitute BOM File</a>
+<li><a href="#Operation BOP File">Operation BOP File</a>
+<li><a href="#<li><a href="#Parameters File">Parameters File</a>
+</ul>
+
+<br>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Parts Conditioning File">Parts Conditioning File</a></b></caption>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+<tr valign="top"> <td> partNumber </td>
+     <td> ``char'' </td>
+     <td> <p> A part number that is known to be constrained </td> </tr> 
+<tr valign="top"> <td> PDF </td>
+     <td> ``char'' </td>
+     <td> <p>  PDF location of where the supply of the part 
+                            is constrained
+                       (use ``WW'' to represent the world wide aggregation)
+            </td> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> constraintEndDate </td>
+     <td> date </td>
+     <td> <p> Date at which part becomes unconstrained;
+   default = FUTURE (that is, constrained over the entire problem horizon)
+         </td> 
+</tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Part Definition File">Part Definition File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top" > <td> partNumber </td>
+   <td> ``char'' </td>
+   <td> <p> </td>
+</tr>
+<tr valign="top" > <td> PDF </td>
+   <td> ``char''   </td>
+   <td> <p> </td>
+</tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing BOM File">Manufacturing BOM File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top">
+   <td> partNumber1 </td>
+   <td>   ``char'' </td>
+   <td> <p>    Parent </td>
+</tr>
+<tr valign="top">
+   <td> partNumber2 </td>
+   <td>   ``char'' </td>
+   <td> <p>    Child  </td>
+</tr>
+<tr valign="top">
+   <td> PDF     </td>
+   <td>    ``char'' </td>
+   <td> <p> </td>
+</tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top">
+   <td> usage_rate     </td>
+   <td>    float  </td>
+   <td> <p>    Quantity per; default = 1.0 </td> </tr>
+<tr valign="top">
+   <td> usage_time    </td>
+   <td>     float  </td>
+   <td> <p>    Offset from parent stb date that child
+                             is consumed; default = 0.0 </td>
+</tr>
+<tr valign="top">
+   <td> effect_start   </td>
+   <td>    date  </td>
+   <td> <p>     Date BOM record becomes active;
+      default = PAST </td> 
+</tr>
+<tr valign="top">
+   <td> effect_end     </td>
+   <td>    date  </td>
+   <td> <p>     Last date BOM record is still active;
+      default = FUTURE </td>
+</tr>
+<tr valign="top">
+   <td> fallout        </td>
+   <td>    int   </td>
+   <td> <p>     Percent of child that is lost during
+                             production of parent (different than
+                             yield); default = 0; 0 <= fallout < 100 </td>
+</tr>
+<tr valign="top">
+   <td> mand_EC_flag   </td>
+   <td>    boolean </td>
+   <td> <p>   TRUE indicates that inventory of
+                             parent produced prior to effect_start
+                             date cannot be used after effect_start;
+                             default = 0 </td>
+</tr>
+<tr valign="top">
+   <td> phantom_flag   </td>
+   <td>    boolean </td>
+   <td> <p>   TRUE indicates bill is a phantom
+                             bill. </td>
+</tr>
+<tr valign="top">
+   <td> remove_flag    </td>
+   <td>    boolean  </td>
+   <td> <p>  TRUE indicates bill is a ``remove''
+                             bill.  </td>
+</tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing Substitute BOM File">Manufacturing Substitute BOM File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td> ``char'' </td> 
+  <td> <p> Parent </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char'' </td>
+  <td> <p>     Child to be substituted  </td> </tr>
+<tr valign="top"> <td> partNumber3 </td>
+  <td>  ``char'' </td>
+  <td> <p>      Substitute child </td> </tr>
+  <td> PDF     </td>
+  <td>   ``char'' </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate     </td>
+  <td>    float  </td>
+  <td> <p>  Quantity per; default = 1.0 </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>    date  </td>
+  <td> <p>   Date BOM record becomes active; 
+     default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>    date  </td>
+  <td> <p>   Last date BOM record is still active;
+     default = FUTURE </td> </tr>
+<tr valign="top"> <td> fallout        </td>
+  <td>    int   </td>
+  <td> <p>    Percent of child that is lost during
+                             production of parent (different than
+                             yield); default = 0 </td> </tr>
+<tr valign="top"> <td> preference/cost </td>
+  <td>  float </td>
+  <td> <p>   In priority mode, this is the relative
+                           preference of making the substitution.
+                           In optimization mode,
+                           this is the penalty
+                           cost for substituting partNumber3 
+                           for partNumber2 when building partNumber1;
+                           default is set by defaultSubPenalty
+                           in the parameters file. </td> </tr>
+<tr valign="top"> <td> explode_active </td>
+  <td>  boolean </td>
+  <td> <p>  This substitution arc is active if using the smart 
+                 explosions; default = 0. </td> </tr>
+
+
+</table>
+<br>
+<br>
+<table border>
+<caption><b><a name="Top-level Build to Building Block Category Definition">Top-level Build to Building Block Category Definition</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+   <td> ``char'' </td>
+   <td> <p>  Planner top-level build part number which has selective features
+                             or building blocks </td> </tr>
+<tr valign="top"> <td> geography </td>
+  <td>     ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr valign="top"> <td> bbCategory </td>
+  <td>   ``char'' </td>
+  <td> <p>     An identifier for the building block category.
+    It must be unique for the (partNumber1, geography) pair. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> upper_bound  </td>
+  <td>      float    </td>
+  <td> <p>   The upper limit on the number of selective 
+    features within a set that can be included in the top-level build.
+    If upper_bound = 1, this is equivalent to choosing exactly
+    one selective feature or building block within the set. 
+    upper_bound >= 1; default = 1.0 </td> </tr>
+</table>
+<br>
+<br>
+<table border>
+<caption><b><a name="Top-Level Build/Building Block Category Ratio File">Top-Level Build/Building Block Category Ratio File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td> ``char'' </td>
+  <td> <p>  Planner top-level build part number which has selective features
+                             or building blocks </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>     ``char'' </td>
+  <td> <p>     Geographic source of the demand for partNumber1. </td> </tr>
+<tr valign="top"> <td> bbCategory </td>
+  <td>   ``char'' </td>
+  <td> <p>     An identifier for the building block category  </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char''  </td>
+  <td> <p>    Part number belonging to the selective feature or building block  </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate    </td>
+  <td>     float  </td>
+  <td> <p>     Quantity per </td> </tr>
+<tr valign="top"> <td> feature_ratio  </td>
+  <td>    floatVec  </td>
+  <td> <p>     A time vector of feature ratios.  In implosion, 
+   this ratio multiplied by the total demand for the parent, partNumber1,
+   represents the total maximum amount of the parent, partNumber1, that can be 
+   produced with partNumber2; default = 0.0 </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Top-Level Build/Optional Feature Ratio File">Top-Level Build/Optional Feature Ratio File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Planner top-level build part number which has optional features </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>     ``char'' </td>
+  <td> <p>     Geographic source of the demand partNumber1. </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char''  </td>
+  <td> <p>    An optional feature for partNumber1  </td> </tr>
+<tr valign="top"> <td> usage_rate    </td>
+  <td>     float  </td>
+  <td> <p>     Quantity per </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> option_ratio   </td>
+  <td>    floatVec    </td>
+  <td> <p>   A time vector of option ratios.  In implosion, 
+                        this ratio multiplied by the shipment quantity of the parent 
+                        represents the maximum amount of this feature that can
+                        be shipped; default = 0.0 (vector)</td> </tr>
+<tr valign="top"> <td> max_ratio_without </td>
+  <td>  floatVec   </td>
+  <td> <p>  In implosion, this ratio multiplied by
+                             the total demand for the parent
+                             represents the maximum amount 
+                             of the demand for the parent
+                             that can be produced WITHOUT the child; 
+                             default = 1.0 (vector). (NOTE: If
+                             max_ratio_without = 1, then the feature is 
+                             purely optional; if max_ratio_without = 0, then
+                             the feature is mandatory.) </td> </tr>
+
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing Part Cycle Time File">Manufacturing Part Cycle Time File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char''  </td> </tr>
+  <td> PDF   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> cycleTime    </td>
+  <td>    float </td>
+  <td> <p>    Number of days to build this  part (time
+                         to assemble single level bill only) </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> start        </td>
+  <td>    date </td>
+  <td> <p>     Date at which this data becomes effective; 
+      default = PAST  </td> </tr>
+<tr valign="top"> <td> end         </td>
+  <td>     date  </td>
+  <td> <p>    Last date at which this data is effective;  
+      default = FUTURE </td> </tr>
+</table> 
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing Part Yield File">Manufacturing Part Yield File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td> ``char'' </td>
+  <td> <p>  (assemblies only) </td> </tr>
+  <td> PDF   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> yield     </td>
+  <td>       int  </td>
+  <td> <p>     1 <= yield <= 100 </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> start     </td>
+  <td>       date </td>
+  <td> <p>     Date at which this data becomes effective; 
+        default = PAST </td> </tr>
+<tr valign="top"> <td> end       </td>
+  <td>       date </td>
+  <td> <p>     Last date at which this data is effective;
+        default = FUTURE </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing Lot Size File">Manufacturing Lot Size File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td> ``char'' </td>
+  <td> <p>  (assemblies only) </td> </tr>
+  <td> PDF   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> minimum_lot_size     </td>
+  <td>       float  </td>
+  <td> <p>     0.0 <= minimum_lot_size; default
+    = 1.0 </td> </tr>
+<tr valign="top"> <td> incremental_lot_size     </td>
+  <td>       float </td>
+  <td> <p>  1.0 <= incremental_lot_size; 
+       default = 1.0</td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> start     </td>
+  <td>       date </td>
+  <td> <p>     Date at which this data becomes effective; 
+        default = PAST </td> </tr>
+<tr valign="top"> <td> end       </td>
+  <td>       date </td>
+  <td> <p>     Last date at which this data is effective;
+        default = FUTURE </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing Part to Dummy Aggregation Part File">Manufacturing Part to Dummy Aggregation Part File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td> ``char'' </td>
+  <td> <p>   Detailed partname </td> </tr>
+  <td> PDF1   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> partNumber2  </td>
+  <td>  ``char'' </td>
+  <td> <p>    Aggregated partname  </td> </tr>
+  <td> PDF2   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate </td>
+  <td>  float </td>
+  <td> <p>  Units of the aggregate part consumed by one unit of
+               the detailed part; default = 1.0. (This is useful for aggregating hardfiles
+               to a storage quantity.) </td> </tr>
+<tr valign="top"> <td> usage_time </td>
+  <td>  float </td>
+  <td> <p>  Time offset; default = 0.0. (Useful for modelling aggregation of location
+                  to a central supply.) </td> </tr>
+
+<tr valign="top"> <td> preference/cost </td>
+  <td>  float </td>
+  <td> <p>   In priority mode, this is the relative
+                           preference of using the aggregate part.
+                           In optimization mode,
+                           this is the penalty
+                           cost for using the aggregate part; default
+                           is set by defaultAggregateBopPreference 
+                           in the parameters file.
+                            </td> </tr>
+<tr valign="top"> <td> explode_active </td>
+  <td>  boolean </td>
+  <td> <p>  This aggregation arc is active in 
+                        certain types of explosions; default = 1. </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Geography to PDF Source File">Demand Geography to PDF Source File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1  </td>
+  <td>    ``char'</td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                           MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>     ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char'' </td>
+  <td> <p>   This is the manufacturing part number corresponding to the 
+                           demand from geography for partNumber1 which is produced at PDF. </td> </tr>
+<tr valign="top"> <td> PDF   </td>
+  <td>  ``char''</td>
+  <td> <p>        This is where demand for partNumber1 from geography is produced. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>   date  </td>
+  <td> <p>     Date for which this record is effective; 
+     default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>   date  </td>
+  <td> <p>     Last date for which this record is effective;
+     default = FUTURE </td> </tr>
+<tr valign="top"> <td> transitTime </td>
+  <td>  float </td>
+  <td> <p>  The nominal transit time, in days, from the PDF to the
+       geography.  This parameter is optional; default = 0.0 </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Volume File">Demand Volume File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char''  </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel </td> </tr>
+<tr valign="top"> <td> geography </td>
+  <td>   ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> demVol    </td>
+  <td>   floatVec  </td>
+  <td> <p>  Time-phased demand Volume; default = 0.0 (vector) </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Priority File  (Only used with Priority Based Optimization)">Demand Priority File  (Only used with Priority Based Optimization)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>   ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> priority   </td>
+  <td>  intVec   </td>
+  <td> <p>   Time phased priority (must be integers); default set by
+     defaultPriority in the parameters file </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Revenue  File  (Only used with Revenue Based Optimization)">Demand Revenue  File  (Only used with Revenue Based Optimization)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> revenue    </td>
+  <td>   floatVec </td>
+  <td> <p>   Time phased revenue. Note: this revenue should be
+                       the revenue of the BASE machine.  Use the Option 
+                       Revenue File to represent additional machine
+                       revenue associated with options; default = 0.0 (vector) </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Selective Feature/Building Block Revenue File 
+          (used only with Revenue Based Opt.)">Selective Feature/Building Block Revenue File 
+          (used only with Revenue Based Opt.)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Parent: Planner part number for a top-level build manufacturing 
+                           part (typically machine type or machine/type/mod) that has 
+                           partNumber2 as a selective feature/building block or option
+                          in its bill. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>    Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Child: The selective feature/building block part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> optionRevenue  </td>
+  <td>  floatVec </td>
+  <td> <p>   Additional revenue associated with supplying 
+                             the child, partNumber2, with the parent, 
+                             partNumber1, for the source of demand, geography.
+                             Note: make sure that this revenue is not applied twice;
+                             default is set by defaultOptionShipReward in the
+                             parameters file. </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Optional Feature Revenue File 
+          (used only with Revenue Based Opt.)">Optional Feature Revenue File 
+          (used only with Revenue Based Opt.)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Parent: Planner part number for a top-level build manufacturing 
+                           part that has 
+                           partNumber2 as an optional feature in its bill. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>    Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Child: The optional feature. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> optionRevenue  </td>
+  <td>  floatVec </td>
+  <td> <p>   Additional revenue associated with supplying the 
+                             child, partNumber2, with the parent, partNumber1, 
+                             for the source of demand, geography.
+                             Note: make sure that this revenue is not applied twice;
+                             default is set by defaultOptionShipReward in the
+                             parameters file. </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Profit File  (only used with Profit Based Optimization)">Demand Profit File  (only used with Profit Based Optimization)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>      Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> profit     </td>
+  <td>   floatVec </td>
+  <td> <p>   Time phased profit.  Note: this profit  should be
+                       the profit  of the BASE machine.  Use the Option
+                       Profit File to represent additional machine
+                       profit associated with options; default = 0.0 (vector)
+   </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Selective Feature/Building Block Profit File 
+            (only used with Profit Based Opt.)">
+   Selective Feature/Building Block Profit File
+ (only used with Profit Based Opt.)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Parent: Planner part number for a top-level build manufacturing 
+                           part (typically machine type or machine/type/mod) that has 
+                           partNumber2 as a selective feature/building block or option
+                           in its bill. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>    Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Child: selective feature/building block or option </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> optionProfit  </td>
+  <td>  floatVec </td>
+  <td> <p>   Additional profit associated with supplying the child, partNumber2,
+                           with the parent, partNumber2, for the source of demand, geography.
+                           Note: make sure that this profit is not applied twice;
+                           default is set by defaultOptionShipReward in the 
+                           parameters file. </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Optional Feature Profit File
+   (only used with Profit Based Opt.)">Optional Feature Profit File
+   (only used with Profit Based Opt.)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>  Parent: Planner part number for a top-level build manufacturing 
+    part (typically machine type or machine/type/mod) that has 
+    partNumber2 as an optional feature in its bill. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>  ``char'' </td>
+  <td> <p>    Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Child: optional feature </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> optionProfit  </td>
+  <td>  floatVec </td>
+  <td> <p> Additional profit associated with supplying the child, partNumber2,
+           with the parent, partNumber2, for the source of demand, geography.
+            Note: make sure that this profit is not applied twice;
+           default is set by defaultOptionShipReward in the parameters file.
+         </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Minimum Demand Volumes File">Minimum Demand Volumes File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber  </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                        MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography  </td>
+  <td>   ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> minDemandVol </td>
+  <td>  floatVec </td>
+  <td> <p>   If the solution method is heuristic or rollover,
+then this represents the lower bounds on demand volume to be met during the 
+period regardless of priorities; default = 0.0 (vector). 
+If the solution method is optimization,
+then this represents the lower bounds on the cumulative demand volume to 
+be met through the period; default = 0.0 (vector).  </td>  </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Supply Availability File (component,  subassemmbly, and finished good)">Supply Availability File (component,  subassemmbly, and finished good)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber  </td>
+  <td>   ``char''  </td>
+  <td> <p>  partNumber is a manufacturing part number</td> </tr>
+  <td> PDF   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> SupplyVol        </td>
+  <td>  floatVec </td>
+  <td> <p>   Committed or project supply of partNumber to PDF;
+        default = 0.0 (vector) </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Calendar File">Calendar File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> periodNum      </td>
+  <td>    int  </td>
+  <td> <p>    Period number;  0 <= periodNum <= numPeriods </td> </tr>
+<tr valign="top"> <td> periodStart    </td>
+  <td>    date  </td>
+  <td> <p>   Start date of period (for periodNum = numPeriods,
+                          periodStart is the date of the end of the horizon) </td> </tr>
+<tr valign="top"> <td> length         </td>
+  <td>    float </td>
+  <td> <p>   The length of the period in working days.
+                          (for periodNum = numPeriods, length is ignored)
+  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Interplant File">Interplant File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1  </td>
+  <td>  ``char'' </td>
+  <td> <p>     Destination part number </td> </tr>
+<tr valign="top"> <td> PDF1   </td>
+  <td>  ``char''    </td>
+  <td> <p>     Destination PDF </td> </tr>
+<tr valign="top"> <td> partNumber2  </td>
+  <td>  ``char'' </td>
+  <td> <p>      Source part number </td> </tr>
+<tr valign="top"> <td> PDF2   </td>
+  <td>  ``char''  </td>
+  <td> <p>          Source PDF </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> transit_time     </td>
+  <td>  float  </td>
+  <td> <p>     Transit time from source PDF2 to destination PDF1;
+     default = 0.0 </td> </tr>
+<tr valign="top"> <td> effect_start </td>
+  <td>  date </td>
+  <td> <p>  Date record becomes active; default = PAST </td> </tr>
+<tr valign="top"> <td> effect_end </td>
+  <td>  date </td>
+  <td> <p>  Last date record is still active; default =
+FUTURE </td> </tr>
+<tr valign="top"> <td> minimum_lot_size     </td>
+  <td>       float  </td>
+  <td> <p>     0.0 <= minimum_lot_size; default
+    = 1.0 </td> </tr>
+<tr valign="top"> <td> incremental_lot_size     </td>
+  <td>   float </td>
+  <td> <p>      1.0 <= incremental_lot_size; 
+                                          default = 1.0 </td> </tr>
+<tr valign="top"> <td> usage_rate     </td>
+  <td>               float </td>
+  <td> <p>      quantity per; default = 1.0 </td> </tr>
+
+<tr valign="top"> <td> preference/cost </td>
+  <td>  float </td>
+  <td> <p>  The relative preference (in priority mode) or the
+                           penalty cost (in optimization mode) for
+                           using this
+                           interplant sourcing arc; default
+                           is set by defaultInterPlantBopPreference in 
+                           in the parameters file.
+                            </td> </tr>
+<tr valign="top"> <td> explode_active </td>
+  <td>  boolean </td>
+  <td> <p>  This interplant arc is active if using smart
+                         explosions; default = 1.  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Capacity Definition File">Capacity Definition File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> capacityName </td>
+  <td>   ``char' '    </td> </tr>
+<tr valign="top"> <td> PDF   </td>
+<td>  ``char''    </td>
+  <td> <p> </td> </tr>
+</table>
+ 
+<br>
+<br>
+<table border>
+<caption><b><a name="Manufacturing BOC File">Manufacturing BOC File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>   ``char'' </td>
+  <td> <p>     Parent (partNumber is of part type 1) or
+     operation name </td> </tr>
+<tr valign="top"> <td> capacityName </td>
+  <td>   ``char'' </td>
+  <td> <p>     Child </td> </tr>
+  <td> PDF     </td>
+  <td>   ``char'' </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate     </td>
+  <td>    float  </td>
+  <td> <p>     Quantity per; default = 1.0 </td> </tr>
+<tr valign="top"> <td> usage_time    </td>
+  <td>     float  </td>
+  <td> <p>     Offset from parent stb date that the capacity
+                             is consumed; default = 0.0 </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>    date  </td>
+  <td> <p>      Date BOM record becomes active; 
+      default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>    date  </td>
+  <td> <p>      Last date BOM record is still active;
+      default = FUTURE </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Capacity Availability File">Capacity Availability File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> capacityName </td>
+  <td> ``char'' </td>
+  <td <p> </td> </tr>
+<tr valign="top">   <td> PDF   </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> SupplyVol        </td>
+  <td>  floatVec </td>
+  <td> <p>  Committed or project availability of
+         capacity at the PDF; default = 0.0 (vector). 
+        (Note: capacity availability must be expressed in units consistent with the
+         usage rate given in the BOC.)  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Upper Bound Production Schedule File">Upper Bound Production Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char''   </td>
+  <td> <p> </td> </tr>
+  <td> PDF        </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> prodVolUB  </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased Vector of the hard upper-bounds for
+                      the Production Volume; default  = infinity  </td> </tr>
+</table>
+
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Lower Bound Production Schedule File">Lower Bound Production Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td> ``char'' </td>
+  </td> <p> </td> </tr>
+  <td> PDF        </td>
+  <td> ``char''  </td>
+  <td> <p> </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> prodVolLB  </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased Vector of the soft lower-bounds for
+                      the Production Volume; default = 0.0</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Demand Backlog Yield File (Perishability Factor)">Demand Backlog Yield File (Perishability Factor)</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char''  </td>
+  <td> <p>  Planner part number being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel </td> </tr>
+<tr valign="top"> <td> geography </td>
+  <td>   ``char'' </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> backlogYield    </td>
+  <td>   floatVec  </td>
+  <td> <p>  Time-phased perishability factor; 0 <= 
+   backlogYield  <= 1; default = 1.0 (vector) </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="FSS General Set Scheme Input File">FSS General Set Scheme Input File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> setID </td>
+  <td>  ``char'' </td>
+  <td> <p>  The FSS set identification of the demand pair partNumber and
+ geography</td> </tr>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded </td> </tr>
+<tr valign="top"> <td> geography </td>
+  <td>  ``char'' </td>
+  <td> <p>  Geographic source of the demand for partNumber </td> </tr>
+</table> 
+
+<br>
+<br>
+<table border>
+<caption><b><a name="FSS Machine Scheme Input File">FSS Machine Scheme Input File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> setID </td>
+  <td> ``char'' </td>
+  <td> <p>  The FSS set identification of the demand pair partNumber and
+ geography </td> </tr>
+<tr valign="top"> <td> partNumber </td>
+  <td> ``char'' </td>
+  <td> <p>  Planner part number being demanded </td> </tr>
+<tr valign="top"> <td> geography </td>
+  <td> ``char'' </td>
+  <td> <p>  Geographic source of the demand for partNumber </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Definition File">Operation Definition File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td> ``char'' </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> PDF </td>
+  <td>  ``char'' </td>
+  <td> <p> </td> </tr>
+</table>
+ 
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Lot Size File">Operation Lot Size File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td> ``char'' </td>
+  <td> <p>   The name of the operation </td> </tr>
+<tr valign="top"> <td> PDF </td>
+  <td> ``char'' </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> minimum_lot_size     </td>
+  <td>      float  </td>
+  <td> <p>     0.0 <= minimum_lot_size; default = 1.0 </td> </tr>
+<tr valign="top"> <td> incremental_lot_size     </td>
+  <td>      float </td>
+  <td> <p>  1.0 <= incremental_lot_size; default = 1.0 </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> start     </td>
+  <td>      date </td>
+  <td> <p>     Date at which this data becomes effective; default = PAST </td> </tr>
+<tr valign="top"> <td> end       </td>
+  <td>      date </td>
+  <td> <p>     Last date at which this data is effective; default = FUTURE </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Yield File">Operation Yield File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td> ``char'' </td>
+  <td>  <p>  The operation name </td> </tr>
+  <td> PDF </td>
+  <td> ``char'' </td>
+  <td> <p> </td> </tr>
+<tr valign="top"> <td> yield     </td> 
+  <td>       int  </td>
+  <td> <p>    1 <= yield <= 100 </td> </tr>
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> start     </td>
+  <td>       date </td>
+  <td> <p>     Date at which this data becomes effective; 
+        default = PAST </td> </tr>
+<tr valign="top"> <td> end       </td>
+  <td>       date </td>
+  <td> <p>     Last date at which this data is effective;
+        default = FUTURE </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Upper Bound Operation Schedule File">Upper Bound Operation Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> execVolUB  </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased vector of the hard upper-bounds for
+                      the operation execution volume; default  = infinity
+   </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Lower Bound Operation Schedule File">Lower Bound Operation Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> execVolLB  </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased vector of the soft lower-bounds for
+                      the operation execution volume; default = 0.0</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation BOM File">Operation BOM File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td>   ``char'' </td>
+  <td> <p>     Name of operation </td> </tr>
+<tr valign="top"> <td> partNumber </td>
+  <td>   ``char'' </td>
+  <td> <p>     Child part belonging to operationName </td> </tr>
+  <td> PDF     </td>
+  <td>    ``char'' </td>
+  <td> <p> </td> </tr> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate     </td>
+  <td>    float  </td>
+  <td> <p>     Quantity per; default = 1.0 </td> </tr>
+<tr valign="top"> <td> offset    </td>
+  <td>     float  </td>
+  <td> <p>     Offset in days from date in which operationName is executed
+   that partNumber is consumed; default = 0.0 </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>    date  </td>
+  <td> <p>      Date BOM record becomes active; 
+      default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>    date  </td>
+  <td> <p>      Last date BOM record is still active;
+      default = FUTURE </td> </tr>
+<tr valign="top"> <td> fallout        </td>
+  <td>    int   </td>
+  <td> <p>      Percent of child that is lost during
+                   execution of operationName; default = 0</td> </tr> 
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Substitute BOM File">Operation Substitute BOM File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td>   ``char'' </td>
+  <td> <p>     Name of operation </td> </tr>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>   ``char'' </td>
+  <td> <p>     Child part belonging to operationName </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>     Substitute part for partNumber1 in operationName's BOM </td> </tr>
+  <td> PDF     </td>
+  <td>    ``char'' </td>
+  <td> <p> </td> </tr> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> usage_rate     </td>
+  <td>    float  </td>
+  <td> <p>     Quantity per; default = 1.0 </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>    date  </td>
+  <td> <p>      Date BOM record becomes active; 
+      default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>    date  </td>
+  <td> <p>      Last date BOM record is still active;
+      default = FUTURE </td> </tr>
+<tr valign="top"> <td> fallout        </td>
+  <td>    int   </td>
+  <td> <p>      Percent of partNumber2 that is lost during
+                             execution of operationName; default = 0 </td> </tr>
+<tr valign="top"> <td> preference/cost </td>
+  <td>  float </td>
+  <td> <p>   In priority mode, this is the relative
+                           preference of making the substitution.
+                           In optimization mode,
+                           this is the penalty
+                           cost for substituting partNumber3 
+                           for partNumber2 when executing operationName;
+                           default is set by defaultSubPenalty
+                           in the parameters file. </td> </tr>
+<tr valign="top"> <td> explode_active </td>
+  <td>  boolean </td>
+  <td> <p>  This substitution arc is active if using the smart 
+                 explosions; default = 0. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation BOP File">Operation BOP File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>   ``char'' </td>
+  <td> <p>     Part produced by the execution of operationName </td> </tr>
+<tr valign="top"> <td> operationName </td>
+  <td>   ``char'' </td>
+  <td> <p>     The operation name </td> </tr>
+  <td> PDF     </td>
+  <td>    ``char'' </td>
+  <td> <p> </td> </tr> 
+<tr> <td colspan=3> <hr> </td> </tr>
+<tr valign="top"> <td> productionRate     </td>
+  <td>    float  </td>
+  <td> <p>   The number of units of partNumber which are
+  produced by the execution of operationName; default = 1.0 </td> </tr>
+<tr valign="top"> <td> offset  </td>
+  <td>   float  </td>
+  <td> <p>    Offset in days from date in which operationName is executed
+   that partNumber is produced; default = 0.0 </td> </tr>
+<tr valign="top"> <td> effect_start   </td>
+  <td>    date  </td>
+  <td> <p>      Date BOM record becomes active; 
+      default = PAST  </td> </tr>
+<tr valign="top"> <td> effect_end     </td>
+  <td>    date  </td>
+  <td> <p>      Last date BOM record is still active; 
+      default = FUTURE </td> </tr>
+<tr valign="top"> <td> preference/cost </td>
+  <td>  float </td>
+  <td> <p>  The preference (in priority mode) or the
+                          penalty cost (in optimization mode) for
+                         using operationName to produce
+                         partNumber; default is set by
+                         defaultExplicitBopPerence in the
+                          parameters file. </td> </tr>
+<tr valign="top"> <td> explode_active </td>
+  <td>  boolean </td>
+  <td> <p>  This bop arc is active in 
+                        certain types of explosions; default = 1.</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Parameters File">Parameters File</a> </b> </caption>
+<thead> </thead>
+<tr> <td> paramID </td>   
+     <td colspan=2> string </td>
+     <td> <p>  A keyword that defines the parameter code
+                          (see below for a list of legal parameter IDs
+                          and their expected types) </td> </tr>
+<tr> <td>parameter </td> 
+     <td colspan=2>  string </td>  
+     <td> <p> The parameter </td> </tr>
+<tr> <td> <hr> </td> </tr>
+<tr> <td> <hr> </td> </tr>
+<tr> <td> <b> paramID </b> </td>
+     <td> <b> Type </b> </td>
+     <td> <b> Mand </b> </td>
+     <td> <b> <p> comment} </b> </td> </tr>
+<tr align="top">
+  <td> aggregationFile  </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p>  Part Aggregation File </td> </tr>
+<tr align="top">
+  <td> backlogYieldFile </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Backlog Yield file </td> </tr>
+<tr align="top">
+  <td> bocFile          </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Manufacturing BOC File </td> </tr>
+<tr align="top">
+  <td> bomFile          </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  BOM file</td> </tr>
+<tr align="top">
+  <td> calendarFile     </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  Calendar File </td> </tr>
+<tr align="top">
+  <td> capFile          </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Capacity Definition File </td> </tr>
+<tr align="top">
+  <td> capSupplyFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Capacity Supply File </td> </tr>
+<tr align="top">
+  <td> cycleTimeFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  CycleTime File</td> </tr>
+<tr align="top">
+  <td> demandVolFile    </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  Demand Volumes File</td> </tr>
+<tr align="top">
+  <td> featProfitFile   </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Feature Profit File (objectiveType = 3)</td> </tr>
+<tr align="top">
+  <td> featRevFile      </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Feature Revenue File (objectiveType = 2)</td> </tr>
+<tr align="top">
+  <td> fssGeneralSetFile </td>
+  <td> string </td>
+  <td>  Y </td>
+  <td> <p>  FSS General Set Input File </td> </tr>
+<tr align="top">
+  <td> fssMachineFile   </td>
+  <td> string </td>
+  <td>  Y </td>
+  <td> <p>  FSS Machine Input File </td> </tr>
+<tr align="top">
+  <td> geoSourceFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Demand Geo to PDF Source File </td> </tr>
+<tr align="top">
+  <td> interPlantFile   </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Interplant file </td> </tr>
+<tr align="top">
+  <td> lotSizeFile      </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Manufacturing Lot Size File </td> </tr>
+<tr align="top">
+  <td> minDemandVolFile </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Minimum Demand Volumes File</td> </tr>
+<tr align="top">
+  <td> opBomFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation BOM File </td> </tr>
+<tr align="top">
+  <td> opBopFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation BOP File </td> </tr>
+<tr align="top">
+  <td> opFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Definition File </td> </tr>
+<tr align="top">
+  <td> opLotSizeFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Lot Size File </td> </tr>
+<tr align="top">
+  <td> opLowerFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Lower Bound Execution File </td> </tr>
+<tr align="top">
+  <td> opSubBomFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Substitution BOM File </td> </tr>
+<tr align="top">
+  <td> opUpperFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Upper Bound Execution File </td> </tr>
+<tr align="top">
+  <td> opYieldFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Operation Yield File </td> </tr>
+<tr align="top">
+  <td> optionProfitFile </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Option Profit File (objectiveType = 2)</td> </tr>
+<tr align="top">
+  <td> optionRevFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Option Revenue File (objectiveType = 2)</td> </tr>
+<tr align="top">
+  <td> partCondFile     </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  Parts Conditioning File </td> </tr>
+<tr align="top">
+  <td> partFile         </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  Part Definition File</td> </tr>
+<tr align="top">
+  <td> priorityFile     </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Demand Priority File (objectiveType = 1)</td> </tr>
+<tr align="top">
+  <td> prodVolLBFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Lower Bound Production Volume File </td> </tr>
+<tr align="top">
+  <td> prodVolUBFile    </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Upper Bound Production Volume File </td> </tr>
+<tr align="top">
+  <td> profitFile       </td>
+  <td> string </td>
+  <td>   Y </td>
+  <td> <p>  Demand Profit File (objectiveType = 3)</td> </tr>
+<tr align="top">
+  <td> revenueFile      </td>
+  <td> string </td>
+  <td>   Y </td>
+  <td> <p> Demand Revenue File (objectiveType = 2)</td> </tr>
+<tr align="top">
+  <td> subBomFile       </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Substitute BOM file</td> </tr>
+<tr align="top">
+  <td> supplyFile       </td>
+  <td> string </td>
+  <td>   Y  </td>
+  <td> <p>  Supply Volumes File</td> </tr>
+<tr align="top">
+  <td> topLevelToBBdefFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Top Level to Building Block definition File </td> </tr>  
+<tr align="top">
+  <td> topLevelToBBratioFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Top Level to Building Block Ratio File </td> </tr> 
+<tr align="top">
+  <td> topLevelToOptionFile </td>
+  <td> string </td>
+  <td>  N </td>
+  <td> <p> Top Level to Option Ratio File </td> </tr> 
+<tr align="top">
+  <td> yieldFile        </td>
+  <td> string </td>
+  <td>   N  </td>
+  <td> <p>  Yield File</td> </tr>
+<tr align="top">
+  <td> calendarFormat </td>
+  <td> "char" </td>
+  <td> Y </td>
+  <td> <p> U = US Format, mm/dd/yyyy <br> 
+           E = European Format, dd/mm/yyyy <br>
+           G = General Format, yyyymmdd </td> </tr>
+<tr align="top">
+  <td> doImplode </td>
+  <td> boolean </td>
+  <td> Y </td>
+  <td> <p> do an implosion; if set to 0, SCE will run
+only its MRP engine, default = 1 </td> </tr>
+<tr align="top">
+  <td> defaultPDF   </td>
+  <td> string </td>
+  <td> Y </td>
+  <td> <p> Default PDF name  </td> </tr>
+<tr align="top">
+  <td> defaultAggregateBopPreference </td>
+  <td> float </td>
+  <td> N </td>
+  <td> <p> In optimization mode,
+                                        the penalty cost aggregate bop, otherwise,
+                                        the preference; default = 0.0 </td> </tr>
+<tr align="top">
+  <td> defaultDefaultBopPreference </td>
+  <td> float </td>
+  <td> N </td>
+  <td> <p> In optimization mode, the
+                                        penalty cost of using the default bop,
+                                        otherwise, the preference; default = 0.0 </td> </tr>
+<tr align="top">
+  <td> defaultExplicitBopPreference </td>
+  <td> float </td>
+  <td> N </td>
+  <td> <p> Used when opBopFile is
+                                        defined. In optimization mode,
+                                        the penalty
+                                        cost of using the user-defined (explicit) bop, otherwise, the
+                                        preference; default = 0.0 </td> </tr>
+<tr align="top">
+  <td> defaultInterPlantBopPreference </td>
+  <td> float </td>
+  <td> N </td>
+  <td> <p> In optimization mode, 
+                                        the penalty cost of using the
+                                        interplant bop, otherwise, the preference;
+                                        default = 0.0 </td> </tr>
+<tr align="top">
+  <td> defaultOptionShipReward       </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p>    5.0  </td> </tr>
+<tr align="top">
+  <td> defaultPriority </td>
+  <td> int </td>
+  <td> Y </td>
+  <td> <p> The default priority assigned to every demand
+      in every period </td> </tr>
+<tr align="top">
+  <td> defObj1ProdCostDiscRateRealParts </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> <i> Very small </i> discount
+    rate for obj1ProdCost for all real parts. (This keeps parts from being
+    built early.) </td> </tr>
+<tr align="top">
+  <td> defObj1ProdCostRealParts </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> Small obj1ProdCost for all real
+     parts </td> </tr>
+<tr align="top">
+  <td> defaultShipLateLimit </td>
+  <td> int </td>
+  <td> N </td>
+  <td> <p> This is the heuristic ship late limit and
+   it applies to all demands;  default = numPeriods - 1</td> </tr>
+<tr align="top">
+  <td> defaultSubPenalty </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> Used when substitutes are permitted,
+                                as a penalty cost in
+                                optimization mode, or as a sub bop
+                                preference otherwise. </td> </tr>
+<tr align="top">
+  <td> doFssSingleton </td>
+  <td>  boolean </td>
+  <td> N </td>
+  <td> <p> Run FSS with the Singleton Method; default = 0 </td> </tr>
+<tr align="top">
+  <td> doFssGeneralSet </td>
+  <td>  boolean </td>
+  <td> N </td>
+  <td> <p> Run FSS with the General Set Method; default = 0 </td> </tr>
+<tr align="top">
+  <td> doFssMachine </td>
+  <td>  boolean </td>
+  <td> N </td>
+  <td> <p> Run FSS with the Machine Method; default = 0 </td> </tr>
+<tr align="top">
+  <td> engine </td>
+  <td> string </td>
+  <td> Y </td>
+  <td> <p> Solution Method: optimization or heuristic or rollover </td> </tr>
+<tr align="top">
+  <td> equitability </td>
+  <td> int </td>
+  <td> Y </td>
+  <td> <p>  Equitability factor for heuristic implosion </td> </tr>
+<tr align="top">
+  <td> featureFileOutputFormat </td>
+  <td> string </td>
+  <td>  N  </td>
+  <td> <p> absolute = Report total amount of features used for the 
+       build plan (default) <br>
+       percentage = Report percentage usage of features in the build plan
+         </td> </tr>
+<tr align="top">
+  <td> fileFormatType   </td>
+  <td> string </td>
+  <td>  N  </td>
+  <td> <p> Standard = Standard file format </td> </tr>
+<tr align="top">
+  <td> featureRatioFlag              </td>
+  <td> int   </td>
+  <td> Y </td>
+  <td> <p> 1 = Use feature capability <br>
+           0 = Otherwise </td> </tr>
+<tr align="top">
+  <td> featureSetScrapPenalty        </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> 99999.9  </td> </tr>
+<tr align="top">
+  <td> featureSetStockPenalty        </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> 99999.9  </td> </tr>
+<tr align="top">
+  <td> fssFeatureSingletonMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> minimal (optional features do not contribute
+to FSSReq calculation) or maximal (optional features contribute to FSSReq calculation); default = maximal </td> </tr>
+<tr align="top">
+  <td> fssFeatureGeneralSetMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> minimal (optional features do not contribute
+to FSSReq calculation) or maximal (optional features contribute to FSSReq calculation); default = maximal </td> </tr>
+<tr align="top">
+  <td> fssFeatureMachineMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> minimal (optional features do not contribute
+to FSSReq calculation) or maximal (optional features contribute to FSSReq calculation); default = maximal </td> </tr>
+<tr align="top">
+  <td> fssFlag </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Enable the FSS Engine; default = 0 </td> </tr>
+<tr align="top">
+  <td> fssSingletonMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> conservative (FSS engine does not use excess supply
+for FSSCov calucalation) or liberal(FSS engine uses excess supply for FSSCov
+calcalation); default = liberal </td> </tr>
+<tr align="top">
+  <td> fssGeneralSetMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> conservative (FSS engine does not use excess supply
+for FSSCov calucalation) or liberal(FSS engine uses excess supply for FSSCov
+calcalation); default = liberal </td> </tr>
+<tr align="top">
+  <td> fssMachineMethod </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> conservative (FSS engine not use excess supply
+for FSSCov calucalation) or liberal(FSS engine uses excess supply for FSSCov
+calcalation); default = conservative </td> </tr>
+<tr align="top">
+  <td> fssSingletonHorizon </td>
+  <td> int </td>
+  <td> N </td>
+  <td> <p> The FSS threshold horizon for the singleton method; 
+   default = numPeriods - 1  </td> </tr>
+<tr align="top">
+  <td> fssGeneralSetHorizon </td>
+  <td> int </td>
+  <td> N </td>
+  <td> <p> The FSS threshold horizon for the general set method; 
+   default = numPeriods - 1  </td> </tr>
+<tr align="top">
+  <td> fssMachineHorizon </td>
+  <td> int </td>
+  <td> N </td>
+  <td> <p> The FSS threshold horizon for the machine method; 
+   default = numPeriods - 1  </td> </tr>
+<tr align="top">
+  <td> heurForceEquit </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Force heuristic equitability; default = 0. </td> </tr>
+<tr align="top">
+  <td> numPeriods   </td>
+  <td>    int </td>
+  <td>    Y  </td>
+  <td> <p>  Number of periods in the model </td> </tr>
+<tr align="top">
+  <td> objectiveType  </td>
+  <td>  int </td>
+  <td>    Y  </td>
+  <td> <p> 1 = Priority Based Optimization <br>
+           2 = Revenue Based Optimization <br>
+           3 = Profit Based Optimization </td> </tr>
+<tr align="top">
+  <td> optionRatioSupplyStockPenalty </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p>     10.0 </td> </tr>
+<tr align="top">
+  <td> pdfSeparator </td>
+  <td> character </td>
+  <td> N </td>
+  <td> <p> The separator character is used internally
+   in SCE to create dummy part names.  The default separator character is
+   the underscore character, _. The pdfSeparator character must be a 
+   character that is not used in any other SCE input file.  (Hint:  Likely 
+   candidates for the pdfSeparator include ~,!,@,#,$,%,^,&, and ?.)</td> </tr>
+<tr align="top">
+  <td> periodicInterestRate </td>
+  <td> float </td>
+  <td> Y </td>
+  <td> <p> Time value of money factor </td> </tr>
+<tr align="top">
+  <td> smartExplodeEquit </td>
+  <td> int </td>
+  <td> N </td>
+  <td> <p> Equitability factor used  for the smart
+          explode utility; 1 <= smartExplodeEquit <= 100;  use when co-products
+          are involved.
+                   default = 10. </td> </tr>
+<tr align="top">
+  <td> smartExplodeForceEquit </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Force smart explode equitability;
+  this should always be set to 1; 
+      default = 1. </td> </tr>
+<tr align="top">
+  <td> useFullExplodeUtility </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> When set to 1, SCE's MRP logic will
+explode requirements to the lowest level regardless of whether they are past due
+or not;  when set to 0, SCE uses PRM's standard explode logic in which pastDue demands
+do not explode.  default = 1 </td> </tr>
+<tr align="top">
+  <td> useLocalBuildAhead </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Use local build ahead capability; default = 0.</td> </tr>
+<tr align="top">
+  <td> useSmartExplodeUtility </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> When set to 1 SCE uses the smart exploder (
+optimization logic) to solve the MRP explode problem using optimization logic.  This
+function should only be used if co-product generation and/or substitution logic needs
+to be considered for explosion calculations.  default = 0. </td> </tr>
+<tr align="top">
+  <td> inputLogFileName </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Input Log File, default = sceInput.log </td> </tr>
+<tr align="top">
+  <td> outputFilePrefix </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p>  Output file prefix; default = ./output; .\output </td> </tr>
+<tr align="top">
+  <td> outputLogFileName </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Output Log File, default = sceOutput.log; sceOut.log </td> </tr>
+<tr align="top">
+  <td> parameterLogFileName </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Parameter Log File, default = param.log </td> </tr>
+<tr align="top">
+  <td> backlogResponseFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .backlog; .brf </td> </tr>
+<tr align="top">
+  <td> buildSchedFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .buildSched; .bsf </td> </tr>
+<tr align="top">
+  <td> capacityDBFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .capacityDB; .cdb </td> </tr>
+<tr align="top">
+  <td> criticalListFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .critList; .clf </td> </tr>
+<tr align="top">
+  <td> debugFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .sce.debug; .dfe </td> </tr>
+<tr align="top">
+  <td> explodeEchoFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witExplode.echo; .eef </td> </tr>
+<tr align="top">
+  <td> explodeWitDataFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witExplode.data; .ewd </td> </tr>
+<tr align="top">
+  <td> formattedSupplyReportFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .supplyReport; .fsr </td> </tr>
+<tr align="top">
+  <td> fssGeneralSetFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .fssGeneralSetReport; .fgr</td> </tr>
+<tr align="top">
+  <td> fssMachineFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .fssMachineReport; .fmr</td> </tr>
+<tr align="top">
+  <td> fssSingletonFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .fssSingletonReport; .fss </td> </tr>
+<tr align="top">
+  <td> geoSourceDebugFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .geoSourceDebug; .gsd </td> </tr>
+<tr align="top">
+  <td> geoSupplyByPdfFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .geoSupplyByPdf; .gsp </td> </tr>
+<tr align="top">
+  <td> heurEchoFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witHeur.echo; .hef </td> </tr>
+<tr align="top">
+  <td> heurWitDataFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witHeur.data; .hwd </td> </tr>
+<tr align="top">
+  <td> interplantDemandFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .interplantDemand;.idf </td> </tr>
+<tr align="top">
+  <td> interplantOrdersFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .interplant;.iof </td> </tr>
+<tr align="top">
+  <td> mrpDemandOrdersFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .mrpDemOrd; .mdo </td> </tr>
+<tr align="top">
+  <td> mrpSubUsageFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .mrpSubsUs; .msu </td> </tr>
+<tr align="top">
+  <td> mrpOpSubUsageFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .mrpOpSubsUs; .mos </td> </tr>
+<tr align="top">
+  <td> mrpSupplyOrdersFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .mrpSupOrd; .mso </td> </tr>
+<tr align="top">
+  <td> objectiveSummaryFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .optResults; .osf </td> </tr>
+<tr align="top">
+  <td> opExecutionVolumeFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .opExecVol; .oev </td> </tr>
+<tr align="top">
+  <td> operationDBFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .operationDB; .odb;</td> </tr>
+<tr align="top">
+  <td> opSubUsageFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .opSubUsage; .osu </td> </tr>
+<tr align="top">
+  <td> optEchoFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witOpt.echo; .oef </td> </tr>
+<tr align="top">
+  <td> optWitDataFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witOpt.data; .owd </td> </tr>
+<tr align="top">
+  <td> optionalFeatRatioFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .optionRatio; .ofr </td> </tr>
+<tr align="top">
+  <td> partDBFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .partDB; .pdb </td> </tr>
+<tr align="top">
+  <td> problemStatisticsFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .probStats; .psf </td> </tr>
+<tr align="top">
+  <td> selFeatBBratioFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .bbRatio; .sfb </td> </tr>
+<tr align="top">
+  <td> subUsageFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .subUsage; .suf </td> </tr>
+<tr align="top">
+  <td> supplyResponseFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .supplyResp; .srf </td> </tr>
+<tr align="top">
+  <td> totalDemandReportFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .totalDemand; .tdr </td> </tr>
+<tr align="top">
+  <td> witExplodeMsgFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .witExplode.msg; .wem</td> </tr>
+<tr align="top">
+  <td> witMsgFileExtension </td>
+  <td> string </td>
+  <td> N </td>
+  <td> <p> Default = .wit.msg; wmf </td> </tr>
+<tr align="top">
+  <td> printCapacityDBFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the capacity database file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printCriticalListFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the critical list file; default = 0</td> </tr>
+<tr align="top">
+  <td> 
+printDebugFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the debug file; default = 0</td> </tr>
+<tr align="top">
+  <td> printExplodeEchoFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the explode (MRP) echo file; default = 0</td> </tr>
+<tr align="top">
+  <td> printExplodeWitDataFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the explode (MRP) WIT data file; default = 0</td> </tr>
+<tr align="top">
+  <td> 
+printFormattedSupplyReportFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the formatted supply report file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printGeoSourceDebugFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the geography source debug file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printGeoSupplyByPdfFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the geography supply by PDF file;  default = 0 </td> </tr>
+<tr align="top">
+  <td> printHeurEchoFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the heuristic echo file; default = 0</td> </tr>
+<tr align="top">
+  <td> printHeurWitDataFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the heuristic WIT data file; default = 0</td> </tr>
+<tr align="top">
+  <td> 
+printInterplantDemandFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the interplant (MRP) demand file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printMrpDemandOrdersFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the MRP Demand Orders file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printMrpSupplyOrdersFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the MRP Supply Orders file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printOperationDBFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the operation database file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printOptEchoFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the echo file; default = 0</td> </tr>
+<tr align="top">
+  <td> printOptWitDataFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the optimization WIT data file; default = 0</td> </tr>
+<tr align="top">
+  <td> 
+printPartDBFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the part database file; default = 0 </td> </tr>
+<tr align="top">
+  <td> printTotalDemandReport </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the total demand report file; default = 1 </td> </tr>
+<tr align="top">
+  <td> printWitExplodeMsgFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the WIT message file for the Explode Engine; default = 0</td> </tr>
+<tr align="top">
+  <td> printWitMsgFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the WIT message file; default = 0</td> </tr>
+<tr align="top">
+  <td> printWitRolloverMsgFile </td>
+  <td> boolean </td>
+  <td> N </td>
+  <td> <p> Print the WIT message file for the rollover heuristic; default = 0</td> </tr>
+</table>
+
+<br>
+<br>
+<b> Output File Format Specifications </b>
+<ul>
+<li><a href="#Supply Response File">Supply Response File</a>
+<li><a href="#Supply Response by PDF File">Supply Response by PDF File</a>
+<li><a href="#Backlog Response File">Backlog Response File</a>
+<li><a href="#Build Schedule File">Build Schedule File</a>
+<li><a href="#Feasible Selective Feature/Building Block Ratio File">Feasible Selective Feature/Building Block Ratio File</a>
+<li><a href="#Feasible Optional Feature Ratio File">Feasible Optional Feature Ratio File</a>
+<li><a href="#Substitute Usage Volume File">Substitute Usage Volume File</a>
+<li><a href="#Supply Response File">Supply Response File</a>
+<li><a href="#Supply Response by PDF File">Supply Response by PDF File</a>
+<li><a href="#Backlog Response File">Backlog Response File</a>
+<li><a href="#Build Schedule File">Build Schedule File</a>
+<li><a href="#Feasible Selective Feature/Building Block Ratio File">Feasible Selective Feature/Building Block Ratio File</a>
+<li><a href="#Feasible Optional Feature Ratio File">Feasible Optional Feature Ratio File</a>
+<li><a href="#Substitute Usage Volume File">Substitute Usage Volume File</a>
+<li><a href="#MRP Substitute Usage Volume File">MRP Substitute Usage Volume File</a>
+<li><a href="#Part Database Dump File">Part Database Dump File</a>
+<li><a href="#Capacity Database Dump File">Capacity Database Dump File</a>
+<li><a href="#Interplant Orders File">Interplant Orders File</a>
+<li><a href="#Interplant Demand File">Interplant Demand File</a>
+<li><a href="#Critical Parts List File">Critical Parts List File</a>
+<li><a href="#Total Demand File">Total Demand File</a>
+<li><a href="#FSS Singleton Scheme Dump File">FSS Singleton Scheme Dump File</a>
+<li><a href="#FSS General Set Scheme Dump File">FSS General Set Scheme Dump File</a>
+<li><a href="#Operation Execution Volume Schedule File">Operation Execution Volume Schedule File</a>
+<li><a href="#Operation Substitute Usage Volume Schedule File">Operation Substitute Usage Volume Schedule File</a>
+<li><a href="#MRP Operation Substitute Usage Volume Schedule File">MRP Operation Substitute Usage Volume Schedule File</a>
+<li><a href="#Operation Database Dump File">Operation Database Dump File</a>
+<li><a href="#MRP Demand Orders File">MRP Demand Orders File</a>
+<li><a href="#MRP Supply Orders File">MRP Supply Orders File</a>
+<li><a href="#Formatted Supply Response File">Formatted Supply Response File</a>
+<li><a href="#SCE Input Log File">SCE Input Log File</a>
+<li><a href="#SCE Output Log File">SCE Output Log File</a>
+<li><a href="#SCE Parameter Log File">SCE Parameter Log File</a>
+<li><a href="#SCE Error Log File">SCE Error Log File</a>
+</ul>
+
+<br>
+<br>
+<br>
+<table border>
+<caption><b><a name="Supply Response File">Supply Response File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber  </td>
+  <td>  ``char'' </td>
+  <td> <p>      Part being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>  ``char''  </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr valign="top"> <td> supplyVol   </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased supply Volume as computed by SCE </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Supply Response by PDF File">Supply Response by PDF File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> plannerPart  </td>
+  <td>  ``char'' </td>
+  <td> <p>      plannerPart being demanded.  
+           This will generally be a
+                       MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>  ``char''  </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr valign="top"> <td> mfgPart     </td>
+  <td>  ``char''  </td>
+  <td> <p>  Manufacturing part number at PDF </td> </tr>
+<tr valign="top"> <td> PDF         </td>
+  <td>  ``char''  </td>
+  <td> <p>  PDF name </td> </tr>
+<tr valign="top"> <td> supplyVol   </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased supply Volume of plannerPart for 
+    geography coming from PDF  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Backlog Response File">Backlog Response File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber  </td>
+  <td>  ``char'' </td>
+  <td> <p>      Part being demanded.  This will generally be a
+                       MachineType, or MachineTypeModel. </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>  ``char''  </td>
+  <td> <p>     Geographic source of the demand for this part. </td> </tr>
+<tr valign="top"> <td> backlogVol   </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased backlog Volume as computed by SCE </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Build Schedule File">Build Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char''  </td>
+  <td> <p>  Manufacturing part number </td> </tr>
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> prodVol    </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased Vector of Production Volume.  Note
+                      these volumes are with respect to the completion
+                      date of production, not the start-to-build dates.
+                      To get STB volumes by periods, we need to apply
+                      the cycle-time offsets. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Feasible Selective Feature/Building Block Ratio File">Feasible Selective Feature/Building Block Ratio File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1  </td>
+  <td>  ``char'' </td>
+  <td> <p>        A planner top-level build part number 
+                            (Machine Type, Machine/type/mod)
+                            with a selective feature/building block in its bill.  </td> </tr>
+<tr valign="top"> <td> geography   </td>
+  <td>  ``char''    </td>
+  <td> <p>       Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> bbCategory </td>
+  <td>   ``char'' </td>
+  <td> <p>    An identifier for the building block category  </td> </tr>
+<tr valign="top"> <td> partNumber2  </td>
+  <td>  ``char'' </td>
+  <td> <p>       The selective feature or building block </td> </tr>
+<tr valign="top"> <td> FeasibleRatio    </td>
+  <td>  floatVec </td>
+  <td> <p>    Feasible ratio for this selective feature or 
+                            building block/feature wrt the top-level build, partNumber1. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Feasible Optional Feature Ratio File">Feasible Optional Feature Ratio File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1  </td>
+  <td>  ``char'' </td>
+  <td> <p>        A planner top-level build part number 
+                            (Machine Type, Machine/type/mod)
+                            with an optional feature in its bill.  </td> </tr>
+<tr valign="top"> <td> geography    </td>
+  <td>  ``char'' </td>
+  <td> <p>       Geographic source of the demand for partNumber1 </td> </tr>
+<tr valign="top"> <td> partNumber2  </td>
+  <td>  ``char'' </td>
+  <td> <p>       The optional feature </td> </tr>
+<tr valign="top"> <td> FeasibleRatio    </td>
+  <td>  floatVec </td>
+  <td> <p>    Feasible ratio for this optional feature wrt
+                        the top-level build, partNumber1. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Substitute Usage Volume File">Substitute Usage Volume File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Parent</td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Child </td> </tr>
+<tr valign="top"> <td> partNumber3 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Substitute part</td> </tr>
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> prodVol    </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the production volume of
+                      partNumber1 using partNumber3 as a substitute for
+                      partNumber2, based on the implosion solution.</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="MRP Substitute Usage Volume File">MRP Substitute Usage Volume File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Parent</td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Child </td> </tr>
+<tr valign="top"> <td> partNumber3 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Substitute part</td> </tr>
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> prodVol    </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the production volume of
+                      partNumber1 using partNumber3 as a substitute for
+                      partNumber2, based on the MRP solution. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Part Database Dump File">Part Database Dump File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> partNumber </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+  <td> PDF </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> keyword </td>
+  <td>  ``char''  </td>
+  <td> <p>  The keywords are 
+bldVol, consVol, cycleTime, deAggVol, excessVol, intPlVol, mrpBldVol, mrpConsVol, 
+mrpDeAggVol, mrpExcessVol, mrpIntPlVol, mrpProdVol, mrpRequirements, mrpResidualVol,
+mrpUserOpVol, prodVol, reqVol, residualVol, scrapVol, stockVol, supplyVol, 
+and userOpVol, 
+   Zero vectors are excluded.</td> </tr>
+<tr valign="top"> <td> keyword value  </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the keyword </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Capacity Database Dump File">Capacity Database Dump File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> capacityName </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+  <td> PDF </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> keyword </td>
+  <td>  ``char''  </td>
+  <td> <p>  The keywords are 
+consVol, excessVol, mrpConsVol, mrpExcessVol, mrpRequirements, mrpUserOpVol, 
+reqVol, scrapVol, supplyVol, and userOpVol.
+   Zero vectors are excluded.</td> </tr>
+<tr valign="top"> <td> keyword value  </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the keyword </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Interplant Orders File">Interplant Orders File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>   ``char'' </td>
+  <td> <p>   Manufacturing part name at PDF1  </td> </tr> 
+<tr valign="top"> <td> PDF1   </td>
+  <td>  ``char'' </td>
+  <td> <p>  Ordering PDF </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char'' </td>
+  <td> <p>  Manufacturing part name at PDF2    </td> </tr> 
+<tr valign="top"> <td> PDF2   </td>
+  <td>  ``char'' </td>
+  <td> <p>  Supplier PDF </td> </tr>
+<tr valign="top"> <td> ipDemandVol </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased volume of interplant orders(implosion)</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Interplant Demand File">Interplant Demand File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>   ``char'' </td>
+  <td> <p>   Manufacturing part name at PDF1  </td> </tr> 
+<tr valign="top"> <td> PDF1   </td>
+  <td>  ``char'' </td>
+  <td> <p>  Ordering PDF </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>   ``char'' </td>
+  <td> <p>  Manufacturing part name at PDF2    </td> </tr> 
+<tr valign="top"> <td> PDF2   </td>
+  <td>  ``char'' </td>
+  <td> <p>  Supplier PDF </td> </tr>
+<tr valign="top"> <td> ipDemandVol </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased volume of interplant demand(unconstrained)  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Critical Parts List File">Critical Parts List File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> partNumber </td>
+  <td>   ``char''     </td>
+  <td> <p> </td> </tr>  
+  <td> PDF   </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> period </td>
+  <td>  int </td>
+  <td> <p>  Period in which partNumber was needed and not available</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Total Demand File">Total Demand File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> partNumber </td>
+  <td>   ``char''     </td>
+  <td> <p> </td> </tr>  
+  <td> PDF   </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> totalDemand </td>
+  <td>  floatVec </td>
+  <td> <p>  Total (independent + dependent) demand for this part</td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="FSS Singleton Scheme Dump File">FSS Singleton Scheme Dump File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char'' </td>
+  <td> <p>  Planner part number being demanded    </td> </tr> 
+<tr valign="top"> <td> geography </td>
+  <td>  ``char'' </td>
+  <td> <p>  Geographic source for the demand </td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char'' </td>
+  <td> <p>  The part number gating the demand of partNumber1 for
+ geography </td> </tr>
+<tr valign="top"> <td> PDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The name of the production facility where the gating 
+ part, partNumber2, is consumed when building partNumber1 </td> </tr>
+<tr valign="top"> <td> keyword </td>
+  <td>  ``char''  </td>
+  <td> <p>  The keywords are FSSReq, FSSCoverage, FSSdelta. </td> </tr>
+<tr valign="top"> <td> keyword value  </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the keyword </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="FSS General Set Scheme Dump File">FSS General Set Scheme Dump File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> setID </td>
+  <td>  ``char'' </td>
+  <td> <p>  The FSS set identification</td> </tr>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  The part number gating the demand of the set, setid </td> </tr>
+<tr valign="top"> <td> PDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The name of the production facility where the gating 
+ part, partNumber, is consumed  </td> </tr>
+<tr valign="top"> <td> keyword </td>
+  <td>  ``char''  </td>
+  <td> <p>  The keywords are FSSReq, FSSCoverage, FSSdelta.
+    Zero vectors are excluded.</td> </tr>
+<tr valign="top"> <td> keyword value  </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the keyword </td> </tr>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Execution Volume Schedule File">Operation Execution Volume Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p>  The operation name </td> </tr>
+  <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> executionVol  </td>
+  <td>  floatVec</td>
+  <td> <p>   Time-phased vector of the execution volume
+  of the operationName.  </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Substitute Usage Volume Schedule File">Operation Substitute Usage Volume Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p>  Name of operation</td> </tr>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Child part belonging to operationName</td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Substitute part for partNumber1 in operationName's BOM</td> </tr>
+<tr valign="top"> <td> PDF        </td>
+  <td>   ``char''  </td> 
+  <td> <p> </td> </tr>
+<tr valign="top">   <td> prodVol    </td>
+  <td> <p>  floatVec </td>
+  <td>   Time-phased Vector of the execution volume of
+                      operationName using partNumber2 as a substitute for
+                      partNumber1, based on the implosion solution. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="MRP Operation Substitute Usage Volume Schedule File">MRP Operation Substitute Usage Volume Schedule File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p>  Name of operation</td> </tr>
+<tr valign="top"> <td> partNumber1 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Child part belonging to operationName</td> </tr>
+<tr valign="top"> <td> partNumber2 </td>
+  <td>  ``char''  </td>
+  <td> <p>  Substitute part for partNumber1 in operationName's BOM</td> </tr>
+<tr valign="top"> <td> PDF        </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top">   <td> prodVol    </td>
+  <td> floatVec </td>
+  <td> <p>  Time-phased Vector of the execution volume of
+                      operationName using partNumber2 as a substitute for
+                      partNumber1, based on the MRP solution. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Operation Database Dump File">Operation Database Dump File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+  <td> operationName </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+  <td> PDF </td>
+  <td>  ``char''  </td>
+  <td> <p> </td> </tr> 
+<tr valign="top"> <td> keyword </td>
+  <td>  ``char''  </td>
+  <td> <p>  The keywords are 
+execFlag,
+execVol,
+mrpExecVol,
+yieldRate,
+   Zero vectors are excluded.</td> </tr>
+<tr valign="top"> <td> keyword value  </td>
+  <td>  floatVec </td>
+  <td> <p>   Time-phased Vector of the keyword </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="MRP Demand Orders File">MRP Demand Orders File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  The part number </td> </tr>
+<tr valign="top"> <td> customerPDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The PDF placing the demand </td> </tr>
+<tr valign="top"> <td> supplierPDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The PDF on which the demand is placed</td> </tr>
+<tr valign="top"> <td> demandSourceCode </td>
+  <td> ``char'' </td>
+  <td> <p>  A = Interplant source <br>
+            F = Build In-House <br>
+            O = User-defined Operation <br>
+            D = De-aggregation <br>
+            E = External </td> </tr>
+<tr valign="top"> <td> demandOrderVolume </td>
+  <td>  floatVec </td>
+  <td> <p>  The time-phased vector of MRP demand orders </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="MRP Supply Orders File">MRP Supply Orders File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> partNumber </td>
+  <td>  ``char'' </td>
+  <td> <p>  The part number</td> </tr>
+<tr valign="top"> <td> supplierPDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The PDF which is the source of the supply</td> </tr>
+<tr valign="top"> <td> customerPDF </td>
+  <td>  ``char'' </td>
+  <td> <p>  The PDF which is the customer of the supply</td> </tr>
+<tr valign="top"> <td> supplySourceCode </td>
+  <td> ``char'' </td>
+  <td> <p> A = Interplant source <br>
+           F = Build In-House <br>
+           O = User-defined Operation <br>
+           D = De-aggregation <br>
+           E = External </td> </tr>
+<tr valign="top"> <td> supplyOrderVolume </td>
+  <td>  floatVec </td>
+  <td> <p>  The time-phased vector of MRP supply orders</td> </tr>
+</table>
+
+<br>
+<br>
+<b> Formatted Output File Specifications </b>
+
+<ul>
+<li><a href="#Formatted Supply Response File">Formatted Supply 
+              Response File</a>
+<li><a href="#SCE Output Log File">SCE Output Log File</a>
+<li><a href="#SCE Input Log File">SCE Input Log File</a>
+<li><a href="#SCE Parameter Log File">SCE Parameter Log File</a>
+<li><a href="#SCE Error Log File">SCE Error Log File</a>
+</ul>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="Formatted Supply Response File">Formatted Supply Response File</a> </b> </caption>
+<tr valign="top"> <td> </td>
+  <td> Date<sub>0</sub> </td>
+  <td> Date<sub>1</sub> </td>
+  <td> ... </td>
+  <td> Date<sub>numPeriods - 2</sub> </td> 
+  <td> Date<sub>numPeriods - 1</sub>  </td> </tr>
+<tr valign="top"> <td> partNumber --- geo: </td> </tr>
+<tr valign="top"> <td> Demand </td>
+  <td> Demand<sub>0</sub> </td>  
+  <td> Demand<sub>1</sub> </td>  
+  <td> ... </td>
+  <td> Demand<sub>numPeriods - 2</sub> </td> 
+  <td> Demand<sub>numPeriods - 1</sub> </td> </tr>
+<tr valign="top"> <td> Supply </td>
+  <td> Supply<sub>0</sub> </td>
+  <td> Supply<sub>1</sub> </td>
+  <td> ... <td> Supply<sub>numPeriods - 2</sub> </td>
+  <td> Supply<sub>numPeriods - 1</sub> <td> </tr>
+<tr valign="top"> <td> Delta </td>
+  <td> Delta<sub>0</sub> </td>
+  <td> Delta<sub>1</sub> </td> 
+  <td> ... </td>
+  <td> Delta<sub>numPeriods - 2</sub> </td>
+  <td> Delta<sub>numPeriods - 1</sub> </td> </tr>
+<tr> <td> </td> </tr>
+<tr valign="top"> <td> partNumber --- geo: </td> </tr>
+<tr valign="top"> <td> Demand </td>
+  <td> Demand<sub>0</sub> </td>  
+  <td> Demand<sub>1</sub> </td>  
+  <td> ... </td>
+  <td> Demand<sub>numPeriods - 2</sub> </td> 
+  <td> Demand<sub>numPeriods - 1</sub> </td> </tr>
+<tr valign="top"> <td> Supply </td>
+  <td> Supply<sub>0</sub> </td>
+  <td> Supply<sub>1</sub> </td>
+  <td> ... <td> Supply<sub>numPeriods - 2</sub> </td>
+  <td> Supply<sub>numPeriods - 1</sub> <td> </tr>
+<tr valign="top"> <td> Delta </td>
+  <td> Delta<sub>0</sub> </td>
+  <td> Delta<sub>1</sub> </td> 
+  <td> ... </td>
+  <td> Delta<sub>numPeriods - 2</sub> </td>
+  <td> Delta<sub>numPeriods - 1</sub> </td> </tr>
+<tr> <td> </td> </tr>
+<tr valign="top"> <td> ... </td> 
+  <td> ... </td> 
+  <td> ... </td>  
+  <td> ... </td>  
+  <td> ... </td>  
+  <td> ... </td> </tr>
+<tr> <td> </td> </tr>
+<tr valign="top"> <td> partNumber --- geo: </td> </tr>
+<tr valign="top"> <td> Demand </td>
+  <td> Demand<sub>0</sub> </td>  
+  <td> Demand<sub>1</sub> </td>  
+  <td> ... </td>
+  <td> Demand<sub>numPeriods - 2</sub> </td> 
+  <td> Demand<sub>numPeriods - 1</sub> </td> </tr>
+<tr valign="top"> <td> Supply </td>
+  <td> Supply<sub>0</sub> </td>
+  <td> Supply<sub>1</sub> </td>
+  <td> ... <td> Supply<sub>numPeriods - 2</sub> </td>
+  <td> Supply<sub>numPeriods - 1</sub> <td> </tr>
+<tr valign="top"> <td> Delta </td>
+  <td> Delta<sub>0</sub> </td>
+  <td> Delta<sub>1</sub> </td> 
+  <td> ... </td>
+  <td> Delta<sub>numPeriods - 2</sub> </td>
+  <td> Delta<sub>numPeriods - 1</sub> </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="SCE Input Log File">SCE Input Log File</a> </b> </caption>
+<thead>
+<tr> <th> </th> <th> </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> In input file: </td> 
+  <td> {Name of Input File}  </td>
+  <td> <p> For each input file read, SCE generates
+   an entry in the Input Log File </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> k records read. </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> l records accepted. </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> m records rejected. </td> </tr>
+<tr valign="top"> <td> </td> 
+  <td> n lines commented or blank </td> 
+  <td> <p> SCE checks that k = l + m + n </td> </tr>
+<tr valign="top" <td> ... </td>
+  <td> ... </td>
+  <td> ... </td>
+  <td> ... </td> </tr>
+<tr valign="top"><td colspan=2><p>There were p input records rejected by SCE.
+  </td>
+  <td> <p> SCE reports the total number of input records rejected. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="SCE Output Log File">SCE Output Log File</a> </b> </caption>
+<thead>
+<tr> <th>  </th> <th>  </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> In input file: </td>
+  <td> {Name of Output File} </td>
+  <td> <p>  For each output file written, 
+                 SCE generates an entry in the Output Log File.  This entry
+                 reconciles the number of output records with the number
+                 number of valid records from appropriate input files. </td>
+      </tr>
+<tr valign="top"> <td> </td>
+  <td> n good records from input file: {name} </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> --------------- </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> k data sets written </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> (f(k) total lines written) </td>
+  <td> <p> Total number of lines written to {Name of Output File}.  
+        f(k) is a function of k. </td> </tr>
+<tr valign="top"> <td> ... </td>
+  <td> ... </td> <td> ... </td> </tr>
+<tr valign="top"> <td> In input file: </td>
+  <td> {Name of Output File} </td> <tr>
+<tr valign="top"> <td> </td>
+  <td> +(-) l good records from file: {name1} </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> +(-) m good records from file: {name1} </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> - n records with zeroVectors ommitted. </td>
+  <td> <p> Zero vectors are not printed in many output reports. </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> --------------- </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> p data sets written </td>
+  <td> <p> p is the sum (taking into account the signs) of 
+           l, m, and n. </td> </tr>
+<tr valign="top"> <td> </td>
+  <td> (g(p) total lines written) </td>
+  <td> <p> Total number of lines written to {Name of Output File}.  
+        g(p) is a function of p. </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="SCE Parameter Log File">SCE Parameter Log File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> Parameter Name </td>
+  <td>  string </td>
+  <td> <p>  Name of SCE parameter </td> </tr>
+<tr valign="top"> <td> Default Value </td>
+  <td>  string </td>
+  <td> <p>  The default value for this parameter </td> </tr>
+<tr valign="top"> <td> Actual/Used Value </td>
+  <td>  string </td>
+  <td> <p>  The value SCE used for this parameter </td> </tr>
+<tr valign="top"> <td> Method Set </td>
+  <td>  string </td>
+  <td> <p>  How the parameter was set: DEFUALT or USER-DEFINED </td> </tr>
+<tr valign="top"> <td> ... </td>
+  <td> ... </td>
+  <td> ... </td> </tr>
+<tr valign="top"> <td colspan=2><p> Number of User-Defined Parameters: l </td>
+  <td> <p> The number of SCE parameters set by the user. </td> </tr>
+<tr valign="top"> <td colspan=2><p> Number of Default Parameters: m </td>
+  <td> The number of SCE parameters set by default. </td> </tr>
+<tr valign="top"> <td colspan=2><p> Total Number of Parameters: n </td>
+  <td> <p> The total number of SCE parameters;  n should equal l+m </td> </tr>
+</table>
+
+<br>
+<br>
+<table border>
+<caption><b><a name="SCE Error Log File">SCE Error Log File</a> </b> </caption>
+<thead>
+<tr> <th> DataElement </th> <th> type </th> <th> comment </th> </tr>
+</thead>
+<tr valign="top"> <td> Error Message ID </td>
+  <td>  string </td>
+  <td> <p>  The SCE error message identification number. </td> </tr>
+<tr valign="top"> <td> Error Text </td>
+  <td>  string </td>
+  <td> <p>  The error message </td> </tr>
+</table>
+
+
+</body>
+</html>

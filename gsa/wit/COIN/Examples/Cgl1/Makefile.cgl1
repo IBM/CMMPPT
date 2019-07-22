@@ -1,0 +1,90 @@
+# Select optimization (-O or -g). -O will be automatically bumped up to the 
+# highest level of optimization the compiler supports. If want something in
+# between then specify the exact level you want, e.g., -O1 or -O2
+
+# OptLevel := -O
+OptLevel := -g
+
+##############################################################################
+# You should not need to edit below this line.
+##############################################################################
+# The location of the customized Makefiles
+# also inherited from the parent Makefile
+include ${MakefileDir}/Makefile.coin
+include ${MakefileDir}/Makefile.location
+
+IncDir := ${CglIncDir} ${OsiClpIncDir} ${OsiIncDir} ${ClpIncDir}
+IncDir += ${CoinIncDir} ${bzlibIncDir} ${zlibIncDir}
+
+LibDir := ${CglLibDir} ${OsiClpLibDir} ${OsiLibDir} ${ClpLibDir}
+LibDir += ${CoinLibDir} ${bzlibLibDir} ${zlibLibDir}
+
+LibName := ${CglLibName} ${OsiClpLibName} ${OsiLibName} ${ClpLibName}
+LibName += ${CoinLibName} ${bzlibLibName} ${zlibLibName}
+
+Define := ${CglDefine} ${OsiClpDefine} ${OsiLibDefine} ${ClpDefine}
+Define += ${CoinDefine} ${bzlibDefine} ${zlibDefine}
+
+##############################################################################
+
+CXXFLAGS += $(OPTFLAG)
+
+EXSRC := cgl1.cpp
+
+###############################################################################
+
+space:= $(empty) $(empty)
+OptVersion := $(subst $(space),_,$(OptLevel))
+
+TARGETDIR := $(UNAME)$(OptVersion)
+DEPDIR := dep
+
+VPATH := . : include : Junk : ${TARGETDIR} : ${DEPDIR}
+
+#########################################################################
+
+CXXFLAGS += $(addprefix -I,$(IncDir))
+CXXFLAGS += $(addprefix -D,$(Define))
+
+LIBDIRS := ${LibDir}
+LIBS    := ${LibName}
+
+LDFLAGS := $(addprefix -L,$(LIBDIRS))
+LDFLAGS += $(call ifprefix,$(SHLINKPREFIX),$(LIBDIRS))
+LDFLAGS += $(patsubst lib%,-l%,$(basename $(LIBS)))
+
+###############################################################################
+
+EXOBJ := $(addprefix $(TARGETDIR)/, $(EXSRC:.cpp=.o))
+EXDEP := $(addprefix $(DEPDIR)/, $(EXSRC:.cpp=.d))
+
+###############################################################################
+# This one must be right before the rules
+
+include ${MakefileDir}/Makefile.rules
+
+###############################################################################
+
+.DELETE_ON_ERROR:
+
+.PHONY: cgl1
+
+cgl1: $(TARGETDIR)/cgl1
+
+$(TARGETDIR)/cgl1 : $(EXOBJ)
+	@echo ""
+	@echo Creating example cgl1
+	@mkdir -p $(TARGETDIR)
+	@rm -f $@
+	$(CXX) $(CXXFLAGS) -o $@ $(EXOBJ) $(LDFLAGS) $(SYSLD) -lm
+
+###############################################################################
+
+%::
+	@mkdir -p Junk
+	touch Junk/$(notdir $@)
+
+###############################################################################
+
+-include $(EXDEP)
+

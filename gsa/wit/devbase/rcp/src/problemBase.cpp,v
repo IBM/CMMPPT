@@ -1,0 +1,1564 @@
+head	1.17;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.17
+date	2006.05.17.14.32.21;	author gresh;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2006.05.15.14.07.57;	author gresh;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2005.09.08.14.57.48;	author gresh;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2004.10.29.02.45.24;	author fasano;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2004.06.04.17.07.37;	author gresh;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.05.14.13.34.19;	author dpc;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.05.12.14.04.25;	author dpc;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.05.04.02.08.01;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.05.03.13.29.27;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.04.16.14.24.08;	author dpc;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.03.23.14.27.49;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.01.08.21.04.09;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.11.23.11.10.48;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.11.21.04.22.25;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.11.19.19.34.24;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.11.18.19.32.19;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2003.11.13.14.23.39;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2003.11.13.14.23.39;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.17
+log
+@remove witsetpostsolverecover
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <numeric>
+#include <set>
+
+#include <cassert>
+#include <iostream>
+#include <cfloat>
+#include <cstdio>
+#include <climits>
+
+#include <wit.h>
+#include "checkWitRC.h"
+
+#include "CoinFloatEqual.h"
+//#include "probAppData.h"
+//#include "mtmAppData.h"
+//#include "mtmDemanBomAppData.h"
+//#include "featureXrefAppData.h"
+//#include "featureAppData.h"
+//#include "loosePartAppData.h"
+#include "problemBase.h"
+//#include "eso2.h"
+//#include "unitTestResultsData.h"
+//#include "eso2WitPrune.h"
+
+extern bool witOK;
+
+// Get Bom Entry Index
+// Return first bomEntryIndex for specified operation and part
+// -1 returned if bomEntryIndex does not exist
+int SCOproblemBase::getBomEntryIndex( 
+                                const std::string & opName, 
+                                const std::string & partName
+                                ) const
+{
+  int retVal = -1;
+  
+  //int nP = getNPeriods();
+
+  // Get current number of bops connected to operation
+  int nBoms;
+  checkWitRC(witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms));
+
+  int bei;
+  for ( bei=0; bei<nBoms; bei++ ) {
+    char * consPartFromWit;
+    checkWitRC(witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),bei,&consPartFromWit));
+    if(partName==consPartFromWit) retVal=bei;
+    checkWitRC(witFree(consPartFromWit));
+    if(retVal!=-1) break;
+  }
+
+  return retVal;
+}
+
+
+// Return true if demand exist
+bool SCOproblemBase::witGetDemandExists(const std::string & pn, const std::string & dn ) const
+{
+  bool retVal = false;
+  
+  witBoolean partExists;
+  checkWitRC(witGetPartExists( mutableWitRun(), pn.c_str(), &partExists ));
+  if ( !partExists ) return retVal;   
+  
+  int nPartDemands;
+  char ** demandList;
+  checkWitRC(witGetPartDemands( mutableWitRun(), pn.c_str(), &nPartDemands, &demandList));
+  for ( int d=0; d<nPartDemands; ++d ) {
+    if ( demandList[d] == dn ) {
+      retVal = true;
+    }    
+    checkWitRC(witFree(demandList[d]));
+  }
+  checkWitRC(witFree(demandList));
+  return retVal;
+}
+
+
+bool SCOproblemBase::witPartExists(const std::string & witPartName )const
+{
+  witBoolean partExists;
+  checkWitRC(witGetPartExists(mutableWitRun(),witPartName.c_str(),&partExists));
+  bool retVal = false;
+  if( partExists) retVal = true;
+  return retVal;
+}
+
+
+bool SCOproblemBase::witOperationExists(const std::string & witOpName )const
+{
+  witBoolean opExists;
+  checkWitRC(witGetOperationExists(mutableWitRun(),witOpName.c_str(),&opExists));
+  bool retVal = false;
+  if( opExists) retVal = true;
+  return retVal;
+}
+
+void SCOproblemBase::compareWitSolutionsTimeVec(
+                                const std::string & id,
+                                const std::vector<float> & execTv1,
+                                const std::vector<float> & execTv2, 
+                                const std::vector<float> & costTv1,
+                                const std::vector<float> & costTv2 ) 
+{
+  unsigned int t;
+  assert( execTv1.size()==execTv2.size() );
+  for ( t=0; t<execTv1.size(); ++t ) {
+    CoinRelFltEq eq;
+    if ( !eq(execTv1[t],execTv2[t]) ) {
+      std::cout <<id.c_str() <<" period: " <<t <<" vol: " <<execTv1[t] <<" " <<execTv2[t] <<" cost: " <<costTv1[t] <<" " <<costTv2[t] <<std::endl;
+    }
+  }
+}
+
+
+void SCOproblemBase::compareWitSolutions( const SCOproblemBase & p1,  const SCOproblemBase & p2 ) 
+{
+  // Iterate over demands in p1
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p1.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_DEMAND ) {
+        char * demandedPartName;
+        char * demandName;
+        checkWitRC(witGetObjItrDemand(p1.mutableWitRun(),&demandedPartName,&demandName));
+        std::vector<float> shipVol1 = p1.witGetDemandAttribute(witGetDemandShipVol,demandedPartName,demandName);
+        std::vector<float> shipRew1 = p1.witGetDemandAttribute(witGetDemandObj1ShipReward,demandedPartName,demandName);
+        
+        std::vector<float> shipVol2 = p2.floatToStlVec(0.0);
+        std::vector<float> shipRew2 = p2.floatToStlVec(-FLT_MAX);
+        bool exists = p2.witGetDemandExists(demandedPartName,demandName);
+        if ( exists ) {
+          shipVol2 = p2.witGetDemandAttribute(witGetDemandShipVol,demandedPartName,demandName);
+          shipRew2 = p2.witGetDemandAttribute(witGetDemandObj1ShipReward,demandedPartName,demandName);
+        }
+
+        std::string id = std::string(demandName) + "/" + demandedPartName;
+        compareWitSolutionsTimeVec(id,shipVol1,shipVol2,shipRew1,shipRew2);        
+        
+        checkWitRC(witFree(demandedPartName));
+        checkWitRC(witFree(demandName));
+      } 
+      
+    } // end while( true )
+  }
+  
+  // Iterate over demands in p2
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p2.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_DEMAND ) {
+        char * demandedPartName;
+        char * demandName;
+        checkWitRC(witGetObjItrDemand(p2.mutableWitRun(),&demandedPartName,&demandName));
+        std::vector<float> shipVol2 = p2.witGetDemandAttribute(witGetDemandShipVol,demandedPartName,demandName);
+        std::vector<float> shipRew2 = p2.witGetDemandAttribute(witGetDemandObj1ShipReward,demandedPartName,demandName);
+        
+        std::vector<float> shipVol1 = p1.floatToStlVec(0.0);
+        std::vector<float> shipRew1 = p1.floatToStlVec(-FLT_MAX);
+        bool exists = p1.witGetDemandExists(demandedPartName,demandName);
+        if ( exists ) continue;
+
+        std::string id = std::string(demandName) + "/" + demandedPartName;
+        compareWitSolutionsTimeVec(id,shipVol1,shipVol2,shipRew1,shipRew2);        
+        
+        checkWitRC(witFree(demandedPartName));
+        checkWitRC(witFree(demandName));
+      } 
+      
+    } // end while( true )
+  }
+
+  
+  // Iterate over operations in p1
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p1.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_OPERATION ) {
+        char * operationName;
+        checkWitRC(witGetObjItrOperation(p1.mutableWitRun(),&operationName));
+        std::vector<float> execVol1 = p1.witGetNameAttribute(witGetOperationExecVol,operationName);
+        std::vector<float> execCost1 = p1.witGetNameAttribute(witGetOperationObj1ExecCost,operationName);
+        
+        std::vector<float> execVol2 = p2.floatToStlVec(0.0);
+        std::vector<float> execCost2 = p2.floatToStlVec(-FLT_MAX);
+        int exists;
+        checkWitRC(witGetOperationExists(p2.mutableWitRun(),operationName, &exists));
+        if ( exists ) {
+          execVol2 = p2.witGetNameAttribute(witGetOperationExecVol,operationName);
+          execCost2 = p2.witGetNameAttribute(witGetOperationObj1ExecCost,operationName);
+        }
+
+        std::string id = std::string("Operation:: ") + operationName;
+        compareWitSolutionsTimeVec(id,execVol1,execVol2,execCost1,execCost2);        
+        
+        checkWitRC(witFree(operationName));
+      } 
+      
+    } // end while( true )
+  }
+  
+  // Iterate over operations in p2
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p2.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_OPERATION ) {
+        char * operationName;
+        checkWitRC(witGetObjItrOperation(p2.mutableWitRun(),&operationName));
+        std::vector<float> execVol2 = p2.witGetNameAttribute(witGetOperationExecVol,operationName);
+        std::vector<float> execCost2 = p2.witGetNameAttribute(witGetOperationObj1ExecCost,operationName);
+        
+        std::vector<float> execVol1 = p1.floatToStlVec(0.0);
+        std::vector<float> execCost1 = p1.floatToStlVec(-FLT_MAX);
+        int exists;
+        checkWitRC(witGetOperationExists(p1.mutableWitRun(),operationName, &exists));
+        if ( exists ) continue; 
+
+        std::string id = std::string("Operation:: ") + operationName;
+        compareWitSolutionsTimeVec(id,execVol1,execVol2,execCost1,execCost2);        
+        
+        checkWitRC(witFree(operationName));
+      } 
+      
+    } // end while( true )
+  }
+
+   
+  // Iterate over substitutes in p1
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p1.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p1.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_SUB_ENTRY ) {
+        char * operationName;
+        int bomEntry;
+        int subEntry;
+        checkWitRC(witGetObjItrSubsBomEntry(p1.mutableWitRun(),&operationName, &bomEntry, &subEntry));
+        std::vector<float> subVol1 = p1.witGetSubArcAttribute(witGetSubsBomEntrySubVol,operationName,bomEntry,subEntry);
+        std::vector<float> subCost1 = p1.witGetSubArcAttribute(witGetSubsBomEntryObj1SubCost,operationName,bomEntry,subEntry);
+        
+        std::vector<float> subVol2 = p2.floatToStlVec(0.0);
+        std::vector<float> subCost2 = p2.floatToStlVec(-FLT_MAX);
+        bool exists = p2.witGetSubsBomEntryExists(operationName,bomEntry,subEntry);
+        if ( exists ) {
+          subVol2 = p2.witGetSubArcAttribute(witGetSubsBomEntrySubVol,operationName,bomEntry,subEntry);
+          subCost2 = p2.witGetSubArcAttribute(witGetSubsBomEntryObj1SubCost,operationName,bomEntry,subEntry);
+        }
+
+
+        char bomEntryAsChar[100];
+        char subEntryAsChar[100];
+        sprintf(bomEntryAsChar,"%d",bomEntry);
+        sprintf(subEntryAsChar,"%d",subEntry);        
+        std::string id = std::string("Subs:: ") + operationName + " bomEntry: " + bomEntryAsChar + " subEntry: " + subEntryAsChar;
+        compareWitSolutionsTimeVec(id,subVol1,subVol2,subCost1,subCost2);        
+        
+        checkWitRC(witFree(operationName));
+      } 
+      
+    } // end while( true )
+  }
+    
+  // Iterate over substitutes in p2
+  {  
+    witAttr objItrState;
+    checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+    while( true )   {
+      checkWitRC(witAdvanceObjItr(p2.mutableWitRun()));
+      checkWitRC(witGetObjItrState(p2.mutableWitRun(), &objItrState));
+      if (objItrState==WitINACTIVE) break;
+      if( objItrState == WitAT_SUB_ENTRY ) {
+        char * operationName;
+        int bomEntry;
+        int subEntry;
+        checkWitRC(witGetObjItrSubsBomEntry(p2.mutableWitRun(),&operationName, &bomEntry, &subEntry));
+        std::vector<float> subVol2 = p2.witGetSubArcAttribute(witGetSubsBomEntrySubVol,operationName,bomEntry,subEntry);
+        std::vector<float> subCost2 = p2.witGetSubArcAttribute(witGetSubsBomEntryObj1SubCost,operationName,bomEntry,subEntry);
+        
+        std::vector<float> subVol1 = p1.floatToStlVec(0.0);
+        std::vector<float> subCost1 = p1.floatToStlVec(-FLT_MAX);
+        bool exists = p1.witGetSubsBomEntryExists(operationName,bomEntry,subEntry);
+        if ( exists ) continue; 
+
+        char bomEntryAsChar[100];
+        char subEntryAsChar[100];
+        sprintf(bomEntryAsChar,"%d",bomEntry);
+        sprintf(subEntryAsChar,"%d",subEntry);        
+        std::string id = std::string("Subs:: ") + operationName + "bomEntry: " + bomEntryAsChar + "subEntry: " + subEntryAsChar;
+        compareWitSolutionsTimeVec(id,subVol1,subVol2,subCost1,subCost2);        
+        
+        checkWitRC(witFree(operationName));
+      } 
+      
+    } // end while( true )
+  }
+}
+//--------------------------------------------
+//--------------------------------------------
+
+
+// Set wit bounds and ensure that hlb<=slb<=hub
+// This condition is not being met.
+void SCOproblemBase::setExecBounds(
+                                const std::string opName,
+                                std::vector<float> hlb,
+                                std::vector<float> slb,
+                                std::vector<float> hub )
+{
+  CoinRelFltEq eq(1.e-8);
+  int np = getNPeriods();
+  int p;
+  for (p=0; p<np; ++p) {
+    if( eq( hlb[p],slb[p] ) ) slb[p] = hlb[p];
+    if( eq( slb[p],hub[p] ) ) hub[p] = slb[p];
+  }
+  witSetNameBoundAttribute(witSetOperationExecBounds,opName, hlb,slb,hub);
+}
+
+//-------------------------------------------------------------------------
+// text utilities Methods
+//-------------------------------------------------------------------------
+std::string SCOproblemBase::textBetween(
+                        const std::string & src, 
+                        const std::string & begMark,
+                        const std::string & endMark)
+{
+  int begPos = src.find(begMark);
+  //assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = src.find(endMark);
+  //assert( endPos != std::string::npos );
+
+  int len = endPos-begPos;
+  std::string retVal = src.substr(begPos,len);
+  return retVal;
+}
+
+std::string SCOproblemBase::textAfter(
+                        const std::string & src, 
+                        const std::string & begMark)
+{
+  int begPos = src.find(begMark);
+  //assert( begPos != std::string::npos );
+  begPos = begPos+begMark.size();
+
+  int endPos = src.size();
+
+  int len = endPos-begPos;
+  std::string retVal = src.substr(begPos,len);
+  return retVal;
+}
+bool SCOproblemBase::beginsWith(
+                        const std::string & src, 
+                        const std::string & begString)
+{
+  int begPos = src.find(begString);
+  if ( begPos==0 ) return true;
+  else return false;
+}
+
+
+// Set OSL Logfile name
+void SCOproblemBase::setOslMesgFileName(const std::string & name)
+{
+  checkWitRC(witSetSolverLogFileName(witRun(),name.c_str()));
+}
+
+//--------------------------------------------
+// Return true if subsBomEntry exists
+bool SCOproblemBase::witGetSubsBomEntryExists(
+                                           const std::string & operationName,
+                                           int bomEntry,
+                                           int subEntry) const
+{
+  int opExists;
+  checkWitRC(witGetOperationExists(mutableWitRun(),operationName.c_str(),&opExists));
+  if ( !opExists ) return false;
+
+  int nBomEntries;
+  checkWitRC(witGetOperationNBomEntries(mutableWitRun(),operationName.c_str(),&nBomEntries));
+
+  int nSubBomEntries;
+  checkWitRC(witGetBomEntryNSubsBomEntries(mutableWitRun(),operationName.c_str(),bomEntry,&nSubBomEntries));
+  if ( subEntry >= nSubBomEntries ) return false;
+  return true;
+}
+
+//-------------------------------------------------------------------------
+// Utilities for invoking Wit Methods
+//-------------------------------------------------------------------------
+// Set element of Part/Operation float* attribute, given period and float
+void SCOproblemBase::witSetNameAttribute(
+    witGetNameFloatStarStar witGetFunc,
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    int period, 
+    float flt )    
+{ 
+  assert( period>= 0 );
+  assert( period<getNPeriods() );
+  float * floatStar;
+  checkWitRC(witGetFunc(mutableWitRun(),name.c_str(),&floatStar));
+  floatStar[period] = flt;
+  checkWitRC(witSetFunc(witRun(),name.c_str(),floatStar));
+  checkWitRC(witFree(floatStar));
+}
+
+// Set Part/Operation float* attribute, given std::vector<float>
+void SCOproblemBase::witSetNameAttribute(
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    const std::vector<float> & value )
+{
+  float * fltStar = stlVecToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),name.c_str(),fltStar));
+  delete [] fltStar;
+}
+
+// Set Part/Operation float* attribute, given float
+void SCOproblemBase::witSetNameAttribute(
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    float value )
+{
+  float * fltStar = floatToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),name.c_str(),fltStar));
+  delete [] fltStar;
+}
+
+// Set demand int* attribute, given int
+void SCOproblemBase::witSetDemandAttribute(
+    witSetDblNameIntStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    int value )
+{
+  int * intStar = intToIntStar(value);
+  checkWitRC(witSetFunc(witRun(),partName.c_str(),demandName.c_str(),intStar));
+  delete [] intStar;
+}
+
+// Set Part/Operation bound attribute, given three std::vector<float> vectors
+void SCOproblemBase::witSetNameBoundAttribute(
+    witSetName3FloatStar     witSetFunc,
+    const std::string & name,
+    const std::vector<float> & hlb,
+    const std::vector<float> & slb,
+    const std::vector<float> & hub )
+{
+  float * hlbFltStar = stlVecToFloatStar(hlb);
+  float * slbFltStar = stlVecToFloatStar(slb);
+  float * hubFltStar = stlVecToFloatStar(hub);
+  checkWitRC(witSetFunc(witRun(),name.c_str(),hlbFltStar, slbFltStar, hubFltStar));
+  delete [] hlbFltStar;
+  delete [] slbFltStar;
+  delete [] hubFltStar;
+}
+// Get Part/Operation bound attributes, given three std::vector<float> vectors
+void SCOproblemBase::witGetNameBoundAttribute(
+    witGetName3FloatStar     witGetFunc,
+    const std::string & name,
+    std::vector<float> & hlb,
+    std::vector<float> & slb,
+    std::vector<float> & hub )const
+{
+  float * hlbFltStar;
+  float * slbFltStar;
+  float * hubFltStar;
+  checkWitRC(witGetFunc(mutableWitRun(),name.c_str(),&hlbFltStar, &slbFltStar, &hubFltStar));
+  hlb=witFloatStarToStlVec(hlbFltStar);
+  slb=witFloatStarToStlVec(slbFltStar);
+  hub=witFloatStarToStlVec(hubFltStar);
+  checkWitRC(witFree(hlbFltStar));
+  checkWitRC(witFree(slbFltStar));
+  checkWitRC(witFree(hubFltStar));
+}
+
+
+
+// Set element of Bop/Bop Entry float* attribute, given period and float
+void SCOproblemBase::witSetArcAttribute(
+    witGetNameIndexFloatStarStar witGetFunc,
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    int period, 
+    float flt )    
+{ 
+  assert( period>= 0 );
+  assert( period<getNPeriods() );
+  //int bei = getBopEntryIndex(opName,partName);
+  //assert( bei!=-1 );
+  float * floatStar;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,&floatStar));
+  floatStar[period] = flt;
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,floatStar));
+  checkWitRC(witFree(floatStar));
+}
+
+// Set element of Bop/Bop Entry float* attribute, given std::vector<float>
+void SCOproblemBase::witSetArcAttribute(
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    const std::vector<float> & value )    
+{ 
+  float * fltStar = stlVecToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,fltStar));
+  delete []  fltStar;
+}
+
+// Set element of Bop/Bop Entry float* attribute, given float
+void SCOproblemBase::witSetArcAttribute(
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    float value )    
+{ 
+  float * fltStar = floatToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,fltStar));
+  delete []  fltStar;
+}
+
+
+// Set element on demand float* attribute, given period and fltValue
+void SCOproblemBase::witSetDemandAttribute(
+    witGetDblNameFloatStarStar      witGetFunc,
+    witSetDblNameFloatStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    int period, 
+    float flt )
+{
+  assert( period>= 0 );
+  assert( period<getNPeriods() );
+  float * floatStar;
+  checkWitRC(witGetFunc(mutableWitRun(),partName.c_str(),demandName.c_str(),&floatStar));
+  floatStar[period] = flt;
+  checkWitRC(witSetFunc(witRun(),partName.c_str(),demandName.c_str(),floatStar));
+  checkWitRC(witFree(floatStar));
+}
+
+void SCOproblemBase::witSetDemandAttribute(
+    witSetDblNameFloatStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    float flt )
+{
+  float * fltStar = floatToFloatStar(flt);
+  checkWitRC(witSetFunc(witRun(),partName.c_str(),demandName.c_str(),fltStar));
+  delete [] fltStar;
+}
+
+// Get vector of wit part/Operation float* attribute
+std::vector<float> SCOproblemBase::witGetNameAttribute(
+    witGetNameFloatStarStar witGetFunc,
+    const std::string & name ) const
+{
+  float * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),name.c_str(),&attr));
+  std::vector<float> retVal = witFloatStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+// Get vector of bom/bop float* attribute
+std::vector<float> SCOproblemBase::witGetArcAttribute(
+                                     witGetNameIndexFloatStarStar     witGetFunc,
+                                     const std::string & opName,
+                                     int index )const
+{
+  float * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,&attr));
+  std::vector<float> retVal = witFloatStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+// Get vector of bom/bop int* attribute
+std::vector<int> SCOproblemBase::witGetArcAttribute(
+                                     witGetNameIndexIntStarStar     witGetFunc,
+                                     const std::string & opName,
+                                     int index )const
+{
+  int * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,&attr));
+  std::vector<int> retVal = witIntStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+
+
+// Get vector of sub float* attribute
+std::vector<float> SCOproblemBase::witGetSubArcAttribute(
+                                     witGetNameIndexIndexFloatStarStar     witGetFunc,
+                                     const std::string & opName,
+                                     int index, int subIndex )const
+{
+  float * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&attr));
+  std::vector<float> retVal = witFloatStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+// Get vector of sub int* attribute
+std::vector<int> SCOproblemBase::witGetSubArcAttribute(
+                                     witGetNameIndexIndexIntStarStar     witGetFunc,
+                                     const std::string & opName,
+                                     int index, int subIndex )const
+{
+  int * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&attr));
+  std::vector<int> retVal = witIntStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+// Get vector of sub int attribute
+int SCOproblemBase::witGetSubArcAttribute(
+                                     witGetNameIndexIndexIntStar     witGetFunc,
+                                     const std::string & opName,
+                                     int index, int subIndex )const
+{
+  int retVal;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&retVal));
+  return retVal;
+}
+
+// Set sub float* attribute, given period and fltValue
+void SCOproblemBase::witSetSubArcAttribute(
+    witGetNameIndexIndexFloatStarStar witGetFunc,
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    int period, 
+    float flt )    
+{ 
+  assert( period>= 0 );
+  assert( period<getNPeriods() );
+  float * floatStar;
+  checkWitRC(witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&floatStar));
+  floatStar[period] = flt;
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,subIndex,floatStar));
+  checkWitRC(witFree(floatStar));
+}
+
+// Set sub float* attribute
+void SCOproblemBase::witSetSubArcAttribute(
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    const std::vector<float> & value )    
+{ 
+
+  float * fltStar = stlVecToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,subIndex,fltStar));
+  delete []  fltStar;
+}
+
+// Set sub float* attribute
+void SCOproblemBase::witSetSubArcAttribute(
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    float value )    
+{ 
+
+  float * fltStar = floatToFloatStar(value);
+  checkWitRC(witSetFunc(witRun(),opName.c_str(),index,subIndex,fltStar));
+  delete []  fltStar;
+}
+
+
+
+
+
+
+
+// Get vector of wit demand float* attribute
+std::vector<float> SCOproblemBase::witGetDemandAttribute(
+    witGetDblNameFloatStarStar witGetFunc,
+    const std::string & partName,
+    const std::string & demandName )const
+{
+  float * attr;
+  checkWitRC(witGetFunc(mutableWitRun(),partName.c_str(),demandName.c_str(),&attr));
+  std::vector<float> retVal = witFloatStarToStlVec(attr);
+  checkWitRC(witFree(attr));
+  return retVal;
+}
+
+
+
+
+#if 0
+//---------------------------------------------
+// Get resource shortage list
+//---------------------------------------------
+
+void SCOproblemBase::getResourceShortages(     
+    std::vector<std::string> & resourceDescriptions,
+    std::vector<int> & periods,
+    std::vector<float> & shortageVols ) const
+{
+  resourceDescriptions.clear();
+  periods.clear();
+  shortageVols.clear();
+
+  std::vector<std::string> projects;
+  getProjects(projects);
+  int np = getNPeriods();
+  
+  // Set Focus
+  for ( int p=0; p<projects.size(); p++ ) {
+    float *dv;
+    checkWitRC(witGetDemandDemandVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),&dv));
+    checkWitRC(witSetDemandFssShipVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),dv));
+    checkWitRC(witFree(dv));
+  }
+
+  int lenList;
+  char **partList;
+  float ** shortageVolList;  
+  //OsiRelFltEq eq;
+  checkWitRC(witGetFocusShortageVol ( mutableWitRun(), &lenList, &partList, &shortageVolList ));
+  for ( int i=0; i<lenList; i++ ) {
+    for ( int t=0; t<np; t++ ) {
+      if ( shortageVolList[i][t]==0.0 ) continue;
+      resourceDescriptions.push_back(partList[i]);
+      periods.push_back(t);
+      shortageVols.push_back(shortageVolList[i][t]);
+    }
+    checkWitRC(witFree(partList[i]));
+    checkWitRC(witFree(shortageVolList[i]));
+  }
+  checkWitRC(witFree(partList));
+  checkWitRC(witFree(shortageVolList));
+}
+#endif
+
+//--------------------------------------------------------
+
+void SCOproblemBase::setTitle( const std::string & title)
+{
+  checkWitRC(witSetTitle(witRun(),title.c_str()));
+}
+
+std::string SCOproblemBase::getTitle() const
+{
+  char * t;
+  checkWitRC(witGetTitle(mutableWitRun(),&t));
+  std::string retVal(t);
+  checkWitRC(witFree(t));
+  return retVal;
+}
+
+void SCOproblemBase::setNPeriods( int nP )
+{
+  checkWitRC(witSetNPeriods(witRun(),nP));
+  nPeriods_ = nP;
+}
+
+
+double SCOproblemBase::getObjValue() const
+{
+  double retVal;
+  float objVal;
+  float boundsVal;
+  checkWitRC(witGetObjValues (mutableWitRun(),&objVal,&boundsVal));
+  retVal = objVal;
+  return retVal;
+}
+
+void SCOproblemBase::writeWitData( std::string filename ) const
+{
+  checkWitRC(witWriteData(mutableWitRun(), filename.c_str() ));
+}
+
+WitRun * SCOproblemBase::mutableWitRun() const { return wr_; }
+WitRun * SCOproblemBase::witRun() { return wr_; }
+
+int SCOproblemBase::implosionCount() const { return implosionCount_; }
+
+// default constructor
+SCOproblemBase::SCOproblemBase()
+:
+wr_(NULL),
+implosionCount_(0),
+nPeriods_(26)
+{
+  checkWitRC(witNewRun( &wr_ ));
+  checkWitRC(witInitialize( witRun() ));
+  //witSetOslMesgFileName(witRun(),WitSTDOUT);
+
+  checkWitRC(witSetMesgStopRunning(witRun(),WitTRUE,WitSEVERE_MESSAGES,WitFALSE));
+  checkWitRC(witSetMesgStopRunning(witRun(),WitTRUE,WitFATAL_MESSAGES,WitFALSE));
+
+  // Turn off WIT informational messages
+  checkWitRC(witSetMesgTimesPrint( witRun(), WitTRUE, WitINFORMATIONAL_MESSAGES, 0));
+  // Turn off warning msg about long names.
+  checkWitRC(witSetMesgTimesPrint( witRun(), WitTRUE, 338, 0));
+
+  // Turn on some interesting informational messages
+  //  witSetMesgTimesPrint( witRun(), WitTRUE, 729, UCHAR_MAX);
+  //  witSetMesgTimesPrint( witRun(), WitTRUE, 730, UCHAR_MAX);
+
+  //WIT0729I Deleting selected objects.
+  //         Number of objects selected by the user:  158900
+  //         Number of objects selected by WIT:       160629
+  //         Number of objects selected total:        319529
+
+  //WIT0730I Object purge complete.
+  //         Number of objects before purge:  332170
+  //         Number of objects deleted:       319529
+  //         Number of objects after purge:    12641
+
+  /* Turn off warning msg:
+  WIT0749W One or more BOP entries have been rejected for possible explosion,
+         because they had positive effective production rates (= yieldRate *
+         productRate) that were below the value of expCutoff. The largest
+         effective production rate that was rejected and the corresponding BOP
+         entry and execution period are given below:
+
+            expCutoff:             0.01
+            Largest Rejected Rate: 0.008
+            Operation:             "disassemble_26353AU"
+            BOP Entry Index:       4
+            Exec. Period:          0
+  */
+  //witSetMesgTimesPrint( witRun(), WitTRUE, 749, 0);
+  
+  
+  //witSetTitle( witRun(), "DaimlerChrysler" );
+  //witSetNPeriods( witRun(), 1 );
+  checkWitRC(witSetObjChoice( witRun(), 1 ));
+  checkWitRC(witSetUseFocusHorizons( witRun(), WitFALSE ));
+
+  checkWitRC(witSetExecEmptyBom( witRun(), WitFALSE ));
+  checkWitRC(witSetMultiRoute( witRun(), WitTRUE ));
+  checkWitRC(witSetIndependentOffsets( witRun(), WitTRUE ));
+
+  checkWitRC(witSetAccAfterOptImp(witRun(),WitFALSE ));
+  checkWitRC(witSetAccAfterSoftLB(witRun(),WitFALSE ));
+
+  //checkWitRC(witSetPostSolveRecovery(witRun(),WitTRUE));
+
+  //ESO2probAppData * problemAppData = new ESO2probAppData;
+  //witSetAppData(witRun(),problemAppData);
+ 
+}
+
+// destructor
+SCOproblemBase::~SCOproblemBase()
+{
+  if (witOK)
+    gutsOfDestructor();
+}
+
+// copy constructor
+SCOproblemBase::SCOproblemBase( const SCOproblemBase& source ):
+wr_(NULL),
+implosionCount_(source.implosionCount_),
+nPeriods_(source.nPeriods_)
+{
+  gutsOfCopy(source);
+}
+
+// assignment operator
+SCOproblemBase&
+SCOproblemBase::operator=(const SCOproblemBase& rhs)
+{  
+  if (this != &rhs) { 
+    if ( wr_ != NULL ) gutsOfDestructor();
+    wr_ = NULL;
+    gutsOfCopy(rhs);
+  }
+  return *this;
+}
+
+// copy object
+void SCOproblemBase::gutsOfCopy( const SCOproblemBase& source )
+{
+  // Copy Wit Run
+  assert(wr_==NULL);
+  checkWitRC(witNewRun( &wr_ ));
+
+  // Turn off WIT informational messages
+  checkWitRC(witSetMesgTimesPrint( wr_, WitTRUE, WitINFORMATIONAL_MESSAGES, 0));
+  // Turn off warning msg about long names.
+  checkWitRC(witSetMesgTimesPrint( wr_, WitTRUE, 338, 0));
+
+  checkWitRC(witCopyData(wr_,source.wr_));
+  implosionCount_ = source.implosionCount_;
+  nPeriods_ = source.nPeriods_;
+}
+
+// destructor
+void SCOproblemBase::gutsOfDestructor()
+{
+  // delete the witRun
+  checkWitRC(witDeleteRun(witRun()));
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+//------------------------------------------------------------------------------
+// Test function
+//------------------------------------------------------------------------------
+void
+SCOproblemBase::test()
+{
+  //OsiRelFltEq eq(1e-05);
+  {
+    SCOproblemBase prob;
+    
+    prob.setNPeriods(12);
+    assert( prob.getNPeriods() == 12 );
+    
+    prob.setTitle("wittitle");
+    assert( prob.getTitle() == "wittitle");
+
+    assert( prob.implosionCount()==0 );
+    
+
+  }
+
+  
+}
+
+
+@
+
+
+1.16
+log
+@added engagement families for the "portfolio" option.
+@
+text
+@d872 1
+a872 1
+  checkWitRC(witSetPostSolveRecovery(witRun(),WitTRUE));
+@
+
+
+1.15
+log
+@getting the flex mix stuff working. Seems to be pretty close to correct
+@
+text
+@d390 1
+a390 1
+  checkWitRC(witSetOslMesgFileName(witRun(),name.c_str()));
+@
+
+
+1.14
+log
+@Fixed bug in code checking to see if an operation exists.  The code was actualy checking to see if a part existed.
+@
+text
+@d362 1
+@
+
+
+1.13
+log
+@commented out assorted asserts and did things to make the eclipse compiler happy. Also for cleanliness, added "acquireTime" to readResourceFile.
+@
+text
+@d97 1
+a97 1
+  checkWitRC(witGetPartExists(mutableWitRun(),witOpName.c_str(),&opExists));
+@
+
+
+1.12
+log
+@More checks were added to catch potential WIT severe or fatal issues.  You must update WIT for these changes to work.
+@
+text
+@d42 1
+a42 1
+  int nP = getNPeriods();
+d352 1
+a352 1
+  assert( begPos != std::string::npos );
+d356 1
+a356 1
+  assert( endPos != std::string::npos );
+d367 1
+a367 1
+  assert( begPos != std::string::npos );
+@
+
+
+1.11
+log
+@Added a wrapper around all WIT calls:  checkWitRC(witReturnCode wrc)
+@
+text
+@d30 2
+d822 1
+d881 2
+a882 1
+  gutsOfDestructor();
+@
+
+
+1.10
+log
+@added method witSetDemandAttribute
+@
+text
+@d16 1
+d44 1
+a44 1
+  witGetOperationNBomEntries(mutableWitRun(),opName.c_str(),&nBoms);
+d49 1
+a49 1
+    witGetBomEntryConsumedPart(mutableWitRun(),opName.c_str(),bei,&consPartFromWit);
+d51 1
+a51 1
+    witFree(consPartFromWit);
+d65 1
+a65 1
+  witGetPartExists( mutableWitRun(), pn.c_str(), &partExists );
+d70 1
+a70 1
+  witGetPartDemands( mutableWitRun(), pn.c_str(), &nPartDemands, &demandList);
+d75 1
+a75 1
+    witFree(demandList[d]);
+d77 1
+a77 1
+  witFree(demandList);
+d85 1
+a85 1
+  witGetPartExists(mutableWitRun(),witPartName.c_str(),&partExists);
+d95 1
+a95 1
+  witGetPartExists(mutableWitRun(),witOpName.c_str(),&opExists);
+d124 1
+a124 1
+    witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d126 2
+a127 2
+      witAdvanceObjItr(p1.mutableWitRun());
+      witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d132 1
+a132 1
+        witGetObjItrDemand(p1.mutableWitRun(),&demandedPartName,&demandName);
+d147 2
+a148 2
+        witFree(demandedPartName);
+        witFree(demandName);
+d157 1
+a157 1
+    witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d159 2
+a160 2
+      witAdvanceObjItr(p2.mutableWitRun());
+      witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d165 1
+a165 1
+        witGetObjItrDemand(p2.mutableWitRun(),&demandedPartName,&demandName);
+d177 2
+a178 2
+        witFree(demandedPartName);
+        witFree(demandName);
+d188 1
+a188 1
+    witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d190 2
+a191 2
+      witAdvanceObjItr(p1.mutableWitRun());
+      witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d195 1
+a195 1
+        witGetObjItrOperation(p1.mutableWitRun(),&operationName);
+d202 1
+a202 1
+        witGetOperationExists(p2.mutableWitRun(),operationName, &exists);
+d211 1
+a211 1
+        witFree(operationName);
+d220 1
+a220 1
+    witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d222 2
+a223 2
+      witAdvanceObjItr(p2.mutableWitRun());
+      witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d227 1
+a227 1
+        witGetObjItrOperation(p2.mutableWitRun(),&operationName);
+d234 1
+a234 1
+        witGetOperationExists(p1.mutableWitRun(),operationName, &exists);
+d240 1
+a240 1
+        witFree(operationName);
+d250 1
+a250 1
+    witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d252 2
+a253 2
+      witAdvanceObjItr(p1.mutableWitRun());
+      witGetObjItrState(p1.mutableWitRun(), &objItrState);
+d259 1
+a259 1
+        witGetObjItrSubsBomEntry(p1.mutableWitRun(),&operationName, &bomEntry, &subEntry);
+d279 1
+a279 1
+        witFree(operationName);
+d288 1
+a288 1
+    witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d290 2
+a291 2
+      witAdvanceObjItr(p2.mutableWitRun());
+      witGetObjItrState(p2.mutableWitRun(), &objItrState);
+d297 1
+a297 1
+        witGetObjItrSubsBomEntry(p2.mutableWitRun(),&operationName, &bomEntry, &subEntry);
+d313 1
+a313 1
+        witFree(operationName);
+d387 1
+a387 1
+  witSetOslMesgFileName(witRun(),name.c_str());
+d398 1
+a398 1
+  witGetOperationExists(mutableWitRun(),operationName.c_str(),&opExists);
+d402 1
+a402 1
+  witGetOperationNBomEntries(mutableWitRun(),operationName.c_str(),&nBomEntries);
+d405 1
+a405 1
+  witGetBomEntryNSubsBomEntries(mutableWitRun(),operationName.c_str(),bomEntry,&nSubBomEntries);
+d424 1
+a424 1
+  witGetFunc(mutableWitRun(),name.c_str(),&floatStar);
+d426 2
+a427 2
+  witSetFunc(witRun(),name.c_str(),floatStar);
+  witFree(floatStar);
+d437 1
+a437 1
+  witSetFunc(witRun(),name.c_str(),fltStar);
+d448 1
+a448 1
+  witSetFunc(witRun(),name.c_str(),fltStar);
+d460 1
+a460 1
+  witSetFunc(witRun(),partName.c_str(),demandName.c_str(),intStar);
+d475 1
+a475 1
+  witSetFunc(witRun(),name.c_str(),hlbFltStar, slbFltStar, hubFltStar);
+d491 1
+a491 1
+  witGetFunc(mutableWitRun(),name.c_str(),&hlbFltStar, &slbFltStar, &hubFltStar);
+d495 3
+a497 3
+  witFree(hlbFltStar);
+  witFree(slbFltStar);
+  witFree(hubFltStar);
+d516 1
+a516 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,&floatStar);
+d518 2
+a519 2
+  witSetFunc(witRun(),opName.c_str(),index,floatStar);
+  witFree(floatStar);
+d530 1
+a530 1
+  witSetFunc(witRun(),opName.c_str(),index,fltStar);
+d542 1
+a542 1
+  witSetFunc(witRun(),opName.c_str(),index,fltStar);
+d559 1
+a559 1
+  witGetFunc(mutableWitRun(),partName.c_str(),demandName.c_str(),&floatStar);
+d561 2
+a562 2
+  witSetFunc(witRun(),partName.c_str(),demandName.c_str(),floatStar);
+  witFree(floatStar);
+d572 1
+a572 1
+  witSetFunc(witRun(),partName.c_str(),demandName.c_str(),fltStar);
+d582 1
+a582 1
+  witGetFunc(mutableWitRun(),name.c_str(),&attr);
+d584 1
+a584 1
+  witFree(attr);
+d595 1
+a595 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,&attr);
+d597 1
+a597 1
+  witFree(attr);
+d608 1
+a608 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,&attr);
+d610 1
+a610 1
+  witFree(attr);
+d623 1
+a623 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&attr);
+d625 1
+a625 1
+  witFree(attr);
+d636 1
+a636 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&attr);
+d638 1
+a638 1
+  witFree(attr);
+d649 1
+a649 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&retVal);
+d665 1
+a665 1
+  witGetFunc(mutableWitRun(),opName.c_str(),index,subIndex,&floatStar);
+d667 2
+a668 2
+  witSetFunc(witRun(),opName.c_str(),index,subIndex,floatStar);
+  witFree(floatStar);
+d680 1
+a680 1
+  witSetFunc(witRun(),opName.c_str(),index,subIndex,fltStar);
+d693 1
+a693 1
+  witSetFunc(witRun(),opName.c_str(),index,subIndex,fltStar);
+d710 1
+a710 1
+  witGetFunc(mutableWitRun(),partName.c_str(),demandName.c_str(),&attr);
+d712 1
+a712 1
+  witFree(attr);
+d740 3
+a742 3
+    witGetDemandDemandVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),&dv);
+    witSetDemandFssShipVol(mutableWitRun(),projects[p].c_str(),projects[p].c_str(),dv);
+    witFree(dv);
+d749 1
+a749 1
+  witGetFocusShortageVol ( mutableWitRun(), &lenList, &partList, &shortageVolList );
+d757 2
+a758 2
+    witFree(partList[i]);
+    witFree(shortageVolList[i]);
+d760 2
+a761 2
+  witFree(partList);
+  witFree(shortageVolList);
+d769 1
+a769 1
+  witSetTitle(witRun(),title.c_str());
+d775 1
+a775 1
+  witGetTitle(mutableWitRun(),&t);
+d777 1
+a777 1
+  witFree(t);
+d783 1
+a783 1
+  witSetNPeriods(witRun(),nP);
+d793 1
+a793 1
+  witGetObjValues (mutableWitRun(),&objVal,&boundsVal);
+d800 1
+a800 1
+  witWriteData(mutableWitRun(), filename.c_str() );
+d815 2
+a816 2
+  witNewRun( &wr_ );
+  witInitialize( witRun() );
+d818 3
+a820 1
+  
+d822 1
+a822 1
+  witSetMesgTimesPrint( witRun(), WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+d824 1
+a824 1
+  witSetMesgTimesPrint( witRun(), WitTRUE, 338, 0);
+d858 2
+a859 2
+  witSetObjChoice( witRun(), 1 );
+  witSetUseFocusHorizons( witRun(), WitFALSE );
+d861 3
+a863 3
+  witSetExecEmptyBom( witRun(), WitFALSE );
+  witSetMultiRoute( witRun(), WitTRUE );
+  witSetIndependentOffsets( witRun(), WitTRUE );
+d865 2
+a866 2
+  witSetAccAfterOptImp(witRun(),WitFALSE );
+  witSetAccAfterSoftLB(witRun(),WitFALSE );
+d868 1
+a868 1
+  witSetPostSolveRecovery(witRun(),WitTRUE);
+d907 1
+a907 1
+  witNewRun( &wr_ );
+d910 1
+a910 1
+  witSetMesgTimesPrint( wr_, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+d912 1
+a912 1
+  witSetMesgTimesPrint( wr_, WitTRUE, 338, 0);
+d914 1
+a914 1
+  witCopyData(wr_,source.wr_);
+d923 1
+a923 1
+  witDeleteRun(witRun());
+@
+
+
+1.9
+log
+@Added some more debug testing code
+@
+text
+@d451 12
+@
+
+
+1.8
+log
+@Commented out some std::cout's and commented out the witSetMesg that was turning on the printing of the
+purge results (in problemBase.cpp).
+@
+text
+@d90 10
+@
+
+
+1.7
+log
+@misc. compiler warning fixes
+@
+text
+@d802 2
+a803 2
+  witSetMesgTimesPrint( witRun(), WitTRUE, 729, UCHAR_MAX);
+  witSetMesgTimesPrint( witRun(), WitTRUE, 730, UCHAR_MAX);
+@
+
+
+1.6
+log
+@added code that calls witAddSubsBomEntry for substitute skills
+@
+text
+@d97 1
+a97 1
+  int t;
+@
+
+
+1.5
+log
+@changed name of method floatToConstFloatStar to floatToFloatStar because it makes more sense
+@
+text
+@d648 28
+@
+
+
+1.4
+log
+@Modified so an RCP bom maps to many WIT bomEntries. One for each consumption period.
+@
+text
+@d436 1
+a436 1
+  float * fltStar = floatToConstFloatStar(value);
+d518 1
+a518 1
+  float * fltStar = floatToConstFloatStar(value);
+d548 1
+a548 1
+  float * fltStar = floatToConstFloatStar(flt);
+@
+
+
+1.3
+log
+@added code methods to addBom and set/get attributes.
+added code to read bom file and addBoms and attributes.
+@
+text
+@d511 12
+@
+
+
+1.2
+log
+@fixed problem where resources of the same name were being created
+@
+text
+@d29 11
+d41 15
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d55 9
+@
+
+
+1.1.1.1
+log
+@initial import
+@
+text
+@@

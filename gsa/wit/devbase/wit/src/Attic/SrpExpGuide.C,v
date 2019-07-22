@@ -1,0 +1,558 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2005.12.27.19.43.40;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2005.12.23.23.07.43;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2005.12.23.21.12.02;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2005.12.23.16.49.53;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.12.23.16.07.11;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.12.20.22.48.24;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.12.20.19.04.55;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.12.20.17.09.36;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@[shared-resource pegging]
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "SrpExpGuide.C"
+//
+// Contains the implementation of the following classes:
+//
+//    SrpExpGuide
+//    SrpFillMeth
+//------------------------------------------------------------------------------
+
+#include <SrpExpGuide.h>
+#include <SrpFillMeth.h>
+#include <PairStack.h>
+#include <Part.h>
+#include <Demand.h>
+#include <BopEntry.h>
+#include <Opn.h>
+#include <BomEntry.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpExpGuide.
+//------------------------------------------------------------------------------
+
+WitSrpExpGuide::WitSrpExpGuide (WitProblem * theProblem):
+
+      WitProbAssoc     (theProblem),
+      myFillMethPairs_ (myProblem ())
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myFillMethPairs_.myPtrAt (thePart, thePer) =
+            new WitPairStack <WitSrpFillMeth, double> (myProblem ());
+
+   buildUp ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpExpGuide::~WitSrpExpGuide ()
+   {
+   WitPart *        thePart;
+   WitPeriod        thePer;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStack <WitSrpFillMeth, double> * theSrpFillMethsPtr;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         theSrpFillMethsPtr = myFillMethPairs_.myPtrAt (thePart, thePer);
+
+         while (theSrpFillMethsPtr->pop (theSrpFillMeth, fillVol))
+            delete theSrpFillMeth;
+
+         delete theSrpFillMethsPtr;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::print ()
+   {
+   WitPart *        thePart;
+   WitPeriod        thePer;
+   bool             firstPair;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStItr <WitSrpFillMeth, double> theItr;
+
+   fprintf (solnFile (),
+      "\n\n"
+      "Explosion Guide Specifications:\n");
+
+   fprintf (solnFile (),
+      "\n"
+      "   -------------------------------------------------\n"
+      "   Part  Per    FillVol  Fill Method\n");
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         if (myFillMethPairs_.myElemAt (thePart, thePer).isEmpty ())
+            continue;
+
+         fprintf (solnFile (),
+            "   -------------------------------------------------\n");
+
+         firstPair = true;
+
+         myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+
+         while (theItr.advance (theSrpFillMeth, fillVol))
+            {
+            if (firstPair)
+               fprintf (solnFile (),
+                  "   %4s  %3d  ",
+                  thePart->partName ().myCstring (),
+                  thePer);
+            else
+               fprintf (solnFile (), "              ");
+
+            fprintf (solnFile (), "%9.3f  ", fillVol);
+
+            if (theSrpFillMeth->byNetWithSupp ())
+               fprintf (solnFile (), "By Netting with Supply");
+
+            if (theSrpFillMeth->byExpToProd ())
+               fprintf (solnFile (), "By Exploding to Production");
+
+            fprintf (solnFile (), "\n");
+
+            firstPair = false;
+            }
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::getFillMethPairs (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    theReqVol,
+      double    prevVol,
+      WitPairStack <WitSrpFillMeth, double> & theFillMethPairs)
+   {
+   double           netReqVol;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStItr <WitSrpFillMeth, double> theItr;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   theFillMethPairs.clear ();
+
+   stronglyAssert (prevVol == 0.0);
+
+   netReqVol = theReqVol;
+
+   myFillMethPairs_.myElemAt (thePart, thePer).attach (theItr);
+
+   while (theItr.advance (theSrpFillMeth, fillVol))
+      {
+      setToMin (fillVol, netReqVol);
+
+      netReqVol -= fillVol;
+
+      theFillMethPairs.push (theSrpFillMeth, fillVol);
+
+      if (theReqVol < NET_TOL)
+         break;
+      }
+
+   witAssert (netReqVol <= 2.0 * FEAS_TOL);
+
+   theFillMethPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::buildUp ()
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+   double    theReqVol;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         {
+         theReqVol = compReqVol (thePart, thePer);
+
+         if (theReqVol > NET_TOL)
+            findFillMeths (thePart, thePer, theReqVol);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSrpExpGuide::compReqVol (WitPart * thePart, WitPeriod thePer)
+   {
+   double        theReqVol;
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+
+   theReqVol = 0.0;
+
+   if (not thePart->myDemands ().isEmpty ())
+      {
+      theDemand = thePart->myDemands ().first ();
+
+      theReqVol += theDemand->shipVol ()[thePer];
+      }
+
+   if (not thePart->consumingBomEntries().isEmpty ())
+      {
+      theBomEnt = thePart->consumingBomEntries().first ();
+
+      theReqVol += theBomEnt->myOperation ()->execVol ()[thePer];
+      }
+
+   return theReqVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::findFillMeths (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    theReqVol)
+   {
+   double netReqVol;
+
+   witAssert (theReqVol > NET_TOL);
+
+   netReqVol = theReqVol;
+
+   netWithSupply (thePart, thePer, netReqVol);
+
+   if (netReqVol > NET_TOL)
+      expToProd (thePart, thePer, netReqVol);
+
+   witAssert (netReqVol <= 2 * FEAS_TOL);
+
+   myFillMethPairs_.myElemAt (thePart, thePer).reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::netWithSupply (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double &  netReqVol)
+   {
+   double           consSuppVol;
+   double           fillVol;
+   WitSrpFillMeth * theSrpFillMeth;
+
+   witAssert (netReqVol > NET_TOL);
+
+   consSuppVol  = thePart->supplyVol ()[thePer];
+
+   consSuppVol -= positivePart (thePart->residualVol ()[thePer]);
+
+   setToMax (consSuppVol, 0.0);
+
+   if (consSuppVol <= NET_TOL)
+      return;
+
+   fillVol      = min (netReqVol, consSuppVol);
+
+   netReqVol   -= fillVol;
+
+   theSrpFillMeth = WitSrpFillMeth::newInstByNetWithSupp ();
+
+   myFillMethPairs_.
+      myElemAt (thePart, thePer).
+         push (theSrpFillMeth, fillVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::expToProd (
+      WitPart * thePart,
+      WitPeriod expPer,
+      double &  netReqVol)
+   {
+   WitBopEntry *    theBopEnt;
+   WitOperation *   theOpn;
+   double           fillVol;
+   WitSrpFillMeth * theSrpFillMeth;
+
+   witAssert (netReqVol > NET_TOL);
+
+   if (thePart->producingBopEntries ().isEmpty ())
+      return;
+
+   theBopEnt = thePart->producingBopEntries ().first ();
+
+   stronglyAssert (theBopEnt->expEligible (expPer));
+
+   theOpn         = theBopEnt->myOperation ();
+
+   if (theOpn->execVol ()[expPer] <= NET_TOL)
+      return;
+
+   fillVol        = min (netReqVol, theOpn->execVol ()[expPer]);
+
+   netReqVol     -= fillVol;
+
+   theSrpFillMeth = WitSrpFillMeth::newInstByExpToProd ();
+
+   myFillMethPairs_.
+      myElemAt (thePart, expPer).
+         push (theSrpFillMeth, fillVol);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpFillMeth.
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth * WitSrpFillMeth::newInstByNetWithSupp ()
+   {
+   return new WitSrpFillMeth (true, false);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth * WitSrpFillMeth::newInstByExpToProd ()
+   {
+   return new WitSrpFillMeth (false, true);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth::~WitSrpFillMeth ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpFillMeth::WitSrpFillMeth (
+         bool byNetWithSuppVal,
+         bool byExpToProdVal):
+
+      byNetWithSupp_ (byNetWithSuppVal),
+      byExpToProd_   (byExpToProdVal)
+   {
+   }
+@
+
+
+1.7
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.6
+log
+@[shared-resource pegging]
+@
+text
+@d136 1
+a136 1
+      double    prevFillVol,
+d149 1
+a149 1
+   stronglyAssert (prevFillVol == 0.0);
+@
+
+
+1.5
+log
+@[shared-resource pegging]
+@
+text
+@d34 2
+a35 2
+      WitProbAssoc  (theProblem),
+      serFillMeths_ (myProblem ())
+d42 1
+a42 1
+         serFillMeths_.myPtrAt (thePart, thePer) =
+d62 1
+a62 1
+         theSrpFillMethsPtr = serFillMeths_.myPtrAt (thePart, thePer);
+d95 1
+a95 1
+         if (serFillMeths_.myElemAt (thePart, thePer).isEmpty ())
+d103 1
+a103 1
+         serFillMeths_.myElemAt (thePart, thePer).attach (theItr);
+d132 42
+d237 1
+a237 1
+   serFillMeths_.myElemAt (thePart, thePer).reverse ();
+d268 1
+a268 1
+   serFillMeths_.
+d305 1
+a305 1
+   serFillMeths_.
+@
+
+
+1.4
+log
+@[shared-resource pegging]
+@
+text
+@d205 1
+d211 7
+a217 1
+   if (thePart->supplyVol ()[thePer] <= NET_TOL)
+d220 1
+a220 1
+   fillVol        = min (netReqVol, thePart->supplyVol ()[thePer]);
+d222 1
+a222 1
+   netReqVol     -= fillVol;
+@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@d32 4
+a35 1
+WitSrpExpGuide * WitSrpExpGuide::builtExpGuide (WitProblem * theProblem)
+d37 2
+a38 1
+   WitSrpExpGuide * theSrpExpGuide;
+d40 4
+a43 3
+   theSrpExpGuide = new WitSrpExpGuide (theProblem);
+
+   theSrpExpGuide->build ();
+d45 1
+a45 1
+   return theSrpExpGuide;
+d132 1
+a132 17
+WitSrpExpGuide::WitSrpExpGuide (WitProblem * theProblem):
+
+      WitProbAssoc  (theProblem),
+      serFillMeths_ (myProblem ())
+   {
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         serFillMeths_.myPtrAt (thePart, thePer) =
+            new WitPairStack <WitSrpFillMeth, double> (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpGuide::build ()
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@d32 13
+a67 13
+WitSrpExpGuide * WitSrpExpGuide::newInst (WitProblem * theProblem)
+   {
+   WitSrpExpGuide * theSrpExpGuide;
+
+   theSrpExpGuide = new WitSrpExpGuide (theProblem);
+
+   theSrpExpGuide->buildSpecs ();
+
+   return theSrpExpGuide;
+   }
+
+//------------------------------------------------------------------------------
+
+d143 1
+a143 1
+void WitSrpExpGuide::buildSpecs ()
+@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d61 1
+a61 1
+   theSrpExpGuide->buildGuide ();
+d80 1
+a80 1
+      "Explosion Specification:\n");
+d143 1
+a143 1
+void WitSrpExpGuide::buildGuide ()
+@
+

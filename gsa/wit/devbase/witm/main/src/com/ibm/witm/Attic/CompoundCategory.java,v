@@ -1,0 +1,1312 @@
+head	1.23;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.23
+date	2011.07.12.22.39.57;	author rjw;	state dead;
+branches;
+next	1.22;
+
+1.22
+date	2011.07.08.20.45.56;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2011.07.06.19.22.43;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2011.07.05.21.15.02;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2011.07.05.20.01.43;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2011.07.01.22.48.29;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2011.07.01.21.37.29;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2011.07.01.21.17.40;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.07.01.20.17.34;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.07.01.15.56.21;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.06.30.23.43.47;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.06.30.23.25.39;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.06.30.22.03.37;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.06.24.20.29.47;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.06.23.22.52.03;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.06.22.22.09.42;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.05.22.02.10.41;	author rjw;	state dead;
+branches;
+next	1.6;
+
+1.6
+date	2011.05.22.00.33.11;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.05.20.23.52.00;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.05.20.21.57.19;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.20.21.30.11;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.20.18.18.54;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.19.23.31.42;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.23
+log
+@Compound ==> Tuple
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File CompoundCategory.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io  .PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/*******************************************************************************
+ * A CompoundCategory is an Category of Compounds.<br><br>
+ * 
+ * The factory method for creating instances of this class is
+ * Scheme.newCompoundCategory (String, Category <?>...).
+ *******************************************************************************
+ */
+public final class CompoundCategory extends Category <Compound>
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The "dimensions" of this CompoundCategory<br>
+ * For each Compound in this CompoundCategory, the number of coordinates of the
+ * Compound must match myDimensions.size () and
+ * for i = 0, ... myDimensions.size () - 1, coordinate #i of the Compound must
+ * belong to myDimensions.get (i).<br>
+ * This List is an unmodifiable view of an ArrayList.
+ *******************************************************************************
+ */
+   private final List <Category <?>> myDimensions;
+
+/*******************************************************************************
+ * This field is null until the Scheme for this CompoundCategory is frozen.
+ * After the Scheme for this CompoundCategory is frozen:
+ *    uniqueDimenIndexArr[theCat.getCatIndex ()] =
+ *       The unique dimension index of theCat in this CompoundCategory,
+ *          if there is exactly one<br>
+ *       -1, if there is no matching dimension.<br>
+ *       -2, if there is more than one matching dimension.
+ *******************************************************************************
+ */
+   private int[] uniqueDimenIndexArr = null;
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Verifies that the # of coordinates passed to a method matches the # of
+ * dimensions in this CompoundCategory.
+ * 
+ * @@param signature The signature of the method called
+ *******************************************************************************
+ */
+   private void checkNCoords (Item[] theCoordArr, String signature)
+      {
+      if (theCoordArr.length != myDimensions.size ())
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to CompoundCategory." + signature + ",\n"
+             + "   where the number of coordinates passed does not match the\n"
+             + "   number of dimensions of the CompoundCategory.\n"
+             + "\n"
+             + "      CompoundCategory:     " + getName ()           + "\n"
+             + "      # Dimensions:         " + myDimensions.size () + "\n"
+             + "      # Coordinates Passed: " + theCoordArr.length   + "\n");
+        }
+   
+/*******************************************************************************
+ * Verifies that the Categories of the coordinates passed to a method match the
+ * dimensions of this CompoundCategory.
+ * 
+ * @@param signature The signature of the method called
+ *******************************************************************************
+ */
+   private void checkCategories (Item[] theCoordArr, String signature)
+      {
+      int          theIdx;
+      Category <?> theCat;
+      Category <?> theDimen;
+      
+      for (theIdx = 0; theIdx < theCoordArr.length; theIdx ++)
+         {
+         if (theCoordArr[theIdx] == null)
+            continue;
+         
+         theCat   = theCoordArr[theIdx].getCategory ();
+         
+         theDimen = myDimensions.get (theIdx);
+         
+         if (theCat != theDimen)
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to CompoundCategory." + signature + ",\n"
+                + "   where the Category of at least one of the\n"
+                + "   coordinates passed does not match the corresponding\n"
+                + "   dimension of the CompoundCategory.\n"
+                + "\n"
+                + "      CompoundCategory:    " +          getName () + "\n"
+                + "      Dimension Index:     " + theIdx              + "\n"
+                + "      Dimension:           " + theDimen.getName () + "\n"
+                + "      Coordinate Category: " + theCat  .getName () + "\n"
+                );
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies that the Items passed to a method all belong to the current
+ * Embodiment.
+ *******************************************************************************
+ */
+   private void requireEmbsMatchCur (Item[] theCoordArr, String signature)
+      {
+      int        theIdx;
+      Embodiment theEmb;
+      
+      for (theIdx = 0; theIdx < theCoordArr.length; theIdx ++)
+         {
+         if (theCoordArr[theIdx] == null)
+            continue;
+         
+         theEmb = theCoordArr[theIdx].getEmbodiment ();
+         
+         if (theEmb != curEmbodiment ())
+            throw
+               new IllegalArgumentException (
+                  "\n\n"
+                + "   Call to CompoundCategory." + signature + ",\n"
+                + "   where at least one of the coordinate Items does not\n"
+                + "   belong to the current Embodiment.\n"
+                + "\n"
+                + "      CompoundCategory:      "   + getName ()          + "\n"
+                + "      Coordinate Index:      "   + theIdx              + "\n"
+                + "      Coordinate:            "   + theCoordArr[theIdx] + "\n"
+                + "      Coordinate Embodiment: \"" + theEmb.getName () + "\"\n"
+                + "      Current    Embodiment: \""
+                +           curEmbodiment ().getName () + "\"\n");
+         }
+      }
+   
+/*******************************************************************************
+ * Verifies that theCoordArr does not duplicate the coordinate list of a
+ * Compound of this CompoundCategory in the current Embodiment.
+ *******************************************************************************
+ */
+   private void prohibitDupCoords (Item[] theCoordArr)
+      {
+      Compound theComp;
+      
+      theComp =
+         curEmbodiment ().getCompoundMgr (this).getCompound (theCoordArr);
+      
+      if (theComp != null)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to CompoundCategory.newCompound (Item...)\n"
+             + "   with a coordinate list that duplicates coordinate list of\n"
+             + "   an existing Compound of the CompoundCategory in the\n"
+             + "   current Embodiment.\n"
+             + "\n"
+             + "      Compound: " + theComp + "\n");
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Constructor
+////////////////////////////////////////////////////////////////////////////////
+
+   CompoundCategory (
+         Scheme         theScheme,
+         String         theName,
+         Category <?>[] theDimenArr)
+      {
+      super (theScheme, theName);
+      
+      ArrayList <Category <?>> theDimens;
+      
+      theDimens = new ArrayList <Category <?>> (theDimenArr.length);
+      
+      Collections.addAll (theDimens, theDimenArr);
+      
+      myDimensions = Collections.unmodifiableList (theDimens);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Sets up uniqueDimenIndexArr.
+ *******************************************************************************
+ */    @@Override 
+   void freeze ()
+      {
+      int nCats;
+      int theIdx;
+      int theCatIdx;
+      
+      nCats = getScheme ().getCategories ().size ();
+
+      uniqueDimenIndexArr = new int[nCats];
+      
+      Arrays.fill (uniqueDimenIndexArr, 0, nCats, -1);
+      
+      for (theIdx = 0; theIdx < myDimensions.size (); theIdx ++)
+         {
+         theCatIdx = myDimensions.get (theIdx).getIndex ();
+         
+         if (uniqueDimenIndexArr[theCatIdx] == -1)
+            {
+            uniqueDimenIndexArr[theCatIdx] = theIdx;
+            }
+         else
+            {
+            uniqueDimenIndexArr[theCatIdx] = -2;
+            }
+         }
+      }
+   
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */    @@Override
+   void printConcrete (PrintStream theStream)
+      {
+      int theIdx;
+      
+      theStream.printf (
+         "%n"
+      +  "CompoundCategory \"%s\":%n",
+         getName ());
+
+      for (theIdx = 0; theIdx < myDimensions.size (); theIdx ++)
+         {
+         theStream.printf (
+            "   Dimension #%d: %s%n",
+            theIdx,
+            myDimensions.get (theIdx).getName ());
+         }
+      }
+
+/*******************************************************************************
+ * {@@inheritDoc}
+********************************************************************************
+ */           @@Override 
+   ItemMgr <?> newItemMgr (Embodiment theEmb)
+      {
+      return new CompoundMgr (this, theEmb);
+      }
+
+/*******************************************************************************
+ * @@return The "dimensions" of this CompoundCategory, stored as an unmodifiable
+ *         view of an ArrayList.
+ *******************************************************************************
+ */
+   List <Category <?>> getDimensions ()
+      {
+      return myDimensions;
+      }
+
+/*******************************************************************************
+ * @@return The unique dimension index of theCat in this CompoundCatagory, if
+ *         there is exactly one<br>
+ *         -1, if there is no matching dimension<br>
+ *         -2, if there is more than one matching dimension
+ * 
+ * @@throws NullPointerException If the Scheme for this CompoundCategory is not
+ *                              frozen.
+ *******************************************************************************
+ */
+   int uniqueDimenIndex (Category <?> theCat)
+      {
+      return uniqueDimenIndexArr[theCat.getIndex ()];
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */      @@Override
+   public String toString ()
+      {
+      return "CompoundCategory \"" + getName () + "\"";
+      }
+   
+/*******************************************************************************
+ * Factory method:<br>
+ * Constructs a new Compound for this CompoundCategory in the current
+ * Embodiment.
+ *
+ * @@param theCoords                 The Items that are to be the coordinates
+ *                                  of the Compound
+ * @@return                          The new Compound
+ * 
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalStateException    If the current Embodiment is null
+ * @@throws IllegalStateException    If the Scheme of this CompoundCategory does
+ *                                  not match the Scheme of the current
+ *                                  Embodiment
+ * @@throws IllegalArgumentException If the Categories of the Items do not match
+ *                                  the corresponding dimension Categories of
+ *                                  this CompoundCategory
+ * @@throws IllegalArgumentException If the Items do not all belong to the 
+ *                                  current Embodiment
+ * @@throws IllegalArgumentException If the Items match the coordinate list of an
+ *                                  existing Compound of this CompoundCategory
+ *                                  in the current Embodiment
+ *******************************************************************************
+ */
+   public Compound newCompound (Item... theCoords)
+      {
+      prohibitNullArray          (theCoords, "theCoords");
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+      checkNCoords               (theCoords, "newCompound (Item...)");
+      checkCategories            (theCoords, "newCompound (Item...)");
+      requireEmbsMatchCur        (theCoords, "newCompound (Item...)");
+      prohibitDupCoords          (theCoords);
+      
+      return new Compound (this, curEmbodiment (), theCoords);
+      }
+   
+/*******************************************************************************
+ * Compound look-up method.
+ * 
+ * @@param theCoords                 The list of coordinates for the Compound to
+ *                                  be retrieved
+ * @@return                          The Compound of theCompCat in the current
+ *                                  Embodiment whose coordinates match
+ *                                  theCoords, if any; otherwise null.
+ *                                  
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalStateException    If the current Embodiment is null
+ * @@throws IllegalStateException    If the Scheme of this CompoundCategory does
+ *                                  not match the Scheme of the current
+ *                                  Embodiment
+ * @@throws IllegalArgumentException If the Categories of the Items do not match
+ *                                  the corresponding dimension Categories of
+ *                                  this CompoundCategory
+ * @@throws IllegalArgumentException If the Items do not all belong to the 
+ *                                  current Embodiment
+ *******************************************************************************
+ */
+   public Compound get (Item... theCoords)
+      {
+      prohibitNullArray          (theCoords,  "theCoords");
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+      checkNCoords               (theCoords, "get (Item...)");
+      checkCategories            (theCoords, "get (Item...)");
+      requireEmbsMatchCur        (theCoords, "get (Item...)");
+      
+      return curEmbodiment ().getCompoundMgr (this).getCompound (theCoords);
+      }
+   
+/*******************************************************************************
+ * Computes a "slice": the set of all Compounds of this CompoundCategory in the
+ * current Embodiment whose coordinates match a "pattern". The pattern is a
+ * sequence of n Item references, where n is the number of dimensions in the
+ * CompoundCatagory. Some of the Item references may be null. A Compound will be
+ * in the slice, iff it belongs to the CompoundCategory and to the current
+ * Embodiment and for each coordinate of the Compound, either the coordinate
+ * == the corresponding Item in the pattern, or the corresponding Item
+ * reference in the pattern is null. Thus the nulls in the pattern function as
+ * "wild cards" that match all Items.<br>
+ * <br>
+ * The slice is computed by looping through each Compound of this
+ * CompoundCategory in the current Embodiment and adding to the slice each
+ * Compound whose coordinates match the pattern. The Compounds are listed in the
+ * order in which they were created.
+ * 
+ * @@see    getSliceDense
+ * 
+ * @@param  thePattern The pattern to which the Compounds in the slice are to be
+ *                    matched
+ * @@return            The slice
+ * 
+ * @@throws NullPointerException     If thePattern is a null references
+ * @@throws IllegalStateException    If the current Embodiment is null
+ * @@throws IllegalStateException    If the Scheme of this CompoundCategory does
+ *                                  not match the Scheme of the current
+ *                                  Embodiment
+ * @@throws IllegalArgumentException If the Categories of the Items do not match
+ *                                  the corresponding dimension Categories of
+ *                                  this CompoundCategory
+ * @@throws IllegalArgumentException If the Items do not all belong to the 
+ *                                  current Embodiment
+ *******************************************************************************
+ */
+   public List <Compound> getSliceSparse (Item... thePattern)
+      {
+      prohibitNull               (thePattern, "thePattern");
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+      checkNCoords               (thePattern, "getSliceSparse (Item...)");
+      checkCategories            (thePattern, "getSliceSparse (Item...)");
+      requireEmbsMatchCur        (thePattern, "getSliceSparse (Item...)");
+      
+      return
+         curEmbodiment ().getCompoundMgr (this).getSliceSparse (thePattern);
+      }
+   
+/*******************************************************************************
+ * Computes a "slice": the set of all Compounds of this CompoundCategory in the
+ * current Embodiment whose coordinates match a "pattern". The pattern is a
+ * sequence of n Item references, where n is the number of dimensions in the
+ * CompoundCatagory. Some of the Item references may be null. A Compound will be
+ * in the slice, iff it belongs to the CompoundCategory and to the current
+ * Embodiment and for each coordinate of the Compound, either the coordinate
+ * == the corresponding Item in the pattern, or the corresponding Item
+ * reference in the pattern is null. Thus the nulls in the pattern function as
+ * "wild cards" that match all Items.<br>
+ * <br>
+ * The slice is computed by performing a multiply-nested loop that iterates
+ * through each possible coordinate specification that would match the pattern
+ * and adds to the slice the corresponding Compound if it exists. The Compounds
+ * are listed in lexicographic order.
+ * 
+ * @@see    getSliceSparse
+ * 
+ * @@param  thePattern The pattern to which the Compounds in the slice are to be
+ *                    matched
+ * @@return            The slice
+ * 
+ * @@throws NullPointerException     If thePattern is a null references
+ * @@throws IllegalStateException    If the current Embodiment is null
+ * @@throws IllegalStateException    If the Scheme of this CompoundCategory does
+ *                                  not match the Scheme of the current
+ *                                  Embodiment
+ * @@throws IllegalArgumentException If the Categories of the Items do not match
+ *                                  the corresponding dimension Categories of
+ *                                  this CompoundCategory
+ * @@throws IllegalArgumentException If the Items do not all belong to the 
+ *                                  current Embodiment
+ *******************************************************************************
+ */
+   public List <Compound> getSliceDense (Item... thePattern)
+      {
+      prohibitNull               (thePattern, "thePattern");
+      requireCurEmbodiment       ();
+      requireSchemeMatchesCurEmb ();
+      checkNCoords               (thePattern, "getSliceDense (Item...)");
+      checkCategories            (thePattern, "getSliceDense (Item...)");
+      requireEmbsMatchCur        (thePattern, "getSliceDense (Item...)");
+      
+      return
+         curEmbodiment ().getCompoundMgr (this).getSliceDense (thePattern);
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.22
+log
+@Class ProblemMgr.
+@
+text
+@@
+
+
+1.21
+log
+@Moved some responsibility to constructors.
+@
+text
+@d6 1
+a6 1
+package       com.ibm.witm;
+@
+
+
+1.20
+log
+@Implementation ==> Embodiment
+@
+text
+@a324 2
+      Compound theComp;
+      
+d333 1
+a333 5
+      theComp = new Compound (this, curEmbodiment (), theCoords);
+      
+      curEmbodiment ().getCompoundMgr (this).store (theComp);
+      
+      return theComp;
+@
+
+
+1.19
+log
+@getSliceSparse
+@
+text
+@d119 1
+a119 1
+ * Implementation.
+d122 1
+a122 1
+   private void requireImpsMatchCur (Item[] theCoordArr, String signature)
+d124 2
+a125 2
+      int            theIdx;
+      Implementation theImple;
+d132 1
+a132 1
+         theImple = theCoordArr[theIdx].getImplementation ();
+d134 1
+a134 1
+         if (theImple != curImplementation ())
+d140 1
+a140 1
+                + "   belong to the current Implementation.\n"
+d142 6
+a147 8
+                + "      CompoundCategory:          "   + getName () + "\n"
+                + "      Coordinate Index:          "   + theIdx     + "\n"
+                + "      Coordinate:                "   + theCoordArr[theIdx]
+                + "\n"
+                + "      Coordinate Implementation: \"" + theImple.getName ()
+                + "\"\n"
+                + "      Current    Implementation: \""
+                +           curImplementation ().getName () + "\"\n");
+d153 1
+a153 1
+ * Compound of this CompoundCategory in the current Implementation.
+d161 1
+a161 1
+         curImplementation ().getCompoundMgr (this).getCompound (theCoordArr);
+d170 1
+a170 1
+             + "   current Implementation.\n"
+d256 1
+a256 1
+   ItemMgr <?> newItemMgr (Implementation theImple)
+d258 1
+a258 1
+      return new CompoundMgr (this, theImple);
+d302 1
+a302 1
+ * Implementation
+d309 1
+a309 1
+ * @@throws IllegalStateException    If the current Implementation is null
+d312 1
+a312 1
+ *                                  Implementation
+d317 1
+a317 1
+ *                                  current Implementation
+d320 1
+a320 1
+ *                                  in the current Implementation
+d328 2
+a329 2
+      requireCurImplementation   ();
+      requireSchemeMatchesCurImp ();
+d332 1
+a332 1
+      requireImpsMatchCur        (theCoords, "newCompound (Item...)");
+d335 1
+a335 1
+      theComp = new Compound (this, curImplementation (), theCoords);
+d337 1
+a337 1
+      curImplementation ().getCompoundMgr (this).store (theComp);
+d348 1
+a348 1
+ *                                  Implementation whose coordinates match
+d352 1
+a352 1
+ * @@throws IllegalStateException    If the current Implementation is null
+d355 1
+a355 1
+ *                                  Implementation
+d360 1
+a360 1
+ *                                  current Implementation
+d366 2
+a367 2
+      requireCurImplementation   ();
+      requireSchemeMatchesCurImp ();
+d370 1
+a370 1
+      requireImpsMatchCur        (theCoords, "get (Item...)");
+d372 1
+a372 1
+      return curImplementation ().getCompoundMgr (this).getCompound (theCoords);
+d377 1
+a377 1
+ * current Implementation whose coordinates match a "pattern". The pattern is a
+d381 1
+a381 1
+ * Implementation and for each coordinate of the Compound, either the coordinate
+d387 1
+a387 1
+ * CompoundCategory in the current Implementation and adding to the slice each
+d398 1
+a398 1
+ * @@throws IllegalStateException    If the current Implementation is null
+d401 1
+a401 1
+ *                                  Implementation
+d406 1
+a406 1
+ *                                  current Implementation
+d412 2
+a413 2
+      requireCurImplementation   ();
+      requireSchemeMatchesCurImp ();
+d416 1
+a416 1
+      requireImpsMatchCur        (thePattern, "getSliceSparse (Item...)");
+d419 1
+a419 1
+         curImplementation ().getCompoundMgr (this).getSliceSparse (thePattern);
+d424 1
+a424 1
+ * current Implementation whose coordinates match a "pattern". The pattern is a
+d428 1
+a428 1
+ * Implementation and for each coordinate of the Compound, either the coordinate
+d445 1
+a445 1
+ * @@throws IllegalStateException    If the current Implementation is null
+d448 1
+a448 1
+ *                                  Implementation
+d453 1
+a453 1
+ *                                  current Implementation
+d459 2
+a460 2
+      requireCurImplementation   ();
+      requireSchemeMatchesCurImp ();
+d463 1
+a463 1
+      requireImpsMatchCur        (thePattern, "getSliceDense (Item...)");
+d466 1
+a466 1
+         curImplementation ().getCompoundMgr (this).getSliceDense (thePattern);
+@
+
+
+1.18
+log
+@Coordinate indexing from 0.
+@
+text
+@d386 55
+a440 1
+ * "wild cards" that match all Items.
+d458 1
+a458 1
+   public List <Compound> getSlice (Item... thePattern)
+d463 3
+a465 3
+      checkNCoords               (thePattern, "getSlice (Item...)");
+      checkCategories            (thePattern, "getSlice (Item...)");
+      requireImpsMatchCur        (thePattern, "getSlice (Item...)");
+d467 2
+a468 1
+      return curImplementation ().getCompoundMgr (this).getSlice (thePattern);
+@
+
+
+1.17
+log
+@getSlice Implementation ==> CompoundCategory
+@
+text
+@d110 1
+a110 1
+                + "      Dimension #:         " + (theIdx + 1)        + "\n"
+d142 2
+a143 2
+                + "      CompoundCategory:          "   + getName ()   + "\n"
+                + "      Coordinate Index:          "   + (theIdx + 1) + "\n"
+@
+
+
+1.16
+log
+@get Implementation ==> CompoundCategory
+@
+text
+@d377 39
+@
+
+
+1.15
+log
+@Moved newCompound from Implementation to CompoundCategory.
+@
+text
+@d344 33
+@
+
+
+1.14
+log
+@Moved newProperty to class Category
+@
+text
+@d8 2
+d53 125
+d301 43
+@
+
+
+1.13
+log
+@//=== ==> /////
+@
+text
+@a7 2
+import static com.ibm.witm.Utility.*;
+
+@
+
+
+1.12
+log
+@Re-arranged source code.
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d25 1
+a25 1
+//==============================================================================
+d27 1
+a27 1
+//==============================================================================
+d52 1
+a52 1
+//==============================================================================
+d54 1
+a54 1
+//==============================================================================
+d72 1
+a72 1
+//==============================================================================
+d74 1
+a74 1
+//==============================================================================
+d163 1
+a163 1
+//==============================================================================
+d165 1
+a165 1
+//==============================================================================
+d176 1
+a176 1
+//==============================================================================
+@
+
+
+1.11
+log
+@Various revisions.
+@
+text
+@d26 1
+a26 1
+// Public
+d30 6
+a35 1
+ * {@@inheritDoc}
+d37 2
+a38 9
+ */      @@Override
+   public String toString ()
+      {
+      return "CompoundCategory \"" + getName () + "\"";
+      }
+   
+//==============================================================================
+// Package Internal
+//==============================================================================
+d41 7
+a47 1
+ * Constructor
+d50 6
+d72 4
+d164 1
+a164 1
+// Private
+d168 1
+a168 6
+ * The "dimensions" of this CompoundCategory<br>
+ * For each Compound in this CompoundCategory, the number of coordinates of the
+ * Compound must match myDimensions.size () and
+ * for i = 0, ... myDimensions.size () - 1, coordinate #i of the Compound must
+ * belong to myDimensions.get (i).<br>
+ * This List is an unmodifiable view of an ArrayList.
+d170 6
+a175 15
+ */
+   private final List <Category <?>> myDimensions;
+
+/*******************************************************************************
+ * This field is null until the Scheme for this CompoundCategory is frozen.
+ * After the Scheme for this CompoundCategory is frozen:
+ *    uniqueDimenIndexArr[theCat.getCatIndex ()] =
+ *       The unique dimension index of theCat in this CompoundCategory,
+ *          if there is exactly one<br>
+ *       -1, if there is no matching dimension.<br>
+ *       -2, if there is more than one matching dimension.
+ *******************************************************************************
+ */
+   private int[] uniqueDimenIndexArr = null;
+
+@
+
+
+1.10
+log
+@0-based indexing of coordinates and dimensions
+@
+text
+@d32 2
+a33 2
+ */
+   @@Override public String toString ()
+d65 2
+a66 2
+ */
+   @@Override void freeze ()
+d96 2
+a97 2
+ */
+   @@Override void printConcrete (PrintStream theStream)
+d116 9
+@
+
+
+1.9
+log
+@getSlice
+@
+text
+@d110 1
+a110 1
+            theIdx + 1,
+@
+
+
+1.8
+log
+@Tuple ==> Compound
+@
+text
+@a96 9
+   @@Override ItemMgr <?> newItemMgr ()
+      {
+      return new CompoundMgr ();
+      }
+   
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */
+@
+
+
+1.7
+log
+@Compound ==> Tuple
+@
+text
+@d10 2
+a11 1
+import java.io.PrintStream;
+d13 2
+d17 4
+a20 1
+ * A CompoundCategory is an ElementCategory for Compounds.
+d23 1
+a23 1
+public final class CompoundCategory extends ElementCategory
+d30 1
+a30 44
+ * Factory method:<br>
+ * Constructs a new CompoundCategory.
+ * 
+ * @@param  theName                  The name of the CompoundCategory to be
+ *                                  constructed
+ * @@param  theElCats                The ElementCategories that are to be the
+ *                                  coordinates of the CompoundCategory    
+ * @@return                          The new CompoundCategory
+ * @@throws NullPointerException     If any argument is null
+ * @@throws IllegalArgumentException If no ElementCategories are given
+ * @@throws IllegalArgumentException The ElementCategories do all belong to the
+ *                                  same Scheme
+ * @@throws IllegalStateException    If the Scheme of the ElementCategories is
+ *                                  frozen
+ *******************************************************************************
+ */
+   public static CompoundCategory newCompoundCategory (
+         String             theName,
+         ElementCategory... theElCats)
+      {
+      int    theIdx;
+      Scheme theScheme;
+      
+      prohibitNull (theName,   "theName");
+      prohibitNull (theElCats, "theElCats");
+      
+      for (theIdx = 0; theIdx < theElCats.length; theIdx++)
+         if (theElCats[theIdx] == null)
+            prohibitNull (theElCats[theIdx], "theElCats[" + theIdx + "]");
+      
+      requireAtLeast1ElCat (theName, theElCats);
+      requireSchemesMatch  (theName, theElCats);
+   
+      theScheme = theElCats[0].getScheme ();
+      
+      theScheme.prohibitDupCompCatName (theName);
+      
+      theScheme.prohibitFrozen ();
+      
+      return theScheme.newCompoundCategory (theName, theElCats);
+      }
+
+/* *****************************************************************************
+ * The doc comment is inherited
+d43 1
+a43 1
+ * To be called by theScheme.newCompoundCategory (...).
+d47 3
+a49 3
+         Scheme            theScheme,
+         String            theName,
+         ElementCategory[] theElCatArr)
+d53 5
+a57 1
+      myCoordinateArr = Arrays.copyOf (theElCatArr, theElCatArr.length);
+d59 1
+a59 1
+      myIndex         = theScheme.getCompoundCategories ().size ();
+d63 41
+a103 1
+ * Prints this CompoundCategory to theStream.
+d106 1
+a106 1
+   void print (PrintStream theStream)
+d115 1
+a115 1
+      for (theIdx = 0; theIdx < myCoordinateArr.length; theIdx++)
+d118 3
+a120 4
+            "   Coordinate Category #%d:%n"
+          + "      %s%n",
+            theIdx,
+            myCoordinateArr[theIdx].getName ());
+a121 2
+      
+      printProperties (theStream);
+d125 2
+a126 1
+ * @@return A unique index for this CompoundCategory.
+d129 1
+a129 1
+   int getIndex ()
+d131 1
+a131 1
+      return myIndex;
+a133 4
+//==============================================================================
+// Private
+//==============================================================================
+
+d135 7
+a141 3
+ * Verifies that newCompoundCategory (...) was called with at least 1
+ * ElementCategory.<br>
+ * To be called by newCompoundCategory.
+d144 1
+a144 3
+   private static void requireAtLeast1ElCat (
+         String            theName,
+         ElementCategory[] theElCatArr)
+d146 1
+a146 10
+      if (theElCatArr.length == 0)
+         {
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to CompoundCategory.newCompoundCategory (...) with no\n"
+             + "   ElementCategories.\n"
+             + "\n"
+             + "      CompoundCategory Name: \"" + theName + "\"\n");
+         }
+d148 5
+a152 33
+   
+/*******************************************************************************
+ * Verifies that newCompoundCategory (...) was called with ElementCategories
+ * whose Schemes match.<br>
+ * To be called by newCompoundCategory.
+ *******************************************************************************
+ */
+   private static void requireSchemesMatch (
+         String            theName,
+         ElementCategory[] theElCatArr)
+      {
+      Scheme theScheme;
+      int    theIdx;
+      
+      theScheme = theElCatArr[0].getScheme ();
+      
+      for (theIdx = 1; theIdx < theElCatArr.length; theIdx++)
+         {
+         if (theElCatArr[theIdx].getScheme () != theScheme)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   Call to CompoundCategory.newCompoundCategory (...) with\n"
+             + "   ElementCategories whose Schemes do not match.\n"
+             + "\n"
+             + "      theElCats[0]: \"" + theElCatArr[0].getName () + "\", "
+             +        "Scheme: \"" + theScheme.getName () + "\"\n"
+             + "      theElCats[" + theIdx + "]: "
+             +        "\"" + theElCatArr[theIdx].getName () + "\", "
+             +        "Scheme: \"" + theElCatArr[theIdx].getName () + "\"\n");
+         }
+      }
+   
+d154 1
+a154 1
+ * The coordinate Categories of this CompoundCategory<br>
+d156 4
+a159 3
+ * Compound must match myCoordinateArr.length and
+ * for i = 0, ... myCoordinateArr.length - 1, coordinate #i of the Compound must
+ * belong to myCoordinateArr[i].
+d162 1
+a162 1
+   private final ElementCategory[] myCoordinateArr;
+d165 7
+a171 2
+ * A unique index for this CompoundCategory.<br>
+ * # of CompoundCategories in the Scheme that were constructed before this one.
+d174 1
+a174 1
+   private final int myIndex;
+@
+
+
+1.6
+log
+@Created class CompoundMgr.
+@
+text
+@@
+
+
+1.5
+log
+@CompoundCategory
+@
+text
+@d91 2
+d120 9
+a194 1
+   @@SuppressWarnings("unused")
+d197 7
+@
+
+
+1.4
+log
+@Exception messages.
+@
+text
+@d10 3
+d66 9
+d89 27
+d176 11
+@
+
+
+1.3
+log
+@Check for duplicate ComponentCategory name.
+@
+text
+@d98 2
+a99 2
+             + "   CompoundCategory.newCompoundCategory (...) was called\n"
+             + "   with no ElementCategories.\n"
+d126 2
+a127 2
+             + "   CompoundCategory.newCompoundCategory (...) was called\n"
+             + "   with ElementCategories whose Schemes do not match.\n"
+@
+
+
+1.2
+log
+@Added tests for newCompoundCategory.
+@
+text
+@d56 2
+d60 1
+a60 1
+      return new CompoundCategory (theScheme, theName, theElCats);
+d64 1
+a64 1
+// Private
+d68 1
+a68 1
+ * Constructor.
+d71 1
+a71 1
+   private CompoundCategory (
+d79 4
+@
+
+
+1.1
+log
+@Created CompoundCategory
+@
+text
+@d30 1
+a30 1
+ * @@throws IllegalArgumentException If less than 2 ElementCategories are given
+d51 2
+a52 2
+      requireAtLeast2ElCats (theName, theElCats);
+      requireSchemesMatch   (theName, theElCats);
+d78 2
+a79 2
+ * Verifies that newCompoundCategory (...) was called with at least 2
+ * ElementCategories.<br>
+d83 1
+a83 1
+   private static void requireAtLeast2ElCats (
+d87 1
+a87 1
+      if (theElCatArr.length < 2)
+d93 1
+a93 1
+             + "   with less than 2 ElementCategories.\n"
+d121 1
+a121 1
+             + "   with ElementCategories of more than one distinct Scheme.\n"
+d123 5
+a127 7
+             + "      ElementCategory #0: \""
+             +           theElCatArr[0].getName () + "\"\n"
+             + "         Scheme:             \"" + theScheme.getName () + "\"\n"
+             + "      ElementCategory #" + theIdx + ": \""
+             +           theElCatArr[theIdx].getName () + "\"\n"
+             + "         Scheme:             \""
+             +           theElCatArr[theIdx].getName () + "\"\n");
+@
+

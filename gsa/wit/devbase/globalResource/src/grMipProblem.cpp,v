@@ -1,0 +1,1290 @@
+head	1.10;
+access;
+symbols
+	beforeTiersAdded:1.9;
+locks; strict;
+comment	@// @;
+
+
+1.10
+date	2002.09.05.13.19.22;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.04.11.21.37.23;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2002.04.10.17.30.30;	author barahon;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.04.09.20.57.32;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2002.04.09.15.57.46;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2002.04.09.15.41.54;	author barahon;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2002.04.05.17.03.59;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.04.05.01.09.36;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.03.28.23.01.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.03.28.15.42.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@changes to accomodate tiers
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#if 0
+//#include <numeric>
+//#include <set>
+#define OSLMSDLL
+#if defined(_MSC_VER)
+#  include <ekk_c_api.h>
+#else
+#  include <osl/ekk_c_api.h>
+#endif
+#include <assert.h>
+#include <iostream>
+#include <float.h>
+
+//#include <wit.h>
+
+//#define COIN_USE_OSL
+//#include <OsiSolverInterface.hpp>
+//#include <OsiOslSolverInterface.hpp>
+//#include <OsiPackedMatrix.hpp>
+//#include <OsiPackedVector.hpp>
+
+#include "OsiFloatEqual.h"
+//#include "grSortablePortfolio.h"
+#include "grProblem.h"
+#include "grMipProblem.h"
+#include "columnIndexManager.h"
+//#include "appData.h"
+
+//#define SOLVEASLP
+#include <iostream.h>
+#include <fstream.h>
+#include "VOL_vector.h"
+#include "lp.h"
+
+
+void GRmipProblem::grProblemPtr(GRproblem * prob) 
+{ 
+  grProblemPtr_=prob; 
+}
+const GRproblem * GRmipProblem::constGRproblemPtr() const 
+{ 
+  assert( grProblemPtr_ != NULL);
+  return grProblemPtr_; 
+}
+GRproblem * GRmipProblem::grProblemPtr() 
+{ 
+  assert( grProblemPtr_ != NULL);
+  return grProblemPtr_; 
+}
+
+#if 0
+const OsiSolverInterface * GRmipProblem::constOsiPtr() const 
+{ 
+  if( osiPtr_ == NULL) osiPtr_ = new OsiOslSolverInterface();
+  return osiPtr_; 
+}
+OsiSolverInterface * GRmipProblem::osiPtr() 
+{ 
+  if( osiPtr_ == NULL) osiPtr_ = new OsiOslSolverInterface();
+  return osiPtr_; 
+}
+
+EKKModel * GRmipProblem::ekkModelPtr()
+{
+  OsiSolverInterface * osi = osiPtr();
+  OsiOslSolverInterface * oslOsi = dynamic_cast<OsiOslSolverInterface *>(osi);
+  return oslOsi->getModelPtr();
+}
+#endif
+
+void GRmipProblem::solve() 
+{
+ 
+  assert(constGRproblemPtr()->getAlgorithm()=="MIP");
+  // portfolios
+  std::vector<std::string> ports=constGRproblemPtr()->getPortfolios();
+  typedef std::map<std::string, int> map_int;
+  map_int port_numb;
+  int i;
+  for ( i=0; i<ports.size(); ++i ){
+      port_numb[ports[i]]=i;
+  }
+  // portfolio-locations
+  std::vector< std::string > port_loc_p;
+  std::vector< std::string > port_loc_l;
+  constGRproblemPtr()->getPortfolioLocationLinks( port_loc_p, port_loc_l );
+  std::vector< std::string > port_loc_op;
+  map_int oper_numb;
+  for ( i=0; i<port_loc_p.size(); ++i ){
+      std::string opName = constGRproblemPtr()->portfolioSourcingOpName(port_loc_p[i],port_loc_l[i]);
+      port_loc_op.push_back(opName);
+      oper_numb[opName]=i;
+  }
+  // portfolio-resource links
+  std::vector< std::string > port_res_port;
+  std::vector< std::string > port_res_portLoc;
+  std::vector< std::string > port_res_skill;
+  std::vector< std::string > port_res_resLoc;
+  std::vector< std::string > port_res_band;
+  std::vector< std::string > port_res_role;
+  std::vector<bool> port_res_home;
+  constGRproblemPtr()->getPortfolioResourceLinks(port_res_port,port_res_portLoc,port_res_skill,
+						 port_res_resLoc,port_res_band,port_res_role,
+						 port_res_home);
+
+  std::vector< std::pair<std::string, std::string> > port_res_link; //
+  std::vector< std::vector<float> > port_res_consr; //
+  //
+  VOL_ivector count(port_loc_op.size());
+  count=0;
+  //
+  for ( i=0; i<port_res_port.size(); ++i ){
+      std::string opName = constGRproblemPtr()->portfolioSourcingOpName(port_res_port[i],port_res_portLoc[i]);
+      std::string resName = constGRproblemPtr()->resourceName(port_res_skill[i],port_res_resLoc[i],
+							      port_res_band[i],port_res_role[i],
+							      port_res_home[i]);
+      port_res_link.push_back(std::make_pair(opName,resName));
+      std::vector<float> cons=constGRproblemPtr()->
+	  getPortfolioResourceLinkConsRate(port_res_port[i],port_res_portLoc[i],port_res_skill[i],
+					   port_res_resLoc[i],port_res_band[i],port_res_role[i],
+					   port_res_home[i]);
+      port_res_consr.push_back(cons);
+      // counting links per port-loc	
+      map_int::iterator where=oper_numb.find(opName);
+      assert ( where!=oper_numb.end() );
+      const int k=(*where).second;
+      count[k]++;
+  }
+  // resources
+  std::vector< std::string > res_skill;
+  std::vector< std::string > res_loc;
+  std::vector< std::string > res_band;
+  std::vector< std::string > res_role;
+  constGRproblemPtr()->getResources(res_skill,res_loc,res_band,res_role);
+  std::vector< std::string > resr_name;
+  typedef std::map<std::string, std::vector<float> > map_vec;
+  map_vec resr_cost;
+  map_vec resr_sppl;
+  map_int resr_numb;
+  std::vector< std::string > rebs_name;
+  map_int rebs_numb;
+  std::vector< std::pair<std::string,std::string> > sub_resr_link;
+  std::vector< std::vector<float> > sub_resr_cost;
+  std::vector< std::vector<int> > sub_link_point;
+  std::vector< std::vector<std::string> > sub_skill;
+  std::vector< std::vector<std::string> > sub_resrs;
+  std::vector< std::vector<std::string> > sub_bands;
+  std::vector< std::vector<std::string> > sub_roles;
+  for ( i=0; i<res_skill.size(); ++i){
+      std::string remoteRes =  constGRproblemPtr()->remoteSiteResourceName(res_skill[i],
+									   res_loc[i],res_band[i],res_role[i]);
+      std::string homeRes =constGRproblemPtr()-> homeSiteResourceName(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+      std::string baseRes =constGRproblemPtr()-> baseResourceName(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+      std::vector<float> supply=constGRproblemPtr()->
+	  getResourceSupply(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+      resr_sppl[baseRes]=supply;
+
+      resr_numb[remoteRes]=resr_name.size();
+      resr_name.push_back(remoteRes); 
+      std::vector<float> rcost=constGRproblemPtr()-> 
+	  getResourceCostRemoteSite(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+      resr_cost[remoteRes]=rcost;
+      
+      resr_numb[homeRes]=resr_name.size();
+      resr_name.push_back(homeRes);
+      std::vector<float> hcost=constGRproblemPtr()-> 
+	  getResourceCostHomeSite(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+      resr_cost[homeRes]=hcost;
+      
+      rebs_numb[baseRes]=rebs_name.size();
+      rebs_name.push_back(baseRes);
+      // subsitute resource link
+      std::vector<std::string> substituteSkills;
+      std::vector<std::string> substituteResrcLocs;
+      std::vector<std::string> substituteBands;
+      std::vector<std::string> substituteRoles;
+      constGRproblemPtr()->
+	  getSubstituteResourceLinks(res_skill[i],res_loc[i],
+				     res_band[i],res_role[i],
+				     substituteSkills,substituteResrcLocs,
+				     substituteBands,substituteRoles);
+      sub_skill.push_back(substituteSkills);
+      sub_resrs.push_back(substituteResrcLocs);
+      sub_bands.push_back(substituteBands);
+      sub_roles.push_back(substituteRoles);
+      for ( int j=0; j<substituteSkills.size(); ++j ){
+	  // remote
+	  std::string op;
+	  op=constGRproblemPtr()->
+	      remoteSiteResourceName(res_skill[i],res_loc[i],res_band[i],
+				     res_role[i]);
+	  std::string subsResrc=constGRproblemPtr()->
+	      baseResourceName(substituteSkills[j],substituteResrcLocs[j],
+			       substituteBands[j],substituteRoles[j]);
+	  sub_resr_link.push_back(std::make_pair(op,subsResrc)); //
+	  std::vector<int> point(3);
+	  point[0]=i;
+	  point[1]=j;
+	  point[2]=0; // remote
+	  sub_link_point.push_back(point);
+	  std::vector<float> primCost;
+	  primCost= constGRproblemPtr()->
+	      getResourceCostRemoteSite(res_skill[i],res_loc[i],res_band[i],
+					      res_role[i]);
+	  std::vector<float> subsCost;
+	  subsCost=constGRproblemPtr()->
+	      getResourceCostRemoteSite(substituteSkills[j],substituteResrcLocs[j],
+					     substituteBands[j],substituteRoles[j]);
+	  std::vector<float> delta(subsCost.size());
+	  int k;
+	  for ( k=0; k<subsCost.size(); ++k) delta[k]=subsCost[k]-primCost[k];
+	  sub_resr_cost.push_back(delta);
+	  // home
+	  op=constGRproblemPtr()->
+	      homeSiteResourceName(res_skill[i],res_loc[i],res_band[i],
+				   res_role[i]);
+	  sub_resr_link.push_back(std::make_pair(op,subsResrc)); //
+	  point[0]=i;
+	  point[1]=j;
+	  point[2]=1; // home
+	  sub_link_point.push_back(point);
+	  primCost= constGRproblemPtr()->
+	      getResourceCostHomeSite(res_skill[i],res_loc[i],res_band[i],
+					res_role[i]);
+	  subsCost=constGRproblemPtr()->
+	      getResourceCostHomeSite(substituteSkills[j],substituteResrcLocs[j],
+					substituteBands[j],substituteRoles[j]);
+	  for ( k=0; k<subsCost.size(); ++k) delta[k]=subsCost[k]-primCost[k];
+	  sub_resr_cost.push_back(delta);
+      }
+  }
+  // countries
+  std::vector<std::string> cnt_name=constGRproblemPtr()->getCountries();
+  map_int cnt_numb;
+  std::vector<  std::vector<float> > cnt_maxFte;
+  for ( i=0; i < cnt_name.size(); ++i ) {
+      std::vector<float> Fte= constGRproblemPtr()->
+	  getCountryMaxFte( cnt_name[i] );
+      cnt_maxFte.push_back(Fte);
+      cnt_numb[cnt_name[i]]=i;
+  } 
+  // resr-country links
+  std::vector< std::pair<std::string,std::string> > resr_cntr_link;
+  for ( i=0; i<res_skill.size(); ++i){
+      std::vector< std::string > ln=constGRproblemPtr()->
+	  getResourceCountryLinks(res_skill[i],res_loc[i],res_band[i],
+				  res_role[i]);
+      for ( int j=0; j<ln.size(); ++j ){
+	  std::string op;
+	  op=constGRproblemPtr()->
+	      remoteSiteResourceName(res_skill[i],res_loc[i],res_band[i],
+				     res_role[i]);
+	  resr_cntr_link.push_back(std::make_pair(op,ln[j]));
+	  op=constGRproblemPtr()->
+	      homeSiteResourceName(res_skill[i],res_loc[i],res_band[i],
+				   res_role[i]);
+	  resr_cntr_link.push_back(std::make_pair(op,ln[j]));
+      }
+  }
+
+  const int np = constGRproblemPtr()->getNPeriods();
+  //
+  // Now set MIP
+  //
+  //
+  const double inf=1.e31;
+  Lp lp;
+  // Variables
+  // link portfolio-location
+  const double bigM=1.e8/np;
+  for ( i=0; i<port_loc_p.size(); ++i){	
+      double bound=1.0;
+      if ( count[i]==0 ) bound=0.0;
+      else bound=1.0;
+      const int jj=lp.ncols;
+      lp.intcol(jj);
+      lp.addcol(-bigM, 0.0, bound);	
+  }
+  // Portfolio Resource Link
+  const int prl=lp.ncols;
+  int t;
+  for ( t=0; t<np; ++t){
+      for ( i=0; i<port_res_link.size(); ++i){
+	  lp.addcol(0.0, 0.0, inf);
+      }
+  } 
+  // total used resource 
+  const int res=lp.ncols;
+  for ( t=0; t<np; ++t){
+      for ( i=0; i<resr_name.size(); ++i){
+	  std::string resName=resr_name[i];
+	  map_vec::iterator where=resr_cost.find(resName);
+	  assert( where!=resr_cost.end() );
+	  double cost=(*where).second[t];
+	  lp.addcol(cost, 0.0, inf);
+      }
+  }
+  // resource coming from base
+  const int res_from_base=lp.ncols;
+  for ( t=0; t<np; ++t){
+      for ( i=0; i<resr_name.size(); ++i){
+	  lp.addcol(0.0, 0.0, inf);
+      }
+  }
+  // substitute resources
+  const int sub_res=lp.ncols;
+  for ( t=0; t<np; ++t){
+      for ( i=0; i<sub_resr_link.size(); ++i ){
+	  double cost=sub_resr_cost[i][t];
+	  lp.addcol(cost, 0.0, inf);
+      }
+  }
+  // 
+  // Constraints
+  //
+  int nrows=-1;
+  // Constraint group 1: portfolios
+  for ( i=0; i<ports.size(); ++i ){
+      lp.rhs(++nrows,-inf,1.0);
+  }
+  // portfolio-location links
+  for ( i=0; i<port_loc_p.size(); ++i ){
+      std::string opName=port_loc_op[i];
+      std::string portName=port_loc_p[i];
+      map_int::iterator where=port_numb.find(portName);
+      assert ( where!=port_numb.end() );
+      int k=(*where).second;
+      lp.addel(k,i,1.0);
+  }
+  //-------------------------------------------
+  // Constraint group 2: comsuption rate at location 
+  for ( t=0; t<np; ++t){
+      const int crp=nrows+1;
+      for ( i=0; i<port_res_link.size(); ++i ){
+	  lp.rhs(++nrows,0.0,0.0);  
+	  
+	  std::string opName=port_res_link[i].first;
+	  map_int::iterator where=oper_numb.find(opName);
+	  assert ( where!=oper_numb.end() );
+	    const int k=(*where).second;
+	    double coeff=port_res_consr[i][t];
+	    lp.addel(nrows,k,-coeff); // -cons * x_lp
+	    
+	    const int l=prl+t*port_res_link.size()+i;
+	    lp.addel(nrows,l,1.0); //y_rlt
+      }
+  }
+
+  // Constraint group 3: resources 
+  for ( t=0; t<np; ++t){
+      const int resc=nrows+1;
+      for ( i=0; i<resr_name.size(); ++i ){
+	  lp.rhs(++nrows,0.0,0.0); 
+	  int k=res+t*resr_name.size()+i;
+	  lp.addel(nrows,k,-1.0); // a_rt 
+      }
+      for ( i=0; i<port_res_link.size(); ++i){
+	  std::string opName=port_res_link[i].first;
+	  std::string resName=port_res_link[i].second;
+	  map_int::iterator where=resr_numb.find(resName);
+	  assert( where!=resr_numb.end() );
+	  int k=(*where).second+ resc;
+	  int l=t*(port_res_link.size())+prl+i;
+	  lp.addel(k,l,1.0);
+      }
+  }
+  // Constraint group 4: using base and substitute resources
+  for ( t=0; t<np; ++t){
+      const int osb=nrows+1;
+      for ( i=0; i<resr_name.size(); ++i ){
+	  lp.rhs(++nrows,0.0,0.0); 
+	  int k=res+t*resr_name.size()+i;
+	  lp.addel(nrows,k,-1.0); // a_rt 
+      }
+	// resources
+	for ( i=0; i<rebs_name.size(); ++i){
+	    std::string skill=res_skill[i];
+	    std::string loc=res_loc[i];
+	    std::string band=res_band[i];
+	    std::string role=res_role[i];
+	    std::string remoteRes = constGRproblemPtr()->remoteSiteResourceName(skill,loc,band,role);
+	    std::string   homeRes = constGRproblemPtr()->homeSiteResourceName(skill,loc,band,role);
+	    map_int::iterator where=resr_numb.find(remoteRes);
+	    assert ( where!=resr_numb.end() );
+	    int k=(*where).second+osb;
+
+	    int l=res_from_base + t*resr_name.size()+(*where).second; // check (*where).second
+	    lp.addel(k,l,1.0); // base to remote  
+
+	    map_int::iterator where2=resr_numb.find(homeRes);
+	    assert ( where2!=resr_numb.end() );
+ 	    k=(*where2).second+osb;
+	    l=res_from_base+t*resr_name.size()+(*where2).second;
+	    lp.addel(k,l,1.0); // base to home
+	}
+	// substitutes
+	for ( i=0; i<sub_resr_link.size(); ++i ){
+	    std::string resName=sub_resr_link[i].first;
+	    map_int::iterator where=resr_numb.find(resName);
+	    assert ( where!=resr_numb.end() );
+	    int k=(*where).second+osb;
+	    int l=sub_res+t*sub_resr_link.size()+i;
+	    lp.addel(k,l,1.0); // substitute 
+	}
+    }
+  
+  // Constraint group 5: resource supply
+  for ( t=0; t<np; ++t){
+      const int sup=nrows+1;
+      for ( i=0; i<rebs_name.size(); ++i){
+	  std::string baseRes=rebs_name[i];
+	  map_vec::iterator where=resr_sppl.find(baseRes);
+	  assert ( where!=resr_sppl.end() );
+	  double supply=(*where).second[t];
+	  lp.rhs(++nrows,-inf,supply);
+	  
+	  // base to remote 
+	  std::string remoteRes =  constGRproblemPtr()->
+	      remoteSiteResourceName(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+	  map_int::iterator rem_number=resr_numb.find(remoteRes);
+	  assert( rem_number!=resr_numb.end()) ;
+	  
+	  int l=res_from_base + t*resr_name.size() + (*rem_number).second;
+	  lp.addel(nrows,l,1.0); 
+
+	  // base to home
+	  std::string homeRes =constGRproblemPtr()-> 
+	      homeSiteResourceName(res_skill[i],res_loc[i],res_band[i],res_role[i]);
+	  map_int::iterator home_number=resr_numb.find(homeRes);
+	  assert ( home_number!=resr_numb.end());
+
+	  l=res_from_base + t*resr_name.size() + (*home_number).second;
+	  lp.addel(nrows,l,1.0); // base to home
+      }
+      // substitutes
+      for ( i=0; i<sub_resr_link.size(); ++i ){
+	  std::string baseRes=sub_resr_link[i].second;
+	  map_int::iterator where=rebs_numb.find(baseRes);
+	  assert ( where!=rebs_numb.end() ) ;
+	  int k=(*where).second+sup;
+	  int l=sub_res+t*sub_resr_link.size()+i;
+	  lp.addel(k,l,1.0); // substitute 
+      }
+  }
+  // Constraint group 5:  upper bounds per country 
+  for ( t=0; t<np; ++t){
+      const int cnt=nrows+1;
+      for ( i=0; i<cnt_name.size(); ++i){
+	  double maxFte=cnt_maxFte[i][t];
+	  lp.rhs(++nrows,-inf,maxFte);
+      }
+      for ( i=0; i< resr_cntr_link.size(); ++i ){
+	    std::string resrName=resr_cntr_link[i].first;
+	    map_int::iterator where=resr_numb.find(resrName);
+	    assert ( where!=resr_numb.end() );
+	    int l=(*where).second + res + t * resr_name.size();
+	    
+	    std::string cntrName=resr_cntr_link[i].second;
+	    map_int::iterator where2=cnt_numb.find(cntrName);
+	    assert ( where2!=cnt_numb.end() );
+	    int k=(*where2).second + cnt;
+
+	    lp.addel(k,l,1.0); // resource
+	}
+    }  
+    ++nrows;
+    lp.finish_up();
+    // end model
+
+    // OSL
+    EKKContext * env;
+    env = ekk_initializeContext();
+    int rtcod;
+    EKKModel * model;
+    model=ekk_newModel(env,NULL);
+    int ncols=lp.ncols;
+    double *dlor=lp.dlor.v;
+    double *dupr=lp.dupr.v;
+    double *dcost=lp.dcost.v;
+    double *dloc=lp.dloc.v;
+    double *dupc=lp.dupc.v;
+    
+    //ekk_messagesPrintOff(model,1,999); /******turn off messages*********/
+    
+    rtcod=ekk_loadRimModel(model,nrows,dlor,dupr,ncols,dcost,dloc,dupc);
+    
+    int *mrow=lp.mrow.v;
+    int *mcstrt=lp.mcstrt.v;
+    double *dels=lp.dels.v;
+    
+    rtcod=ekk_addColumnElementBlock(model,ncols,mrow,mcstrt,dels);
+    rtcod=ekk_mergeBlocks(model,1);
+    
+    ekk_setMinimize(model);
+
+#if 1
+    rtcod=ekk_eitherSimplex(model);
+#else   
+    int nints=lp.nints;
+    int *intnums=lp.intnums.v;
+    VOL_dvector upcost(nints);
+    upcost=0.999;
+    VOL_dvector dncost(nints);
+    dncost=0.001;
+    double *up=upcost.v;
+    double *dn=dncost.v;
+    rtcod=ekk_addIntegerSet(model,1,nints,intnums,dn,up);
+    ekk_branchAndBound(model,NULL,NULL);
+#endif
+
+    //
+
+    // get solution
+    const double *sol=ekk_colsol(model);
+    const double *obj=ekk_getObjective(model);
+    const double eps=1.e-6;
+    // portfolio-location
+    for ( i=0; i<port_loc_p.size(); ++i){
+	grProblemPtr()->setPortfolioLocationExecVol(port_loc_p[i],port_loc_l[i],sol[i]);
+    }
+    // substitutes
+    for ( i=0; i<sub_resr_link.size(); ++i ){
+	int ii=sub_link_point[i][0];
+	int jj=sub_link_point[i][1];
+	int home=sub_link_point[i][2];
+	bool homeSite;
+	if ( home ) homeSite=1;
+	else homeSite=0;
+	std::vector<float> values(np);
+	for ( t=0; t<np; ++t){
+	    int dd=sub_res + t*sub_resr_link.size() + i;
+      // std::max does not compile on windows.
+	    //values[t]=std::max(0.0,sol[dd]);
+      values[t]= 0.0>sol[dd] ? 0.0 : sol[dd];
+	}
+	grProblemPtr()->
+	    setSubstituteResourceLinkSubsVol(res_skill[ii],res_loc[ii],
+					     res_band[ii],res_role[ii],
+					     sub_skill[ii][jj],sub_resrs[ii][jj],
+					     sub_bands[ii][jj],sub_roles[ii][jj],
+					     homeSite,values);
+	
+    }
+#if 0
+    for ( i=0; i<port_res_link.size(); ++i){
+	for ( t=0; t<np; ++t){
+	    const int d=prl+t*port_res_link.size()+i;
+	    if ( sol[d] < eps ) continue;
+	    fout << "period " << t << " ";
+	    fout << port_res_link[i].first.c_str() << endl
+		 << port_res_link[i].second.c_str() << endl
+		 << sol[d] << " obj " << obj[i] << endl;
+	}
+    }
+#endif   
+    
+
+    ekk_deleteModel(model);
+    ekk_endContext(env);
+}
+
+
+  
+
+// default constructor
+GRmipProblem::GRmipProblem()
+:
+grProblemPtr_(NULL)
+//osiPtr_(NULL)
+{
+ // Nothing to do here
+}
+
+// destructor
+GRmipProblem::~GRmipProblem()
+{
+  gutsOfDestructor();
+}
+
+
+
+// copy constructor
+GRmipProblem::GRmipProblem( const GRmipProblem& source ):
+grProblemPtr_(NULL)
+//osiPtr_(NULL)
+{
+  gutsOfCopy(source);
+}
+
+// assignment operator
+GRmipProblem&
+GRmipProblem::operator=(const GRmipProblem& rhs)
+{  
+  if (this != &rhs) {
+    if ( grProblemPtr_ != NULL /*|| osiPtr_!=NULL*/ ) gutsOfDestructor();
+    grProblemPtr_ = NULL;
+    //osiPtr_ = NULL;
+    gutsOfCopy(rhs);
+  }
+  return *this;
+}
+
+// copy object
+void GRmipProblem::gutsOfCopy( const GRmipProblem& source )
+{
+  
+  // Point to the same GrProblem. Do not create a new one.
+  assert(grProblemPtr_==NULL);
+  grProblemPtr_ = source.grProblemPtr_;
+
+  //assert(osiPtr_==NULL);
+  //osiPtr_ = source.osiPtr_->clone();
+  
+}
+
+// destructor
+void GRmipProblem::gutsOfDestructor()
+{
+  
+  grProblemPtr_ = NULL;
+  //delete osiPtr_; 
+}
+
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+//------------------------------------------------------------------------------
+// Test function
+//------------------------------------------------------------------------------
+void
+GRmipProblem::test()
+{
+  //OsiRelFltEq eq(1e-05);
+  GRmipProblem dcp;
+  dcp.solve();
+    
+    
+}
+
+
+#endif@
+
+
+1.9
+log
+@removed std::max to get it to compile on windows
+@
+text
+@d6 1
+d648 1
+@
+
+
+1.8
+log
+@setting substitute usage part of the solution
+@
+text
+@d536 3
+a538 1
+	    values[t]=std::max(0.0,sol[dd]);
+@
+
+
+1.7
+log
+@Changed abort to asserts
+@
+text
+@d148 5
+d186 4
+d199 6
+a204 1
+	  sub_resr_link.push_back(std::make_pair(op,subsResrc));
+d214 1
+a214 1
+    int k;
+d221 5
+a225 1
+	  sub_resr_link.push_back(std::make_pair(op,subsResrc));
+d517 1
+a517 1
+   
+d521 1
+d524 21
+@
+
+
+1.6
+log
+@Changes to compile on windows
+@
+text
+@d129 1
+a129 1
+      if ( where==oper_numb.end() ) abort();
+d279 1
+a279 1
+	  if ( where==resr_cost.end() ) abort();
+d312 1
+a312 1
+      if ( where==port_numb.end() ) abort();
+d325 1
+a325 1
+	  if ( where==oper_numb.end() ) abort();
+d347 1
+a347 1
+	  if ( where==resr_numb.end() ) abort();
+d370 1
+a370 1
+	    if ( where==resr_numb.end() ) abort();
+d377 1
+a377 1
+	    if ( where2==resr_numb.end() ) abort();
+d386 1
+a386 1
+	    if ( where==resr_numb.end() ) abort();
+d399 1
+a399 1
+	  if ( where==resr_sppl.end() ) abort();
+d407 1
+a407 1
+	  if ( rem_number==resr_numb.end()) abort();
+d416 1
+a416 1
+	  if ( home_number==resr_numb.end()) abort();
+d425 1
+a425 1
+	  if ( where==rebs_numb.end() ) abort();
+d441 1
+a441 1
+	    if ( where==resr_numb.end() ) abort();
+d446 1
+a446 1
+	    if ( where2==cnt_numb.end() ) abort();
+@
+
+
+1.5
+log
+@I added code to set up a MIP model and solve it with OSL.
+@
+text
+@d83 2
+a84 1
+  for ( int i=0; i<ports.size(); ++i ){
+d93 1
+a93 1
+  for ( int i=0; i<port_loc_p.size(); ++i ){
+d116 1
+a116 1
+  for ( int i=0; i<port_res_port.size(); ++i ){
+d148 1
+a148 1
+  for (int i=0; i<res_skill.size(); ++i){
+d200 2
+a201 1
+	  for ( int k=0; k<subsCost.size(); ++k) delta[k]=subsCost[k]-primCost[k];
+d214 1
+a214 1
+	  for ( int k=0; k<subsCost.size(); ++k) delta[k]=subsCost[k]-primCost[k];
+d222 1
+a222 1
+  for ( int i=0; i < cnt_name.size(); ++i ) {
+d230 1
+a230 1
+  for (int i=0; i<res_skill.size(); ++i){
+d257 1
+a257 1
+  for ( int i=0; i<port_loc_p.size(); ++i){	
+d267 3
+a269 2
+  for ( int t=0; t<np; ++t){
+      for ( int i=0; i<port_res_link.size(); ++i){
+d275 2
+a276 2
+  for ( int t=0; t<np; ++t){
+      for ( int i=0; i<resr_name.size(); ++i){
+d286 2
+a287 2
+  for ( int t=0; t<np; ++t){
+      for ( int i=0; i<resr_name.size(); ++i){
+d293 2
+a294 2
+  for ( int t=0; t<np; ++t){
+      for ( int i=0; i<sub_resr_link.size(); ++i ){
+d304 1
+a304 1
+  for ( int i=0; i<ports.size(); ++i ){
+d308 1
+a308 1
+  for ( int i=0; i<port_loc_p.size(); ++i ){
+d318 1
+a318 1
+  for ( int t=0; t<np; ++t){
+d320 1
+a320 1
+      for ( int i=0; i<port_res_link.size(); ++i ){
+d336 1
+a336 1
+  for ( int t=0; t<np; ++t){
+d338 1
+a338 1
+      for ( int i=0; i<resr_name.size(); ++i ){
+d343 1
+a343 1
+      for ( int i=0; i<port_res_link.size(); ++i){
+d354 1
+a354 1
+  for ( int t=0; t<np; ++t){
+d356 1
+a356 1
+      for ( int i=0; i<resr_name.size(); ++i ){
+d362 1
+a362 1
+	for ( int i=0; i<rebs_name.size(); ++i){
+d383 1
+a383 1
+	for ( int i=0; i<sub_resr_link.size(); ++i ){
+d394 1
+a394 1
+  for ( int t=0; t<np; ++t){
+d396 1
+a396 1
+      for ( int i=0; i<rebs_name.size(); ++i){
+d422 1
+a422 1
+      for ( int i=0; i<sub_resr_link.size(); ++i ){
+d432 1
+a432 1
+  for ( int t=0; t<np; ++t){
+d434 1
+a434 1
+      for ( int i=0; i<cnt_name.size(); ++i){
+d438 1
+a438 1
+      for ( int i=0; i< resr_cntr_link.size(); ++i ){
+d503 1
+a503 1
+    for ( int i=0; i<port_loc_p.size(); ++i){
+d507 2
+a508 2
+    for ( int i=0; i<port_res_link.size(); ++i){
+	for ( int t=0; t<np; ++t){
+@
+
+
+1.4
+log
+@Added code to test the new methods last night.
+Fixed a bug in the code (free changed to witFree).
+Added JP_TEST to conditionally compile testing code.
+@
+text
+@d34 4
+d79 17
+a95 55
+
+  //----------------------------------------------------------
+  // Compute number of columns.
+  // This is the sum of:
+  //   portfolio location pairs
+  //   numPeriods * ( number of substitutes )
+  //   numPeriods * ( number of resources )
+  //----------------------------------------------------------
+  // get portfolio location pairs
+  std::vector< std::string > portNames;
+  std::vector< std::string > locNames;
+  constGRproblemPtr()->getPortfolioLocationLinks( portNames, locNames );
+  int numPortLocs = portNames.size();
+  std::vector<std::string> skills;
+  std::vector<std::string> locs;
+  std::vector<std::string> bands;
+  std::vector<std::string> roles;
+  constGRproblemPtr()->getResources(skills,locs,bands,roles);
+  int numResources = skills.size();
+  int numSubs = constGRproblemPtr()->getNumSubstitutes();
+  int np = constGRproblemPtr()->getNPeriods();
+  int nc = numPortLocs + numSubs*np + numResources*np;
+
+  //----------------------------------------------------------
+  // Allocate storage for obj, col lower bnds, and col upper bnds,
+  // and fill with nonsense values
+  //----------------------------------------------------------
+  double * obj = (double*) malloc(nc*sizeof(double));
+  double * colUp = (double*) malloc(nc*sizeof(double));
+  double * colLo = (double*) malloc(nc*sizeof(double));
+  int c;
+  for ( c=0; c<nc; c++ ) {
+    obj[c]=FLT_MAX;
+    colUp[c]=-FLT_MAX;
+    colLo[c]=FLT_MAX;
+  }
+  // Allocate storage which will be used to temporarily hold
+  // a row of the constraint matrix
+  int * colIndices = (int*) malloc(nc*sizeof(int));
+  double * rowElements = (double*) malloc(nc*sizeof(double));
+  int numElems = 0;
+
+
+  //----------------------------------------------------------
+  // Assign column numbers to the portfolio location variables,
+  // fill-in obj coef and col bnds.
+  //----------------------------------------------------------
+  GRcolumnIndexManager ciMgr;
+  // get portfolio location pairs
+  int pl;
+  for ( pl=0; pl<numPortLocs; pl++ ) {
+    int c = ciMgr.definePortfolioLocationCol(portNames[pl],locNames[pl]);
+    obj[c]=constGRproblemPtr()->getPortfolioLocationCost(portNames[pl],locNames[pl]);
+    colUp[c]=1.0;
+    colLo[c]=0.0;
+d97 34
+a130 16
+  
+  
+  //----------------------------------------------------------
+  // Assign column numbers to variables that will represent
+  // the consumpution of each resource
+  //----------------------------------------------------------
+  int s;
+  int t;
+  for ( s=0; s<numResources; ++s ) {
+    std::vector<float> sup = constGRproblemPtr()->getResourceSupply( skills[s],locs[s],bands[s],roles[s] );
+    for (t=0; t<np; ++t ) {
+      int c = ciMgr.defineResourceCol(skills[s],locs[s],bands[s],roles[s],t);
+      obj[c]=0.0;
+      colUp[c]=sup[t];
+      colLo[c]=0.0;
+    }
+d132 35
+a166 31
+  //----------------------------------------------------------
+  // Assign column numbers to the subVol decision variables
+  //----------------------------------------------------------
+  // To be done
+
+  //----------------------------------------------------------
+  // Initialize OSL
+  //----------------------------------------------------------
+  EKKContext *  ekkContext = ekk_initializeContext();
+  EKKModel *  ekkModel = ekk_newModel(ekkContext,constGRproblemPtr()->getTitle().c_str());
+
+  //----------------------------------------------------------
+  // Pass column obj coef and bounds to mip solver
+  //----------------------------------------------------------
+  ekk_loadRimModel(ekkModel , 
+		       0, NULL, NULL,
+		       nc, obj, 
+		       colLo, colUp );
+  free(obj);
+  free(colUp);
+  free(colLo);
+
+  //----------------------------------------------------------
+  // Mark Port Location columns as int
+  //----------------------------------------------------------
+  {   
+    // loop once for each portfolio
+    std::vector< std::string > portNames = constGRproblemPtr()->getPortfolios();
+    int p;
+    for (p=0; p<portNames.size(); ++p ) {
+      std::vector< std::string > locNames= constGRproblemPtr()->getPortfolioLocs( portNames[p] );
+d168 76
+a243 5
+      // loop once for each location
+      int l;
+      for (l=0; l<locNames.size(); l++ ) {
+        // get port loc column number
+        int cn = ciMgr.portfolioLocationColNum(portNames[p],locNames[l]);
+d245 84
+a328 2
+        // Should probably be marked as a special ordered set
+        ekk_markAsInteger(ekkModel,cn);
+a329 1
+    }
+d332 25
+a356 24
+  
+  //----------------------------------------------------------
+  // Add constraints that specify a portfolio must be done exactly once.
+  // This is may not be a necessary set of constraints if special ordered
+  // sets are used.
+  //----------------------------------------------------------
+  {       
+    // loop once for each portfolio
+    std::vector< std::string > portNames = constGRproblemPtr()->getPortfolios();
+    int p;
+    for (p=0; p<portNames.size(); ++p ) {
+      std::vector< std::string > locNames= constGRproblemPtr()->getPortfolioLocs( portNames[p] );
+      
+      // loop once for each location
+      int l;
+      for (l=0; l<locNames.size(); l++ ) {
+        // get port loc column number
+        int cn = ciMgr.portfolioLocationColNum(portNames[p],locNames[l]);
+        
+        // set coef in column cn to 1 in sparse storage row vector
+        assert(numElems<nc);
+        colIndices[numElems]=cn;
+        rowElements[numElems]=1.0;
+        numElems++;
+d358 30
+a387 6
+      
+      // put row in matrix
+      double loBnd = 1.0;
+      double upBnd = 1.0;
+      ekk_addOneRow(ekkModel,loBnd,upBnd,numElems,colIndices,rowElements);
+      numElems = 0;    
+a388 1
+  }
+d390 36
+a425 55
+  //----------------------------------------------------------
+  // Add rows which will define the consumption of a resource
+  //----------------------------------------------------------
+  {
+    for ( s=0; s<numResources; ++s ) {
+      
+      // Get list port locs that consume this resource  
+      std::vector<std::string> ports; 
+      std::vector<std::string> portLocs;
+      constGRproblemPtr()->getPortfolioResourceLinks( skills[s],locs[s],bands[s],roles[s], ports, portLocs);
+      
+      // loop once for each period
+      for (t=0; t<np; ++t ) {
+        
+        // loop once for each consuming port Loc pair
+        for ( int pl=0; pl<ports.size(); pl++ ) {
+          const std::string & port = ports[pl];
+          const std::string & portLoc = portLocs[pl];
+          
+          // get the amount of the resource the port loc consumes      
+          std::vector<float> consRateHome = 
+            constGRproblemPtr()->getPortfolioResourceLinkConsRate( 
+            port,portLoc,
+            skills[s],locs[s],bands[s],roles[s],
+            true );     
+          std::vector<float> consRateRemote = 
+            constGRproblemPtr()->getPortfolioResourceLinkConsRate( 
+            port, portLoc,
+            skills[s],locs[s],bands[s],roles[s],
+            false );
+          float consRate = consRateHome[t] + consRateRemote[t];
+
+          // set column representing port loc to consRate
+          int cn = ciMgr.portfolioLocationColNum(portNames[pl],locNames[pl]);
+          assert(numElems<nc);
+          colIndices[numElems]=cn;
+          rowElements[numElems]=consRate;
+          numElems++;              
+        }
+
+        // set coef in column which represents consumption of resource to -1
+        int cn = ciMgr.resourceColNum(skills[s],locs[s],bands[s],roles[s],t);
+        assert(numElems<nc);
+        colIndices[numElems]=cn;
+        rowElements[numElems]=-1.0;
+        numElems++;
+        
+        // put row in matrix
+        //for ( int e=0; e<numElems; e++ ) {
+        //  printf("%d  %f\n",colIndices[e],rowElements[e]);
+        //}
+        double loBnd = 0.0;
+        double upBnd = 0.0;
+        ekk_addOneRow(ekkModel,loBnd,upBnd,numElems,colIndices,rowElements);
+        numElems = 0;
+a426 1
+    }
+d428 50
+d479 13
+a491 20
+
+  // Add other constraints
+  // To be done
+
+  
+  //----------------------------------------------------------
+  // Finished adding constraints so free temporary storage
+  // for storing a row
+  //----------------------------------------------------------
+  free(colIndices);
+  free(rowElements);
+
+  
+  //----------------------------------------------------------
+  // solve mip
+  //----------------------------------------------------------
+#ifndef SOLVEASLP
+  ekk_branchAndBound(ekkModel,NULL,NULL);
+#else
+  ekk_simplex(ekkModel,1);
+d494 1
+a494 49
+  //----------------------------------------------------------
+  // get solution from osl and put into GRproblem
+  //----------------------------------------------------------
+  const double * colSol = ekk_colsol(ekkModel); 
+  // Loop once for each port loc decision variable
+  for ( pl=0; pl<numPortLocs; pl++ ) {
+    // Get column number of variable
+    int cn = ciMgr.portfolioLocationColNum(portNames[pl],locNames[pl]);
+    // get column's solution
+    double solCn = colSol[cn];
+    // set the solution
+    grProblemPtr()->setPortfolioLocationExecVol(portNames[pl],locNames[pl],solCn);    
+  }
+  // get subVol decision variable values from osl and set them in grProblem
+  // To be done
+
+  // Indicate that the setting of the solution is complete
+  grProblemPtr()->execVolSubVolSettingComplete();
+
+#ifdef JP_TEST
+  //----------------------------------------------------------
+  // Test that the consVols in the GRproblem agree with those
+  // in the mip
+  //----------------------------------------------------------
+  //loop once for each resource
+  for (int r=0; r<numResources; ++r ) {
+    
+    // get from grProblem the resources it thinks were consumed
+    std::vector<float> resConsGrProb = 
+      constGRproblemPtr()->getResourceConsVol(skills[r],locs[r],bands[r],roles[r]);
+
+    // loop once for each time period
+    for ( t=0; t<np; t++ ) {
+
+      // get resources the mip thinks were consumed
+      int cn = ciMgr.resourceColNum(skills[r],locs[r],bands[r],roles[r],t);
+      double resConsMipT = colSol[cn];
+      double resConsGrProbT = resConsGrProb[t];
+      std::cout 
+        <<resConsMipT <<" " 
+        <<resConsGrProbT <<" "
+        <<t <<" "
+        <<skills[r] <<" "
+        <<locs[r] <<" "
+        <<bands[r] <<" "
+        <<roles[r] <<" "
+        <<std::endl;
+      OsiRelFltEq eq;
+      assert( eq(resConsMipT,resConsGrProbT) );
+d496 17
+d514 2
+a515 2
+  }
+#endif
+d517 2
+a518 8
+
+  
+  //----------------------------------------------------------
+  // Release OSL
+  //----------------------------------------------------------
+  ekk_deleteModel(ekkModel);
+  ekk_endContext(ekkContext);
+  
+@
+
+
+1.3
+log
+@Added code to add resource capacity columns to mip problem
+@
+text
+@d326 1
+d359 1
+@
+
+
+1.2
+log
+@change to include<ekk_c_api.h> to get it to compile on aix
+@
+text
+@d9 5
+a13 1
+#include <osl/ekk_c_api.h>
+d15 1
+a15 1
+//#include <iostream.h>
+d26 1
+a26 1
+//#include "OsiFloatEqual.h"
+d33 1
+a33 1
+#define SOLVEASLP
+d81 1
+d88 6
+d96 1
+a96 1
+  int nc = numPortLocs + numSubs*np;
+d132 16
+d222 60
+a281 2
+      numElems = 0;
+     
+d285 1
+d322 37
+@
+
+
+1.1
+log
+@Changes to add osl mip solver structure to code
+@
+text
+@d9 1
+a9 1
+#include <ekk_c_api.h>
+@
+

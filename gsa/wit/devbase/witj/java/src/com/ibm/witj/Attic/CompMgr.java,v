@@ -1,0 +1,838 @@
+head	1.22;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.22
+date	2008.10.06.22.14.05;	author rjw;	state dead;
+branches;
+next	1.21;
+
+1.21
+date	2008.09.30.15.17.42;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2008.09.19.22.21.34;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2008.09.18.16.01.28;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2008.09.17.21.42.21;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2008.09.17.21.27.58;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2008.09.17.21.01.34;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2008.09.17.19.10.16;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2008.09.12.16.09.36;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2008.09.09.15.15.30;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2008.09.08.19.45.35;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2008.09.05.22.06.50;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2008.09.03.20.33.10;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2008.08.28.18.30.38;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2008.08.19.22.14.32;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2008.08.18.22.16.57;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2008.08.06.18.48.22;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2008.06.30.22.02.11;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2008.06.17.13.38.07;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2008.06.16.20.41.01;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.05.14.16.07.26;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2008.05.13.21.06.36;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.22
+log
+@Changed name of Component to Entity.
+@
+text
+@
+//==============================================================================
+// WIT-J Java Source File CompMgr.java.
+//
+// Contains the declaration of class CompMgr.
+//==============================================================================
+
+package       com.ibm.witj;
+
+import static com.ibm.witj.Utility.*;
+
+import           java.util.*;
+
+//==============================================================================
+// Class CompMgr
+//
+// "Component Manager"
+// Coordinates the Components of a Problem.
+//
+// Class Hierarchy:
+//
+//    RetainedObject
+//       CompMgr
+//==============================================================================
+
+final class CompMgr extends RetainedObject
+{
+//==============================================================================
+// Package-Internal Constructor
+//==============================================================================
+
+   CompMgr (Problem theProblem)
+      {
+      myProblem    = theProblem;
+
+      myComponents = new ArrayList <Component> ();
+
+      myPartMap    = new HashMap <String, Part>      ();
+      myOpnMap     = new HashMap <String, Operation> ();
+
+      new GlobalComp (this);
+      }
+
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// shutDown ().
+//
+// Override from class RetainedObject.
+//------------------------------------------------------------------------------
+
+   void shutDown ()
+      {
+      int theIdx;
+
+      for (theIdx = myComponents.size () - 1; theIdx >= 0; theIdx --)
+         {
+         myComponents.get (theIdx).shutDown ();
+         }
+
+      myComponents.clear ();
+
+      super.shutDown ();
+      }
+
+//------------------------------------------------------------------------------
+// record (theComp)
+//
+// Records the fact that theComp has been created.
+//------------------------------------------------------------------------------
+
+   void record (Component theComp)
+      {
+      assert (theComp.getCompMgr () == this);
+
+      myComponents.add (theComp);
+      }
+
+//------------------------------------------------------------------------------
+// record (theGlobalComp)
+//
+// Records the fact that theGlobalComp has been created.
+//------------------------------------------------------------------------------
+
+   void record (GlobalComp theGlobalComp)
+      {
+      assert (theGlobalComp.getCompMgr () == this);
+
+      assert (myGlobalComp == null);
+
+      myGlobalComp = theGlobalComp;
+      }
+
+//------------------------------------------------------------------------------
+// record (thePart)
+//
+// Records the fact that thePart has been created.
+//------------------------------------------------------------------------------
+
+   void record (Part thePart)
+      {
+      assert (thePart.getCompMgr () == this);
+
+      myPartMap.put (thePart.getPartName (), thePart);
+      }
+
+//------------------------------------------------------------------------------
+// record (theOpn)
+//
+// Records the fact that theOpn has been created.
+//------------------------------------------------------------------------------
+
+   void record (Operation theOpn)
+      {
+      assert (theOpn.getCompMgr () == this);
+
+      myOpnMap.put (theOpn.getOperationName (), theOpn);
+      }
+
+//------------------------------------------------------------------------------
+// getPart (thePartName)
+//
+// Returns the Part that belongs to this CompMgr whose PartName matches
+// thePartName, if any; otherwise null.
+//------------------------------------------------------------------------------
+
+   Part getPart (String thePartName)
+      {
+      return myPartMap.get (thePartName);
+      }
+
+//------------------------------------------------------------------------------
+// getOperation (theOpnName)
+//
+// Returns the Operation that belongs to this CompMgr whose OperationName
+// matches theOpnName, if any; otherwise null.
+//------------------------------------------------------------------------------
+
+   Operation getOperation (String theOpnName)
+      {
+      return myOpnMap.get (theOpnName);
+      }
+
+//------------------------------------------------------------------------------
+// hasPartsOpns ()
+//
+// Returns true, iff this CompMgr owns at least one Part or Operation.
+//------------------------------------------------------------------------------
+
+   boolean hasPartsOpns ()
+      {
+      return (myComponents.size () > 1);
+      }
+
+//------------------------------------------------------------------------------
+// Accessors.
+//------------------------------------------------------------------------------
+
+   Problem getProblem ()
+      {
+      return myProblem;
+      }
+
+   Component[] getComponents ()
+      {
+      return myComponents.toArray (new Component[0]);
+      }
+
+   GlobalComp getGlobalComp ()
+      {
+      return myGlobalComp;
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+ 
+//------------------------------------------------------------------------------
+// myProblem.
+//
+// The Problem that owns this CompMgr.
+//------------------------------------------------------------------------------
+
+   private final Problem myProblem;
+
+//------------------------------------------------------------------------------
+// myComponents.
+//
+// The list of all Components that belong to this CompMgr.
+//------------------------------------------------------------------------------
+
+   private final List <Component> myComponents;
+
+//------------------------------------------------------------------------------
+// myGlobalComp.
+//
+// The GlobalComp responsible for working with global attributes of the Problem.
+//------------------------------------------------------------------------------
+
+   private GlobalComp myGlobalComp = null;
+
+//------------------------------------------------------------------------------
+// myPartMap
+//
+// myPartMap.get (thePartName) is the Part that belongs to this CompMgr whose
+// PartName matches thePartName, if any; otherwise null.
+//------------------------------------------------------------------------------
+
+   private final Map <String, Part> myPartMap;
+
+//------------------------------------------------------------------------------
+// myOpnMap
+//
+// myOpnMap.get (theOpnName) is the Operation that belongs to this CompMgr whose
+// OperationName matches theOpnName, if any; otherwise null.
+//------------------------------------------------------------------------------
+
+   private final Map <String, Operation> myOpnMap;
+
+//------------------------------------------------------------------------------
+}
+@
+
+
+1.21
+log
+@Call-back infrastructure.
+@
+text
+@@
+
+
+1.20
+log
+@Minor revision.
+@
+text
+@a37 2
+      myGlobalComp = new GlobalComp (this);
+
+d40 2
+d82 15
+d202 1
+a202 1
+   private final GlobalComp myGlobalComp;
+@
+
+
+1.19
+log
+@Implemented thePart.getDemands ().
+@
+text
+@a91 2
+
+      nPeriodsFrozen = true;
+a104 2
+
+      nPeriodsFrozen = true;
+d132 11
+a160 5
+   boolean getNPeriodsFrozen ()
+      {
+      return nPeriodsFrozen;
+      }
+
+a207 9
+// nPeriodsFrozen.
+//
+// True, iff the value of nPeriods cannot be changed, due to the presence of at
+// least one Part or Operation in the Problem.
+//------------------------------------------------------------------------------
+
+   private boolean nPeriodsFrozen = false;
+
+//------------------------------------------------------------------------------
+@
+
+
+1.18
+log
+@Implemented theProblem.getOperation (theOpnName).
+@
+text
+@d12 1
+a12 1
+import  java.util.*;
+d69 1
+a69 1
+// add (theComp)
+d71 1
+a71 1
+// Adds theComp to the set of Components that belong to the Problem.
+d74 1
+a74 1
+   void add (Component theComp)
+d76 2
+d82 1
+a82 1
+// add (thePart)
+d84 1
+a84 1
+// Adds thePart to the set of Parts that belong to the Problem.
+d87 1
+a87 1
+   void add (Part thePart)
+d89 2
+d97 1
+a97 1
+// add (theOpn)
+d99 1
+a99 1
+// Adds theOpn to the set of Operations that belong to the Problem.
+d102 1
+a102 1
+   void add (Operation theOpn)
+d104 2
+d177 1
+a177 1
+   private final ArrayList <Component> myComponents;
+@
+
+
+1.17
+log
+@Minor revision.
+@
+text
+@d40 2
+a41 1
+      myPartMap    = new HashMap <String, Part> ();
+d100 2
+d118 12
+d191 9
+@
+
+
+1.16
+log
+@Implemented theProblem.getPart (thePartName).
+@
+text
+@d70 1
+a70 1
+// Adds theComp to the set of Components owned by the Problem.
+d81 1
+a81 1
+// Adds thePart to the set of Parts owned by the Problem.
+d94 1
+a94 1
+// Adds theOpn to the set of Operations owned by the Problem.
+d105 2
+a106 2
+// Returns the Part owned by this CompMgr whose PartName matches thePartName,
+// if any; otherwise null.
+d153 1
+a153 1
+// The list of all Components owned by the Problem.
+d169 2
+a170 2
+// myPartMap.get (thePartName) is the Part owned by this CompMgr whose PartName
+// matches thePartName, if any; otherwise null.
+@
+
+
+1.15
+log
+@Implemented theProblem.getComponents ().
+@
+text
+@d39 2
+d76 11
+d88 24
+a111 4
+      if (! nPeriodsFrozen)
+         if (   (theComp instanceof Part)
+             || (theComp instanceof Operation))
+            nPeriodsFrozen = true;
+d167 9
+@
+
+
+1.14
+log
+@Active state / shutDown method.
+@
+text
+@d85 6
+a90 1
+   GlobalComp getGlobalComp ()
+d92 1
+a92 1
+      return myGlobalComp;
+d95 1
+a95 1
+   Problem getProblem ()
+d97 1
+a97 1
+      return myProblem;
+@
+
+
+1.13
+log
+@Removed Java class ProbCoord.
+@
+text
+@d46 1
+a46 1
+// release ().
+d51 1
+a51 1
+   void release ()
+d57 1
+a57 1
+         myComponents.get (theIdx).release ();
+d62 1
+a62 1
+      super.release ();
+@
+
+
+1.12
+log
+@Initial implementation of the Session classes.
+@
+text
+@d32 1
+a32 1
+   CompMgr (ProbCoord theProbCoord)
+d34 1
+a34 1
+      myProbCoord  = theProbCoord;
+d90 1
+a90 1
+   ProbCoord getProbCoord ()
+d92 1
+a92 1
+      return myProbCoord;
+d105 1
+a105 1
+// myProbCoord.
+d107 1
+a107 1
+// The ProbCoord that owns this CompMgr.
+d110 1
+a110 1
+   private final ProbCoord myProbCoord;
+@
+
+
+1.11
+log
+@Terminology change.
+@
+text
+@d18 1
+a18 1
+// Coordinates the Components of a problem.
+d29 1
+a29 1
+// Package-Internal Methods
+a31 4
+//------------------------------------------------------------------------------
+// Constructor.
+//------------------------------------------------------------------------------
+
+d41 4
+@
+
+
+1.10
+log
+@Replaced class InternalObject with class VitalObject.
+@
+text
+@d22 1
+a22 1
+//    VitalObject
+d26 1
+a26 1
+final class CompMgr extends VitalObject
+d46 1
+a46 1
+// shutDown ().
+d48 1
+a48 1
+// Override from class VitalObject.
+d51 1
+a51 1
+   void shutDown ()
+d57 1
+a57 1
+         myComponents.get (theIdx).shutDown ();
+d62 1
+a62 1
+      super.shutDown ();
+@
+
+
+1.9
+log
+@Name change: Global --> GlobalComp.
+@
+text
+@d22 1
+a22 1
+//    InternalObject
+d26 1
+a26 1
+final class CompMgr extends InternalObject
+d48 1
+a48 1
+// Override from class InternalObject.
+@
+
+
+1.8
+log
+@Revised the shut-down model.
+@
+text
+@d42 1
+a42 1
+      myGlobal     = new Global (this);
+d85 1
+a85 1
+   Global getGlobal ()
+d87 1
+a87 1
+      return myGlobal;
+d121 1
+a121 1
+// myGlobal.
+d123 1
+a123 1
+// The Global responsible for working with global attributes of the Problem.
+d126 1
+a126 1
+   private final Global myGlobal;
+@
+
+
+1.7
+log
+@Implemented Utility class.
+@
+text
+@a61 3
+      myProbCoord = null;
+      myGlobal    = null;
+
+d110 1
+a110 1
+   private ProbCoord myProbCoord;
+d126 1
+a126 1
+   private Global myGlobal;
+@
+
+
+1.6
+log
+@Classes Global and GlobalCI.
+@
+text
+@d8 3
+a10 1
+package com.ibm.witj;
+@
+
+
+1.5
+log
+@Made accessor names begin with "get".
+@
+text
+@d40 1
+a40 1
+      myGlobalComp = new GlobalComp (this);
+d60 2
+a61 2
+      myProbCoord  = null;
+      myGlobalComp = null;
+d86 1
+a86 1
+   GlobalComp getGlobalComp ()
+d88 1
+a88 1
+      return myGlobalComp;
+d122 1
+a122 1
+// myGlobalComp.
+d124 1
+a124 1
+// The GlobalComp responsible for working with global attributes of the Problem.
+d127 1
+a127 1
+   private GlobalComp myGlobalComp;
+@
+
+
+1.4
+log
+@Implemented Java class AttRep.
+@
+text
+@d83 1
+a83 3
+// myGlobalComp ()
+//
+// Accessor.
+d86 1
+a86 1
+   GlobalComp myGlobalComp ()
+d91 1
+a91 7
+//------------------------------------------------------------------------------
+// myProbCoord ()
+//
+// Accessor.
+//------------------------------------------------------------------------------
+
+   ProbCoord myProbCoord ()
+d96 1
+a96 7
+//------------------------------------------------------------------------------
+// nPeriodsFrozen ()
+//
+// Accessor.
+//------------------------------------------------------------------------------
+
+   boolean nPeriodsFrozen ()
+@
+
+
+1.3
+log
+@Created Java class CompMgr.
+@
+text
+@d44 1
+a44 1
+// shutdown ().
+@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@d1 7
+d16 1
+a16 1
+// Responsible for coordinating the Components owned by a Problem.
+d34 1
+a34 1
+   CompMgr (Problem theProblem)
+d36 1
+a36 1
+      myProblem    = theProblem;
+d60 3
+d77 2
+a78 1
+         if (theComp instanceof Operation)
+d83 1
+a83 1
+// myProblem ()
+d88 1
+a88 1
+   Problem myProblem ()
+d90 1
+a90 1
+      return myProblem;
+d94 1
+a94 1
+// myGlobalComp ()
+d99 1
+a99 1
+   GlobalComp myGlobalComp ()
+d101 1
+a101 1
+      return myGlobalComp;
+d120 1
+a120 1
+// myProblem.
+d122 1
+a122 1
+// The Problem that owns this CompMgr.
+d125 1
+a125 1
+   private final Problem myProblem;
+d141 1
+a141 1
+   private final GlobalComp myGlobalComp;
+d147 1
+a147 1
+// least one Operation in the Problem.
+@
+
+
+1.1
+log
+@*** empty log message ***
+@
+text
+@@
+

@@ -1,0 +1,105 @@
+#!/bin/csh
+
+# Make a library
+
+# This command is designed to be used on AIX.  It can be changed to work
+# on other operating systems too, but it doesn't do that right now.
+
+# $Id: dsMakeLibAix43.sh,v 1.1.1.1 2000/02/23 17:02:57 wit Exp $
+
+if ($#argv < 4) then
+    echo "Format: dsMakeLib"
+    echo "           shared_flag"
+    echo "           ar_update_flags"
+    echo "           linker_flag1 ... linker_flagN"
+    echo "           library o_file1 ... o_fileN"
+    echo "where shared_flag = -s means make a shared library and any"
+    echo "other value means don't make a shared library"
+    exit 1
+endif
+
+unset noclobber		# so that output redirection overwrites existing
+			# files without asking user first
+@ n = $#argv
+
+set sharedFlag = $argv[1]
+
+set arFlags = $argv[2]
+if ($?OBJECT_MODE) then
+        set arFlags = "-X${OBJECT_MODE} $arFlags"
+endif
+
+# Get linker flags.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument (\012 is ASCII newline code) and
+# using egrep to find the ones that start with a dash
+set linkerFlags = ( `echo $argv[3-$n] | /bin/tr ' ' '\012' | /bin/egrep -e '^-' ` )
+
+# Get file arguments.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument and
+# using egrep to find the ones that don't start with a dash
+set files = ( `echo $argv[3-$n] | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' ` )
+@ nFiles = $#files
+set library = $files[1]
+set oFiles = ( $files[2-$nFiles] )
+unset files
+
+# Let user override $sharedFlag
+if ($?DS_MAKE_NONSHARED_LIBRARIES) then
+	set sharedFlag = '-ns'
+endif
+
+# Make the library
+if ($sharedFlag == '-s') then
+	set nonSharedLibrary = `echo $library | sed 's/\.a/ns.a/' `
+	set expFile = `echo $nonSharedLibrary | sed 's/\.a/.exp/' `
+	set sharedOFile = `echo $nonSharedLibrary | sed 's/\.a/.o/' `
+
+	set echo
+
+	if (-e $library) then
+		/bin/rm -f $library
+	endif
+
+	# Make non-shared library file
+	/usr/bin/ar $arFlags $nonSharedLibrary $oFiles
+	if ($status != 0) then
+		exit 2
+	endif
+	/usr/bin/ranlib $nonSharedLibrary
+	if ($status != 0) then
+		exit 3
+	endif
+
+	# Generate export symbols
+	${DS_DIR}bin/genexlist $nonSharedLibrary > $expFile
+	if ($status != 0) then
+		exit 4
+	endif
+
+	# Make .o file containing entry points for
+	# what is in the non-shared library file
+	/usr/ibmcxx/bin/makeC++SharedLib -o $sharedOFile \
+		-p2100 -E$expFile $linkerFlags $nonSharedLibrary
+	if ($status != 0) then
+		exit 5
+	endif
+
+	# Make a shared library
+	/usr/bin/ar $arFlags $library $sharedOFile
+	if ($status != 0) then
+		exit 6
+	endif
+
+	# Remove the funny .o file and the exports list
+	/bin/rm -f $sharedOFile $expFile
+	if ($status != 0) then
+		exit 7
+	endif
+	unset echo
+else
+	set echo
+	/usr/bin/ar $arFlags $library $oFiles
+	unset echo
+endif

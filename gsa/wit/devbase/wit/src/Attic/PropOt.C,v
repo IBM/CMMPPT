@@ -1,0 +1,1997 @@
+head	1.25;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.25
+date	2005.01.10.22.34.48;	author rjw;	state dead;
+branches;
+next	1.24;
+
+1.24
+date	2005.01.07.19.22.17;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2005.01.06.20.34.10;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2005.01.01.00.43.13;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2004.12.31.18.28.28;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2004.12.28.22.34.27;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2004.12.28.19.21.19;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2004.12.23.20.30.08;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2004.12.22.23.36.28;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2004.12.22.22.27.10;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2004.12.22.19.57.26;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2004.12.21.22.13.49;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2004.12.20.21.13.10;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.12.20.18.36.24;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.12.17.21.53.01;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.12.16.23.35.17;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.12.15.23.50.11;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.12.15.20.20.50;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.12.14.22.37.10;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.12.13.23.35.48;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.12.10.16.49.44;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.12.09.23.57.02;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.12.09.22.06.07;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.12.09.21.34.12;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.12.06.22.38.16;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.25
+log
+@Low-Pri Prop-Rt.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "PropOt.C"
+//
+// Contains the implementation of the following classes:
+//
+//    PoMgr.
+//    PoCoord.
+//    PoSelMgr.
+//    PpoSelMgr.
+//    CpoSelMgr.
+//    PoBrPt.
+//    PoPt.
+//    PoCand.
+//------------------------------------------------------------------------------
+
+#include <PoMgr.h>
+#include <PoCoord.h>
+#include <PoSelMgr.h>
+#include <PoCand.h>
+#include <PoBrPt.h>
+#include <PoPt.h>
+#include <DetAltPt.h>
+#include <Selector.h>
+#include <RtMgr.h>
+#include <RtSite.h>
+#include <RtCand.h>
+#include <SplitPt.h>
+#include <RtAn.h>
+#include <SglSrcMgr.h>
+#include <Part.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <BopEntry.h>
+#include <ConsEnt.h>
+#include <Global.h>
+#include <MsgFac.h>
+#include <MapIdxI.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class PoMgr.
+//------------------------------------------------------------------------------
+
+WitPoMgr::WitPoMgr (WitSelector * theSelector):
+
+      WitProbAssoc (theSelector->myProblem ()),
+      myPoCoord_   (NULL)
+   {
+   stronglyAssert (not myGlobalComp ()->newPropRt ());
+
+   myPoCoord_ = new WitPoCoord (theSelector);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoMgr::~WitPoMgr ()
+   {
+   delete myPoCoord_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoMgr::instNeededFor (WitProblem * theProblem)
+   {
+   WitPart *     thePart;
+   WitBomEntry * theBomEnt;
+
+   stronglyAssert (not theProblem->myGlobalComp ()->newPropRt ());
+
+   forEachPart (thePart, theProblem)
+      if (thePart->propRouting ())
+         return true;
+
+   forEachBomEntry (theBomEnt, theProblem)
+      if (theBomEnt->propRouting ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoMgr::print ()
+   {
+   myPoCoord_->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoMgr::definePropExp (
+      WitRtSite *         theRtSite, 
+      WitPeriod           thePer,
+      double              expVol,
+      WitRtCandDblStack & theExpPairs)
+   {
+   myPoCoord_->definePropExp (theRtSite, thePer, expVol, theExpPairs);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoMgr::active (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   return myPoCoord_->active (theRtCand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoMgr::setActive (
+      WitRtCand * theRtCand,
+      WitPeriod   thePer,
+      bool        theValue)
+   {
+   myPoCoord_->setActive (theRtCand, thePer, theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoMgr::potActive (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   return myPoCoord_->potActive (theRtCand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoMgr::selIsSplit (WitRtSite * theRtSite, WitPeriod thePer)
+   {
+   return myPoCoord_->selIsSplit (theRtSite, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoMgr::defineSplit (
+      WitRtSite *         theRtSite, 
+      WitPeriod           thePer,
+      double              expVol,
+      WitRtCandDblStack & theExpPairs,
+      double &            unbddVol)
+   {
+   myPoCoord_->defineSplit (
+      theRtSite,
+      thePer,
+      expVol,
+      theExpPairs,
+      unbddVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoMgr::recordFlowSS (
+      WitRtSite * theRtSite,
+      WitPeriod   thePer,
+      double      incFlowVol)
+   {
+   myPoCoord_->recordFlowSS (theRtSite, thePer, incFlowVol);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelMgr * WitPoMgr::mySelMgrFor (WitRtCase theRtCase)
+   {
+   return myPoCoord_->myPoSelMgrFor (theRtCase);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PoCoord.
+//------------------------------------------------------------------------------
+
+WitPoCoord::WitPoCoord (WitSelector * theSelector):
+
+      WitProbAssoc       (theSelector->myProblem ()),
+      myPoSelMgrForProd_ (NULL),
+      myPoSelMgrForCons_ (NULL),
+      myPoBrPts_         (),
+      myPoPts_           (),
+      mySelector_        (theSelector),
+      myRtMgr_           (theSelector->myRtMgr ())
+   {
+   myPoSelMgrForProd_ = new WitPpoSelMgr (this);
+   myPoSelMgrForCons_ = new WitCpoSelMgr (this);
+
+   buildPoBrPts ();
+   buildPoPts   ();
+
+   myMsgFac () ("propRoutingMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoCoord::~WitPoCoord ()
+   {
+   WitRtCand * theRtCand;
+   WitRtSite * theRtSite;
+   WitPeriod   thePer;
+
+   forEachEl (theRtCand, myRtMgr_->myRtCands ())
+      if (myPoPts_.myPtrTVecAt (theRtCand).isAllocated ())
+         forEachPeriod (thePer, myProblem ())
+            delete myPoPts_.myPtrAt (theRtCand, thePer);
+
+   forEachEl (theRtSite, myRtMgr_->myRtSites ())
+      if (hasPoBrPtsFor (theRtSite))
+         forEachPeriod (thePer, myProblem ())
+            delete myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+   delete myPoSelMgrForCons_;
+   delete myPoSelMgrForProd_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::definePropExp (
+      WitRtSite *         theRtSite, 
+      WitPeriod           thePer,
+      double              expVol,
+      WitRtCandDblStack & theExpPairs)
+   {
+   WitPoBrPt *    thePoBrPt;
+   WitRtCandStack theRtCands (myProblem ());
+   WitRtCand *    theRtCand;
+
+   witAssert (theRtSite->propRouting ());
+
+   theExpPairs.clear ();
+
+   if (theRtSite->myRtCands ().nElements () > 1)
+      {
+      thePoBrPt = myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+      witAssert (thePoBrPt != NULL);
+
+      thePoBrPt->findActiveRtCands (theRtCands);
+
+      definePropExp (theRtCands, thePer, expVol, theExpPairs);
+      }
+   else
+      {
+      witAssert (theRtSite->myRtCands ().nElements () == 1);
+
+      theRtCand = theRtSite->myRtCands ().first ();
+
+      witAssert (theRtCand->isEligible (thePer));
+
+      theExpPairs.push (theRtCand, expVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoCoord::active (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   WitPoPt * thePoPt;
+
+   witAssert (theRtCand->myRtSite ()->propRouting ());
+
+   thePoPt = myPoPtFor (theRtCand, thePer);
+
+   if (thePoPt != NULL)
+      return thePoPt->active ();
+
+   if (theRtCand->myRtSite ()->myRtCands ().nElements () == 1)
+      if (theRtCand->isEligible (thePer))
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::setActive (
+      WitRtCand * theRtCand,
+      WitPeriod   thePer,
+      bool        theValue)
+   {
+   WitPoPt * thePoPt;
+
+   witAssert (theRtCand->myRtSite ()->propRouting ());
+
+   thePoPt = myPoPtFor (theRtCand, thePer);
+
+   witAssert (thePoPt != NULL);
+
+   thePoPt->setActive (theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoCoord::potActive (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   WitPoPt * thePoPt;
+
+   witAssert (theRtCand->myRtSite ()->propRouting ());
+
+   thePoPt = myPoPtFor (theRtCand, thePer);
+
+   if (thePoPt != NULL)
+      return thePoPt->potActive ();
+
+   if (theRtCand->myRtSite ()->myRtCands ().nElements () == 1)
+      if (theRtCand->isEligible (thePer))
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitAltPt * WitPoCoord::myAltPtFor (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   WitPoPt * thePoPt;
+
+   thePoPt = myPoPtFor (theRtCand, thePer);
+
+   if (thePoPt != NULL)
+      if (thePoPt->active ())
+         if (not thePoPt->myPoBrPt ()->singleton ())
+            return thePoPt->myDetAltPt ();
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::print ()
+   {
+   WitRtSite * theRtSite;
+   WitPeriod   thePer;
+   WitPoBrPt * thePoBrPt;
+
+   fprintf (msgFile (),
+      "\n"
+      "Proportionate Routing Status:\n");
+
+   forEachEl (theRtSite, myRtMgr_->myRtSites ())
+      if (hasPoBrPtsFor (theRtSite))
+         forEachPeriod (thePer, myProblem ())
+            {
+            thePoBrPt = myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+            if (thePoBrPt != NULL)
+               thePoBrPt->print ();
+            }
+
+   fprintf (msgFile (), "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+double WitPoCoord::totRoutingShare (
+      const WitRtCandStack & theRtCands,
+      WitPeriod              thePer)
+   {
+   double                  totShare;
+   WitObjStItr <WitRtCand> theRtCandItr;
+
+   totShare = 0.0;
+
+   theRtCandItr.attachTo (theRtCands);
+
+   while (theRtCandItr.advance ())
+      totShare += theRtCandItr->myBillEnt ()->routingShare ()[thePer];
+
+   return totShare;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoCoord::selIsSplit (WitRtSite * theRtSite, WitPeriod thePer)
+   {
+   WitPoBrPt * thePoBrPt;
+
+   if (not mySelector_->selSplit ())
+      return false;
+
+   if (hasPoBrPtsFor (theRtSite))
+      {
+      thePoBrPt = myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+      if (thePoBrPt != NULL)
+         if (thePoBrPt->splitPoPts ().isNonEmpty ())
+            return true;
+      }
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::defineSplit (
+      WitRtSite *         theRtSite, 
+      WitPeriod           thePer,
+      double              expVol,
+      WitRtCandDblStack & theExpPairs,
+      double &            unbddVol)
+   {
+   WitPoBrPt *           thePoBrPt;
+   WitObjStItr <WitPoPt> theItr;
+   WitPoPt *             thePoPt;
+   double                splitVol;
+   WitRtCandDblStack     localExpPairs (myProblem ());
+   WitRtCand *           theRtCand;
+   double                propExpVol;
+
+   witAssert (selIsSplit (theRtSite, thePer));
+
+   witAssert (expVol >= NET_TOL);
+
+   theExpPairs.clear ();
+
+   unbddVol  = expVol;
+
+   thePoBrPt = myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+   theItr.attachTo (thePoBrPt->splitPoPts ());
+
+   while (theItr.advance (thePoPt))
+      {
+      thePoPt->findSplitVols (unbddVol, splitVol, unbddVol);
+
+      if (splitVol >= NET_TOL)
+         {
+         definePropExp (
+            thePoPt->activeRtCands (),
+            thePer,
+            splitVol,
+            localExpPairs);
+
+         while (localExpPairs.pop (theRtCand, propExpVol))
+            theExpPairs.push (theRtCand, propExpVol);
+         }
+
+      if (unbddVol < NET_TOL)
+         break;
+
+      thePoPt->recordFlowSS (unbddVol);
+      }
+
+   theExpPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::recordFlowSS (
+      WitRtSite * theRtSite,
+      WitPeriod   thePer,
+      double      incFlowVol)
+   {
+   WitRtCand * theRtCand;
+   WitPoPt *   thePoPt;
+
+   if (not hasPoBrPtsFor (theRtSite))
+      return;
+
+   forEachEl (theRtCand, theRtSite->myRtCands ())
+      {
+      thePoPt = myPoPtFor (theRtCand, thePer);
+
+      if (thePoPt != NULL)
+         if (not thePoPt->isSplit ())
+            thePoPt->recordFlowSS (incFlowVol);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoPt * WitPoCoord::myPoPtFor (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   if (myPoPts_.myPtrTVecAt (theRtCand).isAllocated ())
+      return myPoPts_.myPtrAt (theRtCand, thePer);
+
+   return NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoSelMgr * WitPoCoord::myPoSelMgrFor (WitRtCase theRtCase)
+   {
+   return
+      (theRtCase == prodRtCase)? myPoSelMgrForProd_:
+      (theRtCase == consRtCase)? myPoSelMgrForCons_:
+                                 NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::buildPoBrPts ()
+   {
+   WitRtSite * theRtSite;
+   WitPeriod   thePer;
+
+   myPoBrPts_.allocate1D (myProblem ());
+
+   forEachEl (theRtSite, myRtMgr_->myRtSites ())
+      if (theRtSite->myRtCands ().nElements () > 1)
+         if (theRtSite->propRouting ())
+            {
+            myPoBrPts_.myPtrTVecAt (theRtSite).allocate (myProblem ());
+
+            forEachPeriod (thePer, myProblem ())
+               if (theRtSite->explodeable (thePer))
+                  myPoBrPts_.myPtrAt (theRtSite, thePer) =
+                     new WitPoBrPt   (theRtSite, thePer, this);
+            }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::buildPoPts ()
+   {
+   WitRtCand * theRtCand;
+   WitRtSite * theRtSite;
+   WitPeriod   thePer;
+   WitPoBrPt * thePoBrPt;
+
+   myPoPts_.allocate1D (myProblem ());
+
+   forEachEl (theRtCand, myRtMgr_->myRtCands ())
+      {
+      theRtSite = theRtCand->myRtSite ();
+
+      if (not hasPoBrPtsFor (theRtSite))
+         continue;
+
+      myPoPts_.myPtrTVecAt (theRtCand).allocate (myProblem ());
+
+      forEachPeriod (thePer, myProblem ())
+         if (theRtCand->isEligible (thePer))
+            {
+            thePoBrPt = myPoBrPts_.myPtrAt (theRtSite, thePer);
+
+            myPoPts_.myPtrAt (theRtCand, thePer) =
+               new WitPoPt (theRtCand, thePoBrPt, this);
+            }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCoord::definePropExp (
+      const WitRtCandStack & theRtCands,
+      WitPeriod              thePer,
+      double                 expVol,
+      WitRtCandDblStack &    theExpPairs)
+   {
+   double                  expVolPerShare;
+   WitObjStItr <WitRtCand> theRtCandItr;
+   WitRtCand *             theRtCand;
+   double                  propExpVol;
+
+   witAssert (theRtCands.isNonEmpty ());
+
+   theExpPairs.clear ();
+
+   expVolPerShare = expVol / totRoutingShare (theRtCands, thePer);
+
+   theRtCandItr.attachTo (theRtCands);
+
+   while (theRtCandItr.advance (theRtCand))
+      {
+      propExpVol =
+         expVolPerShare * theRtCand->myBillEnt ()->routingShare ()[thePer];
+
+      theExpPairs.push (theRtCand, propExpVol);
+      }
+
+   witAssert (theExpPairs.isNonEmpty ());
+
+   theExpPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoCoord::hasPoBrPtsFor (WitRtSite * theRtSite)
+   {
+   return myPoBrPts_.myPtrTVecAt (theRtSite).isAllocated ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PoSelMgr.
+//------------------------------------------------------------------------------
+
+WitPoSelMgr::~WitPoSelMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoSelMgr::WitPoSelMgr (WitPoCoord * thePoCoord):
+
+      WitSelMgr  (thePoCoord->mySelector ()),
+      myPoCoord_ (thePoCoord)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoSelMgr::selSplitNeeded ()
+   {
+   return myGlobalComp ()->selSplit ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PpoSelMgr.
+//------------------------------------------------------------------------------
+
+WitPpoSelMgr::WitPpoSelMgr (WitPoCoord * thePoCoord):
+
+      WitPoSelMgr (thePoCoord)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPpoSelMgr::~WitPpoSelMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitAltPt * WitPpoSelMgr::myAltPtFor (
+      WitBopEntry * theBopEnt,
+      WitConsEntry *,
+      WitPeriod     execPer,
+      WitPeriod)
+   {
+   WitPeriod expPer;
+
+   expPer = theBopEnt->impactPeriod ()[execPer];
+
+   return myPoCoord ()->myAltPtFor (theBopEnt->myRtCand (), expPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPpoSelMgr::validForNetting ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPpoSelMgr::validForExecBounds ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitPpoSelMgr::selCaseName ()
+   {
+   return "Production Proportionate Routing";
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class CpoSelMgr.
+//------------------------------------------------------------------------------
+
+WitCpoSelMgr::WitCpoSelMgr (WitPoCoord * thePoCoord):
+
+      WitPoSelMgr (thePoCoord)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCpoSelMgr::~WitCpoSelMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitAltPt * WitCpoSelMgr::myAltPtFor (
+      WitBopEntry *,
+      WitConsEntry * theConsEnt,
+      WitPeriod      execPer,
+      WitPeriod)
+   {
+   return myPoCoord ()->myAltPtFor (theConsEnt->myRtCand (), execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitCpoSelMgr::validForNetting ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitCpoSelMgr::validForExecBounds ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitCpoSelMgr::selCaseName ()
+   {
+   return "Consumption Proportionate Routing";
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PoBrPt.
+//------------------------------------------------------------------------------
+
+WitPoBrPt::WitPoBrPt (
+         WitRtSite *  theRtSite,
+         WitPeriod    thePer,
+         WitPoCoord * thePoCoord):
+
+      myRtSite_   (theRtSite),
+      myPer_      (thePer),
+      myPoCoord_  (thePoCoord),
+      splitPoPts_ (thePoCoord->myProblem ())
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoBrPt::~WitPoBrPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoBrPt::singleton ()
+   {
+   WitRtCand * theRtCand;
+   WitPoPt *   thePoPt;
+   int         nActive;
+
+   nActive = 0;
+
+   forEachEl (theRtCand, myRtSite_->myRtCands ())
+      {
+      thePoPt = myPoCoord_->myPoPtFor (theRtCand, myPer_);
+
+      if (thePoPt != NULL)
+         if (thePoPt->potActive ())
+            nActive ++;
+      }
+
+   witAssert (nActive > 0);
+
+   return (nActive == 1);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoBrPt::print ()
+   {
+   FILE *         theMsgFile;
+   WitRtCandStack theRtCands (myPoCoord_->myProblem ());
+   WitRtCand *    theRtCand;
+
+   theMsgFile = myPoCoord_->msgFile ();
+
+   fprintf (theMsgFile,
+      "\n"
+      "Proportionate Routing Branch Point:\n"
+      "\n");
+
+   myRtSite_->printID          (4, 19);
+   myRtSite_->printPer (myPer_, 4, 19);
+
+   findActiveRtCands (theRtCands);
+
+   fprintf (theMsgFile,
+      "   Tot Act Share: %.0f\n\n",
+      myPoCoord_->totRoutingShare (theRtCands, myPer_));
+
+   while (theRtCands.pop (theRtCand))
+      {
+      theRtCand->printID (7, 22);
+
+      fprintf (theMsgFile,
+         "      Routing Share: %.0f\n\n",
+         theRtCand->myBillEnt ()->routingShare ()[myPer_]);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoBrPt::recSplit (WitPoPt * thePoPt)
+   {
+   witAssert (thePoPt->isSplit ());
+
+   splitPoPts_.reverse ();
+
+   splitPoPts_.push (thePoPt);
+
+   splitPoPts_.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoBrPt::recUnsplit (WitPoPt * thePoPt)
+   {
+   WitPoPt *             othPoPt;
+   WitObjStack <WitPoPt> thePoPts (myPoCoord_->myProblem ());
+
+   witAssert (not thePoPt->isSplit ());
+
+   while (splitPoPts_.pop (othPoPt))
+      if (othPoPt != thePoPt)
+         thePoPts.push (othPoPt);
+
+   splitPoPts_.revCopyFrom (thePoPts);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoBrPt::findActiveRtCands (WitRtCandStack & theRtCands)
+   {
+   WitRtCand * theRtCand;
+   WitPoPt *   thePoPt;
+
+   theRtCands.clear ();
+
+   forEachEl (theRtCand, myRtSite_->myRtCands ())
+      {
+      thePoPt = myPoCoord_->myPoPtFor (theRtCand, myPer_);
+
+      if (thePoPt != NULL)
+         if (thePoPt->active ())
+            theRtCands.push (theRtCand);
+      }
+
+   theRtCands.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PoPt.
+//------------------------------------------------------------------------------
+
+WitPoPt::WitPoPt (
+         WitRtCand *  theRtCand,
+         WitPoBrPt *  thePoBrPt,
+         WitPoCoord * thePoCoord):
+
+      WitDetSelPt    (),
+         
+      myRtCand_      (theRtCand),
+      myPoBrPt_      (thePoBrPt),
+      myPoCoord_     (thePoCoord),
+      active_        (true),
+      potActive_     (true),
+      activeRtCands_ (theRtCand->myProblem ())
+   {
+   witAssert (myRtCand_->myRtSite () == myPoBrPt_->myRtSite ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoPt::~WitPoPt ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::findSplitVols (
+      double   expVol,
+      double & splitVol,
+      double & unbddVol)
+   {
+   WitSelCandDblStack theSplitPairs (myRtCand_->myProblem ());
+   WitSelCand *       theSelCand;
+   bool               activeVal;
+   bool               potActiveVal;
+
+   splitVol = 0.0;
+
+   mySplitPt ()->defineSplit (expVol, theSplitPairs, unbddVol);
+
+   if (theSplitPairs.isEmpty ())
+      return;
+
+   theSplitPairs.pop (theSelCand, splitVol);
+
+   witAssert (theSplitPairs.isEmpty ());
+
+   if (DEBUG_MODE)
+      {
+      theSelCand->getPoData (activeVal, potActiveVal);
+
+      witAssert (activeVal);
+      witAssert (potActiveVal);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::setActive (bool theValue)
+   {
+   if (myPoCoord_->mySelector ()->sglSrc ())
+      myPoCoord_->mySelector ()->mySglSrcMgr ()->saveConfigVal (active_);
+
+   active_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::setPotActive (bool theValue)
+   {
+   if (myPoCoord_->mySelector ()->sglSrc ())
+      myPoCoord_->mySelector ()->mySglSrcMgr ()->saveConfigVal (potActive_);
+
+   potActive_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::printSelection ()
+   {
+   myPoBrPt_->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelMgr * WitPoPt::mySelMgr ()
+   {
+   WitRtCase theRtCase;
+
+   theRtCase = myRtCand_->myRtSite ()->myRtCase ();
+
+   return myPoCoord_->myPoSelMgrFor (theRtCase);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::prtID ()       
+   {
+   myRtCand_->printID (4, 22);
+
+   fprintf (myRtCand_->msgFile (),
+      "   Period:           %d\n",
+      myPoBrPt_->myPer ());
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoPt::splittable ()
+   {
+   if (myPoCoord_->myGlobalComp ()->selSplit ())
+      return true;
+
+   if (myPoCoord_->myGlobalComp ()->nonMrSelSplit ())
+      return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::getSortData (WitPart * & thePart, WitPeriod & thePer)
+   {
+   thePart = myPoBrPt_->myRtSite ()->mrSortPart ();
+
+   thePer  = myPoBrPt_->myPer ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSelCand * WitPoPt::newSelCand ()
+   {
+   return new WitPoCand (active_, potActive_, myRtCand_->myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::recSplit ()
+   {
+   myPoBrPt_->findActiveRtCands (activeRtCands_);
+
+   myPoBrPt_->recSplit (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::recUnsplit ()
+   {
+   myPoBrPt_->recUnsplit (this);
+
+   activeRtCands_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoPt::hasResAlt ()
+   {
+   return active ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::alterSelection ()
+   {
+   witAssert (active ());
+
+   witAssert (not myPoBrPt_->singleton ());
+
+   setActive    (false);
+   setPotActive (false);
+
+   printPermDeact ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::tempAlterSel ()
+   {
+   alterSelection ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::cancelTempAlt (WitSelCand * theSelCand)
+   {
+   witAssert (theSelCand == NULL);
+
+   witAssert (not active_);
+
+   setActive    (true);
+   setPotActive (true);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoPt::cancelNeedsSelCand ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::printPermDeact ()
+   {
+   if (myRtCand_->myGlobalComp ()->selPrintLevel () < 3)
+      return;
+
+   fprintf (myRtCand_->msgFile (),
+      "\n"
+      "Permanent Deactivation for Proportionate Routing:\n\n");
+
+   myRtCand_->myRtSite ()->printID                       (4, 22);
+   myRtCand_->myRtSite ()->printPer (myPoBrPt_->myPer (), 4, 22);
+   myRtCand_->             printID                       (7, 22);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class PoCand.
+//------------------------------------------------------------------------------
+
+WitPoCand::WitPoCand (
+         bool         activeVal,
+         bool         potActiveVal,
+         WitProblem * theProblem):
+
+      WitSelCand (theProblem),
+      active_    (activeVal),
+      potActive_ (potActiveVal)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoCand::~WitPoCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCand::prtID ()
+   {
+   const char * statusText;
+
+   statusText =
+      active_?    "Active":
+      potActive_? "Provisionally Inactive":
+                  "Permanently Inactive";
+
+   fprintf (msgFile (), "      Status:        %s\n", statusText);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCand::getPoData (bool & activeVal, bool & potActiveVal)
+   {
+   activeVal    = active_;
+   potActiveVal = potActive_;
+   }
+@
+
+
+1.24
+log
+@Low-Pri Prop-Rt.
+@
+text
+@@
+
+
+1.23
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d940 1
+a940 1
+   myRtCand_->printID (7, 22);
+d943 1
+a943 1
+      "      Period:        %d\n",
+@
+
+
+1.22
+log
+@Low-Pri Prop-Rt.
+@
+text
+@a961 17
+void WitPoPt::restoreSelTo (WitSelCand * theSelCand)
+   {
+   bool activeVal;
+   bool potActiveVal;
+
+   theSelCand->getPoData (activeVal, potActiveVal);
+
+   witAssert (activeVal);
+   witAssert (potActiveVal);
+   witAssert (not active_);
+
+   setActive    (true);
+   setPotActive (true);
+   }
+
+//------------------------------------------------------------------------------
+
+d1024 19
+@
+
+
+1.21
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d962 17
+d990 1
+a990 1
+   return new WitPoCand (this);
+d1059 8
+a1066 6
+WitPoCand::WitPoCand (WitPoPt * thePoPt):
+
+      WitSelCand (thePoPt->myRtCand ()->myProblem ()),
+      myPoPt_    (thePoPt),
+      active_    (thePoPt->active    ()),
+      potActive_ (thePoPt->potActive ())
+a1091 13
+void WitPoCand::restoreSelToThis ()
+   {
+   witAssert (active_);
+   witAssert (potActive_);
+
+   witAssert (not myPoPt_->active ());
+
+   myPoPt_->setActive    (true);
+   myPoPt_->setPotActive (true);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.20
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d425 1
+a425 1
+      findSplitVols (thePoPt, unbddVol, splitVol, unbddVol);
+a579 69
+void WitPoCoord::findSplitVols (
+      WitPoPt * thePoPt,
+      double    expVol,
+      double &  splitVol,
+      double &  unbddVol)
+   {
+   WitSelCandDblStack theSplitPairs (myProblem ());
+   bool               lastUnbdd;
+   WitSelCand *       theSelCand;
+   double             firstVol;
+   double             secondVol;
+   bool               activeVal;
+   bool               potActiveVal;
+
+   thePoPt->mySplitPt ()->defineSplit (expVol, theSplitPairs, lastUnbdd);
+
+   if (theSplitPairs.isEmpty ())
+      {
+      splitVol = 0.0;
+      unbddVol = 0.0;
+
+      return;
+      }
+
+   theSplitPairs.reverse ();
+
+   theSplitPairs.pop (theSelCand, firstVol);
+
+   if (DEBUG_MODE)
+      {
+      theSelCand->getPoData (activeVal, potActiveVal);
+
+      witAssert (activeVal);
+      witAssert (potActiveVal);
+      }
+
+   if (theSplitPairs.isNonEmpty ())
+      {
+      witAssert (lastUnbdd);
+
+      theSplitPairs.pop (theSelCand, secondVol);
+
+      if (DEBUG_MODE)
+         {
+         theSelCand->getPoData (activeVal, potActiveVal);
+
+         witAssert (not activeVal);
+         witAssert (not potActiveVal);
+         }
+
+      witAssert (theSplitPairs.isEmpty ());
+
+      splitVol = firstVol;
+      unbddVol = secondVol;
+      }
+   else if (lastUnbdd)
+      {
+      splitVol = 0.0;
+      unbddVol = firstVol;
+      }
+   else
+      {
+      splitVol = firstVol;
+      unbddVol = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+d868 32
+a1072 8
+void WitPoCand::updateToCurSel ()
+   {
+   active_    = myPoPt_->active    ();
+   potActive_ = myPoPt_->potActive ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.19
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d31 1
+d324 1
+a324 1
+            return thePoPt->myAltPt ();
+a956 7
+bool WitPoPt::hasResAlt ()
+   {
+   return active ();
+   }
+
+//------------------------------------------------------------------------------
+
+d1033 7
+@
+
+
+1.18
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d314 1
+a314 1
+WitSelAlt * WitPoCoord::mySelAltFor (WitRtCand * theRtCand, WitPeriod thePer)
+d323 1
+a323 1
+            return thePoPt->mySelAlt ();
+d695 1
+a695 1
+WitSelAlt * WitPpoSelMgr::mySelAltFor (
+d705 1
+a705 1
+   return myPoCoord ()->mySelAltFor (theBopEnt->myRtCand (), expPer);
+d747 1
+a747 1
+WitSelAlt * WitCpoSelMgr::mySelAltFor (
+d753 1
+a753 1
+   return myPoCoord ()->mySelAltFor (theConsEnt->myRtCand (), execPer);
+@
+
+
+1.17
+log
+@Low-Pri Prop-Rt.
+@
+text
+@a131 7
+WitSelPt * WitPoMgr::mySelPtFor (WitRtCand * theRtCand, WitPeriod thePer)
+   {
+   return myPoCoord_->myPoPtFor (theRtCand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.16
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d75 1
+a75 2
+   if (theProblem->myGlobalComp ()->newPropRt ())
+      return false;
+@
+
+
+1.15
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d56 2
+d75 3
+@
+
+
+1.14
+log
+@Low-Pri Prop-Rt.
+@
+text
+@a1016 7
+void WitPoPt::tempAlterSel ()
+   {
+   alterSelection ();
+   }
+
+//------------------------------------------------------------------------------
+
+d1056 7
+@
+
+
+1.13
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d317 1
+a317 1
+WitSelPt * WitPoCoord::mySelPtForAlt (WitRtCand * theRtCand, WitPeriod thePer)
+d326 1
+a326 1
+            return thePoPt;
+d698 1
+a698 1
+WitSelPt * WitPpoSelMgr::mySelPtForAlt (
+d708 1
+a708 1
+   return myPoCoord ()->mySelPtForAlt (theBopEnt->myRtCand (), expPer);
+d750 1
+a750 1
+WitSelPt * WitCpoSelMgr::mySelPtForAlt (
+d756 1
+a756 1
+   return myPoCoord ()->mySelPtForAlt (theConsEnt->myRtCand (), execPer);
+a965 14
+void WitPoPt::alterSelection ()
+   {
+   witAssert (active ());
+
+   witAssert (not myPoBrPt_->singleton ());
+
+   setActive    (false);
+   setPotActive (false);
+
+   printPermDeact ();
+   }
+
+//------------------------------------------------------------------------------
+
+d1049 14
+@
+
+
+1.12
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d919 1
+a919 1
+      WitSelPt       (),
+@
+
+
+1.11
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d593 2
+d610 7
+a616 2
+   witAssert (theSelCand->myPoCand ()->active    ());
+   witAssert (theSelCand->myPoCand ()->potActive ());
+d624 7
+a630 2
+      witAssert (not theSelCand->myPoCand ()->active    ());
+      witAssert (not theSelCand->myPoCand ()->potActive ());
+d1133 1
+a1133 1
+WitPoCand * WitPoCand::myPoCand ()
+d1135 2
+a1136 1
+   return this;
+@
+
+
+1.10
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d608 2
+a609 2
+   witAssert (theSelCand->myPoCand ()->activeForPR    ());
+   witAssert (theSelCand->myPoCand ()->potActiveForPR ());
+d617 2
+a618 2
+      witAssert (not theSelCand->myPoCand ()->activeForPR    ());
+      witAssert (not theSelCand->myPoCand ()->potActiveForPR ());
+a662 7
+WitSelCand * WitPoSelMgr::newSelCand ()
+   {
+   return new WitPoCand (this);
+   }
+
+//------------------------------------------------------------------------------
+
+d1026 1
+a1026 1
+void WitPoPt::setToMyCurSel (WitSelCand * theSelCand)
+d1028 1
+a1028 1
+   theSelCand->setToCurSelOf (this);
+d1069 1
+a1069 1
+WitPoCand::WitPoCand (WitPoSelMgr * thePoSelMgr):
+d1071 4
+a1074 4
+      WitSelCand      (thePoSelMgr),
+      myPoPt_         (NULL),
+      activeForPR_    (true),
+      potActiveForPR_ (true)
+d1091 3
+a1093 3
+      activeForPR_?    "Active":
+      potActiveForPR_? "Provisionally Inactive":
+                       "Permanently Inactive";
+d1100 8
+d1110 2
+a1111 4
+   witAssert (active ());
+
+   witAssert (activeForPR_);
+   witAssert (potActiveForPR_);
+a1122 2
+   witAssert (active ());
+
+a1124 11
+
+//------------------------------------------------------------------------------
+
+void WitPoCand::setToCurSelOf (WitPoPt * thePoPt)
+   {
+   witAssert (active ());
+
+   myPoPt_         = thePoPt;
+   activeForPR_    = thePoPt->active    ();
+   potActiveForPR_ = thePoPt->potActive ();
+   }
+@
+
+
+1.9
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d944 10
+a1032 13
+void WitPoPt::restoreSel (WitSelCand * theSelCand)
+   {
+   witAssert (theSelCand->myPoCand ()->activeForPR    ());
+   witAssert (theSelCand->myPoCand ()->potActiveForPR ());
+
+   witAssert (not active ());
+
+   setActive    (true);
+   setPotActive (true);
+   }
+
+//------------------------------------------------------------------------------
+
+a1057 10
+void WitPoPt::setPotActive (bool theValue)
+   {
+   if (myPoCoord_->mySelector ()->sglSrc ())
+      myPoCoord_->mySelector ()->mySglSrcMgr ()->saveConfigVal (potActive_);
+
+   potActive_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+d1079 1
+d1107 15
+d1135 1
+@
+
+
+1.8
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d1036 1
+a1036 1
+void WitPoPt::setToCurSel (WitSelCand * theSelCand)
+d1038 1
+a1038 1
+   theSelCand->myPoCand ()->setToCurSel (this);
+a1104 10
+void WitPoCand::setToCurSel (WitPoPt * thePoPt)
+   {
+   witAssert (active ());
+
+   activeForPR_    = thePoPt->active    ();
+   potActiveForPR_ = thePoPt->potActive ();
+   }
+
+//------------------------------------------------------------------------------
+
+d1125 10
+@
+
+
+1.7
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d608 2
+a609 2
+   witAssert (theSelCand->myPoCand ()->active    ());
+   witAssert (theSelCand->myPoCand ()->potActive ());
+d617 2
+a618 2
+      witAssert (not theSelCand->myPoCand ()->active    ());
+      witAssert (not theSelCand->myPoCand ()->potActive ());
+d1025 2
+a1026 2
+   witAssert (theSelCand->myPoCand ()->active    ());
+   witAssert (theSelCand->myPoCand ()->potActive ());
+d1091 3
+a1093 3
+      WitSelCand (thePoSelMgr),
+      active_    (true),
+      potActive_ (true)
+d1107 4
+a1110 2
+   active_    = thePoPt->active    ();
+   potActive_ = thePoPt->potActive ();
+d1120 3
+a1122 3
+      active_?    "Active":
+      potActive_? "Provisionally Inactive":
+                  "Permanently Inactive";
+d1131 2
+@
+
+
+1.6
+log
+@Low-Pri Prop-Rt.
+@
+text
+@a182 3
+      actCand_           (NULL),
+      provInactCand_     (NULL),
+      fundInactCand_     (NULL),
+a190 4
+   actCand_           = new WitPoCand (true,  true,  myPoSelMgrForCons_);
+   provInactCand_     = new WitPoCand (false, true,  myPoSelMgrForCons_);
+   fundInactCand_     = new WitPoCand (false, false, myPoSelMgrForCons_);
+
+a214 3
+   delete fundInactCand_;
+   delete provInactCand_;
+   delete actCand_;
+d608 2
+a609 1
+   witAssert (theSelCand == actCand_);
+d617 2
+a618 1
+      witAssert (theSelCand == fundInactCand_);
+d663 7
+a993 10
+WitSelCand * WitPoPt::curSelCand ()
+   {
+   return
+      active_?    myPoCoord_->actCand       ():
+      potActive_? myPoCoord_->provInactCand ():
+                  myPoCoord_->fundInactCand ();
+   }
+
+//------------------------------------------------------------------------------
+
+d1025 2
+a1026 1
+   witAssert (theSelCand == myPoCoord_->actCand ());
+d1036 7
+d1089 1
+a1089 4
+WitPoCand::WitPoCand (
+         bool          activeVal,
+         bool          potActiveVal,
+         WitPoSelMgr * thePoSelMgr):
+d1092 6
+d1099 1
+a1099 2
+      active_    (activeVal),
+      potActive_ (potActiveVal)
+d1105 1
+a1105 1
+WitPoCand::~WitPoCand ()
+d1107 2
+d1124 7
+@
+
+
+1.5
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d169 1
+a169 1
+WitSelMgr * WitPoMgr::mySelMgr (WitRtCase theRtCase)
+d171 1
+a171 1
+   return myPoCoord_->myPoSelMgr (theRtCase);
+d194 3
+a196 3
+   actCand_           = new WitPoCand (true,  true,  myProblem ());
+   provInactCand_     = new WitPoCand (false, true,  myProblem ());
+   fundInactCand_     = new WitPoCand (false, false, myProblem ());
+d495 1
+a495 1
+WitPoSelMgr * WitPoCoord::myPoSelMgr (WitRtCase theRtCase)
+d979 1
+a979 1
+   return myPoCoord_->myPoSelMgr (theRtCase);
+d1093 3
+a1095 3
+         bool         activeVal,
+         bool         potActiveVal,
+         WitProblem * theProblem):
+d1097 1
+a1097 1
+      WitSelCand (theProblem),
+@
+
+
+1.4
+log
+@Low-Pri Prop-Rt.
+@
+text
+@a19 1
+//    PoCand.
+d22 1
+a776 36
+// Implementation of class PoCand.
+//------------------------------------------------------------------------------
+
+WitPoCand::WitPoCand (
+         bool         activeVal,
+         bool         potActiveVal,
+         WitProblem * theProblem):
+
+      WitSelCand (theProblem),
+
+      active_    (activeVal),
+      potActive_ (potActiveVal)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitPoCand::~WitPoCand ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoCand::prtID ()
+   {
+   const char * statusText;
+
+   statusText =
+      active_?    "Active":
+      potActive_? "Provisionally Inactive":
+                  "Permanently Inactive";
+
+   fprintf (msgFile (), "      Status:        %s\n", statusText);
+   }
+
+//------------------------------------------------------------------------------
+d1087 36
+@
+
+
+1.3
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d37 1
+d618 2
+d626 2
+a812 7
+
+WitPoCand * WitPoCand::myPoCand ()
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+d956 2
+a960 2
+
+   select (myPoCoord_->actCand ());
+a970 7
+bool WitPoPt::active ()
+   {
+   return selSelCand ()->myPoCand ()->active ();
+   }
+
+//------------------------------------------------------------------------------
+
+d973 2
+a974 7
+   if (theValue)
+      select (myPoCoord_->actCand ());
+   else
+      select (myPoCoord_->provInactCand ());
+   }
+
+//------------------------------------------------------------------------------
+d976 1
+a976 3
+bool WitPoPt::potActive ()
+   {
+   return selSelCand ()->myPoCand ()->potActive ();
+d994 2
+a995 1
+   select (myPoCoord_->fundInactCand ());
+d1033 4
+a1036 1
+   return selSelCand ();
+d1076 2
+a1077 1
+   select (myPoCoord_->actCand ());
+d1100 10
+@
+
+
+1.2
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d973 24
+a1092 24
+bool WitPoPt::active ()
+   {
+   return selSelCand ()->myPoCand ()->active ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitPoPt::setActive (bool theValue)
+   {
+   if (theValue)
+      select (myPoCoord_->actCand ());
+   else
+      select (myPoCoord_->provInactCand ());
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitPoPt::potActive ()
+   {
+   return selSelCand ()->myPoCand ()->potActive ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.1
+log
+@Low-Pri Prop-Rt.
+@
+text
+@d1022 7
+@
+

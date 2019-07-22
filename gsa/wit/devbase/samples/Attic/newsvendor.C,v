@@ -1,0 +1,263 @@
+head	1.5;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2007.10.24.19.45.23;	author rjw;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2007.10.24.18.08.36;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.10.24.17.43.23;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.10.24.17.33.13;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.10.23.21.24.53;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Changed file name.
+@
+text
+@//------------------------------------------------------------------------------
+// Program: "newsvendor.C".
+//
+// A C++ WIT application program to illustrate stochastic implosion.
+// This program uses stochastic implosion to solve a very simple instance of
+// the newsvendor problem.
+//------------------------------------------------------------------------------
+
+#include <wit.h>
+#include <iostream>
+
+//------------------------------------------------------------------------------
+// Functions declarations.
+//------------------------------------------------------------------------------
+
+void buildCoreProblem (WitRun * & theWitRun);
+   //
+   // Builds the core problem in theWitRun.
+
+void enterStochData (WitRun * theWitRun);
+   //
+   // Enters the stochastic data into theWitRun.
+
+void enterScenarioData (
+      WitRun * theWitRun,
+      int      theScenIdx,
+      float    probability,
+      float    demandVol);
+   //
+   // Enters the data for one scenario into theWitRun.
+   // theScenIdx  is the index       of the scenario.
+   // probability is the probability of the scenario.
+   // demandVol   is the demandVol for demand "Sell" in the scenario.
+
+void displaySoln (WitRun * theWitRun);
+   //
+   // Displays the solution to the newsvendor problem from theWitRun.
+
+//------------------------------------------------------------------------------
+// Main Program
+//------------------------------------------------------------------------------
+
+int main (int, char *)
+   {
+   WitRun * theWitRun;
+
+   buildCoreProblem (theWitRun);
+   enterStochData   (theWitRun);
+   witStochImplode  (theWitRun);
+   displaySoln      (theWitRun);
+   witDeleteRun     (theWitRun);
+
+   exit (0);
+   }
+
+//------------------------------------------------------------------------------
+
+void buildCoreProblem (WitRun * & theWitRun)
+   {
+   float execCost  [] = {0.6};
+   float shipReward[] = {1.0};
+
+   witNewRun              (& theWitRun);
+
+   witSetMesgFileAccessMode (theWitRun, WitTRUE, "w");
+   witSetMesgFileName       (theWitRun, WitTRUE, "newsvendor.log");
+
+   witInitialize            (theWitRun);
+   witSetNPeriods           (theWitRun, 1);
+   witAddPart               (theWitRun, "Hold",         WitMATERIAL);
+   witAddOperation          (theWitRun, "Buy");
+   witAddBopEntry           (theWitRun, "Buy",  "Hold");
+   witAddDemand             (theWitRun, "Hold", "Sell");
+   witSetOperationExecCost  (theWitRun, "Buy",          execCost);
+   witSetDemandShipReward   (theWitRun, "Hold", "Sell", shipReward);
+   }
+
+//------------------------------------------------------------------------------
+
+void enterStochData (WitRun * theWitRun)
+   {
+   witSetNScenarios          (theWitRun, 3);
+   witSetStageByObject       (theWitRun, WitTRUE);
+
+   witSetStochMode           (theWitRun, WitTRUE);
+   
+   witSetOperationStageIndex (theWitRun, "Buy",  0);
+   witSetPartStageIndex      (theWitRun, "Hold", 1);
+
+   enterScenarioData         (theWitRun, 0, 0.3, 200.0);
+   enterScenarioData         (theWitRun, 1, 0.4, 300.0);
+   enterScenarioData         (theWitRun, 2, 0.3, 400.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void enterScenarioData (
+      WitRun * theWitRun,
+      int      theScenIdx,
+      float    probability,
+      float    demandVol)
+   {
+   float demandVolVec[1];
+
+   demandVolVec[0] = demandVol;
+
+   witSetCurScenarioIndex (theWitRun,                 theScenIdx);
+   witSetProbability      (theWitRun,                 probability);
+   witSetDemandDemandVol  (theWitRun, "Hold", "Sell", demandVolVec);
+   }
+
+//------------------------------------------------------------------------------
+
+void displaySoln (WitRun * theWitRun)
+   {
+   int     theScenIdx;
+   float * execVol;
+   float * demandVol;
+   float * shipVol;
+   float   objValue;
+   float   boundsValue;
+
+   witGetOperationExecVol (theWitRun, "Buy",  & execVol);
+
+   std::cout
+      << "Buy "
+      << execVol[0]
+      << " papers."
+      << std::endl
+      << std::endl;
+   
+   witFree (execVol);
+
+   for (theScenIdx = 0; theScenIdx < 3; theScenIdx ++)
+      {
+      witSetCurScenarioIndex (theWitRun,                   theScenIdx);
+      
+      witGetDemandDemandVol  (theWitRun, "Hold", "Sell", & demandVol);
+      witGetDemandShipVol    (theWitRun, "Hold", "Sell", & shipVol);
+
+      std::cout
+         << "If the demand is for "
+         << demandVol[0]
+         << " papers, sell "
+         << shipVol[0]
+         << " papers."
+         << std::endl;
+
+      witFree (demandVol);
+      witFree (shipVol);
+      }
+
+   witGetObjValues (theWitRun, & objValue, & boundsValue);
+
+   std::cout
+      << std::endl
+      << "The expected profit is $"
+      << objValue
+      << "."
+      << std::endl;
+   }
+@
+
+
+1.4
+log
+@Minor update.
+@
+text
+@@
+
+
+1.3
+log
+@Minor update.
+@
+text
+@d4 1
+a4 1
+// A WIT application program to illustrate stochastic implosion.
+d13 2
+d17 6
+a22 1
+void enterStochData   (WitRun *   theWitRun);
+d25 13
+a37 6
+   WitRun * theWitRun,
+   int      theScenIdx,
+   float    probability,
+   float    demandVol);
+
+void displaySoln     (WitRun *    theWitRun);
+a95 3
+// enterScenarioData
+// Enters the data for one scenario.
+//------------------------------------------------------------------------------
+@
+
+
+1.2
+log
+@Trivial update.
+@
+text
+@a9 1
+
+d118 1
+d145 1
+@
+
+
+1.1
+log
+@Renamed news.C to newsvendor.C.
+@
+text
+@d2 1
+a2 1
+// Program: "news.C".
+@
+

@@ -1,0 +1,1194 @@
+head	1.9;
+access;
+symbols;
+locks; strict;
+comment	@% @;
+
+
+1.9
+date	2004.10.28.13.46.18;	author dpc;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.10.25.16.19.30;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.10.25.16.03.45;	author dpc;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.10.25.15.59.49;	author dpc;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.10.25.13.01.49;	author dpc;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.08.13.15.14.24;	author dpc;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.08.11.20.47.09;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.08.10.19.50.40;	author dpc;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.07.08.21.45.34;	author dpc;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.9
+log
+@Clarified pegging
+@
+text
+@\documentclass[12pt]{article}
+\setlength{\unitlength}{0.125in}
+
+%%%%  Operation
+\newsavebox{\witOperation}
+\savebox{\witOperation}
+(6,3)[bl]{%
+\put(0,0){\framebox(6,3){}}
+}
+
+%%%% Capacity
+\newsavebox{\witCapacity}
+\savebox{\witCapacity}
+(6,6)[bl]{%
+\put(0,0){\line(1,0){6}}
+\put(0,0){\line(3,5){3}}
+\put(6,0){\line(-3,5){3}}
+}
+
+%%%% Demand
+\newsavebox{\witDemand}
+\savebox{\witDemand}
+(8,4)[bl]{%
+\put(4,0){\line(2,1){4}}
+\put(4,0){\line(-2,1){4}}
+\put(0,2){\line(2,1){4}}
+\put(8,2){\line(-2,1){4}}
+}
+
+%%%% Part
+\newsavebox{\witPart}
+\savebox{\witPart}
+(6,6)[bl]{%
+\put(3,3){\circle{7}}
+}
+
+%%%%  OvalPart
+\newsavebox{\witOvalPart}
+\savebox{\witOvalPart}
+(6,3)[bl]{%
+\put(0,0){\oval(6,3)}
+}
+
+%%%% Daisy
+\newsavebox{\Daisy}
+\savebox{\Daisy}
+(10,10)[bl]{%
+\put(0,0){\line(0,-1){.25}}
+\put(0,-.25){\line(1,0){1.5}}
+\put(1.5,-.25){\line(0,1){10.25}}
+\put(1.5,5){\makebox(0,0){X}}
+\put(1.5,10){\line(1,0){2}}
+}
+
+\newcommand{\addOperation}[3]{\put(#1,#2){\usebox{\witOperation}}\put(#1,#2){\makebox(6,3){#3}}}
+
+\newcommand{\addPart}[3]{\put(#1,#2){\usebox{\witPart}}\put(#1,#2){\makebox(6,6){#3}}}
+
+\newcommand{\addCapacity}[3]{\put(#1,#2){\usebox{\witCapacity}}\put(#1,#2){\makebox(6,2.5){#3}}}
+
+\newcommand{\addDemand}[3]{\put(#1,#2){\usebox{\witDemand}}\put(#1,#2){\makebox(8,4){#3}}}
+\newcommand{\addOvalPart}[3]{\put(#1,#2){\usebox{\witOvalPart}}\put(#1,#2){\makebox(0,3){#3}}}
+
+\newcommand{\addArc}[5]{\put(#1,#2){\line(#3,#4){#5}}}
+
+
+\title{The Resouce Capacity Planning (RCP) Model}
+\author{Daniel Connors \and Donna Gresh \and JP Fasano \and Bob Wittrock}
+%\date{July 9, 2004}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+IBM Research developed the Resource Capacity Planning (RCP) Optimizer
+to support IBM Global Services (IGS) Adaptive Workforce (ADWF)
+initiative to apply supply chain management techniques for planning
+its resource needs.  This document describes the the basic Resource
+Capacity Planning (RCP) models used in the Optimizer.  The models are
+built using Watson Implosion Technology (WIT).  See~\cite{ref:WIT} for details
+on WIT.  The models serve as a framework for solving two resource
+planning problems: Gap/Glut and Resource Action.  The Gap/Glut problem
+is similar to Materials Requirements Planning (MRP), in which we
+determine the shortages (gaps) and excesses (gluts) of resources.  The
+Resource Action problem is to determine what resource actions to take,
+including hiring, using alternative sources or supply, retraining or
+releasing resources, in order to fill the gaps and reduce the gluts.
+The Resource Action problem also determines which engagements to
+accept or decline, for example, due to insufficient profitability.  Detailed requirements for the Optimizer are given in~\cite{ref:specs}.
+
+For the Gap/Glut and Resource Action problems, we have two approaches
+for solving them.  The first solution approach is optimization-based.
+Given costs for using resources and taking resource actions, and
+rewards for meeting the demands, a mathematical programming model is
+formed and solved.  The second solution approach is priority-based.
+Given business rules on the use of resources, a heuristic algorithm
+implements the desired allocation rules.
+
+The WIT model for the basic RCP model is shown in
+Figure~\ref{fig:basic}.  (The models shown in this document are slices
+of the full model highlighting key points of interest or discussion.)
+The portion of the model displayed here shows a job or engagement,
+$E_j$, and a resource, $R_i$, that is part of the Bill-of-Material
+(BOM) or staffing plan of $E_j$.  We use the WIT notation to represent
+the elements of the model.  A diamond represents a demand, a triangle
+represents a ``capacity'' part, a oval represents a ``material'' part,
+and a rectangle represents an operation.  The main difference between
+a capacity part and a material part is that if a capacity part is not
+used in a time period, it goes away at the end of the period, (``use
+it or lose it''), whereas a material part remains in inventory for the
+next time period if it is not used in the current period.
+
+The demand for an engagement or job, $E_j$, is satisfied by a capacity
+part, $E_j$.  In this basic model, the demand volume for an engagement
+is 1 and it is required in period 0.  The capacity part $E_j$ is
+produced by the operation, $E_j$.  The operation, $E_j$, may require
+several parts, including the capacity part named {\em working} $R_i$.
+(For example, the operation may require five resources, only one of
+which is explicitly shown in detail in the slice of the model shown in
+Figure~\ref{fig:basic}.)  The requested quantity of $R_i$, for example
+5 Java Programmers, is represented in the {\tt consRate} of the BOM
+arc from operation $E_j$ to part $R_i$.  The time period in which the
+resource is needed, for example 3 months after the start of the
+enagagement, is represented by the {\tt offset} of the BOM arc.  It is
+often the case that resources of the same type will be needed across
+many of the periods of the engagement.  For example, the engagement
+needs 5 Java programmers in the first period, 10 in the second, 10 in
+the third, etc.  In the basic model, this is represented by having
+multiple BOM arcs from the enagagement to the resource, with each BOM
+arc having the appropriate {\tt consRate} and {\tt offset}.  The {\em
+working} part $R_i$ may be needed $t$ periods after the initiation of
+the start of the engagement, (e.g., testers aren't needed until the
+fourth month of the project), and this is captured in the model by
+setting the offset of the BOM arc.  The part {\em working} $R_i$ comes
+from the operation named {\em enable} $R_i$.  The operation {\em
+enable} $R_i$ takes a part named {\em bench} $R_i$ and produces the
+part {\em working} $R_i$.  It also produces the part {\em bench} $R_i$
+for the next time period (note the offset of -1 on the Bill-of-Product
+(BOP) arc from the operation {\em enable} $R_i$).  The part named {\em
+bench} $R_i$ is a material part, and so unused inventory of this part
+is available for the next time period.  Finally, the part {\em bench}
+$R_i$ is produced by the operation {\em acquire} $R_i$.
+
+We assume the planning horizon is $N$ periods.  In our examples, the
+planning period is monthly buckets and so cost information is scaled
+appropriately to monthly costs.
+
+\thicklines
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+%\put(20,5){\line(0,1){1.295}}
+\addArc{20}{5}{0}{1}{2}
+%\addPart{17}{5.5}{Bench: $R_i$}
+\addOperation{17}{12}{Enable: $R_i$}
+\addArc{18}{15}{0}{1}{1}
+\addArc{18}{16}{-1}{0}{3}
+\addArc{15}{16}{0}{-1}{7.5}
+\put(13.5,11){\makebox(0,0)[br]{\begin{tabular}{rl}Offset: & -1 \\ latestPeriod: & $N-2$ \\ \end{tabular}}}
+\addArc{15}{8.5}{1}{0}{2}
+
+\addArc{20}{12}{0}{-1}{2}
+
+\addCapacity{17}{17}{\shortstack{$R_i$\\Working:}}
+\addArc{20}{17}{0}{-1}{2}
+
+\addOperation{17}{24}{Job: $E_j$}
+\addArc{18}{24}{-1}{-1}{3}
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2}
+\addArc{22}{24}{1}{-1}{3}
+\addArc{20}{24}{0}{-1}{2}
+\put(24,22){\makebox(0,0)[bl]{Offset: $-t$}}
+
+\addCapacity{17}{29}{Job: $E_j$}
+\addArc{20}{29}{0}{-1}{2}
+
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2}
+
+\addOvalPart{20}{7}{Bench:  $R_i$}
+
+%\addPart{10}{4.5}{Bench}
+
+\end{picture}
+\end{center}
+\caption{The Basic Resource Capacity Planning Model}\label{fig:basic}
+\end{figure}
+
+\pagebreak
+
+\section{Gap/Glut}
+The Gap/Glut problem is an MRP-like computation.  We assume that all of
+the demand must be satisfied on time.  We compute gaps in terms of
+when there is an insufficient supply to meet the requirements (not
+when the acquisition of resources should have been initiated).
+
+\subsection{Optimal Gap/Glut}
+The details of the optimization-based gap/glut model are shown in
+Figure~\ref{fig:gapGlutOpt}.  The bench supply at period 0 is set to
+be equal to the external supply at period 0, i.e., the initial supply.
+(Note: This shows a simple release model, where the scrapping takes
+place immediately, and this can be associated directly with the Bench
+part.  This simple view doesn't properly model the possibility of a
+non-zero release time of a resource that is to be scrapped.  A model
+that captures the release time is given in Section~\ref{sec:optScrap}
+and shown in Figure~\ref{fig:scrap}.)
+%\thicklines
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+\put(25,3){\makebox(0,0)[bl]{ExecCost: acquisition cost}}
+\addArc{20}{5}{0}{1}{2}
+\addOperation{17}{12}{Enable: $R_i$}
+\put(25,13){\makebox(0,0){\makebox(0,0)[bl]{ExecCost: $R_i$ monthly salary}}}
+\addArc{18}{15}{0}{1}{1}
+\addArc{18}{16}{-1}{0}{3}
+\addArc{15}{16}{0}{-1}{7.5}
+\put(13.5,11){\makebox(0,0)[br]
+{\begin{tabular}{rl}Offset: & -1 \\ latestPeriod: & $N-2$ \\ \end{tabular}
+}}
+
+\addArc{15}{8.5}{1}{0}{2}
+
+\addArc{20}{12}{0}{-1}{2}
+
+\addCapacity{17}{17}{\shortstack{$R_i$\\Working:}}
+\put(25,18){\makebox(0,0)[bl]{ScrapCost: $M$}}
+\addArc{20}{17}{0}{-1}{2}
+
+\addOperation{17}{24}{Job: $E_j$}
+\put(25,25){\makebox(0,0)[bl]{execBound: softLB of 1 in desired start period}}
+\addArc{18}{24}{-1}{-1}{3}
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2}
+\addArc{22}{24}{1}{-1}{3}
+\addArc{20}{24}{0}{-1}{2}
+
+\addCapacity{17}{29}{Job: $E_j$}
+\put(25,31){\makebox(0,0)[bl]{ScrapCost: $\epsilon$}}
+\addArc{20}{29}{0}{-1}{2}
+
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2}
+
+\put(25,38){\makebox(0,0)[bl]{ShipReward: $E_j$ revenue}}
+
+\addOvalPart{20}{7}{Bench:  $R_i$}
+\put(25,7){\makebox(0,0)[bl]
+{\begin{tabular}{rl}ScrapCost: & $R_i$ serverance cost \\ StockCost: & $R_i$ monthly salary \\ 
+SupplyVol: & $R_i$ external supply \\\end{tabular}
+}}
+
+\put(8.5,6){\makebox(0,0)[br]{\makebox(0,0){Offset: -acquisition leadtime}}}
+
+\end{picture}
+\end{center}
+\caption{The Optimization-Based Gap/Glut Resource Capacity Planning Model}\label{fig:gapGlutOpt}
+\end{figure}
+
+\subsection{Priority-Based Gap/Glut}
+In the priority-based approach for Gap/Glut, we simplify the basic
+model by eliminating the enable operation and the bench part and
+directly connecting the acquire operation to the working part.  The
+enable operation and bench parts are in the basic model to address the
+subtleties of modeling people resources as WIT capacity parts and
+capturing the notion that a resource is either working or sitting on
+the bench.  However, for the priority-based gap/glut problem, since
+our focus is on the net shortages and excesses or resources, we can
+simplify the model.  The logic for allocating resources is as follows.
+We assign priorities to the engagements and use WIT's heuristic
+allocation algorithm to determine the allocation of resources to
+engagements.  In the current implementation the engagements will
+consist of FIRM, OPPORTUNITY and FORECAST, but of course this can be
+easily expanded.  The BOM arc offsets for the engagements are with
+respect to initiating the enagagement.  The customer wants all FIRM,
+over the entire planning horizon, to be handled first, OPPORTUNITY
+second, and so on.  We exploit the heuristic's priority allocation
+scheme by creating the demands, FIRM, OPPORTUNITY and FORECAST, due in
+period zero.  The BOM arc offesets we assign to the parts associated
+to these demand are set with respect to the desired period of the
+resources.  We will have to use WIT's incremental heuristic algorithm
+if the customer wants priorities of the demand to depend on time, as
+well.  A resource request is first filled from available supply of the
+requested resource before consuming supply of allowed substitutes.  If
+the substitute supply is insufficient, then we ``acquire'' the
+requested resource creating the gap.  Gaps and gluts are post-computed
+following the run of the heuristic.  The gap of a resource is the
+execution volume of the acquire operation.  The glut of a resource is
+the scrap volume of the working part.
+
+The model for priority-based Gap/Glut is shown in Figure~\ref{fig:gapGlutPriority}.
+
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+%\put(25,3){\makebox(0,0)[bl]{ExecCost: acquisition cost}}
+\addArc{20}{5}{0}{1}{2}
+
+\addCapacity{17}{7}{\shortstack{$R_i$\\Working:}}
+\put(25,8){\makebox(0,0)[bl]{Supply: $R_i$ external supply}}
+
+\addOperation{17}{24}{Job: $E_j$}
+%\put(25,25){\makebox(0,0)[bl]{execBound: softLB of 1 in desired start period}}
+\addArc{18}{24}{-1}{-1}{3}
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2}
+\addArc{22}{24}{1}{-1}{3}
+\addArc{20}{24}{0}{-1}{12}
+
+\addCapacity{17}{29}{Job: $E_j$}
+%\put(25,31){\makebox(0,0)[bl]{ScrapCost: $\epsilon$}}
+\addArc{20}{29}{0}{-1}{2}
+
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2}
+
+\put(25,38){\makebox(0,0)[bl]{Priority: $E_j$ priority}}
+
+
+\end{picture}
+\end{center}
+\caption{The Priority-Based Gap/Glut Resource Capacity Planning Model}\label{fig:gapGlutPriority}
+\end{figure}
+
+\subsubsection{Priority Gap/Glut with Substitution:  More Details}
+
+The description of resources, used in the BOM and in describing the
+available supply of resources, is attribute-based and is driven by
+parameters in a configuration file.  Our customer uses the following
+attributes to describe its resources: jobRole, skillSet, band,
+resourceType, globalResource, reportingUnit, region, country, state,
+city, competency, industry, and LoB.  The user specifies which
+resource attributes must match.  The user can also define from-to
+substition logic by giving substitutes for a specific attribute value.
+Internal preprocessing logic analyzes the user-specified matching and
+substitution rules and builds the appropriate substitution logic
+within the WIT model.  Substitution arcs come off of the engagement
+BOM arcs, allowing for the substitutions to be dependent on the
+engagement.  The substitituion arcs are shown in the figures with
+dashed lines.  (Note: If substitutions are independent of the
+engagement, we could move the substitution structure below the working
+resource.)  In the underlying WIT model, the substitution arcs get
+added to the BOM arcs of the engagement operations, as shown in
+Figure~\ref{fig:gapGlutPrioritySub}.
+
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+\addArc{20}{5}{0}{1}{2}
+
+\addCapacity{17}{7}{\shortstack{$R_i$\\Working:}}
+\put(25,8){\makebox(0,0)[bl]{Supply: $R_i$ external supply}}
+
+\addCapacity{2}{7}{\shortstack{$R_j$\\Working:}}
+\addArc{5}{12}{0}{1}{4}
+\addArc{5}{12}{-1}{2}{2}
+\addArc{5}{12}{1}{2}{2}
+\put(5,17){\makebox(0,0){$\ldots$}}
+%\addArc{5}{12}{5}{2}{15}
+\multiput(5,12)(2.727,1.091){6}{\line(5,2){1.364}}
+\addOperation{2}{2}{Acquire: $R_j$}
+\addArc{5}{5}{0}{1}{2}
+\put(12.5,17){\makebox(0,0){(Substitute Arc)}}
+\put(12.5,15){\makebox(0,0){expNetAversion}}
+
+
+
+\addOperation{17}{24}{Job: $E_j$}
+\addArc{18}{24}{-1}{-1}{3}
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2}
+\addArc{22}{24}{1}{-1}{3}
+\addArc{20}{24}{0}{-1}{12}
+
+\addCapacity{17}{29}{Job: $E_j$}
+\addArc{20}{29}{0}{-1}{2}
+
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2}
+
+\put(25,38){\makebox(0,0)[bl]{Priority: $E_j$ priority}}
+
+
+\end{picture}
+\end{center}
+\caption{The Priority-Based Gap/Glut Resource Capacity Planning Model
+with Substitution}\label{fig:gapGlutPrioritySub}
+\end{figure}
+
+\subsubsection{Priority Gap/Glut with Ordered Substitution:  More Details}
+
+WIT's underlying heuristic algorithm captures most of the customer's
+business rules, namely prioritizing the demand and consuming available
+supply before considering substitutes.  The customer also has the
+following ``greedy'' business rule: When allocating to a demand, first
+commit supply to the BOMs that are exactly specified for that demand
+(`exact' case), then commit supply to the BOMs that have just one
+resource attribute that has substitution capability (`onesie' case),
+then commit supply to the BOMs that have two resource attributes that
+have substitution capability (`twosie' case), and so on, and finally
+commit supply to the BOMs that are in the `last' case.  Within the
+`onesie' case, the user can specify the order, based on resource
+attribute, in which supply is committed to BOMs having just one
+resource attribute with substitution capability.  Currently any BOM
+having more than one resource attribute with substitution capability
+is thrown into the last case.  A ``sorting layer'' is inserted between
+the engagement operations and the working resource parts.  The layer
+consists of operations and capacity parts that correspond to `exact',
+the `onesie', the `twosie', etc., and the `last' buckets of BOMs.
+These pairs of structures are linked together in a daisy-chain
+approach.  The `exact' operation has a BOM arc to the highest priority
+`onesie' part, the highest priority `onesie' operation has a BOM arc
+to the second highest priority `onesie' part, and so on.  These arcs
+are effectively shut off by setting their {\tt earliestPeriod} to {\tt
+nPeriods}, which is depicted with `X' in the figure.  This daisy-chain
+connection causes the heuristic to implement the required ``greedy''
+rule.  An additional modeling trick is needed to get the heuristic to
+properly net available supply first before going on to substitute
+parts.  BOM arcs that don't have substitute arcs need to have a
+substitute arc added to a global dummy capacity part.  This model is
+shown in Figure~\ref{fig:gapGlutPriorityOrderedSub}.
+
+\begin{figure}
+\begin{center}
+\begin{picture}(42,50)
+
+\put(0,0){\framebox(42,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+\addArc{20}{5}{0}{1}{2}
+
+\addCapacity{17}{7}{\shortstack{$R_i$\\Working:}}
+%\put(25,8){\makebox(0,0)[bl]{Supply: $R_i$ external supply}}
+
+\addCapacity{2}{7}{\shortstack{$R_k$\\Working:}}
+\addArc{5}{12}{0}{1}{4}
+\addArc{5}{12}{-1}{2}{2}
+\addArc{5}{12}{1}{2}{2}
+\put(5,17){\makebox(0,0){$\ldots$}}
+%\addArc{5}{12}{5}{2}{15}
+\multiput(5,12)(2.727,1.091){6}{\line(5,2){1.364}}
+\addOperation{2}{2}{Acquire: $R_k$}
+\addArc{5}{5}{0}{1}{2}
+%\put(12.5,15){\makebox(0,0){expNetAversion}}
+
+
+
+\addOperation{17}{33}{Job: $E_j$}
+%\addArc{18}{24}{-1}{-1}{3}
+%\addArc{19}{24}{-2}{-3}{2}
+%\addArc{21}{24}{2}{-3}{2}
+%\addArc{22}{24}{1}{-1}{3}
+%\addArc{20}{24}{0}{-1}{12}
+
+\addCapacity{17}{38}{Job: $E_j$}
+\addArc{20}{38}{0}{-1}{2}
+
+\addDemand{16}{45}{Job: $E_j$}
+\addArc{20}{45}{0}{-1}{2}
+
+
+\addOperation{17}{21}{`onesie 1'}
+\addArc{20}{24}{0}{1}{2}
+\addCapacity{17}{26}{`onesie 1'}
+\addArc{20}{31}{0}{1}{2}
+\addArc{18}{21}{-1}{-1}{3}
+\addArc{19}{21}{-2}{-3}{2}
+\addArc{21}{21}{2}{-3}{2}
+\addArc{22}{21}{1}{-1}{3}
+\addArc{20}{21}{0}{-1}{9}
+\put(22.5,20.75){\usebox{\Daisy}}
+\put(20,31){\line(-1,0){8}}
+
+\addOperation{5}{21}{`exact'}
+\addArc{8}{24}{0}{1}{2}
+\addCapacity{5}{26}{`exact'}
+\addArc{8}{31}{5}{1}{10}
+\addArc{6}{21}{-1}{-1}{3}
+\addArc{7}{21}{-2}{-3}{2}
+\addArc{9}{21}{2}{-3}{2}
+\addArc{10}{21}{1}{-1}{3}
+%\addArc{8}{21}{0}{-1}{12}
+\put(10.5,20.75){\usebox{\Daisy}}
+
+\addOperation{32}{21}{`last'}
+\addArc{35}{24}{0}{1}{2}
+\addCapacity{32}{26}{`last'}
+\addArc{35}{31}{-6}{1}{12}
+\addArc{33}{21}{-1}{-1}{3}
+\addArc{34}{21}{-2}{-3}{2}
+\addArc{36}{21}{2}{-3}{2}
+\addArc{37}{21}{1}{-1}{3}
+%\addArc{35}{21}{0}{-1}{12}
+\put(29,20.75){\usebox{\Daisy}}
+\put(35,31){\line(-1,0){4}}
+
+\put(27.5,25){\makebox(0,0){$\ldots$}}
+
+\put(25,47){\makebox(0,0)[bl]{Priority: $E_j$ priority}}
+
+\addCapacity{10}{9}{\shortstack{Global\\Dummy}}
+%\addArc{13}{14}{-1}{5}{1}
+\multiput(13,14)(-0.6,3){2}{\line(-1,5){.4}}
+
+
+\end{picture}
+\end{center}
+\caption{The Priority-Based Gap/Glut Resource Capacity Planning Model
+with Ordered Substitution}\label{fig:gapGlutPriorityOrderedSub}
+\end{figure}
+
+
+\subsubsection{Pegging}
+The purpose of {\em pegging} is to determine how each resource request
+in an engagement's Bill-of-Resources was satisfied.  A resource request
+can be satisfied from supply of the requested resource or from supply of
+substitutes for the requested resource.  Any remaining unsatisfied
+amount is attributed to gap.
+
+We invoke WIT's {\tt witGetDemandExecVolPegging} function to determine
+the pegging due to gap.  Using WIT's {\tt witGetSubsBomEntrySubVol},
+we can get detailed information about how much of a specific
+substitute resource was used in place of a requested resource.  It is helpful to look at Figure~\ref{fig:gapGlutPrioritySub} to see a model with substitution.
+Summing over all the substitutes' execution volumes gives us the and
+multiplying this sum by the desired quantity of the requested resource
+gives us the effective amount of the requested resource that was met
+by substitution.  The amount of the resource that we can peg to the
+supply of the resource is the total requested less the effective
+amount that was met by substitution less the amount pegged to gap.
+The computation of the {\tt PeggedSupplyVol} is given (loosely) in the equation
+below.  
+%The subscript $t$ on {\tt consRate} refers to the BOM arc that
+%has offset of $t$.  
+(Note: This description of pegging holds when the
+demand for an engagement is one, as is the case in the basic model.
+In a more general model where the offerings are treated like products
+and there are demands, greater than one, for the offerings, then the
+pegging algorithm must be modified slightly.)
+
+%\[ {\mbox{\rm PeggedSupplyVol}}(t) = 
+%{\mbox{\rm bomArc}}_t.{\mbox{\rm consRate}}(0)(1 - \sum {\mbox{\rm subArc.subVol}}(0)) - 
+%{\mbox{\rm acquire}}(t) \]
+
+\begin{eqnarray*}
+{\mbox{\rm PeggedSupplyVol}}(t) & = &
+{\mbox{\rm bomArc}}_t.{\mbox{\rm consRate}}(0) \left(1 - \sum {\mbox{\rm subArc.subVol}}(0)\right)\\
+& &  - {\mbox{\rm acquire}}(t) 
+\end{eqnarray*}
+
+\pagebreak
+
+\section{Resource Action}
+\subsection{Optimal Resource Action}\label{sec:optScrap}
+
+The details of the optimization-based resource action model that captures
+the release structure are given in Figure~\ref{fig:scrap}.  The
+offsets of the BOPs between the scrap operation and the scrap capacity
+part are set so that once a bench resource has been identified to be
+scrapped, the scrap operation produces one resource for each period in
+the severance leadtime the resource can stay in the system.  The
+resource may work during the period, going through the enable scrap
+operation, or sit and be scrapped for the period.  The monthly salary
+is either incurred by the execution cost of the {\tt Enable Scrap}
+operation or by the scrap cost of the {\tt Scrap} part.
+
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+
+\addArc{20}{5}{0}{1}{2}
+\addOperation{17}{12}{Enable: $R_i$}
+%\put(25,13){\makebox(0,0){\makebox(0,0)[bl]{ExecCost: $R_i$ monthly salary}}}
+\addArc{18}{15}{0}{1}{1}
+\addArc{18}{16}{-1}{0}{3}
+\addArc{15}{16}{0}{-1}{7.5}
+\put(13.5,11){\makebox(0,0)[br]
+{\begin{tabular}{rl}Offset: & -1 \\ latestPeriod: & $N-2$ \\ \end{tabular} }} 
+\addArc{15}{8.5}{1}{0}{2} 
+\addArc{20}{12}{0}{-1}{2}
+\addCapacity{17}{17}{\shortstack{$R_i$\\Working:}}
+%\put(25,18){\makebox(0,0)[bl]{ScrapCost: $M$}}
+\addArc{20}{17}{0}{-1}{2} 
+\addOperation{17}{24}{Job: $E_j$}
+\put(25,25){\makebox(0,0)[bl]{incLotSize: 1}} 
+\addArc{18}{24}{-1}{-1}{3} 
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2} 
+\addArc{22}{24}{1}{-1}{2}
+\addArc{20}{24}{0}{-1}{2} 
+\addCapacity{17}{29}{Job: $E_j$}
+\put(25,31){\makebox(0,0)[bl]{ScrapCost: $\epsilon$}}
+\addArc{20}{29}{0}{-1}{2} 
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2} 
+\put(25,38){\makebox(0,0)[bl]{ShipReward: $E_j$ revenue}} 
+\addOvalPart{20}{7}{Bench: $R_i$}
+
+%\put(25,7){\makebox(0,0)[bl] 
+%{\begin{tabular}{rl}ScrapCost: & $R_i$ serverance cost \\ StockCost: & $R_i$ monthly salary \\ 
+%SupplyVol: &$R_i$ external supply \\\end{tabular} %}}
+
+\put(8.5,6){\makebox(0,0)[br]{\makebox(0,0){Offset: -acquisition leadtime}}} 
+\put(8.5,3){\makebox(0,0)[br]{\makebox(0,0){execCost: acquisition cost}}} 
+\addOperation{27}{7}{\shortstack{$R_i$\\Scrap:}}
+\addCapacity{27}{11}{\shortstack{$R_i$\\Scrap:}}
+\addOperation{27}{17}{\shortstack{Enable\\Scrap:\\$R_i$}}
+\addArc{23}{8.5}{1}{0}{2} 
+\addArc{25}{8.5}{0}{-1}{2.5}
+\addArc{25}{6}{1}{0}{5} 
+\addArc{30}{6}{0}{1}{1}
+\put(25,5.5){\makebox(0,0)[tl]{offset: severance leadtime}}
+\addArc{30}{10}{0}{1}{1} 
+\addArc{29}{10}{0}{1}{1}
+\addArc{28}{10}{0}{1}{1} 
+\addArc{32}{10}{0}{1}{1}
+\put(31,10.5){\makebox(0,0){$\cdots$}} 
+\addArc{30}{16}{0}{1}{1}
+\addArc{30}{20}{0}{1}{1} 
+\addArc{30}{21}{-1}{0}{5}
+\addArc{25}{21}{0}{-1}{5} 
+\addArc{25}{16}{-1}{0}{4}
+\addArc{21}{16}{0}{1}{1} 
+
+\put(25,21){\makebox(0,0)[bl]{expAllowed: false}} 
+\put(34,18.5){\makebox(0,0)[bl]{execCost: monthly salary}}
+\put(34,8.0){\makebox(0,0)[bl]{execCost: severance cost}}
+\put(34,13){\makebox(0,0)[bl]{scrapCost: monthly salary}}
+\put(34,10.25){\makebox(0,0)[bl]{offsets: special}}
+
+\put(13.5,15){\makebox(0,0)[br]
+{\begin{tabular}{rl}scrapCost: & $M$ \\ execCost: & monthly salary \\  \end{tabular} }} 
+
+\put(13.5,7){\makebox(0,0)[br]
+{\begin{tabular}{rl}scrapCost: & $M$ \\ stockCost: & monthly salary \\  \end{tabular} }} 
+
+
+\end{picture} 
+\end{center} 
+\caption{The Optimization-Based Resource Action Capacity Planning Model with
+Details of Release Structure}\label{fig:scrap} 
+\end{figure}
+
+\subsection{Priority Resource Action} 
+Unlike the Gap/Glut calculations in which the shortages and excesses
+are computed based on the planned supply of resources, in the Resource
+Action calculation, we only consider the on-hand initial inventory of
+supply and compute what resource actions (acquire, release) should be
+made over the planning horizon.  Some ill-defined situations could
+occur if we tried to make resource action recommendations if we had to
+consider a planned supply line.  For example, we might have to make
+recommendations to release resources as soon as the planned supply was
+bringing them in.  To eliminate these ill-defined situations, we only
+consider the on-hand supply and make our resource action
+recommendations in light of the initial inventory.  The details of the
+priority-based resource action model are shown in
+Figure~\ref{fig:resourceActionPriority}.  As seen in the Figure,
+resources can be acquired, period by period, for the capacity working
+part $R_i$.  For each period, this model acquires exactly what it
+needs (Working part $R_i$ is a capacity part so no inventory is
+maintained at the end of a time bucket).  We then post-process the
+heuristic implosion output quantities for {\tt consVol} and {\tt
+residualVol} to compute acquisition and release resource actions
+applying a policy to not release a resource if it is needed later on
+in the planning horizon.
+
+\begin{figure}
+\begin{center}
+\begin{picture}(40,50)
+
+\put(0,0){\framebox(40,50){}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\addOperation{17}{2}{Acquire: $R_i$}
+\addArc{20}{5}{0}{1}{2}
+\addArc{19}{5}{0}{1}{2}
+\addArc{18}{5}{0}{1}{2}
+\addArc{22}{5}{0}{1}{2}
+\put(21,6){\makebox(0,0){$\cdots$}} 
+\put(25,5.5){\makebox(0,0)[bl]{offsets and latestPeriod: special}}
+
+
+\addCapacity{17}{7}{\shortstack{$R_i$\\Working:}}
+\put(25,8){\makebox(0,0)[bl]{Supply: $R_i$ external supply at 0}}
+
+\addOperation{17}{24}{Job: $E_j$}
+\addArc{18}{24}{-1}{-1}{3}
+\addArc{19}{24}{-2}{-3}{2}
+\addArc{21}{24}{2}{-3}{2}
+\addArc{22}{24}{1}{-1}{3}
+\addArc{20}{24}{0}{-1}{12}
+
+\addCapacity{17}{29}{Job: $E_j$}
+\addArc{20}{29}{0}{-1}{2}
+
+\addDemand{16}{36}{Job: $E_j$}
+\addArc{20}{36}{0}{-1}{2}
+
+\put(25,38){\makebox(0,0)[bl]{Priority: $E_j$ priority}}
+
+
+\end{picture}
+\end{center}
+\caption{The Priority-Based Resource Action Planning Model}\label{fig:resourceActionPriority}
+\end{figure}
+
+\pagebreak
+
+\section{Conclusions}
+In this report we have documented the WIT models we created to support
+IGS's Resource Capacity Planning process.  The models solve two
+planning problems, Gap/Glut and Resource Action.  For each of these
+planning problems, we give two solution approaches, a priority-based
+and an optimization-based approach.  Novel WIT models were created to
+handle ``people'' resources and IGS's business rules for priotitizing
+the use of resources.  WIT provided a solid modeling foundation and we
+have successfully demonstrated that WIT can be used to model resource
+capacity planning problems in the complex environment of IGS.
+
+\begin{thebibliography}{99}
+\bibitem{ref:specs}{Zink, Ron, \em IBM Global Services Adaptive Workforce (ADWF) Research Optimizer
+Specifications for RCP Release 2.1} Version 1.3, April 27, 2004 (Unpublished)
+\bibitem{ref:WIT} {\em IBM Watson Implosion Technology, Release 6.0, 
+User's Guide and Reference.} May 2004 (Unpublished)
+\end {thebibliography}
+
+\end{document}
+@
+
+
+1.8
+log
+@added a label to figure 4 and added an "or" in an appropriate place
+@
+text
+@a1 1
+
+d81 7
+a87 6
+Capacity Planning (RCP) models used in the Optimizer.  The models
+serve as a framework for solving two resource planning problems:
+Gap/Glut and Resource Action.  The Gap/Glut problem is similar to
+Materials Requirements Planning (MRP), in which we determine the
+shortages (gaps) and excesses (gluts) of resources.  The Resource
+Action problem is to determine what resource actions to take,
+d91 1
+a91 1
+accept or decline, for example, due to insufficient profitability.
+a100 12
+A slice of the model is displayed here showing a job or engagement,
+$E_j$, and a resource, $R_i$, that is part of the Bill-of-Material
+(BOM) or staffing plan of $E_j$.  We use the Watson Implosion Tool
+(WIT) notation to represent the elements of the model.  A diamond
+represents a demand, a triangle represents a ``capacity'' part, a
+oval represents a ``material'' part, and a rectangle represents an
+operation.  The main difference between a capacity part and a
+material part is that if a capacity part is not used in a time
+period, it goes away at the end of the period, (``use it or lose it''),
+whereas a material part remains in inventory for the next time period
+if it is not used in the current period.
+
+d104 11
+d116 29
+a144 18
+part, $E_j$.  The capacity part $E_j$ is produced by the operation,
+$E_j$.  The operation, $E_j$, may require several parts, including the
+capacity part named {\em working} $R_i$.  (For example, the operation
+may require five resources, only one of which is explicitly shown in
+detail in the slice of the model shown in Figure~\ref{fig:basic}.)
+The {\em working} part $R_i$ may be needed $t$ periods after the
+initiation of the start of the engagement, (e.g., testers aren't
+needed until the fourth month of the project), and this is captured in
+the model by setting the offset of the BOM arc.  The part {\em
+working} $R_i$ comes from the operation named {\em enable} $R_i$.  The
+operation {\em enable} $R_i$ takes a part named {\em bench} $R_i$ and
+produces the part {\em working} $R_i$.  It also produces the part {\em
+bench} $R_i$ for the next time period (note the offset of -1 on the
+Bill-of-Product (BOP) arc from the operation {\em enable} $R_i$).  The
+part named {\em bench} $R_i$ is a material part, and so unused
+inventory of this part is available for the next time period.
+Finally, the part {\em bench} $R_i$ is produced by the operation {\em
+acquire} $R_i$.
+d198 2
+d540 1
+a540 1
+in an engagements Bill-of-Resources was satisfied.  A resource request
+d546 1
+a546 1
+the pegging due to gap.  Using Wit's {\tt witGetSubsBomEntrySubVol},
+d548 26
+a573 10
+substitute resource was used in place of a requested resource.
+Summing over all the substitutes' execution volumes gives us the
+fraction of the total amount of the requested resource that was met by
+substitutes, and so multiplying this fraction by the total requested
+amount tells us the effective amount of the requested resource that
+was met by substitution.  The amount of the resource that we can peg
+to the supply of the resource is the total requested less the
+effective amount that was met by substitution less the amount pegged
+to gap.
+
+d575 1
+d736 20
+@
+
+
+1.7
+log
+@Correct typos
+@
+text
+@d375 1
+d529 1
+a529 1
+can be satisfied from supply of the requested resource, from supply of
+@
+
+
+1.6
+log
+@Added Donna's changes
+@
+text
+@d293 1
+a293 1
+The model for priority based Gap/Glut is shown in Figure~\ref{fig:gapGlutPriority}.
+d335 1
+a335 1
+available supply of resources, is attribute based and is driven by
+d655 1
+a655 1
+priority based resource action model are shown in
+@
+
+
+1.5
+log
+@Added priority resource action model
+@
+text
+@d90 2
+d94 2
+a95 2
+for solving them.  The first solution approach is optimization based.
+Given costs for using resources and taking resource actions and
+d97 1
+a97 1
+formed and solved.  The second solution approach is priority based.
+d102 2
+a103 2
+$E_j$, and a resource, $R_i$, that is part of the Bill-of-Resources
+(BOR) or staffing plan of $E_j$.  We use the Watson Implosion Tool
+d109 1
+a109 1
+period, it goes away at the end of the period, ``use it or lose it'',
+d114 8
+a121 4
+Figure~\ref{fig:basic}.  The demand for an engagement or job, $E_j$,
+is satisfied by a capacity part, $E_j$.  The capacity part $E_j$ is
+produced by the operation, $E_j$.  The operation, $E_j$, may require
+several parts, including the capacity part named {\em working} $R_i$.
+d125 1
+a125 1
+the model be setting the offset of the BOM arc.  The part {\em
+d189 1
+a189 1
+The Gap/Glut problem is an MRP-like computation.  We assume that all
+d194 2
+a195 2
+\subsection{Optimal}
+The details of the optimization-based model are shown in
+d197 7
+a203 6
+the external supply at period 0, i.e., the initial supply.  (Note:
+This shows a simple release model, where the scrapping takes place at
+the Bench part.  This simple view doesn't properly model the release
+time of a resource that is to be scrapped.  A model that captures the
+release time is given in Section~\ref{sec:optScrap} and shown in
+Figure~\ref{fig:scrap}.)
+d259 1
+a259 1
+\caption{The Optimization Based Gap/Glut Resource Capacity Planning Model}\label{fig:gapGlutOpt}
+d262 2
+a263 2
+\subsection{Priority}
+In the priority based approach for Gap/Glut, we simplify the basic
+d266 26
+a291 20
+logic for allocating resources is as follows.  We assign priorities to
+the engagements and use WIT's heuristic allocation algorithm to
+determine the allocation.  Initially the engagements will consist of
+FIRM, OPPORTUNITY and FORECAST.  The BOM arc offsets for the
+engagements are with respect to initiating the enagagement.  beginning
+of the planning horizon.  The customer wants all FIRM, over the entire
+planning horizon, to be handled first, OPPORTUNITY second, and so on.
+We exploit the heuristic's priority allocation scheme by creating the
+demands, FIRM, OPPORTUNITY and FORECAST, due in period zero.  The BOM
+arc offesets we assign to the parts associated to these demand are set
+with respect to the desired period of the resources.  We will have to
+use WIT's incremental heuristic algorithm if the customer wants
+priorities of the demand to depend on time, as well.  A resource
+request is first filled from available supply of the requested
+resource before consuming supply of substitutes.  If the substitute
+supply is insufficient, then we ``acquire'' the requested resource
+creating the gap.  Gaps and gluts are then post-computed following the
+run of the heuristic.  The gap of a resource is the execution volume
+of the acquire operation.  The glut of a resource is the scrap volume
+of the working part.
+d329 1
+a329 1
+\caption{The Priority Based Gap/Glut Resource Capacity Planning Model}\label{fig:gapGlutPriority}
+d334 1
+a334 1
+The description of resources, used in the BOR and in describing the
+d344 8
+a351 7
+within the WIT model.  Substitution arcs come off the engagement BOM
+arcs, allowing for the substitutions to be dependent on the
+engagement.  (Note: If substitutions are independent of the
+engagement, we may want to explore moving the substitution structure
+below the working resource.)  In the underlying WIT model, the
+substitution arcs get added to the BOM arcs of the engagement
+operations, as shown in Figure~\ref{fig:gapGlutPrioritySub}.
+d397 1
+a397 1
+\caption{The Priority Based Gap/Glut Resource Capacity Planning Model
+d407 2
+a408 2
+commit supply to the BORs that are exactly specified for that demand
+(`exact' case), then commit supply to the BORs that have just one
+d410 1
+a410 1
+then commit supply to the BORs that have two resource attributes that
+d412 1
+a412 1
+commit supply to the BORs that are in the `last' case.  Within the
+d414 2
+a415 2
+attribute, in which supply is committed to BORs having just one
+resource attribute with substitution capability.  Currently any BOR
+d420 1
+a420 1
+the `onesie', the `twosie', etc., and the `last' buckets of BORs.
+d520 1
+a520 1
+\caption{The Priority Based Gap/Glut Resource Capacity Planning Model
+d527 1
+a527 1
+in an engagements Bill-of-Resources is satisfied.  A resource request
+d529 1
+a529 1
+substitutes for the requested resource, and any remaining unsatisfied
+d548 1
+a548 1
+\subsection{Optimal}\label{sec:optScrap}
+d550 1
+a550 1
+The details of optimization based resource action model that captures
+d639 1
+a639 1
+\caption{The Optimization Based Resource Action Capacity Planning Model with
+d642 2
+a643 1
+\subsection{Priority} 
+d703 1
+a703 1
+\caption{The Priority Based Resource Action Planning Model}\label{fig:resourceActionPriority}
+@
+
+
+1.4
+log
+@More content added for the optimization model.
+@
+text
+@d78 10
+a87 6
+This is an attempt to document the basic Resource Capacity Planning
+(RCP) model.  The model serves as a framework for solving two resource
+planning problems: Gap/Glut and Resource Action.  The Gap/Glut problem
+is similar to Materials Requirements Planning (MRP), in which we
+determine the shortages (gaps) and excesses (gluts) of resources.  The
+Resource Action problem is to determine what resource actions to take,
+d190 7
+a196 5
+Figure~\ref{fig:gapGlutOpt}.  (Note: This shows a simple release
+model, where the scrapping takes place at the Bench part.  This simple
+view doesn't properly model the release time of a resource that is to
+be scrapped.  A model that captures the release time is given in
+Section~\ref{sec:optScrap} and shown in Figure~\ref{fig:scrap}.)
+d412 7
+a418 7
+nPeriods}.  This daisy-chain connection causes the heuristic to
+implement the required ``greedy'' rule.  An additional modeling trick
+is needed to get the heuristic to properly net available supply first
+before going on to substitute parts.  BOM arcs that don't have
+substitute arcs need to have a substitute arc added to a global dummy
+capacity part.  This model is shown in
+Figure~\ref{fig:gapGlutPriorityOrderedSub}.
+d536 10
+a545 7
+The details of resource action model that captures the release
+structure are given in Figure~\ref{fig:scrap}.  The offsets of the
+BOPs between the scrap operation and the scrap capacity part are set
+so that once a bench resource has been identified to be scrapped, the
+scrap operation produces one resource for each period in the severance
+leadtime the resource can stay in the system.  The resource may work,
+going through the enable scrap operation, or sit and be scrapped.
+d629 62
+@
+
+
+1.3
+log
+@Completed sorting layer
+@
+text
+@d60 1
+a60 1
+\newcommand{\addCapacity}[3]{\put(#1,#2){\usebox{\witCapacity}}\put(#1,#2){\makebox(6,2){#3}}}
+d69 2
+a70 2
+\author{Daniel Connors \and Donna Gresh \and JP Fasano}
+\date{July 9, 2004}
+d185 6
+a190 2
+The details of the optimization-based Gap/Glut model are shown in
+Figure~\ref{fig:gapGlutOpt}.
+d325 7
+a331 3
+within the WIT model.  In the underlying WIT model, the substitution
+arcs get added to the BOM arcs of the engagement operations, as shown
+in Figure~\ref{fig:gapGlutPrioritySub}.
+d528 18
+a545 2
+\subsection{Optimal}
+\subsection{Priority}
+d547 73
+@
+
+
+1.2
+log
+@Added more details.
+@
+text
+@d52 1
+d130 1
+a130 1
+%\thicklines
+d315 9
+a323 9
+resourceType, globalResource, resourceId5","reportingUnit, region,
+country, state, city, competency, industry, and LoB.  The user
+specifies which resource attributes must match.  The user can also
+define from-to substition logic by giving substitutes for a specific
+attribute value.  Internal preprocessing logic analyzes the
+user-specified matching and substitution rules and builds the
+appropriate substitution logic within the WIT model.  In the
+underlying WIT model, the substitution arcs get added to the BOM arcs
+of the engagement operations, as shown in Figure~\ref{fig:gapGlutPrioritySub}.
+d343 2
+a344 1
+\addArc{5}{12}{5}{2}{15}
+d424 2
+a425 1
+\addArc{5}{12}{5}{2}{15}
+d484 4
+@
+
+
+1.1
+log
+@Documentation for the RCP model.
+@
+text
+@d45 10
+d106 18
+a123 13
+The WIT model for the basic RCP model is shown in Figure~\ref{fig:basic}.  The demand
+for an engagement or job, $E_j$, is satisfied by a capacity part,
+$E_j$.  The capacity part $E_j$ is produced by the operation, $E_j$.
+The operation, $E_j$, may require several parts, including the
+capacity part named {\em working} $R_i$.  The part {\em working} $R_i$
+comes from the operation named {\em enable} $R_i$.  The operation {\em
+enable} $R_i$ takes a part named {\em bench} $R_i$ and produces the
+part {\em working} $R_i$.  It also produces the part {\em bench} $R_i$
+for the next time period (note the offset of -1 on the Bill-of-Product
+(BOP) arc from the operation {\em enable} $R_i$).  The part named {\em
+bench} $R_i$ is a material part, and so unused inventory of this part
+is available for the next time period.  Finally, the part {\em bench}
+$R_i$ is produced by the operation {\em acquire} $R_i$.
+d160 1
+d180 2
+a181 2
+when there was an insufficient supply to meet the requirements not
+when the acquiring resources should have been initiated.
+d184 2
+a185 1
+The details of the optimization-based Gap/Glut model are shown in Figure~\ref{fig:gapGlutOpt}.
+d245 266
+@
+

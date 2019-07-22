@@ -1,0 +1,260 @@
+head	1.4;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2002.10.28.03.01.43;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.09.13.02.34.02;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.09.06.17.39.04;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.09.04.20.44.46;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.09.04.20.44.46;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Added ability in ScoFile class to handle SCE like comments
+@
+text
+@#ifndef ILS_PROJRESRCLINKATTRFILE_h
+#define ILS_PROJRESRCLINKATTRFILE_h
+
+#include "scoFile.h"
+
+
+class ILSprojResrcLinkAttrFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(proj);
+  getFieldH(role);
+  getIntFieldH(band);
+  getIntFieldH(offsetPeriod);
+  getFloatFieldH(consRate);
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & proj, 
+    const std::string & role, 
+    int band, 
+    int period ) 
+  {
+    char bandchar[100];
+    sprintf( bandchar, "%d", band );
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = proj+"$+&"+role+"$+&"+bandchar+"$+&"+periodchar;
+    return retVal;
+  };
+  
+  // preferred constructor
+  ILSprojResrcLinkAttrFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+#if 0 
+    insertField("proj");
+#else
+    hasHeaderRecord(5);
+#endif
+    commentRecords(true);
+  };
+  
+  // destructor
+  ~ILSprojResrcLinkAttrFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ILSprojResrcLinkAttrFile file("../data/example1/projResrcLinkAttr.csv");
+    
+    // Test reading first record
+    assert( file.proj(1) == "p1" );
+    assert( file.role(1) == "role1" );
+    assert( file.bandAsInt(1) == 7 );
+    assert( file.offsetPeriodAsInt(1) == 0 );
+    assert( file.consRateAsFloat(1) == 30. );
+
+    // Test reading second record
+    assert( file.proj(2) == "p1" );
+    assert( file.role(2) == "role1" );
+    assert( file.bandAsInt(2) == 8 );
+    assert( file.offsetPeriodAsInt(2) == 0 );
+    assert( file.consRateAsFloat(2) == 40. );
+
+    // Test reading third record
+    assert( file.proj(3) == "p2" );
+    assert( file.role(3) == "role1" );
+    assert( file.bandAsInt(3) == 7 );
+    assert( file.offsetPeriodAsInt(3) == 0 );
+    assert( file.consRateAsFloat(3) == 50. );
+    
+    // Test reading record by key
+    assert( file.proj(file.key(4)) == "p2" );
+    assert( file.role(file.key(4)) == "role2" );
+    assert( file.bandAsInt(file.key(4)) == 8 );
+    assert( file.offsetPeriodAsInt(file.key(4)) == 0 );
+    assert( file.consRateAsFloat(file.key(4)) == 60. );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    //std::string retVal = proj(recNum)+"$+&"+role(recNum)+"$+&"+band(recNum)+"$+&"+offsetPeriod(recNum);
+    std::string retVal = key(
+      proj(recNum),
+      role(recNum),
+      bandAsInt(recNum),
+      offsetPeriodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ILSprojResrcLinkAttrFile();
+  
+  // copy constructor  -- don't use!
+  ILSprojResrcLinkAttrFile( const ILSprojResrcLinkAttrFile& source );
+  
+  // assignment operator -- don't use!
+  ILSprojResrcLinkAttrFile&
+  operator=(const ILSprojResrcLinkAttrFile& rhs);
+
+  
+};
+
+
+
+class ILSprojResrcLinkAttrFileIterator : public SCOfileIterator {
+public:
+  
+  // fields  
+  getFieldFileWithIteratorH(proj);
+  getFieldFileWithIteratorH(role);
+  getIntFieldFileWithIteratorH(band);
+  getIntFieldFileWithIteratorH(offsetPeriod);
+  getFloatFieldFileWithIteratorH(consRate);
+
+  
+  // preferred constructor
+  ILSprojResrcLinkAttrFileIterator(const ILSprojResrcLinkAttrFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ILSprojResrcLinkAttrFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ILSprojResrcLinkAttrFile file("../data/example1/projResrcLinkAttr.csv");
+    ILSprojResrcLinkAttrFileIterator fileIter(file);
+    
+    // loop once for each record
+    bool firstRecord = true;
+    for ( fileIter(); fileIter()!=NULL; ) {    
+      if ( firstRecord ) {
+        
+        assert( fileIter.proj() == "p1" );
+        assert( fileIter.role() == "role1" );
+        assert( fileIter.bandAsInt() == 7 );
+        assert( fileIter.offsetPeriodAsInt() == 0 );
+        assert( fileIter.consRateAsFloat() == 30. );
+        
+        firstRecord = false;
+      }
+    }
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ILSprojResrcLinkAttrFileIterator();
+  
+  // copy constructor  -- don't use!
+  ILSprojResrcLinkAttrFileIterator( const ILSprojResrcLinkAttrFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ILSprojResrcLinkAttrFileIterator&
+  operator=(const ILSprojResrcLinkAttrFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.3
+log
+@Fixed ::test code bug.
+Added reading more of the files to ils.cpp
+@
+text
+@d43 1
+@
+
+
+1.2
+log
+@modified so unitTest can be run from the power43 directory
+@
+text
+@d16 15
+d88 6
+a93 1
+    std::string retVal = proj(recNum)+"$+&"+role(recNum)+"$+&"+band(recNum)+"$+&"+offsetPeriod(recNum);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d36 1
+a36 1
+    ILSprojResrcLinkAttrFile file("projResrcLinkAttr.csv");
+d116 1
+a116 1
+    ILSprojResrcLinkAttrFile file("projResrcLinkAttr.csv");
+@
+
+
+1.1.1.1
+log
+@initial import
+@
+text
+@@

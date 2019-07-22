@@ -1,0 +1,888 @@
+head	1.13;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.13
+date	2007.01.10.21.22.55;	author fasano;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.08.11.22.58.50;	author fasano;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.08.09.20.16.33;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.05.09.16.09.01;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.04.23.15.31.36;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.04.23.12.22.37;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.04.23.02.28.42;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.04.22.22.11.18;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.04.22.16.26.41;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.04.22.13.49.29;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.04.14.16.56.26;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.04.03.13.50.26;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.09.21.18.03.25;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@Added code to compute source of supply that makes up totalWac
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <iostream>
+#include "eso2Problem.h"
+#include "partDemandAppData.h"
+
+std::set<std::string> ESO2partDemandAppData::getAttributeNames() const
+{
+  //return attributeNames_;
+  std::vector<std::string> retVal;
+#if 0
+  retVal.push_back("MtmAcquire");
+  retVal.push_back("MtmMoveFrom");
+  retVal.push_back("MtmMovedTo");
+  retVal.push_back("MtmDisassemble");
+  retVal.push_back("PartHarvestedFromMtm");
+  retVal.push_back("FeatureAcquire");
+  retVal.push_back("FeatureXrefFrom");
+  retVal.push_back("PartXrefedTo");
+  retVal.push_back("LoosePartAcquire");
+  retVal.push_back("PartAltFrom");
+  retVal.push_back("PartAltTo");
+  retVal.push_back("PartMoveFrom");
+  retVal.push_back("PartMovedTo"); 
+#endif
+#if 0
+  std::set<std::string>::const_iterator it;
+  for ( it=attributeNames_.begin(); it!=attributeNames_.end(); ++it ) {
+    const std::string & an = *it;
+    retVal.push_back(an);
+  }
+  return retVal;
+#endif
+  return attributeNames_;
+}
+
+void ESO2partDemandAppData::setPriority(int p )
+{
+  priority_=p;
+}
+
+
+int ESO2partDemandAppData::getPriority() const
+{
+  return priority_;
+}
+void ESO2partDemandAppData::setWac(int p, float w )
+{
+  wac_[p]=w;
+}
+
+
+float ESO2partDemandAppData::getWac(int period) const
+{
+  return wac_[period];
+}
+std::vector<float> ESO2partDemandAppData::getWac() const
+{
+  return wac_;
+}
+
+#if 0
+void ESO2partDemandAppData::addPeggedItem(
+  const std::string & attribName, int shipPeriod, 
+  const std::string & item, const std::string & loc, int period, float quantity )
+{
+  addPeggedItem(attribName,shipPeriod,item,loc,period,0,quantity);
+}
+#endif
+
+void ESO2partDemandAppData::addPeggedItem(
+  const std::string & attribName, int shipPeriod, 
+  const std::string & item, const std::string & loc, int period, int depth, float quantity )
+{
+  // if this attribName is new then add it to list of attribNames
+  if ( attributeNames_.find(attribName) == attributeNames_.end() ) {
+    attributeNames_.insert(attribName);
+  }
+
+#if 0
+  ESO2mapIntToMapStringStringIntToFloat & mapOuter = peggedAttributes_[attribName];
+  ESO2mapStringStringIntToFloat & mapInner = mapOuter[shipPeriod];
+  ESO2stringStringIntTriple ilp(item,loc,period);
+#endif
+  
+  ESO2mapIntToMapStringStringIntToIntFloatPair & mapOuter = peggedAttributes_[attribName];
+  ESO2mapStringStringIntToIntFloatPair & mapInner = mapOuter[shipPeriod];
+  ESO2stringStringIntTriple ilp(item,loc,period);
+
+  std::pair<int,float> & depthQtyPair = mapInner[ilp];
+  int curDepth = depthQtyPair.first;
+  float qty = depthQtyPair.second;
+
+  depthQtyPair.first = std::max(depth,curDepth);
+  depthQtyPair.second += quantity;
+
+}
+
+
+/*
+void ESO2partDemandAppData::getPeggedItems(
+  const std::string & attribName,
+  int shipPeriod,
+  std::vector<std::string> &items,
+  std::vector<std::string> &locs,
+  std::vector<int> &periods,
+  std::vector<float> &quantities ) const
+{
+  std::vector<int> depths;
+  getPeggedItems(
+    attribName,
+    shipPeriod,
+    items,
+    locs,
+    periods,
+    depths,
+    quantities 
+    );
+}
+*/
+
+void ESO2partDemandAppData::getPeggedItems(
+  const std::string & attribName,
+  int shipPeriod,
+  std::vector<std::string> &items,
+  std::vector<std::string> &locs,
+  std::vector<int> &periods,
+  std::vector<int> &depths,
+  std::vector<float> &quantities ) const
+{
+  items.clear();
+  locs.clear();
+  periods.clear();
+  depths.clear();
+  quantities.clear();
+
+  std::map<std::string,ESO2mapIntToMapStringStringIntToIntFloatPair>::const_iterator itAttrib = peggedAttributes_.find(attribName);
+  if ( itAttrib != peggedAttributes_.end() ) {
+    const ESO2mapIntToMapStringStringIntToIntFloatPair & mapOuter = (itAttrib->second);
+    ESO2mapIntToMapStringStringIntToIntFloatPair::const_iterator mapOuterIt = mapOuter.find(shipPeriod);
+    if ( mapOuterIt == mapOuter.end() ) return;
+
+    const ESO2mapStringStringIntToIntFloatPair & mapInner = mapOuterIt->second;
+
+    ESO2mapStringStringIntToIntFloatPairConstIterator it;
+    //ESO2mapStringStringIntToFloat::const_iterator it;
+
+    for (it=mapInner.begin(); it!=mapInner.end(); ++it ) {
+      const ESO2stringStringIntTriple & ilpd = it->first;
+      std::pair<int,float> depthQtyPair = it->second;
+      int depth = depthQtyPair.first;
+      float q = depthQtyPair.second;
+      items.push_back(ilpd.getString1());
+      locs.push_back(ilpd.getString2());
+      periods.push_back(ilpd.getInt());
+      depths.push_back(depth);
+      quantities.push_back(q);
+    }
+  }
+}
+
+
+void ESO2partDemandAppData::clearPegging()
+{
+  peggedAttributes_.clear();
+  attributeNames_.clear();
+}
+
+// default constructor
+ESO2partDemandAppData::ESO2partDemandAppData()
+:
+ESO2appData(),peggedAttributes_(),attributeNames_(),priority_(0),wac_()
+{}
+
+ESO2partDemandAppData::ESO2partDemandAppData(int nPeriods)
+:
+ESO2appData(),peggedAttributes_(),attributeNames_(),priority_(0),wac_()
+{
+  setVector(nPeriods,0.f,wac_);
+}
+
+// destructor
+
+ESO2partDemandAppData::~ESO2partDemandAppData()
+{}
+
+// copy constructor
+ESO2partDemandAppData::ESO2partDemandAppData( const ESO2partDemandAppData& source ):
+ESO2appData(source),
+peggedAttributes_(source.peggedAttributes_),
+attributeNames_(source.attributeNames_),
+priority_(source.priority_),
+wac_(source.wac_)
+{};
+
+// assignment operator
+ESO2partDemandAppData&
+ESO2partDemandAppData::operator=(const ESO2partDemandAppData& rhs)
+{  
+  if (this != &rhs) {        
+    ESO2appData::operator=(rhs);
+    peggedAttributes_ = rhs.peggedAttributes_;
+    attributeNames_ = rhs.attributeNames_;
+    priority_ = rhs.priority_;
+    wac_=rhs.wac_;
+  }
+  return *this;
+}
+
+ESO2appData * ESO2partDemandAppData::clone() const
+{ return (new ESO2partDemandAppData(*this));}
+
+// Self-test
+void ESO2partDemandAppData::test()
+{
+
+  ESO2partDemandAppData ad1;
+  std::vector<std::string> mtms;
+  std::vector<std::string> locs;
+  std::vector<int> periods;
+  std::vector<int> depths;
+  std::vector<float> quantities;
+ 
+  {
+    ESO2partDemandAppData ad0(3);
+
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,depths,quantities);
+    assert(mtms.size()==0);
+    //assert(ad0.getAttributeNames().size() == 0 );
+
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a","loc1",1,11,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,depths,quantities);
+    assert(mtms.size()==1);
+    assert(mtms[0]=="mtm_a");
+    assert(locs[0]=="loc1");
+    assert(periods[0]==1);
+    assert(depths[0]==11);
+    assert(quantities[0]==2.f);
+    //assert(ad0.getAttributeNames().size() == 1 );
+    //assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+    
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a","loc2",2,202,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,depths,quantities);
+    assert(mtms.size()==2);
+    assert(mtms[0]=="mtm_a");
+    
+    assert(locs.size()==2);
+    assert(locs[1]=="loc2");
+
+    assert(periods[0]==1);
+    assert(depths[0]==11);
+    assert(quantities[0]==2.f);
+    assert(mtms[1]=="mtm_a");
+    assert(periods[1]==2);
+    assert(depths[1]==202);
+    assert(quantities[1]==2.f);
+    //assert(ad0.getAttributeNames().size() == 1 );
+    //assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+    
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_b","loc1",2,500,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,depths,quantities);
+    assert(mtms.size()==3);
+    assert(mtms[0]=="mtm_a");
+    assert(periods[0]==1);
+    assert(depths[0]==11);
+    assert(quantities[0]==2.f);
+    assert(mtms[1]=="mtm_a");
+    assert(periods[1]==2);
+    assert(depths[1]==202);
+    assert(quantities[1]==2.f);
+    assert(mtms[2]=="mtm_b");
+    assert(periods[2]==2);
+    assert(depths[2]==500);
+    assert(quantities[2]==2.f);
+    //assert(ad0.getAttributeNames().size() == 1 );
+    //assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+
+    assert( ad0.getPriority()==0 );
+    ad0.setPriority(5);
+    assert( ad0.getPriority()==5 );
+
+    assert( ad0.getWac(0)==0.f );
+    ad0.setWac(0,2.f);
+    ad0.setWac(1,4.f);
+    assert( ad0.getWac(0)==2.f );
+    assert( ad0.getWac(1)==4.f );
+    
+    ad1 = ad0;
+    
+  }
+
+  assert( ad1.getPriority()==5 );
+  assert( ad1.getWac()[0]==2.f );
+  assert( ad1.getWac()[1]==4.f );
+  
+  //assert(ad1.getAttributeNames().size() == 1 );
+  //assert(ad1.getAttributeNames()[0] == "AcquireMtm" );
+
+   {
+    ESO2partDemandAppData ad;
+
+    ad.addPeggedItem("AcquireMtm",1,"mtm_a","loc1",1,11,2.f);
+    ad.addPeggedItem("AcquireMtm",1,"mtm_a","loc1",1,12,5.f);
+    ad.getPeggedItems("AcquireMtm",1,mtms,locs,periods,depths,quantities);
+    assert(mtms.size()==1);
+    assert(mtms[0]=="mtm_a");
+    assert(locs[0]=="loc1");
+    assert(periods[0]==1);
+    assert(depths[0]==12);
+    assert(quantities[0]==7.f);
+   }
+
+  
+}
+@
+
+
+1.12
+log
+@modified the way the depth is stored in partDemandAppData
+@
+text
+@d10 1
+a10 1
+std::vector<std::string> ESO2partDemandAppData::getAttributeNames() const
+d29 1
+d36 2
+@
+
+
+1.11
+log
+@Updated to have depth of pegging activity.
+@
+text
+@d86 7
+a92 3
+  ESO2mapIntToMapStringStringIntIntToFloat & mapOuter = peggedAttributes_[attribName];
+  ESO2mapStringStringIntIntToFloat & mapInner = mapOuter[shipPeriod];
+  ESO2stringStringIntIntTuple ilpd(item,loc,period,depth);
+d94 2
+a95 1
+  mapInner[ilpd] += quantity;
+d137 1
+a137 1
+  std::map<std::string,ESO2mapIntToMapStringStringIntIntToFloat>::const_iterator itAttrib = peggedAttributes_.find(attribName);
+d139 2
+a140 2
+    const ESO2mapIntToMapStringStringIntIntToFloat & mapOuter = (itAttrib->second);
+    ESO2mapIntToMapStringStringIntIntToFloat::const_iterator mapOuterIt = mapOuter.find(shipPeriod);
+d143 1
+a143 1
+    const ESO2mapStringStringIntIntToFloat & mapInner = mapOuterIt->second;
+d145 1
+a145 1
+    ESO2mapStringStringIntIntToFloatConstIterator it;
+d149 4
+a152 2
+      const ESO2stringStringIntIntTuple & ilpd = it->first;
+      float q = it->second;
+d155 2
+a156 2
+      periods.push_back(ilpd.getInt1());
+      depths.push_back(ilpd.getInt2());
+d299 13
+@
+
+
+1.10
+log
+@Modified to use new wit API names that doesn't reference OSL
+@
+text
+@d14 1
+d27 7
+a33 1
+  retVal.push_back("PartMovedTo");  
+d62 1
+d67 8
+d76 2
+a77 2
+  if ( peggedAttributes_.find(attribName) == peggedAttributes_.end() ) {
+    attributeNames_.push_back(attribName);
+a80 6
+  ESO2mapIntSetStringStringIntFloatTuple & map = peggedAttributes_[attribName];
+  ESO2stringStringIntFloatTuple ilpq(item,loc,period,quantity);
+  ESO2setStringStringIntFloatTuple & set = map[shipPeriod];
+  assert( set.find(ilpq)==set.end() );
+  set.insert(ilpq);
+#endif
+d84 1
+a84 2
+  mapInner[ilp] += quantity;
+
+d86 3
+d90 1
+a90 1
+  //std::cout <<"mapSize=" <<map.size() <<" setSize=" <<set.size() <<std::endl;
+d95 21
+d123 1
+d129 1
+d132 1
+a132 1
+  std::map<std::string,ESO2mapIntToMapStringStringIntToFloat>::const_iterator itAttrib = peggedAttributes_.find(attribName);
+d134 2
+a135 2
+    const ESO2mapIntToMapStringStringIntToFloat & mapOuter = (itAttrib->second);
+    ESO2mapIntToMapStringStringIntToFloat::const_iterator mapOuterIt = mapOuter.find(shipPeriod);
+d138 1
+a138 1
+    const ESO2mapStringStringIntToFloat & mapInner = mapOuterIt->second;
+d140 1
+a140 1
+    ESO2mapStringStringIntToFloatConstIterator it;
+d144 1
+a144 1
+      const ESO2stringStringIntTriple & ilp = it->first;
+d146 5
+a150 4
+      items.push_back(ilp.getString1());
+      locs.push_back(ilp.getString2());
+      periods.push_back(ilp.getInt() );
+      quantities.push_back(q );
+d214 1
+d220 1
+a220 1
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,quantities);
+d224 2
+a225 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a","loc1",1,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,quantities);
+d230 1
+d235 2
+a236 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a","loc2",2,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,quantities);
+d244 1
+d248 1
+d253 2
+a254 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_b","loc1",2,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,locs,periods,quantities);
+d258 1
+d262 1
+d266 1
+@
+
+
+1.9
+log
+@Added pegging of FeatureXref and AltPart operations
+@
+text
+@d21 1
+a21 1
+  retVal.push_back("PartXrefTo");
+@
+
+
+1.8
+log
+@modified function which offsets execVol to impact period.  some other clean up.
+@
+text
+@d20 2
+d23 2
+@
+
+
+1.7
+log
+@implemented pegging of harvested and moved parts
+@
+text
+@d181 1
+a181 1
+    assert(ad0.getAttributeNames().size() == 0 );
+d190 2
+a191 2
+    assert(ad0.getAttributeNames().size() == 1 );
+    assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+d206 2
+a207 2
+    assert(ad0.getAttributeNames().size() == 1 );
+    assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+d221 2
+a222 2
+    assert(ad0.getAttributeNames().size() == 1 );
+    assert(ad0.getAttributeNames()[0] == "AcquireMtm" );
+d242 2
+a243 2
+  assert(ad1.getAttributeNames().size() == 1 );
+  assert(ad1.getAttributeNames()[0] == "AcquireMtm" );
+@
+
+
+1.6
+log
+@Modified eso2 & eso2Problem to use generalized storing of pegged attributes in partDemandAppData
+@
+text
+@d18 1
+d21 2
+d60 1
+d62 9
+a71 6
+#if 0
+  ESO2intFloatPair pq(period,quantity);
+  ESO2stringIntFloatTriple ipq(item,pq);
+
+  ESO2setStringIntFloatTriple & set = map[shipPeriod];
+#endif
+a72 2
+  ESO2stringStringIntFloatTuple ilpq(item,loc,period,quantity);
+  ESO2setStringStringIntFloatTuple & set = map[shipPeriod];
+a75 2
+  assert( set.find(ilpq)==set.end() );
+  set.insert(ilpq);
+d93 1
+a93 1
+  std::map<std::string,ESO2mapIntSetStringStringIntFloatTuple>::const_iterator itAttrib = peggedAttributes_.find(attribName);
+d95 16
+a110 14
+    const ESO2mapIntSetStringStringIntFloatTuple & map = (itAttrib->second);
+    ESO2mapIntSetStringStringIntFloatTuple::const_iterator mapIt = map.find(shipPeriod);
+    if ( map.find(shipPeriod) == map.end() ) return;
+
+    const ESO2setStringStringIntFloatTuple & set = mapIt->second;
+
+    ESO2setStringStringIntFloatTupleConstIterator it;
+
+    for (it=set.begin(); it!=set.end(); ++it ) {
+      const ESO2stringStringIntFloatTuple & ilpq = *it;
+      items.push_back(ilpq.getString1());
+      locs.push_back(ilpq.getString2());
+      periods.push_back(ilpq.getInt() );
+      quantities.push_back(ilpq.getFloat() );
+@
+
+
+1.5
+log
+@Modified to generalize the storing of pegged attributes in partDemandAppData
+@
+text
+@d10 1
+a10 1
+const std::vector<std::string> & ESO2partDemandAppData::getAttributeNames() const
+d12 9
+a20 1
+  return attributeNames_;
+d48 3
+a50 2
+void ESO2partDemandAppData::addPeggedItem(const std::string & attribName, 
+                                          int shipPeriod, const std::string & item, int period, float quantity )
+d57 1
+a57 1
+  ESO2mapIntsetStringIntFloatTriple & map = peggedAttributes_[attribName];
+d59 1
+d64 4
+d71 2
+a72 2
+  assert( set.find(ipq)==set.end() );
+  set.insert(ipq);
+d81 1
+d86 1
+d90 1
+a90 1
+  std::map<std::string,ESO2mapIntsetStringIntFloatTriple>::const_iterator itAttrib = peggedAttributes_.find(attribName);
+d92 2
+a93 2
+    const ESO2mapIntsetStringIntFloatTriple & map = (itAttrib->second);
+    ESO2mapIntsetStringIntFloatTriple::const_iterator mapIt = map.find(shipPeriod);
+d96 1
+a96 1
+    const ESO2setStringIntFloatTriple & set = mapIt->second;
+d98 1
+a98 1
+    std::set<ESO2stringIntFloatTriple>::const_iterator it;
+d101 5
+a105 3
+      items.push_back(it->first);
+      periods.push_back( (it->second).first );
+      quantities.push_back( (it->second).second );
+d167 1
+d170 1
+a170 1
+
+d174 1
+a174 1
+    ad0.getPeggedItems("AcquireMtm",1,mtms,periods,quantities);
+d178 2
+a179 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a",1,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,periods,quantities);
+d182 1
+d188 2
+a189 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_a",2,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,periods,quantities);
+d192 4
+d204 2
+a205 2
+    ad0.addPeggedItem("AcquireMtm",1,"mtm_b",2,2.f);
+    ad0.getPeggedItems("AcquireMtm",1,mtms,periods,quantities);
+@
+
+
+1.4
+log
+@Added pegging of deman info
+@
+text
+@d10 5
+d40 2
+a41 2
+void ESO2partDemandAppData::addPeggedAcquiredItem(ESO2mapIntsetStringIntFloatTriple & map, 
+                                                  int shipPeriod, const std::string & item, int period, float quantity )
+d43 7
+d62 7
+a68 6
+void ESO2partDemandAppData::getPeggedAcquiredItems(
+    const ESO2mapIntsetStringIntFloatTriple & map,
+    int shipPeriod,
+    std::vector<std::string> &items,
+    std::vector<int> &periods,
+    std::vector<float> &quantities ) const
+d74 15
+a88 11
+  ESO2mapIntsetStringIntFloatTriple::const_iterator mapIt = map.find(shipPeriod);
+  if ( map.find(shipPeriod) == map.end() ) return;
+  
+  const ESO2setStringIntFloatTriple & set = mapIt->second;
+
+  std::set<ESO2stringIntFloatTriple>::const_iterator it;
+  
+  for (it=set.begin(); it!=set.end(); ++it ) {
+    items.push_back(it->first);
+    periods.push_back( (it->second).first );
+    quantities.push_back( (it->second).second );
+a90 26
+  
+void ESO2partDemandAppData::addPeggedAcquiredMtm(int shipPeriod, const std::string & mtm, int period, float quantity )
+{
+  addPeggedAcquiredItem(peggedAcquiredMtms_, shipPeriod, mtm, period, quantity );
+}
+void ESO2partDemandAppData::getPeggedAcquiredMtms(
+    int shipPeriod,
+    std::vector<std::string> &mtms,
+    std::vector<int> &periods,
+    std::vector<float> &quantities ) const
+{
+  getPeggedAcquiredItems(peggedAcquiredMtms_, shipPeriod, mtms, periods, quantities );
+}
+ 
+void ESO2partDemandAppData::addPeggedDemanMtm(int shipPeriod, const std::string & mtm, int period, float quantity )
+{
+  addPeggedAcquiredItem(peggedDemanMtms_, shipPeriod, mtm, period, quantity );
+}
+void ESO2partDemandAppData::getPeggedDemanMtms(
+    int shipPeriod,
+    std::vector<std::string> &mtms,
+    std::vector<int> &periods,
+    std::vector<float> &quantities ) const
+{
+  getPeggedAcquiredItems(peggedDemanMtms_, shipPeriod, mtms, periods, quantities );
+}
+a91 26
+void ESO2partDemandAppData::addPeggedAcquiredFeature(int shipPeriod, const std::string & feature, int period, float quantity )
+{
+  addPeggedAcquiredItem(peggedAcquiredFeatures_, shipPeriod, feature, period, quantity );
+}
+void ESO2partDemandAppData::getPeggedAcquiredFeatures(
+    int shipPeriod,
+    std::vector<std::string> &features,
+    std::vector<int> &periods,
+    std::vector<float> &quantities ) const
+{
+  getPeggedAcquiredItems(peggedAcquiredFeatures_, shipPeriod, features, periods, quantities );
+}
+
+void ESO2partDemandAppData::addPeggedAcquiredLoosePart(int shipPeriod, const std::string & loosePart, int period, float quantity )
+{
+  addPeggedAcquiredItem(peggedAcquiredLooseParts_, shipPeriod, loosePart, period, quantity );
+}
+
+void ESO2partDemandAppData::getPeggedAcquiredLooseParts(
+    int shipPeriod,
+    std::vector<std::string> &looseParts,
+    std::vector<int> &periods,
+    std::vector<float> &quantities ) const
+{
+  getPeggedAcquiredItems(peggedAcquiredLooseParts_, shipPeriod, looseParts, periods, quantities );
+}
+d95 2
+a96 4
+  peggedAcquiredMtms_.clear();
+  peggedAcquiredFeatures_.clear();
+  peggedAcquiredLooseParts_.clear();
+  peggedDemanMtms_.clear();
+d102 1
+a102 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_(),peggedDemanMtms_(),priority_(0),wac_()
+d107 1
+a107 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_(),peggedDemanMtms_(),priority_(0),wac_()
+d120 2
+a121 4
+peggedAcquiredMtms_(source.peggedAcquiredMtms_),
+peggedAcquiredFeatures_(source.peggedAcquiredFeatures_),
+peggedAcquiredLooseParts_(source.peggedAcquiredLooseParts_),
+peggedDemanMtms_(source.peggedDemanMtms_),
+d132 2
+a133 4
+    peggedAcquiredMtms_ = rhs.peggedAcquiredMtms_;
+    peggedAcquiredFeatures_ = rhs.peggedAcquiredFeatures_;
+    peggedAcquiredLooseParts_ = rhs.peggedAcquiredLooseParts_;
+    peggedDemanMtms_ = rhs.peggedDemanMtms_;
+d155 1
+a155 1
+    ad0.getPeggedAcquiredMtms(1,mtms,periods,quantities);
+d157 1
+d159 2
+a160 2
+    ad0.addPeggedAcquiredMtm(1,"mtm_a",1,2.f);
+    ad0.getPeggedAcquiredMtms(1,mtms,periods,quantities);
+d165 2
+d168 2
+a169 2
+    ad0.addPeggedAcquiredMtm(1,"mtm_a",2,2.f);
+    ad0.getPeggedAcquiredMtms(1,mtms,periods,quantities);
+d177 2
+d180 2
+a181 2
+    ad0.addPeggedAcquiredMtm(1,"mtm_b",2,2.f);
+    ad0.getPeggedAcquiredMtms(1,mtms,periods,quantities);
+d192 2
+d212 4
+@
+
+
+1.3
+log
+@added wac scale factors (one for each demand file)
+@
+text
+@d87 13
+d133 1
+d139 1
+a139 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_(),priority_(0),wac_()
+d144 1
+a144 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_(),priority_(0),wac_()
+d160 1
+d174 1
+@
+
+
+1.2
+log
+@Added a more general method for dealing with the ETN flags
+@
+text
+@d20 14
+d125 1
+a125 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_(),priority_(0)
+d128 7
+d146 2
+a147 1
+priority_(source.priority_)
+d160 1
+d178 1
+a178 1
+    ESO2partDemandAppData ad0;
+d216 6
+d228 2
+@
+
+
+1.1
+log
+@new files to support pip
+@
+text
+@d10 10
+d111 1
+a111 1
+ESO2appData(),peggedAcquiredMtms_(),peggedAcquiredFeatures_(),peggedAcquiredLooseParts_()
+d124 2
+a125 1
+peggedAcquiredLooseParts_(source.peggedAcquiredLooseParts_)
+d137 1
+d190 3
+a192 2
+
+    
+d198 1
+a198 1
+
+@
+

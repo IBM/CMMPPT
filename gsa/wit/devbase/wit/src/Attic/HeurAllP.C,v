@@ -1,0 +1,1333 @@
+head	1.7;
+access;
+symbols
+	EndRw-branch:1.6.0.12
+	Root-of-EndRw:1.6
+	rwToStl:1.6.0.10
+	latest_sce_3_10_20010924:1.6.0.8
+	sce_3_10_20010924:1.6
+	latest_sce_3_00_20010601:1.6.0.6
+	sce_3_00_20010601:1.6
+	latest_sce_2_31_20010308:1.6.0.4
+	sce_2_31_20010308:1.6
+	latest_sce_2_31_20001003:1.6.0.2
+	sce_2_31_20001003:1.6
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.7
+date	2003.03.03.23.26.46;	author rjw;	state dead;
+branches;
+next	1.6;
+
+1.6
+date	2000.04.19.22.35.31;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2000.04.01.00.35.43;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2000.03.31.19.25.08;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.03.30.16.33.08;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.03.07.16.55.54;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.13.53.22;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.13.53.22;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.6
+log
+@Continued implementation of stock re-allocation.
+@
+text
+@@
+
+
+1.5
+log
+@Minor update to stock re-allocation.
+@
+text
+@a0 1079
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "HeurAllP.C"
+//
+// Contains the implementation of class HeurAllPerf.
+//------------------------------------------------------------------------------
+
+#include <HeurAllP.h>
+#include <AllMode.h>
+#include <HeurCrit.h>
+#include <Selector.h>
+#include <ExpRest.h>
+
+//------------------------------------------------------------------------------
+
+WitHeurAllPerf::WitHeurAllPerf (
+         WitProblem * theProblem,
+         WitAccFlag * theAccFlag,
+         WitBoolean   forOpt):
+
+      WitProbAssoc      (theProblem),
+
+      myAllocMode_      (NULL),
+      myHeurCritList_   (NULL),
+      mySelector_       (NULL),
+      myExpRest_        (NULL),
+      myAccFlag_        (theAccFlag),
+      multiRoute_       (witFALSE),
+      buildAhead_       (witFALSE),
+      multiExec_        (witFALSE),
+      penExec_          (witFALSE),
+      finiteExecBounds_ (witFALSE),
+      reqVol_           (myProblem (), 0.0),
+      blocked_          (),
+      shipVolDupTl_     (),
+      permExecVolDupTl_ (),
+      subVolDupTl_      (),
+      nMaxCommits_      (0),
+      nSelCommits_      (0),
+      nBsearches_       (0)
+   {
+   WitMaterial *  theMat;
+   WitPart *      thePart;
+   WitOperation * theOpn;
+
+   if (! forOpt)
+      if (myGlobalComp ()->computeCriticalList ())
+         myHeurCritList_ = new WitHeurCritList (myProblem (), myAccFlag_);
+
+   myAllocMode_ = new WitAllocMode (this);
+
+   if (skipFailures ())
+      initBlocked ();
+
+   multiRoute_  = myGlobalComp ()->multiRoute ();
+
+   multiExec_   = myGlobalComp ()->multiExecNeeded ();
+
+   forEachMaterial (theMat, myProblem ())
+      if (theMat->nstnBaNeeded () || theMat->buildAsap ())
+         {
+         buildAhead_ = witTRUE;
+
+         break;
+         }
+
+   if (multiRoute_ || buildAhead_ || multiExec_)
+      {
+      mySelector_ = new WitSelector (myProblem (), buildAhead_);
+
+      penExec_    = mySelector ()->penExec ();
+      }
+
+   if (penExec_)
+      myExpRest_ = mySelector ()->myExpRest ();
+
+   if (myGlobalComp ()->penExec ())
+      if (! multiRoute_)
+         myMsgFac () ("penExecWoMultiRouteWmsg");
+
+   initSoln ();
+
+   if (! stockReAlloc ())
+      forEachPart (thePart, myProblem ())
+         copy (
+            myAllocMode_->curNetSuppForUpdate (thePart), 
+            thePart->supplyVol ());
+
+   forEachOperation (theOpn, myProblem ())
+      if (! (theOpn->execBounds ()->hardUB () == -1.0))
+         {
+         finiteExecBounds_ = witTRUE;
+
+         break;
+         }
+
+   myMsgFac () ("heurAllActiveMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+WitHeurAllPerf::~WitHeurAllPerf ()
+   {
+   WitDemand *    theDemand;
+   WitOperation * theOpn;
+   WitSubEntry *  theSub;
+
+   if (DEVELOPMENT)
+      {
+      myMsgFac ()    ("nMaxCommitsMsg", nMaxCommits_);
+      
+      if (selMode ())
+         myMsgFac () ("nSelCommitsMsg", nSelCommits_);
+
+      myMsgFac ()    ("nBsearchesMsg",  nBsearches_);
+      }
+
+
+   forEachDemand (theDemand, myProblem ())
+      delete shipVolDup (theDemand);
+
+   forEachOperation (theOpn, myProblem ())
+      delete permExecVolDup (theOpn);
+
+   forEachSubEntry (theSub, myProblem ())
+      delete subVolDup (theSub);
+
+   delete mySelector_;
+   delete myHeurCritList_;
+   delete myAllocMode_;
+
+   myMsgFac () ("heurAllInactiveMsg");
+   }
+
+//------------------------------------------------------------------------------
+
+double WitHeurAllPerf::inc (
+      WitDemand * theDemand, 
+      WitPeriod   thePer, 
+      double      desIncVol,
+      WitBoolean  asapMultiExec)
+   {
+   WitPart *  thePart;
+   double     demandedIncVol;
+   WitBoolean prefBA;
+   WitPeriod  firstPer;
+   double     incVol;
+
+   thePart = theDemand->demandedPart ();
+
+   witAssert (desIncVol >= 0.0);
+   witAssert (thePer >= 0);
+   witAssert (thePer < nPeriods ());
+
+   if (desIncVol <= NET_TOL)
+      return 0.0;
+
+   demandedIncVol =
+      WitUtil::min (
+         desIncVol,
+         theDemand->cumDemandVol ()[thePer] - cumShipVol (theDemand, thePer));
+            //
+            // demandedIncVol is desIncVol reduced so as not to exceed
+            // cumulative demand.
+
+   if (demandedIncVol <= NET_TOL)
+      return 0.0;
+
+   prefBA = theDemand->prefBuildAhead ();
+
+   if (myGlobalComp ()->twoWayMultiExec ())
+      mySelector ()->preIncForTwme (asapMultiExec, prefBA, thePart, thePer);
+   else
+      witAssert (! asapMultiExec);
+
+   firstPer = WitUtil::max (0, thePer - theDemand->buildAheadUB ()[thePer]);
+
+   incVol = resAlloc (thePart, thePer, demandedIncVol, firstPer, prefBA);
+
+   if (incVol >= NET_TOL)
+      shipVolDup (theDemand)->inc (thePer, incVol);
+
+   if (penExec_)
+      myExpRest ()->replenishPsSups (myAllocMode_);
+
+   return incVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::initBlocked ()
+   {
+   WitDemand * theDemand;
+   WitPart *   thePart;
+
+   blocked_.partiallyAllocate (myProblem ());
+
+   forEachDemand (theDemand, myProblem ())
+      {
+      thePart = theDemand->demandedPart ();
+
+      if (blocked_ (thePart).isAllocated ())
+         continue;
+
+      if (theDemand->demandVol () == 0.0)
+         continue;
+
+      blocked_ (thePart).allocate (myProblem (), witFALSE);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::initSoln ()
+   {
+   WitDemand *    theDemand;
+   WitOperation * theOpn;
+   WitSubEntry *  theSub;
+
+   shipVolDupTl_    .allocate (myProblem (), NULL);
+   permExecVolDupTl_.allocate (myProblem (), NULL);
+   subVolDupTl_     .allocate (myProblem (), NULL);
+
+   forEachDemand (theDemand, myProblem ())
+      shipVolDup (theDemand) = new WitDupTVec (shipVol (theDemand), 0.0);
+
+   forEachOperation (theOpn, myProblem ())
+      permExecVolDup (theOpn) = new WitDupTVec (execVol (theOpn), 0.0);
+
+   forEachSubEntry (theSub, myProblem ())
+      subVolDup (theSub) = new WitDupTVec (subVol (theSub), 0.0);
+
+   if (critListMode ())
+      myHeurCritList ()->initSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitHeurAllPerf::cumShipVol (WitDemand * theDemand, WitPeriod thePer)
+   {
+   WitPeriod otherPer;
+   double    theCumShipVol;
+
+   theCumShipVol = 0.0;
+
+   for (otherPer = 0; otherPer <= thePer; ++ otherPer)
+      theCumShipVol += theDemand->shipVol ()[otherPer];
+
+   return theCumShipVol;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitHeurAllPerf::resAlloc (
+      WitPart *  thePart,
+      WitPeriod  lastPer,
+      double     qty,
+      WitPeriod  firstPer,
+      WitBoolean prefBA)
+   {
+   WitPeriod firstStockPer;
+   WitPeriod thePer;
+   double    netQty;
+
+   netQty = qty;
+
+   if (stockReAlloc ())
+      myAllocMode_->netOnGoingSurplus (thePart, lastPer, netQty);
+   else
+      netQty = 
+         thePart->net (
+            lastPer, 
+            netQty,
+            myAllocMode_->curNetSuppForUpdate (thePart));
+
+   if (penExec_)
+      mySelector ()->recCommitVol (qty - netQty, witFALSE);
+
+   if (firstPer == lastPer)
+      {
+      if (netQty > NET_TOL)
+         commitMaxQty (netQty, thePart, lastPer);
+      }
+   else
+      {
+      for (firstStockPer = lastPer; firstStockPer > firstPer; -- firstStockPer)
+         if (! thePart->canStock (firstStockPer - 1))
+            break;
+
+      if (prefBA)
+         for (thePer = firstStockPer; thePer <= lastPer; ++ thePer)
+            {
+            if (netQty <= NET_TOL)
+               break;
+      
+            commitMaxQty (netQty, thePart, thePer);
+            }
+      else
+         for (thePer = lastPer; thePer >= firstStockPer; -- thePer)
+            {
+            if (netQty <= NET_TOL)
+               break;
+      
+            commitMaxQty (netQty, thePart, thePer);
+            }
+      }
+
+   return qty - WitUtil::positivePart (netQty);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::commitMaxQty (
+      double &  netQty, 
+      WitPart * thePart, 
+      WitPeriod thePer)
+   {
+   if (skipFailures ())
+      if (blocked_ (thePart, thePer))
+         return;
+
+   if (DEVELOPMENT)
+      nMaxCommits_ ++;
+
+   if (selMode ())
+      commitMaxQtyMultiSel (netQty, thePart, thePer);
+   else
+      commitMaxQtySel      (netQty, thePart, thePer);
+
+   if (skipFailures ())
+      if (netQty > SEARCH_TOL)
+         blocked_ (thePart, thePer) = witTRUE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::commitMaxQtyMultiSel (
+      double &   netQty, 
+      WitPart * thePart, 
+      WitPeriod thePer)
+   {
+   WitBoolean schemeIsFresh;
+
+   mySelector ()->printHeadingIA (thePart, thePer);
+
+   schemeIsFresh = witTRUE; 
+
+   while (schemeIsFresh)
+      {
+      if (penExec_)
+         mySelector ()->modifyRouting (thePart, thePer);
+
+      commitMaxQtySel (netQty, thePart, thePer);
+
+      schemeIsFresh = mySelector ()->findFreshScheme ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::commitMaxQtySel (
+      double &  netQty,
+      WitPart * thePart,
+      WitPeriod thePer)
+   {
+   double     maxQty;
+   WitBoolean success;
+
+   if (selMode ())
+      {
+      if (DEVELOPMENT)
+         nSelCommits_ ++;
+
+      mySelector ()->printCommitMaxQtySelIA (thePart, thePer);
+      }
+
+   maxQty = findMaxQty (netQty, thePart, thePer);
+
+   if (maxQty >= NET_TOL)
+      {
+      success = commit (thePart, thePer, maxQty);
+
+      if (! success)
+         myMsgFac () ("commitFailedFmsg", thePart->partName (), thePer, maxQty);
+
+      netQty -= maxQty;
+
+      witAssert (netQty >= 0.0);
+
+      if (myGlobalComp ()->twoWayMultiExec ())
+         mySelector ()->printPostCommitMaxQtySelIA ();
+      }
+
+   if (penExec_)
+      mySelector ()->recCommitVol (maxQty, witTRUE);
+
+   if (critListMode ())
+      {
+      if (penExec_)
+         if (myExpRest ()->failRestShortOnly ())
+            return;
+
+      myHeurCritList ()->appendCulprit ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitHeurAllPerf::findMaxQty (
+      double    desQty,
+      WitPart * thePart,
+      WitPeriod thePer)
+   {
+   double     minQty;
+   double     incQty;
+   WitBoolean success;
+
+   if (desQty <= SEARCH_TOL)
+      return 0.0;
+
+   defSearchGrid (thePart, thePer, minQty, incQty);
+
+   success = tempCommit (thePart, thePer, minQty);
+
+   if (! success)
+      return 0.0;
+         //
+         // Lower end point is infeasible.
+
+   if (desQty <= minQty + SEARCH_TOL)
+      return WitUtil::min (desQty, minQty);
+         //
+         // Desired quantity is no larger than lower end point, which is
+         // feasible.
+
+   success = tempCommit (thePart, thePer, desQty);
+
+   if (success)
+      return desQty;
+         //
+         // Desired quantity is feasible.
+
+   return binarySearch (desQty, thePart, thePer, minQty, incQty);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::defSearchGrid (
+      WitPart * thePart,
+      WitPeriod fillPer,
+      double &  minQty,
+      double &  incQty)
+   {
+   WitBopEntry *  theBopEnt;
+   WitPeriod      execPer;
+   WitBoolean     canExplode;
+   WitOperation * theOpn;
+   double         theEffProdRate;
+
+   incQty = 1.0;
+   minQty = 1.0;
+      //
+      // Default values.
+
+   if (! myGlobalComp ()->lotSizesExist ())
+      return;
+
+   if (myGlobalComp ()->twoWayMultiExec ())
+      mySelector ()->resetCurMeDirs (fillPer);
+
+   canExplode = defExpCoords (thePart, fillPer, theBopEnt, execPer);
+
+   if (! canExplode)
+      return;
+
+   theOpn = theBopEnt->myOperation ();
+
+   if (! theOpn->lotSizeMode (execPer))
+      return;
+
+   theEffProdRate = theBopEnt->effProdRate ()[execPer];
+
+   incQty = theOpn->incLotSize ()[execPer] * theEffProdRate;
+
+   if (myAllocMode_->execVol (theOpn)[execPer] > FLOAT_EPSILON)
+      minQty = 0.0;
+   else
+      minQty = theOpn->minLotSize ()[execPer] * theEffProdRate;
+
+      // Avoid searching on zero.
+      //
+   if (minQty == 0.0)
+      minQty = incQty;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitHeurAllPerf::binarySearch (
+      double    desQty,
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    minQty,
+      double    incQty)
+   {
+   int        upperGP;
+   int        lowerGP;
+   int        midGP;
+   double     qty;
+   WitBoolean success;
+
+   if (DEVELOPMENT)
+      nBsearches_ ++;
+
+   upperGP =
+      myGlobalComp ()->lotSizeGridPoint (
+         minQty,
+         incQty,
+         desQty,
+         witTRUE,
+         witTRUE);
+
+   lowerGP = 0;
+
+   while (upperGP - lowerGP > 1)
+      {
+      midGP   = (upperGP + lowerGP) / 2;
+
+      qty     = WitOperation::compLotSizeQty (minQty, incQty, midGP);
+
+      success = tempCommit (thePart, thePer, qty);
+
+      if (success)
+         lowerGP = midGP;
+      else
+         upperGP = midGP;
+      }
+
+   qty = WitOperation::compLotSizeQty (minQty, incQty, lowerGP);
+
+   return qty;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitHeurAllPerf::tempCommit (
+      WitPart *  thePart,
+      WitPeriod  thePer,
+      double     qty)
+   {
+   WitBoolean success;
+
+   myAllocMode_->enterTempMode ();
+
+   success = commit (thePart, thePer, qty);
+
+   if (selMode ())
+      mySelector ()->postTempCommit (success);
+
+   myAllocMode_->leaveTempMode ();
+
+   return success;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitHeurAllPerf::commit (
+      WitPart * thePart, 
+      WitPeriod thePer, 
+      double    qty)
+   {
+   WitPart *  fillPart;
+   WitPeriod  fillPer;
+   double     theReqVol;
+   double     prevReqVol;
+   WitBoolean fillOK;
+
+   if (qty <= NET_TOL)
+      return witTRUE;
+
+   initReqVol (thePart, thePer, qty);
+
+   if (myGlobalComp ()->twoWayMultiExec ())
+      mySelector ()->resetCurMeDirs (thePer);
+
+   forEachElDense (fillPart, thePart->belowList ())
+      {
+      if (stockReAlloc ())
+         prevReqVol = 0.0;
+
+      forEachPeriod (fillPer, myProblem ())
+         {
+         theReqVol = reqVol_ (fillPart, fillPer);
+
+         if (stockReAlloc ())
+            {
+            if (prevReqVol > 0.0)
+               if (fillPart->canStock (fillPer - 1))
+                  {
+                  theReqVol += prevReqVol;
+
+                  if (selMode ())
+                     if (myAllocMode_->temp ())
+                        mySelector ()->rollReqs (fillPart, fillPer);
+                  }
+
+            prevReqVol = theReqVol;
+            }
+
+         if (theReqVol <= NET_TOL)
+            continue;
+
+         fillOK = fillReq (fillPart, fillPer, theReqVol);
+
+         if (! penExec_)
+            if (! fillOK)
+               return witFALSE;
+         }
+      }
+
+   if (penExec_)
+      if (myExpRest ()->curShort ())
+         return witFALSE;
+
+   return witTRUE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::initReqVol (
+      WitPart * thePart, 
+      WitPeriod thePer, 
+      double    qty)
+   {
+   WitPart * belowPart;
+
+   forEachElDense (belowPart, thePart->belowList ())
+      reqVol_ (belowPart) = 0.0;
+
+   reqVol_ (thePart, thePer) = qty;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitHeurAllPerf::fillReq (
+      WitPart * thePart, 
+      WitPeriod fillPer, 
+      double    theReqVol)
+   {
+   double        unmetDmd;
+   WitBoolean    canExplode;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPer;
+   WitBoolean    fillOK;
+   WitBoolean    restExpOK;
+
+   witAssert (theReqVol > NET_TOL);
+
+   unmetDmd = theReqVol;
+
+   if (stockReAlloc ())
+      myAllocMode_->netAgainstSurplus (thePart, fillPer, unmetDmd);
+   else
+      unmetDmd = 
+         thePart->net (
+            fillPer, 
+            unmetDmd,
+            myAllocMode_->curNetSuppForUpdate (thePart));
+
+   if (unmetDmd <= NET_TOL)
+      return witTRUE;
+
+   if (penExec_)
+      myExpRest ()->recRestExp (thePart, fillPer, restExpOK);
+
+   canExplode = defExpCoords (thePart, fillPer, theBopEnt, execPer);
+
+   if (! canExplode)
+      {
+      if (selMode ())
+         mySelector ()->recordShortage (thePart, fillPer);
+
+      if (critListMode ())
+         myHeurCritList ()->setCulprit (thePart, fillPer);
+
+      return witFALSE;
+      }
+
+   if (penExec_)
+      if (! restExpOK)
+         return witFALSE;
+
+   explode (theBopEnt, execPer, unmetDmd, fillPer, fillOK);
+
+   return fillOK;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitHeurAllPerf::defExpCoords (
+      WitPart *       thePart, 
+      WitPeriod       fillPer, 
+      WitBopEntry * & theBopEnt,
+      WitPeriod &     execPer)
+   {
+   WitPeriod expPer;
+
+   expPer  = 
+      buildAhead_? 
+         mySelector ()->selExpPeriod (thePart, fillPer):
+         thePart      ->explosionPeriod       (fillPer);
+
+   if (! thePart->explodeable (expPer))
+      return witFALSE;
+
+   theBopEnt =
+      multiRoute_? 
+         mySelector ()->selBopEntry (thePart, expPer):
+         thePart      ->expBopEntry          (expPer);
+
+   execPer =
+      multiExec_?
+         mySelector ()->selExecPeriod (theBopEnt, expPer, fillPer):
+         theBopEnt    ->expExecPeriod ()         [expPer];
+
+   return witTRUE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::explode (
+      WitBopEntry * theBopEnt,
+      WitPeriod     execPer,
+      double        qty,
+      WitPeriod     fillPer,
+      WitBoolean &  expOK)
+   {
+   WitOperation * theOpn;
+   double         oldExecVol;
+   double         deltaExecVol;
+
+   witAssert (qty > NET_TOL);
+
+   expOK        = witTRUE;
+
+   theOpn       = theBopEnt->myOperation ();
+
+   oldExecVol   = myAllocMode_->execVol (theOpn)[execPer];
+
+   deltaExecVol = qty / theBopEnt->effProdRate ()[execPer];
+
+   theOpn->lotSizeDelta (execPer, oldExecVol, deltaExecVol, witTRUE, witTRUE);
+
+   if (deltaExecVol < NET_TOL)
+      return;
+
+   if (finiteExecBounds_)
+      checkExecBounds (
+         theBopEnt,
+         execPer,
+         oldExecVol + deltaExecVol,
+         fillPer,
+         expOK);
+
+   if (expOK)
+      innerExplode (theBopEnt, execPer, qty, deltaExecVol, fillPer, expOK);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::checkExecBounds (
+      WitBopEntry * theBopEnt,
+      WitPeriod     execPer,
+      double        theExecVol,
+      WitPeriod     fillPer,
+      WitBoolean &  expOK)
+   {
+   WitOperation * theOpn;
+
+   theOpn = theBopEnt->myOperation ();
+
+   expOK = theOpn->execBounds ()->hardUBisSatisfied (execPer, theExecVol);
+
+   if (expOK)
+      return;
+
+   if (selMode ())
+      mySelector ()->recordExecBoundShortage (theBopEnt, execPer, fillPer);
+
+   if (critListMode ())
+      myHeurCritList ()->setCulprit (theBopEnt->myPart (), fillPer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::innerExplode (
+      WitBopEntry * theBopEnt,
+      WitPeriod     execPer,
+      double        qty,
+      double        deltaExecVol,
+      WitPeriod     fillPer,
+      WitBoolean &  expOK)
+   {
+   WitOperation * theOpn;
+   WitBomEntry *  theBomEnt;
+   WitBopEntry *  prodBopEnt;
+   double         deltaProdVol;
+   WitPart *      prodPart;
+   WitPeriod      prodPer;
+   WitPart *      thePart;
+   WitPeriod      expPer;
+
+   witAssert (deltaExecVol >= NET_TOL);
+
+   expOK  = witTRUE;
+
+   theOpn = theBopEnt->myOperation ();
+
+   myAllocMode_->incExecVol (theOpn, execPer, deltaExecVol);
+
+   forEachEl (theBomEnt, theOpn->bom ())
+      explodeBomEntry (
+         theBomEnt, 
+         execPer, 
+         deltaExecVol, 
+         fillPer, 
+         theBopEnt,
+         expOK);
+
+   forEachEl (prodBopEnt, theOpn->bop ())
+      {
+      deltaProdVol = deltaExecVol * prodBopEnt->effProdRate ()[execPer];
+
+      if (deltaProdVol > NET_TOL)
+         {
+         prodPart = prodBopEnt->myPart ();
+         prodPer  = prodBopEnt->impactPeriod ()[execPer];
+
+         if (stockReAlloc ())
+            myAllocMode_->incSurplus (prodPart, prodPer, deltaProdVol);
+         else
+            myAllocMode_->curNetSuppForUpdate (prodPart)[prodPer] += 
+               deltaProdVol;
+
+         if (penExec_)
+            if (prodBopEnt != theBopEnt)
+               if (myAllocMode_->perm ())
+                  myExpRest ()->reqPsSupRep (
+                     prodBopEnt->myPart (),
+                     prodBopEnt->impactPeriod ()[execPer]);
+         }
+      }
+
+   thePart = theBopEnt->myPart ();
+
+   expPer  = theBopEnt->impactPeriod ()[execPer];
+
+   if (stockReAlloc ())
+      {
+      myAllocMode_->netAgainstSurplus (thePart, fillPer, qty);
+
+      witAssert (qty < SEARCH_TOL);
+      }
+   else
+      {
+      double & netSupplyVol = 
+         myAllocMode_->curNetSuppForUpdate (thePart)[expPer];
+
+      netSupplyVol -= qty;
+
+      witAssert (netSupplyVol > - SEARCH_TOL);
+
+      WitUtil::updateToMax (netSupplyVol, 0.0);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::explodeBomEntry (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      double        netExecQty,
+      WitPeriod     fillPer,
+      WitBopEntry * theExpBopEntry,
+      WitBoolean &  expOK)
+   {
+   WitConsEntry * theConsEnt;
+
+   witAssert (netExecQty >= NET_TOL);
+
+   if (! theBomEnt->inEffect (execPer))
+      return;
+
+   if (myCompMgr ()->hasSubEntries ())
+      if (theBomEnt->hasSubsInEffect ()[execPer])
+         {
+         netConsEntries (theBomEnt, execPer, netExecQty, expOK);
+
+         if (netExecQty < NET_TOL )
+            return;
+
+         if (! expOK)
+            return;
+         }
+
+   theConsEnt = 
+      multiRoute_?
+         mySelector ()->selConsEntry (theBomEnt, execPer):
+         theBomEnt;
+
+   explodeConsEntry (
+      theConsEnt,
+      execPer, 
+      netExecQty, 
+      fillPer, 
+      theExpBopEntry);
+
+   if (multiRoute_)
+      if (theConsEnt->isaSubEntry ())
+         if (myAllocMode_->perm ())
+            subVolDup (theConsEnt->asaSubEntry ())->inc (execPer, netExecQty);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::netConsEntries (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      double &      netExecQty,
+      WitBoolean &  expOK)
+   {
+   WitSubEntry * theSub;
+
+   netConsEntry (theBomEnt, netExecQty, execPer, expOK);
+      //
+      // First net possible usage of prime from supply.
+
+   if (netExecQty < NET_TOL)
+      return;
+
+   if (! expOK)
+      return;
+
+   forEachEl (theSub, theBomEnt->mySubEntries ())
+      {
+      netSubEntry (theSub, execPer, netExecQty, expOK);
+
+      if (netExecQty < NET_TOL)
+         return;
+
+      if (! expOK)
+         return;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::netSubEntry (
+      WitSubEntry * theSub,
+      WitPeriod     execPer,
+      double &      netExecQty,
+      WitBoolean &  expOK)
+   {
+   double oldExecQty;
+
+   if (! theSub->netAllowed ())
+      return;
+
+   if (! theSub->inEffect (execPer))
+      return;
+
+   oldExecQty = netExecQty;
+
+   netConsEntry (theSub, netExecQty, execPer, expOK);
+
+   if (myAllocMode_->perm ())
+      subVolDup (theSub)->
+         inc (execPer, WitUtil::positivePart (oldExecQty - netExecQty));
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::netConsEntry (
+      WitConsEntry * theConsEnt,
+      double &       netExecQty,
+      WitPeriod      execPer,
+      WitBoolean &   expOK)
+   {
+   double    reqConsQty;
+   WitPart * consPart;
+   WitPeriod consPer;
+   double    netConsQty;
+
+   witAssert (netExecQty > 0.0);
+
+   reqConsQty = theConsEnt->effUsageRate () * netExecQty;
+   consPart   = theConsEnt->myPart ();
+   consPer    = theConsEnt->impactPeriod ()[execPer];
+
+   if (theConsEnt->effUsageRate () >= FLOAT_EPSILON)
+      {
+      netConsQty = reqConsQty;
+
+      if (stockReAlloc ())
+         myAllocMode_->netOnGoingSurplus (consPart, consPer, netConsQty);
+      else
+         netConsQty =
+            consPart->net (
+               consPer,
+               netConsQty,
+               myAllocMode_->curNetSuppForUpdate (consPart));
+
+      netExecQty = netConsQty / theConsEnt->effUsageRate ();
+
+      if (netExecQty <= NET_TOL)
+         netExecQty = 0.0;
+      else if (penExec_)
+         myExpRest ()->recRestExp (consPart, consPer, expOK);
+      }
+   else
+      {
+      if (theConsEnt->effUsageRate () <= - FLOAT_EPSILON )
+         {
+         if (stockReAlloc ())
+            myAllocMode_->incSurplus (consPart, consPer, - reqConsQty);
+         else
+            myAllocMode_->curNetSuppForUpdate (consPart)[consPer] -= reqConsQty;
+         }
+
+      netExecQty = 0.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAllPerf::explodeConsEntry (
+      WitConsEntry * theConsEnt,
+      WitPeriod      execPer,
+      double         netExecQty,
+      WitPeriod      fillPer,
+      WitBopEntry *  theExpBopEntry)
+   {
+   WitPeriod consPer;
+   double    consumedQty;
+   WitPart * consPart;
+
+   consPer     = theConsEnt->impactPeriod ()[execPer];
+   consumedQty = theConsEnt->effUsageRate () * netExecQty;
+   consPart    = theConsEnt->myPart ();
+
+   if (consumedQty > NET_TOL)
+      {
+      reqVol_ (consPart, consPer) += consumedQty;
+
+      if (selMode ())
+         if (myAllocMode_->temp () || myGlobalComp ()->twoWayMultiExec ())
+            mySelector ()->placeReqs (
+               theExpBopEntry,
+               theConsEnt,
+               execPer,
+               fillPer,
+               myAllocMode_->temp ());
+      }
+
+   if (consumedQty < - NET_TOL)
+      {
+      if (stockReAlloc ())
+         myAllocMode_->incSurplus (consPart, consPer, - consumedQty);
+      else
+         myAllocMode_->curNetSuppForUpdate (consPart)[consPer] -= consumedQty;
+      }
+   }
+@
+
+
+1.4
+log
+@Fixed bug:
+   Stock re-allocation caused selection trace-back to malfunction.
+@
+text
+@d91 1
+a91 1
+   if (usingNetSupp ())
+d275 3
+a277 1
+   if (usingNetSupp ())
+a283 3
+   if (usingSurplus ())
+      myAllocMode_->netOnGoingSurplus (thePart, lastPer, netQty);
+
+d595 1
+a595 1
+      if (usingSurplus ())
+d602 1
+a602 1
+         if (usingSurplus ())
+d668 3
+a670 1
+   if (usingNetSupp ())
+a676 3
+   if (usingSurplus ())
+      myAllocMode_->netAgainstSurplus (thePart, fillPer, unmetDmd);
+
+d846 3
+a848 1
+         if (usingNetSupp ())
+a851 3
+         if (usingSurplus ())
+            myAllocMode_->incSurplus (prodPart, prodPer, deltaProdVol);
+
+d865 7
+a871 1
+   if (usingNetSupp ())
+a881 7
+
+   if (usingSurplus ())
+      {
+      myAllocMode_->netAgainstSurplus (thePart, fillPer, qty);
+
+      witAssert (qty < SEARCH_TOL);
+      }
+d1011 3
+a1013 1
+      if (usingNetSupp ())
+a1019 3
+      if (usingSurplus ())
+         myAllocMode_->netOnGoingSurplus (consPart, consPer, netConsQty);
+
+d1031 3
+a1033 1
+         if (usingNetSupp ())
+a1034 3
+
+         if (usingSurplus ())
+            myAllocMode_->incSurplus (consPart, consPer, - reqConsQty);
+d1074 3
+a1076 1
+      if (usingNetSupp ())
+a1077 3
+
+      if (usingSurplus ())
+         myAllocMode_->incSurplus (consPart, consPer, - consumedQty);
+@
+
+
+1.3
+log
+@Initial implementation of stock re-allocation.
+@
+text
+@d605 1
+a605 1
+            if (fillPer > 0)
+d607 1
+d609 5
+@
+
+
+1.2
+log
+@Updating wit/src in /u/wit/devbase to be in synch with /u/implode/devbase
+@
+text
+@a23 6
+#define SEARCH_TOL 1.0E-03
+   //
+   // tolerance for use in search
+
+//------------------------------------------------------------------------------
+
+d91 5
+a95 2
+   forEachPart (thePart, myProblem ())
+      copy (myAllocMode_->netSuppForUpdate (thePart), thePart->supplyVol ());
+d273 11
+a283 2
+   netQty = 
+      thePart->net (lastPer, qty, myAllocMode_->netSuppForUpdate (thePart));
+d583 1
+d595 4
+d603 9
+d621 1
+d661 11
+a671 5
+   unmetDmd = 
+      thePart->net (
+         fillPer, 
+         theReqVol, 
+         myAllocMode_->netSuppForUpdate (thePart));
+d842 6
+a847 1
+         myAllocMode_->netSuppForUpdate (prodPart)[prodPer] += deltaProdVol;
+d862 8
+a869 1
+   double & netSupplyVol = myAllocMode_->netSuppForUpdate (thePart)[expPer];
+d871 2
+a872 1
+   netSupplyVol -= qty;
+d874 3
+a876 1
+   witAssert (netSupplyVol > - SEARCH_TOL);
+d878 2
+a879 1
+   WitUtil::updateToMax (netSupplyVol, 0.0);
+d1007 11
+a1017 5
+      netConsQty =
+         consPart->net (
+            consPer,
+            reqConsQty,
+            myAllocMode_->netSuppForUpdate (consPart));
+d1029 7
+a1035 1
+         myAllocMode_->netSuppForUpdate (consPart)[consPer] -= reqConsQty;
+d1073 7
+a1079 1
+      myAllocMode_->netSuppForUpdate (consPart)[consPer] -= consumedQty;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+@
+
+
+1.1.1.1
+log
+@Import wit
+@
+text
+@@

@@ -1,0 +1,72 @@
+# Copyright (C) 2002, Carnegie Mellon University and others.
+# All Rights Reserved.
+# This code is published under the Common Public License.
+
+#
+#  Standart targets (all is defined in 'calling' Makefile)
+#
+rebuild: veryclean all
+
+clean:
+	rm -rf $(CLEANOBJS) core
+
+veryclean mostlyclean: clean
+	rm -rf $(CLEANLIBS) $(CLEANEXES)
+
+distclean maintainer-clean: veryclean
+	rm -rf $(TMPFILES) $(CLEANDATA)
+
+.PHONY: all clean veryclean mostlyclean maintainer-clean distclean rebuild
+
+FORCE:
+
+#
+#  Rule for Makefile in case environment variables have changed
+#
+Makefile: $(REBUILD)
+
+#
+#  Building rule for auxiliary objects and libraries
+#
+$(DISTBUILD) $(filter %.so, $(patsubst %.a, %.so,$(DISTBUILD))) $(AUXILOBJS):
+	cd $(@D); $(MAKE) $(@F)
+
+#
+#  Standard Building rules for libraries
+#
+$(LIB): $(LIBOBJS)
+	$(AR) $(ARFLAGS) $(LIB) $(LIBOBJS)
+
+$(SOLIB): $(LIBOBJS)
+	$(SOAR) $(SOARFLAGS) $(SOLIB) $(LIBOBJS)
+	cp $(SOLIB) $(SOLIBDIR)
+#
+# some libraries have dependencies:
+#
+ifdef SOLIBDIR
+  $(patsubst %.a, %.so, $(ESO2DAELIB)) : $(patsubst %.a, %.so, $(IDLGPROMSLIB))
+else
+  $(ESO2DAELIB) : $(IDLGPROMSLIB)
+endif
+
+#
+#  Implicit rules
+#
+.f.o:
+	$(F77) -c $(FFLAGS) -I$(SRCDIR) $(FINCFLAGS) $< -o $@
+
+.c.o:
+	$(CC) -c $(CFLAGS) $(DEFS) -I$(SRCDIR) $(CINCFLAGS) $< -o $@
+
+.cpp.o:
+	$(CXX) -c $(CXXFLAGS) $(DEFS) -I$(SRCDIR) $(CXXINCFLAGS) $< -o $@
+
+ifeq ($(UNAME),AIX)
+.F.o:
+	$(F77) -c $(FFLAGS) -WF,"$(DEFS)" -I$(SRCDIR) $(FINCFLAGS) $< -o $@
+else
+.F.o:
+	$(F77) -c $(FFLAGS) $(DEFS) -I$(SRCDIR) $(FINCFLAGS) $< -o $@
+endif
+.F.f:
+	$(FPP) $< >$@

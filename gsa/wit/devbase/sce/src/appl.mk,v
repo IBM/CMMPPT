@@ -1,0 +1,485 @@
+head	1.9;
+access;
+symbols
+	sce_5_01_20080919:1.6
+	latest_sce_4_20_20060523:1.6.0.2
+	sce_4_20_20060523:1.6
+	latest_sce4_20_OSL:1.4.0.2
+	sce_4_20_OSL:1.4
+	sce_4_20_20051222:1.4
+	sce_4_10_30050426:1.4
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.2.0.12
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndRw-branch:1.2.0.10
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.8
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.6
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.2.0.4
+	sce_3_10_20010924:1.2
+	latest_sce_3_00_20010601:1.2.0.2
+	sce_3_00_20010601:1.2
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.9
+date	2011.04.15.01.23.32;	author yktdev;	state Exp;
+branches;
+next	1.8;
+commitid	13e64da79e0e4567;
+
+1.8
+date	2011.03.10.15.29.17;	author ervolina;	state Exp;
+branches;
+next	1.7;
+deltatype	text;
+permissions	644;
+commitid	14cc4d78ede700a2;
+kopt	kv;
+filename	@appl.mk@;
+
+1.7
+date	2010.03.22.13.08.40;	author ervolina;	state Exp;
+branches;
+next	1.6;
+deltatype	text;
+
+1.6
+date	2006.04.19.22.33.35;	author rjw;	state Exp;
+branches;
+next	1.5;
+deltatype	text;
+
+1.5
+date	2006.04.19.21.46.50;	author rjw;	state Exp;
+branches;
+next	1.4;
+deltatype	text;
+
+1.4
+date	2004.12.18.00.04.27;	author fasano;	state Exp;
+branches;
+next	1.3;
+deltatype	text;
+
+1.3
+date	2003.08.04.20.55.11;	author dpc;	state Exp;
+branches;
+next	1.2;
+deltatype	text;
+
+1.2
+date	2001.06.01.16.52.05;	author ervolina;	state Exp;
+branches;
+next	1.1;
+deltatype	text;
+
+1.1
+date	2000.02.25.18.36.48;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+deltatype	text;
+
+1.1.1.1
+date	2000.02.25.18.36.48;	author wit;	state Exp;
+branches;
+next	;
+deltatype	text;
+
+
+desc
+@@
+
+
+1.9
+log
+@changed param defaults. ServerGroup reverse D2O was failing
+@
+text
+@# Make file for compiling and linking genGUI
+
+# Notes:
+# This makefile is included in makefiles in this directory and in 
+# the ../$(platform) directories, so don't assume that the current
+# directory is the one this makefile is in.
+
+# $Header: /gsa/yktgsa/projects/w/wit/devbase/sce/src/appl.mk,v 1.8 2011/03/10 15:29:17 ervolina Exp $
+
+include $(config_dir)ds.mk
+include ../src/sources.mk
+
+objects = scemain.$(obj_suffix) $(lib_objects)
+OBJS    = $(objects)
+
+# Get list of source files: either of the following two lines should work
+# sources = $(subst %.$(obj_suffix),%.$(cxx_suffix),$objects)
+sources = $(objects:.$(obj_suffix)=.$(cxx_suffix))
+
+
+ld_path_flags = -L.
+
+# CPPFLAGS - for C Pre-Processor
+# CXXFLAGS - for C++ Compiler
+CPPFLAGS        = -I$(src_dir). -I$(wituse_includes_dir) 
+CFLAGS          = $(ds_comp_flags)
+CXXFLAGS        = $(ds_comp_flags)
+ld_paths		= $(ld_path_flags) \
+		  -L$(SCENARIO_ROOT_DIR)/$(platform) \
+		  -L$(WIT_ROOT_DIR)/$(platform) \
+		  -L$(SCENARIO_ROOT_DIR)/../mcl/$(platform) 
+
+LDFLAGS 	= $(ds_link_flags) $(ld_paths) $(ds_cplex_link_flags)
+
+
+ifeq ($(platform),sun4)
+	# Use -lrwtoolgs for now ... 
+	LOADLIBES	= -lwitnl \
+			  -lscen \
+			  -lwutl \
+			  -lmcl \
+			  $(ds_math_lib) $(rw_lib) $(ds_fortran_lib) \
+			  $(lex_yacc_lib)
+else
+	# Explicitly use shared rw lib
+	LOADLIBES	+= -lmcl \
+			   $(ds_math_lib) \
+                           $(ds_cplex_link_flags) \
+			   $(lex_yacc_lib)
+endif
+
+# SCE ODBC
+
+sql_library_dir         = $(DB2INSTANCEPATH)/sqllib/lib
+sql_include_dir         = $(DB2INSTANCEPATH)/sqllib/include
+
+db2_api_lib             = -ldb2 -lc
+
+odbc_compiler_flag	= -DSCE_ODBC
+
+
+# PTRPATH is to be used with cfront-based compilers
+PTRPATHOPTS     = -ptr./ptrepository -ptr../../wit/$(platform)/ptrepository
+
+vpath %.$(cxx_suffix) $(src_dir)
+
+libsce.a:      $(lib_objects)
+	$(AR) $(ds_ar_update_flags) $@@ $^
+	$(RANLIB) $@@
+
+
+# Libraries needed to make programs that use the scenario framework and
+# implosion engine
+# typical_scenario_libraries = \
+#	$(SCENARIO_ROOT_DIR)/$(platform)/libscen.a \
+#	$(WIT_ROOT_DIR)/$(platform)/libwitnl.a 
+
+typical_scenario_libraries = \
+	$(SCENARIO_ROOT_DIR)/$(platform)/libscen.a \
+	$(WIT_ROOT_DIR)/$(platform)/libwit.a \
+	$(WIT_ROOT_DIR)/../mcl/$(platform)/libmcl.a
+
+
+
+
+
+sclibs= -lscen -lwitnl
+
+scemain:	$(lib_objects) $(typical_scenario_libraries)
+unitTest:	$(lib_objects) $(typical_scenario_libraries)
+
+#
+# Following are making SCE-ODBC version
+#
+
+# sce engine objects that use db objects
+
+#objs_using_db = scenSce.o
+
+objs_using_db =  \
+		scemain.$(obj_suffix) \
+		scenSce.$(obj_suffix) \
+		sceFssMg.$(obj_suffix)
+
+objs_using_db_target = 	 \
+			scemainTarget.$(obj_suffix) \
+			scenSceTarget.$(obj_suffix) \
+			sceFssMgTarget.$(obj_suffix)
+
+lib_db2 = $(sql_library_dir)/libdb2.a
+debug = -g -DDEBUG -DRWDEBUG 
+compile_flag = $(CPPFLAGS) $(CXXFLAGS) $(odbc_compiler_flag)
+
+db_objects = \
+	dbObj.$(obj_suffix)   \
+	demandDB.$(obj_suffix) \
+	dbLink.$(obj_suffix) \
+	arg.$(obj_suffix) \
+	dbProf.$(obj_suffix) \
+	capAttDB.$(obj_suffix) \
+	fsssDB.$(obj_suffix) \
+	ipOrdDB.$(obj_suffix) \
+	supplyDB.$(obj_suffix) \
+	ppdfDB.$(obj_suffix)
+
+build	:
+	rm -f $(objs_using_db) libsce.a
+
+odbc_scemain	:$(db_objects) $(objs_using_db_target) $(objects) libsce.a.target
+	xlC -o scemain  $(compile_flag) $(debug) $(db_objects) $(objects) \
+		-lm \
+		-bI:/usr/lpp/xlC/lib/libC.imp \
+		-L$(rw_library_dir) \
+		-lrwtoolgs            \
+		$(LDFLAGS) \
+		$(LOADLIBES) \
+		-L$(sql_library_dir) \
+		$(db2_api_lib) \
+		$(sclibs) \
+		-bmaxdata:0x80000000 \
+		-bloadmap:map
+
+scemainTarget.o	:	scemain.C
+	xlC -c -o scemain.o $(compile_flag) $(debug)  -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/scemain.C
+
+scenSceTarget.o	:	scenSce.C
+	xlC -c -o scenSce.o $(compile_flag) $(debug)  -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/scenSce.C
+
+sceFssMgTarget.o	:	sceFssMg.C
+	xlC -c -o sceFssMg.o $(compile_flag) $(debug)  -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/sceFssMg.C
+
+libsce.a.target:	$(lib_objects) $(db_objects)
+	$(AR) $(ds_ar_update_flags) $@@ $^ 
+	$(RANLIB) $@@
+	mv libsce.a.target libsce.a
+
+arg.o	:	arg.C
+	xlC -c $(compile_flag) $(debug)  -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/arg.C
+
+dbObj.o	:	dbObj.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/dbObj.C
+
+demandDB.o	:	demandDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/demandDB.C
+
+
+dbLink.o	:	dbLink.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/dbLink.C
+
+
+dbProf.o	:	dbProf.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/dbProf.C
+
+capAttDB.o	:	capAttDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/capAttDB.C
+
+fsssDB.o	:	fsssDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/fsssDB.C
+
+ipOrdDB.o	:	ipOrdDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/ipOrdDB.C
+
+supplyDB.o	:	supplyDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/supplyDB.C
+
+ppdfDB.o	:	ppdfDB.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/ppdfDB.C
+
+odbc_test	:	$(db_objects) unitTest1.o
+	xlC -o unitTest1  $(compile_flag) $(debug) $(db_objects) unitTest1.o \
+		-lm \
+		-bI:/usr/lpp/xlC/lib/libC.imp \
+		-L$(rw_library_dir) \
+		-lrwtoolgs            \
+		$(LDFLAGS) \
+		$(LOADLIBES) \
+		-L$(sql_library_dir) \
+		$(db2_api_lib) \
+		$(typical_scenario_libraries) \
+		-bmaxdata:0x80000000 \
+		-bloadmap:map
+
+unitTest1.o	:	unitTest1.C
+	xlC -c $(compile_flag) $(debug) -qflag=i:i -qhalt=w \
+		-I$(sql_include_dir) \
+		../src/unitTest1.C
+
+clean_db_obj	:
+		rm -f $(db_objects) 
+
+
+@
+
+
+1.8
+log
+@cplex, and some cleanup
+@
+text
+@d8 1
+a8 1
+# $Header: Z:\devbase/sce/src/appl.mk,v 1.7 2010/03/22 13:08:40 ervolina Exp $
+d33 1
+a33 1
+LDFLAGS 	= $(ds_link_flags) $(ld_paths) 
+@
+
+
+1.7
+log
+@removed witutil dependency
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.6 2006/04/19 22:33:35 rjw Exp $
+d48 1
+@
+
+
+1.6
+log
+@Removed osl_library_dir.
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.5 2006/04/19 21:46:50 rjw Exp $
+d31 1
+a31 2
+		  -L$(SCENARIO_ROOT_DIR)/../mcl/$(platform) \
+		  -L$(SCENARIO_ROOT_DIR)/../witutil/$(platform) 
+a74 1
+#	$(SCENARIO_ROOT_DIR)/../witutil/$(platform)/libwutl.a \
+a78 1
+	$(SCENARIO_ROOT_DIR)/../witutil/$(platform)/libwutl.a \
+@
+
+
+1.5
+log
+@Removed ds_osl_lib.
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.4 2004/12/18 00:04:27 fasano Exp $
+a30 1
+		  -L$(osl_library_dir) \
+@
+
+
+1.4
+log
+@Modified to build on cygwin with gcc compiler
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.3 2003/08/04 20:55:11 dpc Exp $
+a43 2
+			  $(ds_osl_lib) \
+			  $(ds_osl_lib) \
+d48 3
+a50 4
+	LOADLIBES	+= $(ds_osl_lib) \
+			  -lmcl \
+			  $(ds_math_lib) \
+			  $(lex_yacc_lib)
+@
+
+
+1.3
+log
+@Removed references to RougeWave in the build process.
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.2 2001/06/01 16:52:05 ervolina Exp $
+d50 1
+a50 1
+	LOADLIBES	= $(ds_osl_lib) \
+@
+
+
+1.2
+log
+@changes for Release 3.00
+@
+text
+@d8 1
+a8 1
+# $Header: /u/wit/devbase/sce/src/appl.mk,v 1.1.1.1 2000/02/25 18:36:48 wit Exp $
+d25 1
+a25 1
+CPPFLAGS        = -I$(src_dir). -I$(wituse_includes_dir) -I$(rw_include_dir) 
+d31 1
+a31 1
+		  -L$(rw_library_dir) -L$(osl_library_dir) \
+d52 1
+a52 1
+			  $(ds_math_lib) $(rw_lib) $(ds_fortran_lib) \
+d84 1
+a84 1
+	$(SCENARIO_ROOT_DIR)/$(platform)/libscenns.a \
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d8 1
+a8 1
+# $Header: /u/implode/devbase/sce/src/appl.mk,v 1.37 2000/02/23 13:45:57 ervolina Exp $
+d33 1
+a33 1
+		  -L$(SCENARIO_ROOT_DIR)/../witutil/$(platform)
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@

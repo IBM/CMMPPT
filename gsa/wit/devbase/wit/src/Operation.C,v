@@ -1,0 +1,2776 @@
+head	1.11;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.11
+date	2011.09.28.23.49.44;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.09.24.00.28.05;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.08.30.20.17.47;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.02.18.22.28.17;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.09.24.18.17.22;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2010.09.24.15.46.15;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2010.09.22.20.21.53;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2010.09.21.21.19.13;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2010.09.17.22.20.53;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2010.09.10.23.17.47;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2010.09.10.22.10.39;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "Operation.C"
+//
+// Contains the implementation of class Operation.
+//------------------------------------------------------------------------------
+
+#include <Operation.h>
+#include <GlobalComp.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <OptComp.h>
+#include <ExecBS.h>
+#include <CompMgr.h>
+#include <OrigMrp.h>
+#include <DataWrit.h>
+#include <wit/src/Variant.h>
+#include <Pre.h>
+#include <FSS.h>
+#include <HeurAllMgr.h>
+#include <HeurModifier.h>
+#include <OptStarter.h>
+#include <DetOptImpMgr.h>
+#include <StochImpMgr.h>
+#include <IVRealArg.h>
+#include <wit.h>
+#include <MsgFrag.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class Operation.
+//------------------------------------------------------------------------------
+
+WitOperation::WitOperation (const char * theName, WitCompMgr * theCompMgr):
+
+      WitNode           (theName, theCompMgr),
+      mappingIndex_     (myCompMgr ()->nOperations ()),
+      bom_              (),
+      bop_              (),
+      yieldRate_        (myProblem (), defYieldRate ()),
+      minLotSize_       (myProblem (), defMinLotSize ()),
+      incLotSize_       (myProblem (), defIncLotSize ()),
+      twoLevelLotSizes_ (defTwoLevelLotSizes ()),
+      lotSize2Thresh_   (myProblem (), defLotSize2Thresh ()),
+      minLotSize2_      (myProblem (), defMinLotSize2 ()),
+      incLotSize2_      (myProblem (), defIncLotSize2 ()),
+      execPenalty_      (defExecPenalty ()),
+      execCost_         (myProblem (), defExecCost ()),
+      intExecVols_      (defIntExecVols ()),
+      cycleTime34_      (myProblem (), defCycleTime34 ()),
+      execVol_          (myProblem (), 0.0),
+      execBounds_       (NULL),
+      executable_       (myProblem (), false),
+      mrpExecVol_       (myProblem (), 0.0),
+      fssExecVol_       (myProblem (), 0.0)
+   {
+   execBounds_ = new WitExecBoundSet (this);
+
+   myCompMgr ()->insert (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOperation::~WitOperation ()
+   {
+   delete execBounds_;
+   }
+
+//------------------------------------------------------------------------------
+
+int WitOperation::nInstances (WitProblem * theProblem)
+   {
+   return theProblem->myCompMgr ()->nOperations ();
+   }
+
+//------------------------------------------------------------------------------
+// "Set" functions.
+//------------------------------------------------------------------------------
+
+void WitOperation::setOperationName (const char * theName)
+   {
+   myCompMgr ()->setOperationName (this, theName);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setYieldRate (const WitIVRealArg & theValue)
+   {
+   WitPeriod thePer;
+
+   witAssert (theValue != NULL);
+
+   if (DEBUG_MODE)
+      forEachPeriod (thePer, myProblem ())
+         witAssert (validYieldRate (theValue[thePer]));
+
+   prepSetUnpreAttr ();
+
+   yieldRate_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setMinLotSize (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   prepSetUnpreAttr ();
+
+   minLotSize_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setIncLotSize (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   prepSetUnpreAttr ();
+
+   incLotSize_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setTwoLevelLotSizes (bool theValue)
+   {
+   prepSetUnpreAttr ();
+
+   twoLevelLotSizes_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setLotSize2Thresh (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   prepSetUnpreAttr ();
+
+   lotSize2Thresh_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setMinLotSize2 (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   prepSetUnpreAttr ();
+
+   minLotSize2_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setIncLotSize2 (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   prepSetUnpreAttr ();
+
+   incLotSize2_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setExecPenalty (double theValue)
+   {
+   witAssert (theValue >= 0.0);
+
+   prepSetUnpostAttr ();
+
+   execPenalty_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setExecCost (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   prepSetScenSpecAttr ("execCost");
+
+   execCost_.curDblFlexVec () = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setIntExecVols (bool theValue)
+   {
+   prepSetUnpreAttr ();
+
+   intExecVols_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setExecVol (const WitIVRealArg & theValue)
+   {
+   witAssert (theValue != NULL);
+
+   witAssert (theValue.isNonNeg (nPeriods ()));
+
+   if (myProblem ()->myHeurAllMgr ()->modifiable ())
+      {
+      prepSetNonUnpostAttr ();
+
+      myProblem ()->myHeurModifier ()->modifyForExecVol (this, theValue);
+      }
+   else
+      {
+      myDetOptImpMgr ()->shutDown ();
+
+      myOptComp ()->schedOptStarter ()->beChosen ();
+
+      prepSetUnpostAttr ();
+      }
+
+   execVol_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setCycleTime34 (const WitIVRealArg & theValue)
+   {
+   WitBomEntry * theBomEnt;
+
+   witAssert (theValue != NULL);
+
+   witAssert (wit34Compatible ());
+
+   prepSetUnpreAttr ();
+
+   forEachEl (theBomEnt, bom ())
+      theBomEnt->adjustOffset (theValue);
+
+   cycleTime34_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storePreExecutable (WitPeriod thePer, bool theValue)
+   {
+   witAssert (myPreprocessor ()->preprocessing ());
+
+   executable_[thePer] = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeHeurExecVol (WitPeriod thePer, double theValue)
+   {
+   witAssert (myHeurAllMgr ()->updatingSoln ());
+
+   execVol_.elemRef (thePer) = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeOptExecVol (WitPeriod thePer, double theValue)
+   {
+   witAssert (myDetOptImpMgr ()->uploadingSoln ());
+
+   execVol_.elemRef (thePer) = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeStochExecCost (const WitDblFlexVec & theFlexVec)
+   {
+   witAssert (myStochImpMgr ()->uploadingData ());
+
+   execCost_.curDblFlexVec () = theFlexVec;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeStochExecVol (const WitDblFlexVec & theFlexVec)
+   {
+   witAssert (myStochImpMgr ()->uploadingData ());
+
+   execVol_ = theFlexVec;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeMrpMrpExecVol (const WitTVec <double> & theTVec)
+   {
+   witAssert (myOrigMrpExp ()->uploadingSoln ());
+
+   mrpExecVol_ = theTVec;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::storeFssFssExecVol (const WitTVec <double> & theTVec)
+   {
+   witAssert (myFSS ()->uploadingSoln ());
+
+   fssExecVol_ = theTVec;
+   }
+
+//------------------------------------------------------------------------------
+// Other functions.
+//------------------------------------------------------------------------------
+
+void WitOperation::insert (WitBomEntry * theBomEnt)
+   {
+   bom_.appendUniquely (theBomEnt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::insert (WitBopEntry * theBopEnt)
+   {
+   bop_.appendUniquely (theBopEnt);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOperation::inserted ()
+   {
+   return (myCompMgr ()->findOperation (operationName ().myCstring ()) == this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeMultiObjVecs (WitObjective * theObj)
+   {
+   execCost_.writeDataMulti ("execCost", this, theObj);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeSolnData ()
+   {
+   if (execVol () == defExecVol ())
+      return;
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+
+   myDataWriter ()->writeVector ("execVol", execVol (), defExecVol ());
+
+   myDataWriter ()->writeEndCommand ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::copySelfInto (WitCompMgr * theCompMgr)
+   {
+   WitOperation * theOpn;
+
+   theOpn = new WitOperation (operationName ().myCstring (), theCompMgr);
+
+   theOpn->copyAttrsFrom (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::recount ()
+   {
+   mappingIndex_ = myCompMgr ()->nOperations ();
+
+   myCompMgr ()->recountOperation (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::unpreprocess ()
+   {
+   executable_ = false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::clearOptSoln  ()
+   {                              
+   witAssert (myDetOptImpMgr ()->clearingSoln ());
+
+   execVol_ = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::clearStochSoln ()
+   {
+   WitComponent::clearStochSoln ();
+
+   execVol_ = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+WitOperation * WitOperation::thisOpn ()
+   {
+   return this;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::identifyInstance ()
+   {
+   if (myMsgFac ().mayIssue ("operationInstIDMsg"))
+      myMsgFac () ("operationInstIDMsg", operationName ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeSetClause ()
+   {
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitMsgFrag WitOperation::objTypeMsgFrag ()
+   {
+   return myMsgFac ().myFrag ("operationFrag");
+   }
+
+//------------------------------------------------------------------------------
+
+WitAttr WitOperation::apiObjItrState ()
+   {
+   return WitAT_OPERATION;
+   }
+
+//------------------------------------------------------------------------------
+
+int WitOperation::nodeIndex () const
+   {
+   return myCompMgr ()->nParts () + mappingIndex_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOperation::validYieldRate (double theValue)
+   {
+   if    (theValue >= 0.01 - FLOAT_EPSILON)
+      if (theValue <= 1.0  + FLOAT_EPSILON)
+         return true;
+
+   return (theValue == 0.0);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOperation::cycleTime34PreventsExec (WitPeriod thePer)
+   {
+   witAssert (wit34Compatible ());
+
+   if (cycleTime34 ()[thePer] < 0.0)
+      return true;
+
+   if (static_cast <int> (cycleTime34 ()[thePer]) > thePer)
+      return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::setWit34Compatible (bool newValue)
+   {
+   WitPeriod thePer;
+
+   if (wit34Compatible ())
+      if (not newValue)
+         {
+         forEachPeriod (thePer, myProblem ())
+            if (cycleTime34PreventsExec (thePer))
+               if (yieldRate_[thePer] != 0.0)
+                  yieldRate_.elemRef (thePer) = 0.0;
+
+         cycleTime34_ = 0.0;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::copyAttrsFrom (WitOperation * theOpn)
+   {
+   WitNode::copyAttrsFrom (theOpn);
+
+   yieldRate_         = theOpn->yieldRate_;
+   minLotSize_        = theOpn->minLotSize_;
+   incLotSize_        = theOpn->incLotSize_;
+   twoLevelLotSizes_  = theOpn->twoLevelLotSizes_;
+   lotSize2Thresh_    = theOpn->lotSize2Thresh_;
+   minLotSize2_       = theOpn->minLotSize2_;
+   incLotSize2_       = theOpn->incLotSize2_;
+   execPenalty_       = theOpn->execPenalty_;
+   execCost_          = theOpn->execCost_;
+   intExecVols_       = theOpn->intExecVols_;
+
+   if (wit34Compatible ())
+      cycleTime34_    = theOpn->cycleTime34_;
+
+   execBounds_->
+      copyAttrsFrom    (theOpn->execBounds_);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOperation::isCoproducing (WitPeriod execPer)
+   {
+   int           nBroadProduced;
+   WitBopEntry * theBopEnt;
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+
+   nBroadProduced = 0;
+
+   forEachEl (theBopEnt, bop ())
+      if (theBopEnt->productRate ()[execPer] > 0.0)
+         ++ nBroadProduced;
+
+   forEachEl (theBomEnt, bom ())
+      {
+      if (theBomEnt->consRate ()[execPer] < 0.0)
+         ++ nBroadProduced;
+
+      forEachEl (theSub, theBomEnt->mySubEntries ())
+         if (theSub->consRate ()[execPer] < 0.0)
+            ++ nBroadProduced;
+      }
+
+   return (nBroadProduced > 1);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::display ()
+   {
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+
+   myMsgFac () ("opnIdDdMsg", operationName ());
+
+   myMsgFac () ("opnScalarsDdMsg", 
+      mappingIndex_,
+      twoLevelLotSizes_,
+      execPenalty_,
+      intExecVols_);
+
+   if (wit34Compatible ())
+      myProblem ()->display ("cycleTime34DdMsg", cycleTime34_);
+
+   myProblem ()->display ("yieldRateDdMsg",  yieldRate_);
+   myProblem ()->display ("minLotSizeDdMsg", minLotSize_);
+   myProblem ()->display ("incLotSizeDdMsg", incLotSize_);
+
+   if (twoLevelLotSizes_)
+      {
+      myProblem ()->display ("lotSize2ThreshDdMsg", lotSize2Thresh_);
+      myProblem ()->display ("minLotSize2DdMsg",    minLotSize2_);
+      myProblem ()->display ("incLotSize2DdMsg",    incLotSize2_);
+      }
+
+   myProblem ()->display ("execCostDdMsg", execCost_);
+
+   execBounds_->display ();
+
+   if (myPreprocessor ()->preprocessed ())
+      myMsgFac () ("executableDdMsg", executable_);
+
+   myMsgFac () ("procBomHeadingDdMsg");
+
+   if (bom_.isEmpty ())
+      myMsgFac () ("noneDdMsg");
+   else
+      {
+      myMsgFac () ("procBomHeading2DdMsg");
+
+      forEachEl (theBomEnt, bom_)
+         myMsgFac () ("procBomDataDdMsg",
+            theBomEnt->myPartName (),
+            theBomEnt->localIndex ());
+      }
+
+   myMsgFac () ("procBopHeadingDdMsg");
+
+   if (bop_.isEmpty ())
+      myMsgFac () ("noneDdMsg");
+   else
+      {
+      myMsgFac () ("procBopHeading2DdMsg");
+
+      forEachEl (theBopEnt, bop_)
+         myMsgFac () ("procBopDataDdMsg",
+            theBopEnt->myPartName (),
+            theBopEnt->localIndex ());
+      }
+
+   WitDelComp::display ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::clearExecVolForHeur ()
+   {
+   witAssert (myHeurAllMgr ()->updatingSoln ());
+
+   execVol_ = 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOperation::lotSizeDelta (
+      WitPeriod thePer,
+      double    theExecVol,
+      double    delta)
+   {
+   double preLsVol;
+   double lsVol;
+
+   if (not lotSizeMode (thePer))
+      return delta;
+
+   preLsVol = theExecVol + delta;
+
+   if (preLsVol < FLOAT_EPSILON)
+      return delta;
+
+   if (not twoLevelLotSizes_)
+      lsVol =
+         lotSizedExecVol (
+            thePer, 
+            preLsVol,
+            minLotSize_, 
+            incLotSize_);
+   else
+      lsVol = tllsExecVol (thePer, preLsVol);
+
+   return lsVol - theExecVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeSoln ()
+   {
+   WitPeriod thePer;
+
+   fprintf (solnFile (),
+      "\nOperation %s:\n",
+      operationName ().myCstring ());
+
+   fprintf (solnFile (), "Period      ExecVol");
+
+   if (fssComputed ())
+      fprintf (solnFile (), "   FssExecVol");
+
+   fprintf (solnFile (), "\n");
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      fprintf (solnFile (), "%6d", thePer);
+
+      writeSolnValue (execVol ()[thePer]);
+
+      if (fssComputed ())
+         writeSolnValue (fssExecVol ()[thePer]);
+
+      fprintf (solnFile (), "\n");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeMrpSoln ()
+   {
+   WitPeriod thePer;
+
+   fprintf (solnFile (), "\nOperation %s:\n", operationName ().myCstring ());
+
+   fprintf (solnFile (), "Period   MrpExecVol\n");
+
+   forEachPeriod (thePer, myProblem ())
+      {
+      fprintf (solnFile (), "%6d", thePer);
+
+      writeSolnValue (mrpExecVol_[thePer]);
+
+      fprintf (solnFile (), "\n");
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoundSet * WitOperation::myBoundSet ()
+   {
+   return execBounds_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeDataID ()
+   {
+   myDataWriter ()->writeFirstKeyWord ("add");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::writeDataAttrs ()
+   {
+   WitNode::writeDataAttrs ();
+
+   myDataWriter ()->writeVector (
+      "yieldRate",
+      yieldRate_,
+      defYieldRate ());
+
+   myDataWriter ()->writeVector (
+      "minLotSize",
+      minLotSize_,
+      defMinLotSize ());
+
+   myDataWriter ()->writeVector (
+      "incLotSize",
+      incLotSize_,
+      defIncLotSize ());
+
+   myDataWriter ()->writeBool (
+      "twoLevelLotSizes",
+      twoLevelLotSizes_,
+      defTwoLevelLotSizes ());
+
+   myDataWriter ()->writeVector (
+      "lotSize2Thresh",
+      lotSize2Thresh_,
+      defLotSize2Thresh ());
+
+   myDataWriter ()->writeVector (
+      "minLotSize2",
+      minLotSize2_,
+      defMinLotSize2 ());
+
+   myDataWriter ()->writeVector (
+      "incLotSize2",
+      incLotSize2_,
+      defIncLotSize2 ());
+
+   myDataWriter ()->writeDouble (
+      "execPenalty",
+      execPenalty_,
+      defExecPenalty ());
+
+   myDataWriter ()->writeObjVec (
+        "execCost",
+         execCost_,
+      defExecCost ());
+
+   myDataWriter ()->writeBool (
+      "intExecVols",
+      intExecVols_,
+      defIntExecVols ());
+
+   if (wit34Compatible ())
+      myDataWriter ()->writeVector (
+         "cycleTime34",
+         cycleTime34_,
+         defCycleTime34 ());
+
+   execBounds_->writeData ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::purgeCompListsSpec ()
+   {
+   purgeSelComps (bom_);
+   purgeSelComps (bop_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOperation::clearDepListsSpec ()
+   {
+   bom_.clear ();
+   bop_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOperation::lotSizeMode (WitPeriod thePer)
+   {
+   if (not myGlobalComp ()->lotSizesExist ())
+      return false;
+
+   if (not myProblem ()->myOrigMrpExp ()->exploding ())
+      if (not myProblem ()->currentVariant ()->respectsLotSizes ())
+         return false;
+
+   if (incLotSize_[thePer] < 0.0009)
+      return false;
+
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOperation::tllsExecVol (WitPeriod thePer, double theExecVol)
+   {
+   double ls2t;
+   double ls1Vol;
+
+   ls2t = lotSize2Thresh_[thePer];
+
+   if (theExecVol >= ls2t - myGlobalComp ()->lotSizeTol ())
+      return
+         lotSizedExecVol (
+            thePer,
+            theExecVol,
+            minLotSize2_,
+            incLotSize2_);
+
+   ls1Vol =
+      lotSizedExecVol (
+         thePer,
+         theExecVol,
+         minLotSize_,
+         incLotSize_);
+
+   if (ls1Vol >= ls2t - myGlobalComp ()->lotSizeTol ())
+      return
+         lotSizedExecVol (
+            thePer,
+            ls2t,
+            minLotSize2_,
+            incLotSize2_);
+   else
+      return ls1Vol;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOperation::lotSizedExecVol (
+      WitPeriod             thePer,
+      double                theExecVol,
+      const WitDblFlexVec & mlsVec,
+      const WitDblFlexVec & ilsVec)
+   {
+   double mls;
+   double ils;
+   double gridCoord;
+
+   witAssert (theExecVol >= NET_TOL);
+
+   mls       = mlsVec[thePer];
+   ils       = ilsVec[thePer];
+
+   gridCoord = (theExecVol - mls) / ils;
+
+   gridCoord = ceil (gridCoord - myGlobalComp ()->lotSizeTol ());
+
+   if (gridCoord < 0.0)
+      gridCoord = 0.0;
+
+   return mls + gridCoord * ils;
+   }
+@
+
+
+1.10
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.9
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d6 2
+a7 2
+//     IBM Confidential
+//
+d45 22
+a66 22
+WitNode           (theName, theCompMgr),
+mappingIndex_     (myCompMgr ()->nOperations ()),
+bom_              (),
+bop_              (),
+yieldRate_        (myProblem (), defYieldRate ()),
+minLotSize_       (myProblem (), defMinLotSize ()),
+incLotSize_       (myProblem (), defIncLotSize ()),
+twoLevelLotSizes_ (defTwoLevelLotSizes ()),
+lotSize2Thresh_   (myProblem (), defLotSize2Thresh ()),
+minLotSize2_      (myProblem (), defMinLotSize2 ()),
+incLotSize2_      (myProblem (), defIncLotSize2 ()),
+execPenalty_      (defExecPenalty ()),
+execCost_         (myProblem (), defExecCost ()),
+intExecVols_      (defIntExecVols ()),
+cycleTime34_      (myProblem (), defCycleTime34 ()),
+execVol_          (myProblem (), 0.0),
+execBounds_       (NULL),
+executable_       (myProblem (), false),
+mrpExecVol_       (myProblem (), 0.0),
+fssExecVol_       (myProblem (), 0.0)
+{
+execBounds_ = new WitExecBoundSet (this);
+d68 2
+a69 2
+myCompMgr ()->insert (this);
+}
+d74 3
+a76 3
+{
+delete execBounds_;
+}
+d81 3
+a83 3
+{
+return theProblem->myCompMgr ()->nOperations ();
+}
+d90 3
+a92 3
+{
+myCompMgr ()->setOperationName (this, theName);
+}
+d97 2
+a98 2
+{
+WitPeriod thePer;
+d100 1
+a100 1
+witAssert (theValue != NULL);
+d102 3
+a104 3
+if (DEBUG_MODE)
+forEachPeriod (thePer, myProblem ())
+witAssert (validYieldRate (theValue[thePer]));
+d106 1
+a106 1
+prepSetUnpreAttr ();
+d108 2
+a109 2
+yieldRate_ = theValue;
+}
+d114 2
+a115 2
+{
+witAssert (theValue != NULL);
+d117 1
+a117 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d119 1
+a119 1
+prepSetUnpreAttr ();
+d121 2
+a122 2
+minLotSize_ = theValue;
+}
+d127 2
+a128 2
+{
+witAssert (theValue != NULL);
+d130 1
+a130 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d132 1
+a132 1
+prepSetUnpreAttr ();
+d134 2
+a135 2
+incLotSize_ = theValue;
+}
+d140 2
+a141 2
+{
+prepSetUnpreAttr ();
+d143 2
+a144 2
+twoLevelLotSizes_ = theValue;
+}
+d149 2
+a150 2
+{
+witAssert (theValue != NULL);
+d152 1
+a152 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d154 1
+a154 1
+prepSetUnpreAttr ();
+d156 2
+a157 2
+lotSize2Thresh_ = theValue;
+}
+d162 2
+a163 2
+{
+witAssert (theValue != NULL);
+d165 1
+a165 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d167 1
+a167 1
+prepSetUnpreAttr ();
+d169 2
+a170 2
+minLotSize2_ = theValue;
+}
+d175 2
+a176 2
+{
+witAssert (theValue != NULL);
+d178 1
+a178 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d180 1
+a180 1
+prepSetUnpreAttr ();
+d182 2
+a183 2
+incLotSize2_ = theValue;
+}
+d188 2
+a189 2
+{
+witAssert (theValue >= 0.0);
+d191 1
+a191 1
+prepSetUnpostAttr ();
+d193 2
+a194 2
+execPenalty_ = theValue;
+}
+d199 2
+a200 2
+{
+witAssert (theValue != NULL);
+d202 1
+a202 1
+prepSetScenSpecAttr ("execCost");
+d204 2
+a205 2
+execCost_.curDblFlexVec () = theValue;
+}
+d210 2
+a211 2
+{
+prepSetUnpreAttr ();
+d213 2
+a214 2
+intExecVols_ = theValue;
+}
+d219 2
+a220 2
+{
+witAssert (theValue != NULL);
+d222 1
+a222 1
+witAssert (theValue.isNonNeg (nPeriods ()));
+d224 3
+a226 3
+if (myProblem ()->myHeurAllMgr ()->modifiable ())
+{
+prepSetNonUnpostAttr ();
+d228 5
+a232 5
+myProblem ()->myHeurModifier ()->modifyForExecVol (this, theValue);
+}
+else
+{
+myDetOptImpMgr ()->shutDown ();
+d234 1
+a234 1
+myOptComp ()->schedOptStarter ()->beChosen ();
+d236 2
+a237 2
+prepSetUnpostAttr ();
+}
+d239 2
+a240 2
+execVol_ = theValue;
+}
+d245 2
+a246 2
+{
+WitBomEntry * theBomEnt;
+d248 1
+a248 1
+witAssert (theValue != NULL);
+d250 1
+a250 1
+witAssert (wit34Compatible ());
+d252 1
+a252 1
+prepSetUnpreAttr ();
+d254 2
+a255 2
+forEachEl (theBomEnt, bom ())
+theBomEnt->adjustOffset (theValue);
+d257 2
+a258 2
+cycleTime34_ = theValue;
+}
+d263 2
+a264 2
+{
+witAssert (myPreprocessor ()->preprocessing ());
+d266 2
+a267 2
+executable_[thePer] = theValue;
+}
+d272 2
+a273 2
+{
+witAssert (myHeurAllMgr ()->updatingSoln ());
+d275 2
+a276 2
+execVol_.elemRef (thePer) = theValue;
+}
+d281 2
+a282 2
+{
+witAssert (myDetOptImpMgr ()->uploadingSoln ());
+d284 2
+a285 2
+execVol_.elemRef (thePer) = theValue;
+}
+d290 2
+a291 2
+{
+witAssert (myStochImpMgr ()->uploadingData ());
+d293 2
+a294 2
+execCost_.curDblFlexVec () = theFlexVec;
+}
+d299 2
+a300 2
+{
+witAssert (myStochImpMgr ()->uploadingData ());
+d302 2
+a303 2
+execVol_ = theFlexVec;
+}
+d308 2
+a309 2
+{
+witAssert (myOrigMrpExp ()->uploadingSoln ());
+d311 2
+a312 2
+mrpExecVol_ = theTVec;
+}
+d317 2
+a318 2
+{
+witAssert (myFSS ()->uploadingSoln ());
+d320 2
+a321 2
+fssExecVol_ = theTVec;
+}
+d328 3
+a330 3
+{
+bom_.appendUniquely (theBomEnt);
+}
+d335 3
+a337 3
+{
+bop_.appendUniquely (theBopEnt);
+}
+d342 3
+a344 3
+{
+return (myCompMgr ()->findOperation (operationName ().myCstring ()) == this);
+}
+d349 3
+a351 3
+{
+execCost_.writeDataMulti ("execCost", this, theObj);
+}
+d356 7
+a362 7
+{
+if (execVol () == defExecVol ())
+return;
+
+myDataWriter ()->writeFirstKeyWord ("set");
+myDataWriter ()->writeKeyWord      ("operation");
+myDataWriter ()->writeStringValue  (operationName ());
+d364 1
+a364 1
+myDataWriter ()->writeVector ("execVol", execVol (), defExecVol ());
+d366 2
+a367 2
+myDataWriter ()->writeEndCommand ();
+}
+d372 2
+a373 2
+{
+WitOperation * theOpn;
+d375 1
+a375 1
+theOpn = new WitOperation (operationName ().myCstring (), theCompMgr);
+d377 2
+a378 2
+theOpn->copyAttrsFrom (this);
+}
+d383 2
+a384 2
+{
+mappingIndex_ = myCompMgr ()->nOperations ();
+d386 2
+a387 2
+myCompMgr ()->recountOperation (this);
+}
+d392 3
+a394 3
+{
+executable_ = false;
+}
+d399 2
+a400 2
+{
+witAssert (myDetOptImpMgr ()->clearingSoln ());
+d402 2
+a403 2
+execVol_ = 0.0;
+}
+d408 2
+a409 2
+{
+WitComponent::clearStochSoln ();
+d411 2
+a412 2
+execVol_ = 0.0;
+}
+d417 3
+a419 3
+{
+return this;
+}
+d424 4
+a427 4
+{
+if (myMsgFac ().mayIssue ("operationInstIDMsg"))
+myMsgFac () ("operationInstIDMsg", operationName ());
+}
+d432 5
+a436 5
+{
+myDataWriter ()->writeFirstKeyWord ("set");
+myDataWriter ()->writeKeyWord      ("operation");
+myDataWriter ()->writeStringValue  (operationName ());
+}
+d441 3
+a443 3
+{
+return myMsgFac ().myFrag ("operationFrag");
+}
+d448 3
+a450 3
+{
+return WitAT_OPERATION;
+}
+d455 3
+a457 3
+{
+return myCompMgr ()->nParts () + mappingIndex_;
+}
+d462 4
+a465 4
+{
+if    (theValue >= 0.01 - FLOAT_EPSILON)
+if (theValue <= 1.0  + FLOAT_EPSILON)
+return true;
+d467 2
+a468 2
+return (theValue == 0.0);
+}
+d473 2
+a474 2
+{
+witAssert (wit34Compatible ());
+d476 2
+a477 2
+if (cycleTime34 ()[thePer] < 0.0)
+return true;
+d479 2
+a480 2
+if (static_cast <int> (cycleTime34 ()[thePer]) > thePer)
+return true;
+d482 2
+a483 2
+return false;
+}
+d488 2
+a489 2
+{
+WitPeriod thePer;
+d491 11
+a501 11
+if (wit34Compatible ())
+if (not newValue)
+{
+forEachPeriod (thePer, myProblem ())
+if (cycleTime34PreventsExec (thePer))
+if (yieldRate_[thePer] != 0.0)
+yieldRate_.elemRef (thePer) = 0.0;
+
+cycleTime34_ = 0.0;
+}
+}
+d506 2
+a507 2
+{
+WitNode::copyAttrsFrom (theOpn);
+d509 17
+a525 17
+yieldRate_         = theOpn->yieldRate_;
+minLotSize_        = theOpn->minLotSize_;
+incLotSize_        = theOpn->incLotSize_;
+twoLevelLotSizes_  = theOpn->twoLevelLotSizes_;
+lotSize2Thresh_    = theOpn->lotSize2Thresh_;
+minLotSize2_       = theOpn->minLotSize2_;
+incLotSize2_       = theOpn->incLotSize2_;
+execPenalty_       = theOpn->execPenalty_;
+execCost_          = theOpn->execCost_;
+intExecVols_       = theOpn->intExecVols_;
+
+if (wit34Compatible ())
+cycleTime34_    = theOpn->cycleTime34_;
+
+execBounds_->
+copyAttrsFrom    (theOpn->execBounds_);
+}
+d530 21
+a550 21
+{
+int           nBroadProduced;
+WitBopEntry * theBopEnt;
+WitBomEntry * theBomEnt;
+WitSubEntry * theSub;
+
+nBroadProduced = 0;
+
+forEachEl (theBopEnt, bop ())
+if (theBopEnt->productRate ()[execPer] > 0.0)
+++ nBroadProduced;
+
+forEachEl (theBomEnt, bom ())
+{
+if (theBomEnt->consRate ()[execPer] < 0.0)
+++ nBroadProduced;
+
+forEachEl (theSub, theBomEnt->mySubEntries ())
+if (theSub->consRate ()[execPer] < 0.0)
+++ nBroadProduced;
+}
+d552 2
+a553 2
+return (nBroadProduced > 1);
+}
+d558 60
+a617 60
+{
+WitBomEntry * theBomEnt;
+WitBopEntry * theBopEnt;
+
+myMsgFac () ("opnIdDdMsg", operationName ());
+
+myMsgFac () ("opnScalarsDdMsg",
+mappingIndex_,
+twoLevelLotSizes_,
+execPenalty_,
+intExecVols_);
+
+if (wit34Compatible ())
+myProblem ()->display ("cycleTime34DdMsg", cycleTime34_);
+
+myProblem ()->display ("yieldRateDdMsg",  yieldRate_);
+myProblem ()->display ("minLotSizeDdMsg", minLotSize_);
+myProblem ()->display ("incLotSizeDdMsg", incLotSize_);
+
+if (twoLevelLotSizes_)
+{
+myProblem ()->display ("lotSize2ThreshDdMsg", lotSize2Thresh_);
+myProblem ()->display ("minLotSize2DdMsg",    minLotSize2_);
+myProblem ()->display ("incLotSize2DdMsg",    incLotSize2_);
+}
+
+myProblem ()->display ("execCostDdMsg", execCost_);
+
+execBounds_->display ();
+
+if (myPreprocessor ()->preprocessed ())
+myMsgFac () ("executableDdMsg", executable_);
+
+myMsgFac () ("procBomHeadingDdMsg");
+
+if (bom_.isEmpty ())
+myMsgFac () ("noneDdMsg");
+else
+{
+myMsgFac () ("procBomHeading2DdMsg");
+
+forEachEl (theBomEnt, bom_)
+myMsgFac () ("procBomDataDdMsg",
+theBomEnt->myPartName (),
+theBomEnt->localIndex ());
+}
+
+myMsgFac () ("procBopHeadingDdMsg");
+
+if (bop_.isEmpty ())
+myMsgFac () ("noneDdMsg");
+else
+{
+myMsgFac () ("procBopHeading2DdMsg");
+
+forEachEl (theBopEnt, bop_)
+myMsgFac () ("procBopDataDdMsg",
+theBopEnt->myPartName (),
+theBopEnt->localIndex ());
+}
+d619 2
+a620 2
+WitDelComp::display ();
+}
+d625 2
+a626 2
+{
+witAssert (myHeurAllMgr ()->updatingSoln ());
+d628 2
+a629 2
+execVol_ = 0.0;
+}
+d634 24
+a657 24
+WitPeriod thePer,
+double    theExecVol,
+double    delta)
+{
+double preLsVol;
+double lsVol;
+
+if (not lotSizeMode (thePer))
+return delta;
+
+preLsVol = theExecVol + delta;
+
+if (preLsVol < FLOAT_EPSILON)
+return delta;
+
+if (not twoLevelLotSizes_)
+lsVol =
+lotSizedExecVol (
+thePer,
+preLsVol,
+minLotSize_,
+incLotSize_);
+else
+lsVol = tllsExecVol (thePer, preLsVol);
+d659 2
+a660 2
+return lsVol - theExecVol;
+}
+d665 2
+a666 2
+{
+WitPeriod thePer;
+d668 3
+a670 3
+fprintf (solnFile (),
+"\nOperation %s:\n",
+operationName ().myCstring ());
+d672 1
+a672 1
+fprintf (solnFile (), "Period      ExecVol");
+d674 2
+a675 2
+if (fssComputed ())
+fprintf (solnFile (), "   FssExecVol");
+d677 1
+a677 1
+fprintf (solnFile (), "\n");
+d679 3
+a681 3
+forEachPeriod (thePer, myProblem ())
+{
+fprintf (solnFile (), "%6d", thePer);
+d683 1
+a683 1
+writeSolnValue (execVol ()[thePer]);
+d685 2
+a686 2
+if (fssComputed ())
+writeSolnValue (fssExecVol ()[thePer]);
+d688 3
+a690 3
+fprintf (solnFile (), "\n");
+}
+}
+d695 2
+a696 2
+{
+WitPeriod thePer;
+d698 1
+a698 1
+fprintf (solnFile (), "\nOperation %s:\n", operationName ().myCstring ());
+d700 1
+a700 1
+fprintf (solnFile (), "Period   MrpExecVol\n");
+d702 3
+a704 3
+forEachPeriod (thePer, myProblem ())
+{
+fprintf (solnFile (), "%6d", thePer);
+d706 1
+a706 1
+writeSolnValue (mrpExecVol_[thePer]);
+d708 3
+a710 3
+fprintf (solnFile (), "\n");
+}
+}
+d715 3
+a717 3
+{
+return execBounds_;
+}
+d722 5
+a726 5
+{
+myDataWriter ()->writeFirstKeyWord ("add");
+myDataWriter ()->writeKeyWord      ("operation");
+myDataWriter ()->writeStringValue  (operationName ());
+}
+d731 2
+a732 2
+{
+WitNode::writeDataAttrs ();
+d734 55
+a788 55
+myDataWriter ()->writeVector (
+"yieldRate",
+yieldRate_,
+defYieldRate ());
+
+myDataWriter ()->writeVector (
+"minLotSize",
+minLotSize_,
+defMinLotSize ());
+
+myDataWriter ()->writeVector (
+"incLotSize",
+incLotSize_,
+defIncLotSize ());
+
+myDataWriter ()->writeBool (
+"twoLevelLotSizes",
+twoLevelLotSizes_,
+defTwoLevelLotSizes ());
+
+myDataWriter ()->writeVector (
+"lotSize2Thresh",
+lotSize2Thresh_,
+defLotSize2Thresh ());
+
+myDataWriter ()->writeVector (
+"minLotSize2",
+minLotSize2_,
+defMinLotSize2 ());
+
+myDataWriter ()->writeVector (
+"incLotSize2",
+incLotSize2_,
+defIncLotSize2 ());
+
+myDataWriter ()->writeDouble (
+"execPenalty",
+execPenalty_,
+defExecPenalty ());
+
+myDataWriter ()->writeObjVec (
+"execCost",
+execCost_,
+defExecCost ());
+
+myDataWriter ()->writeBool (
+"intExecVols",
+intExecVols_,
+defIntExecVols ());
+
+if (wit34Compatible ())
+myDataWriter ()->writeVector (
+"cycleTime34",
+cycleTime34_,
+defCycleTime34 ());
+d790 2
+a791 2
+execBounds_->writeData ();
+}
+d796 4
+a799 4
+{
+purgeSelComps (bom_);
+purgeSelComps (bop_);
+}
+d804 4
+a807 4
+{
+bom_.clear ();
+bop_.clear ();
+}
+d812 7
+a818 7
+{
+if (not myGlobalComp ()->lotSizesExist ())
+return false;
+
+if (not myProblem ()->myOrigMrpExp ()->exploding ())
+if (not myProblem ()->currentVariant ()->respectsLotSizes ())
+return false;
+d820 2
+a821 2
+if (incLotSize_[thePer] < 0.0009)
+return false;
+d823 2
+a824 2
+return true;
+}
+d829 31
+a859 31
+{
+double ls2t;
+double ls1Vol;
+
+ls2t = lotSize2Thresh_[thePer];
+
+if (theExecVol >= ls2t - myGlobalComp ()->lotSizeTol ())
+return
+lotSizedExecVol (
+thePer,
+theExecVol,
+minLotSize2_,
+incLotSize2_);
+
+ls1Vol =
+lotSizedExecVol (
+thePer,
+theExecVol,
+minLotSize_,
+incLotSize_);
+
+if (ls1Vol >= ls2t - myGlobalComp ()->lotSizeTol ())
+return
+lotSizedExecVol (
+thePer,
+ls2t,
+minLotSize2_,
+incLotSize2_);
+else
+return ls1Vol;
+}
+d864 8
+a871 8
+WitPeriod             thePer,
+double                theExecVol,
+const WitDblFlexVec & mlsVec,
+const WitDblFlexVec & ilsVec)
+{
+double mls;
+double ils;
+double gridCoord;
+d873 1
+a873 1
+witAssert (theExecVol >= NET_TOL);
+d875 2
+a876 2
+mls       = mlsVec[thePer];
+ils       = ilsVec[thePer];
+d878 1
+a878 1
+gridCoord = (theExecVol - mls) / ils;
+d880 1
+a880 1
+gridCoord = ceil (gridCoord - myGlobalComp ()->lotSizeTol ());
+d882 2
+a883 2
+if (gridCoord < 0.0)
+gridCoord = 0.0;
+d885 2
+a886 2
+return mls + gridCoord * ils;
+}
+@
+
+
+1.8
+log
+@Fixed a bug in optInitMethod
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d6 2
+a7 2
+//     IBM Confidential 
+// 
+d45 22
+a66 22
+      WitNode           (theName, theCompMgr),
+      mappingIndex_     (myCompMgr ()->nOperations ()),
+      bom_              (),
+      bop_              (),
+      yieldRate_        (myProblem (), defYieldRate ()),
+      minLotSize_       (myProblem (), defMinLotSize ()),
+      incLotSize_       (myProblem (), defIncLotSize ()),
+      twoLevelLotSizes_ (defTwoLevelLotSizes ()),
+      lotSize2Thresh_   (myProblem (), defLotSize2Thresh ()),
+      minLotSize2_      (myProblem (), defMinLotSize2 ()),
+      incLotSize2_      (myProblem (), defIncLotSize2 ()),
+      execPenalty_      (defExecPenalty ()),
+      execCost_         (myProblem (), defExecCost ()),
+      intExecVols_      (defIntExecVols ()),
+      cycleTime34_      (myProblem (), defCycleTime34 ()),
+      execVol_          (myProblem (), 0.0),
+      execBounds_       (NULL),
+      executable_       (myProblem (), false),
+      mrpExecVol_       (myProblem (), 0.0),
+      fssExecVol_       (myProblem (), 0.0)
+   {
+   execBounds_ = new WitExecBoundSet (this);
+d68 2
+a69 2
+   myCompMgr ()->insert (this);
+   }
+d74 3
+a76 3
+   {
+   delete execBounds_;
+   }
+d81 3
+a83 3
+   {
+   return theProblem->myCompMgr ()->nOperations ();
+   }
+d90 3
+a92 3
+   {
+   myCompMgr ()->setOperationName (this, theName);
+   }
+d97 2
+a98 2
+   {
+   WitPeriod thePer;
+d100 1
+a100 1
+   witAssert (theValue != NULL);
+d102 3
+a104 3
+   if (DEBUG_MODE)
+      forEachPeriod (thePer, myProblem ())
+         witAssert (validYieldRate (theValue[thePer]));
+d106 1
+a106 1
+   prepSetUnpreAttr ();
+d108 2
+a109 2
+   yieldRate_ = theValue;
+   }
+d114 2
+a115 2
+   {
+   witAssert (theValue != NULL);
+d117 1
+a117 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d119 1
+a119 1
+   prepSetUnpreAttr ();
+d121 2
+a122 2
+   minLotSize_ = theValue;
+   }
+d127 2
+a128 2
+   {
+   witAssert (theValue != NULL);
+d130 1
+a130 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d132 1
+a132 1
+   prepSetUnpreAttr ();
+d134 2
+a135 2
+   incLotSize_ = theValue;
+   }
+d140 2
+a141 2
+   {
+   prepSetUnpreAttr ();
+d143 2
+a144 2
+   twoLevelLotSizes_ = theValue;
+   }
+d149 2
+a150 2
+   {
+   witAssert (theValue != NULL);
+d152 1
+a152 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d154 1
+a154 1
+   prepSetUnpreAttr ();
+d156 2
+a157 2
+   lotSize2Thresh_ = theValue;
+   }
+d162 2
+a163 2
+   {
+   witAssert (theValue != NULL);
+d165 1
+a165 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d167 1
+a167 1
+   prepSetUnpreAttr ();
+d169 2
+a170 2
+   minLotSize2_ = theValue;
+   }
+d175 2
+a176 2
+   {
+   witAssert (theValue != NULL);
+d178 1
+a178 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d180 1
+a180 1
+   prepSetUnpreAttr ();
+d182 2
+a183 2
+   incLotSize2_ = theValue;
+   }
+d188 2
+a189 2
+   {
+   witAssert (theValue >= 0.0);
+d191 1
+a191 1
+   prepSetUnpostAttr ();
+d193 2
+a194 2
+   execPenalty_ = theValue;
+   }
+d199 2
+a200 2
+   {
+   witAssert (theValue != NULL);
+d202 1
+a202 1
+   prepSetScenSpecAttr ("execCost");
+d204 2
+a205 2
+   execCost_.curDblFlexVec () = theValue;
+   }
+d210 2
+a211 2
+   {
+   prepSetUnpreAttr ();
+d213 2
+a214 2
+   intExecVols_ = theValue;
+   }
+d219 2
+a220 2
+   {
+   witAssert (theValue != NULL);
+d222 1
+a222 1
+   witAssert (theValue.isNonNeg (nPeriods ()));
+d224 3
+a226 3
+   if (myProblem ()->myHeurAllMgr ()->modifiable ())
+      {
+      prepSetNonUnpostAttr ();
+d228 5
+a232 5
+      myProblem ()->myHeurModifier ()->modifyForExecVol (this, theValue);
+      }
+   else
+      {
+      myDetOptImpMgr ()->shutDown ();
+d234 1
+a234 1
+      myOptComp ()->schedOptStarter ()->beChosen ();
+d236 2
+a237 2
+      prepSetUnpostAttr ();
+      }
+d239 2
+a240 2
+   execVol_ = theValue;
+   }
+d245 2
+a246 2
+   {
+   WitBomEntry * theBomEnt;
+d248 1
+a248 1
+   witAssert (theValue != NULL);
+d250 1
+a250 1
+   witAssert (wit34Compatible ());
+d252 1
+a252 1
+   prepSetUnpreAttr ();
+d254 2
+a255 2
+   forEachEl (theBomEnt, bom ())
+      theBomEnt->adjustOffset (theValue);
+d257 2
+a258 2
+   cycleTime34_ = theValue;
+   }
+d263 2
+a264 2
+   {
+   witAssert (myPreprocessor ()->preprocessing ());
+d266 2
+a267 2
+   executable_[thePer] = theValue;
+   }
+d272 2
+a273 2
+   {
+   witAssert (myHeurAllMgr ()->updatingSoln ());
+d275 2
+a276 2
+   execVol_.elemRef (thePer) = theValue;
+   }
+d281 2
+a282 2
+   {
+   witAssert (myDetOptImpMgr ()->uploadingSoln ());
+d284 2
+a285 2
+   execVol_.elemRef (thePer) = theValue;
+   }
+d290 2
+a291 2
+   {
+   witAssert (myStochImpMgr ()->uploadingData ());
+d293 2
+a294 2
+   execCost_.curDblFlexVec () = theFlexVec;
+   }
+d299 2
+a300 2
+   {
+   witAssert (myStochImpMgr ()->uploadingData ());
+d302 2
+a303 2
+   execVol_ = theFlexVec;
+   }
+d308 2
+a309 2
+   {
+   witAssert (myOrigMrpExp ()->uploadingSoln ());
+d311 2
+a312 2
+   mrpExecVol_ = theTVec;
+   }
+d317 2
+a318 2
+   {
+   witAssert (myFSS ()->uploadingSoln ());
+d320 2
+a321 2
+   fssExecVol_ = theTVec;
+   }
+d328 3
+a330 3
+   {
+   bom_.appendUniquely (theBomEnt);
+   }
+d335 3
+a337 3
+   {
+   bop_.appendUniquely (theBopEnt);
+   }
+d342 3
+a344 3
+   {
+   return (myCompMgr ()->findOperation (operationName ().myCstring ()) == this);
+   }
+d349 3
+a351 3
+   {
+   execCost_.writeDataMulti ("execCost", this, theObj);
+   }
+d356 7
+a362 7
+   {
+   if (execVol () == defExecVol ())
+      return;
+
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+d364 1
+a364 1
+   myDataWriter ()->writeVector ("execVol", execVol (), defExecVol ());
+d366 2
+a367 2
+   myDataWriter ()->writeEndCommand ();
+   }
+d372 2
+a373 2
+   {
+   WitOperation * theOpn;
+d375 1
+a375 1
+   theOpn = new WitOperation (operationName ().myCstring (), theCompMgr);
+d377 2
+a378 2
+   theOpn->copyAttrsFrom (this);
+   }
+d383 2
+a384 2
+   {
+   mappingIndex_ = myCompMgr ()->nOperations ();
+d386 2
+a387 2
+   myCompMgr ()->recountOperation (this);
+   }
+d392 3
+a394 3
+   {
+   executable_ = false;
+   }
+d399 2
+a400 2
+   {                              
+   witAssert (myDetOptImpMgr ()->clearingSoln ());
+d402 2
+a403 2
+   execVol_ = 0.0;
+   }
+d408 2
+a409 2
+   {
+   WitComponent::clearStochSoln ();
+d411 2
+a412 2
+   execVol_ = 0.0;
+   }
+d417 3
+a419 3
+   {
+   return this;
+   }
+d424 4
+a427 4
+   {
+   if (myMsgFac ().mayIssue ("operationInstIDMsg"))
+      myMsgFac () ("operationInstIDMsg", operationName ());
+   }
+d432 5
+a436 5
+   {
+   myDataWriter ()->writeFirstKeyWord ("set");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+   }
+d441 3
+a443 3
+   {
+   return myMsgFac ().myFrag ("operationFrag");
+   }
+d448 3
+a450 3
+   {
+   return WitAT_OPERATION;
+   }
+d455 3
+a457 3
+   {
+   return myCompMgr ()->nParts () + mappingIndex_;
+   }
+d462 4
+a465 4
+   {
+   if    (theValue >= 0.01 - FLOAT_EPSILON)
+      if (theValue <= 1.0  + FLOAT_EPSILON)
+         return true;
+d467 2
+a468 2
+   return (theValue == 0.0);
+   }
+d473 2
+a474 2
+   {
+   witAssert (wit34Compatible ());
+d476 2
+a477 2
+   if (cycleTime34 ()[thePer] < 0.0)
+      return true;
+d479 2
+a480 2
+   if (static_cast <int> (cycleTime34 ()[thePer]) > thePer)
+      return true;
+d482 2
+a483 2
+   return false;
+   }
+d488 2
+a489 2
+   {
+   WitPeriod thePer;
+d491 11
+a501 11
+   if (wit34Compatible ())
+      if (not newValue)
+         {
+         forEachPeriod (thePer, myProblem ())
+            if (cycleTime34PreventsExec (thePer))
+               if (yieldRate_[thePer] != 0.0)
+                  yieldRate_.elemRef (thePer) = 0.0;
+
+         cycleTime34_ = 0.0;
+         }
+   }
+d506 2
+a507 2
+   {
+   WitNode::copyAttrsFrom (theOpn);
+d509 17
+a525 17
+   yieldRate_         = theOpn->yieldRate_;
+   minLotSize_        = theOpn->minLotSize_;
+   incLotSize_        = theOpn->incLotSize_;
+   twoLevelLotSizes_  = theOpn->twoLevelLotSizes_;
+   lotSize2Thresh_    = theOpn->lotSize2Thresh_;
+   minLotSize2_       = theOpn->minLotSize2_;
+   incLotSize2_       = theOpn->incLotSize2_;
+   execPenalty_       = theOpn->execPenalty_;
+   execCost_          = theOpn->execCost_;
+   intExecVols_       = theOpn->intExecVols_;
+
+   if (wit34Compatible ())
+      cycleTime34_    = theOpn->cycleTime34_;
+
+   execBounds_->
+      copyAttrsFrom    (theOpn->execBounds_);
+   }
+d530 21
+a550 21
+   {
+   int           nBroadProduced;
+   WitBopEntry * theBopEnt;
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+
+   nBroadProduced = 0;
+
+   forEachEl (theBopEnt, bop ())
+      if (theBopEnt->productRate ()[execPer] > 0.0)
+         ++ nBroadProduced;
+
+   forEachEl (theBomEnt, bom ())
+      {
+      if (theBomEnt->consRate ()[execPer] < 0.0)
+         ++ nBroadProduced;
+
+      forEachEl (theSub, theBomEnt->mySubEntries ())
+         if (theSub->consRate ()[execPer] < 0.0)
+            ++ nBroadProduced;
+      }
+d552 2
+a553 2
+   return (nBroadProduced > 1);
+   }
+d558 60
+a617 60
+   {
+   WitBomEntry * theBomEnt;
+   WitBopEntry * theBopEnt;
+
+   myMsgFac () ("opnIdDdMsg", operationName ());
+
+   myMsgFac () ("opnScalarsDdMsg", 
+      mappingIndex_,
+      twoLevelLotSizes_,
+      execPenalty_,
+      intExecVols_);
+
+   if (wit34Compatible ())
+      myProblem ()->display ("cycleTime34DdMsg", cycleTime34_);
+
+   myProblem ()->display ("yieldRateDdMsg",  yieldRate_);
+   myProblem ()->display ("minLotSizeDdMsg", minLotSize_);
+   myProblem ()->display ("incLotSizeDdMsg", incLotSize_);
+
+   if (twoLevelLotSizes_)
+      {
+      myProblem ()->display ("lotSize2ThreshDdMsg", lotSize2Thresh_);
+      myProblem ()->display ("minLotSize2DdMsg",    minLotSize2_);
+      myProblem ()->display ("incLotSize2DdMsg",    incLotSize2_);
+      }
+
+   myProblem ()->display ("execCostDdMsg", execCost_);
+
+   execBounds_->display ();
+
+   if (myPreprocessor ()->preprocessed ())
+      myMsgFac () ("executableDdMsg", executable_);
+
+   myMsgFac () ("procBomHeadingDdMsg");
+
+   if (bom_.isEmpty ())
+      myMsgFac () ("noneDdMsg");
+   else
+      {
+      myMsgFac () ("procBomHeading2DdMsg");
+
+      forEachEl (theBomEnt, bom_)
+         myMsgFac () ("procBomDataDdMsg",
+            theBomEnt->myPartName (),
+            theBomEnt->localIndex ());
+      }
+
+   myMsgFac () ("procBopHeadingDdMsg");
+
+   if (bop_.isEmpty ())
+      myMsgFac () ("noneDdMsg");
+   else
+      {
+      myMsgFac () ("procBopHeading2DdMsg");
+
+      forEachEl (theBopEnt, bop_)
+         myMsgFac () ("procBopDataDdMsg",
+            theBopEnt->myPartName (),
+            theBopEnt->localIndex ());
+      }
+d619 2
+a620 2
+   WitDelComp::display ();
+   }
+d625 2
+a626 2
+   {
+   witAssert (myHeurAllMgr ()->updatingSoln ());
+d628 2
+a629 2
+   execVol_ = 0.0;
+   }
+d634 24
+a657 24
+      WitPeriod thePer,
+      double    theExecVol,
+      double    delta)
+   {
+   double preLsVol;
+   double lsVol;
+
+   if (not lotSizeMode (thePer))
+      return delta;
+
+   preLsVol = theExecVol + delta;
+
+   if (preLsVol < FLOAT_EPSILON)
+      return delta;
+
+   if (not twoLevelLotSizes_)
+      lsVol =
+         lotSizedExecVol (
+            thePer, 
+            preLsVol,
+            minLotSize_, 
+            incLotSize_);
+   else
+      lsVol = tllsExecVol (thePer, preLsVol);
+d659 2
+a660 2
+   return lsVol - theExecVol;
+   }
+d665 2
+a666 2
+   {
+   WitPeriod thePer;
+d668 3
+a670 3
+   fprintf (solnFile (),
+      "\nOperation %s:\n",
+      operationName ().myCstring ());
+d672 1
+a672 1
+   fprintf (solnFile (), "Period      ExecVol");
+d674 2
+a675 2
+   if (fssComputed ())
+      fprintf (solnFile (), "   FssExecVol");
+d677 1
+a677 1
+   fprintf (solnFile (), "\n");
+d679 3
+a681 3
+   forEachPeriod (thePer, myProblem ())
+      {
+      fprintf (solnFile (), "%6d", thePer);
+d683 1
+a683 1
+      writeSolnValue (execVol ()[thePer]);
+d685 2
+a686 2
+      if (fssComputed ())
+         writeSolnValue (fssExecVol ()[thePer]);
+d688 3
+a690 3
+      fprintf (solnFile (), "\n");
+      }
+   }
+d695 2
+a696 2
+   {
+   WitPeriod thePer;
+d698 1
+a698 1
+   fprintf (solnFile (), "\nOperation %s:\n", operationName ().myCstring ());
+d700 1
+a700 1
+   fprintf (solnFile (), "Period   MrpExecVol\n");
+d702 3
+a704 3
+   forEachPeriod (thePer, myProblem ())
+      {
+      fprintf (solnFile (), "%6d", thePer);
+d706 1
+a706 1
+      writeSolnValue (mrpExecVol_[thePer]);
+d708 3
+a710 3
+      fprintf (solnFile (), "\n");
+      }
+   }
+d715 3
+a717 3
+   {
+   return execBounds_;
+   }
+d722 5
+a726 5
+   {
+   myDataWriter ()->writeFirstKeyWord ("add");
+   myDataWriter ()->writeKeyWord      ("operation");
+   myDataWriter ()->writeStringValue  (operationName ());
+   }
+d731 2
+a732 2
+   {
+   WitNode::writeDataAttrs ();
+d734 55
+a788 55
+   myDataWriter ()->writeVector (
+      "yieldRate",
+      yieldRate_,
+      defYieldRate ());
+
+   myDataWriter ()->writeVector (
+      "minLotSize",
+      minLotSize_,
+      defMinLotSize ());
+
+   myDataWriter ()->writeVector (
+      "incLotSize",
+      incLotSize_,
+      defIncLotSize ());
+
+   myDataWriter ()->writeBool (
+      "twoLevelLotSizes",
+      twoLevelLotSizes_,
+      defTwoLevelLotSizes ());
+
+   myDataWriter ()->writeVector (
+      "lotSize2Thresh",
+      lotSize2Thresh_,
+      defLotSize2Thresh ());
+
+   myDataWriter ()->writeVector (
+      "minLotSize2",
+      minLotSize2_,
+      defMinLotSize2 ());
+
+   myDataWriter ()->writeVector (
+      "incLotSize2",
+      incLotSize2_,
+      defIncLotSize2 ());
+
+   myDataWriter ()->writeDouble (
+      "execPenalty",
+      execPenalty_,
+      defExecPenalty ());
+
+   myDataWriter ()->writeObjVec (
+        "execCost",
+         execCost_,
+      defExecCost ());
+
+   myDataWriter ()->writeBool (
+      "intExecVols",
+      intExecVols_,
+      defIntExecVols ());
+
+   if (wit34Compatible ())
+      myDataWriter ()->writeVector (
+         "cycleTime34",
+         cycleTime34_,
+         defCycleTime34 ());
+d790 2
+a791 2
+   execBounds_->writeData ();
+   }
+d796 4
+a799 4
+   {
+   purgeSelComps (bom_);
+   purgeSelComps (bop_);
+   }
+d804 4
+a807 4
+   {
+   bom_.clear ();
+   bop_.clear ();
+   }
+d812 7
+a818 7
+   {
+   if (not myGlobalComp ()->lotSizesExist ())
+      return false;
+
+   if (not myProblem ()->myOrigMrpExp ()->exploding ())
+      if (not myProblem ()->currentVariant ()->respectsLotSizes ())
+         return false;
+d820 2
+a821 2
+   if (incLotSize_[thePer] < 0.0009)
+      return false;
+d823 2
+a824 2
+   return true;
+   }
+d829 31
+a859 31
+   {
+   double ls2t;
+   double ls1Vol;
+
+   ls2t = lotSize2Thresh_[thePer];
+
+   if (theExecVol >= ls2t - myGlobalComp ()->lotSizeTol ())
+      return
+         lotSizedExecVol (
+            thePer,
+            theExecVol,
+            minLotSize2_,
+            incLotSize2_);
+
+   ls1Vol =
+      lotSizedExecVol (
+         thePer,
+         theExecVol,
+         minLotSize_,
+         incLotSize_);
+
+   if (ls1Vol >= ls2t - myGlobalComp ()->lotSizeTol ())
+      return
+         lotSizedExecVol (
+            thePer,
+            ls2t,
+            minLotSize2_,
+            incLotSize2_);
+   else
+      return ls1Vol;
+   }
+d864 8
+a871 8
+      WitPeriod             thePer,
+      double                theExecVol,
+      const WitDblFlexVec & mlsVec,
+      const WitDblFlexVec & ilsVec)
+   {
+   double mls;
+   double ils;
+   double gridCoord;
+d873 1
+a873 1
+   witAssert (theExecVol >= NET_TOL);
+d875 2
+a876 2
+   mls       = mlsVec[thePer];
+   ils       = ilsVec[thePer];
+d878 1
+a878 1
+   gridCoord = (theExecVol - mls) / ils;
+d880 1
+a880 1
+   gridCoord = ceil (gridCoord - myGlobalComp ()->lotSizeTol ());
+d882 2
+a883 2
+   if (gridCoord < 0.0)
+      gridCoord = 0.0;
+d885 2
+a886 2
+   return mls + gridCoord * ils;
+   }
+@
+
+
+1.7
+log
+@Modifiable heuristic allocation
+@
+text
+@d232 2
+@
+
+
+1.6
+log
+@Heuristic Adjustment
+@
+text
+@d30 1
+a30 1
+#include <HeurAdjuster.h>
+d224 1
+a224 1
+   if (myProblem ()->myHeurAllMgr ()->adjustMode ())
+d228 1
+a228 1
+      myProblem ()->myHeurAdjuster ()->adjustForExecVol (this, theValue);
+@
+
+
+1.5
+log
+@Heuristic Adjustment
+@
+text
+@d224 1
+a224 1
+   if (myProblem ()->myHeurAllMgr ()->heurAdjustActive ())
+@
+
+
+1.4
+log
+@Heuristic Adjustment
+@
+text
+@d224 1
+a224 1
+   if (myProblem ()->myHeurAdjuster ()->active ())
+@
+
+
+1.3
+log
+@Heuristic Adjustment
+@
+text
+@d30 1
+a30 1
+#include <HeurAdjMgr.h>
+d224 1
+a224 1
+   if (myProblem ()->myHeurAdjMgr ()->active ())
+d228 1
+a228 1
+      myProblem ()->myHeurAdjMgr ()->adjustForExecVol (this, theValue);
+@
+
+
+1.2
+log
+@Heuristic Adjustment
+@
+text
+@d634 1
+a634 2
+      double    delta,
+      bool      useTol)
+d653 1
+a653 2
+            incLotSize_, 
+            useTol);
+d655 1
+a655 1
+      lsVol = tllsExecVol (thePer, preLsVol, useTol);
+d826 1
+a826 4
+double WitOperation::tllsExecVol (
+      WitPeriod thePer,
+      double    theExecVol,
+      bool      useTol)
+d836 1
+a836 1
+            thePer, 
+d838 2
+a839 3
+            minLotSize2_, 
+            incLotSize2_, 
+            useTol);
+d843 1
+a843 1
+         thePer, 
+d845 2
+a846 3
+         minLotSize_, 
+         incLotSize_, 
+         useTol);
+d851 1
+a851 1
+            thePer, 
+d853 2
+a854 3
+            minLotSize2_, 
+            incLotSize2_, 
+            useTol);
+d865 1
+a865 2
+      const WitDblFlexVec & ilsVec,
+      bool                  useTol)
+d878 1
+a878 4
+   if (useTol)
+      gridCoord -= myGlobalComp ()->lotSizeTol ();
+
+   gridCoord = ceil (gridCoord);
+@
+
+
+1.1
+log
+@Heuristic Adjustment
+@
+text
+@d227 2
+@
+

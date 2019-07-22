@@ -1,0 +1,706 @@
+head	1.10;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2005.11.02.16.59.29;	author gresh;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.06.04.17.07.36;	author gresh;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.04.14.18.55.31;	author dpc;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.04.14.16.01.21;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.04.13.19.59.19;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.03.22.13.40.16;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.03.18.15.52.03;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.03.18.14.43.58;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.03.15.20.12.30;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.03.13.23.18.50;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@giving some attribute values nice names (such as appDeveloper instead of r1)
+@
+text
+@#ifndef RCPgnrlResourceFile_h
+#define RCPgnrlResourceFile_h
+
+#include "scoFile.h"
+#include "rcpOptCal.h"
+
+
+class RCPgnrlResourceFile : public SCOcsvFormatFile {
+public:
+
+  // Fields 
+  //getFieldH(jobRole);
+  //getFieldH(skillSet);
+  //getFieldH(LOB);
+  //getFieldH(source);
+  //getFieldH(resourceLocName);
+
+  getIntFieldH(period);
+  getIntFieldH(month);
+  getIntFieldH(year);
+  getFloatFieldH(supplyQuantity);
+  //getFloatFieldH(fixedCost);
+  
+  // preferred constructor
+  RCPgnrlResourceFile(
+    std::string filename,
+    int numResourceIdFields,
+    bool hasFixedCostField,
+    RcpOptCalendar::CalendarType calType )
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    numResourceIdFields_ = numResourceIdFields;
+    int numFields = numResourceIdFields + 1;
+    if ( hasFixedCostField ) ++numFields;
+    if ( calType==RcpOptCalendar::PERIOD ) ++numFields;
+    if ( calType==RcpOptCalendar::MONTH_YEAR ) numFields = numFields+2;
+    hasHeaderRecord(numFields);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+
+  std::string key( 
+    const std::vector<std::string> & resourceIdValues,
+    int period) const
+  {
+    //assert( resourceIdValues.size() == (unsigned int)numResourceIdFields_);
+    std::string retVal;
+    unsigned int i;
+    for ( i=0; i<resourceIdValues.size(); ++i ) {
+      retVal = retVal + resourceIdValues[i] + "!@@#$%";
+    }
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    retVal = retVal + periodchar ;
+    return retVal;
+  };
+  
+  // destructor
+  ~RCPgnrlResourceFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    // tests from resourceFile.h
+    {
+      RCPgnrlResourceFile file("../data/example1/resource.csv",5,true, RcpOptCalendar::PERIOD);
+      
+      // Test reading first record
+      
+      assert( file.fieldAsString(0,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(0,"skillSet")=="java" );
+      assert( file.fieldAsString(0,"LOB")=="AMS" );
+      assert( file.fieldAsString(0,"source")=="IBM" );
+      assert( file.fieldAsString(0,"resourceLocName")=="New York" );
+      assert( file.periodAsInt(0) == 1 );
+      assert( file.fieldAsInt(0,"period") == 1 );
+      assert( file.supplyQuantityAsFloat(0) == 20.f );
+      assert( file.fieldAsFloat(0,"supplyQuantity") == 20.f );
+      assert( file.fieldAsFloat(0,"fixedCost") == 1.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(1,"skillSet")=="java" );
+      assert( file.fieldAsString(1,"LOB")=="AMS" );
+      assert( file.fieldAsString(1,"source")=="IBM" );
+      assert( file.periodAsInt(1) == 2 );
+      assert( file.fieldAsInt(1,"period") == 2 );
+      assert( file.supplyQuantityAsFloat(1) == 40.f );
+      assert( file.fieldAsFloat(1,"supplyQuantity") == 40.f );
+      assert( file.fieldAsFloat(1,"fixedCost") == 1.f );
+      
+      
+      assert( file.fieldAsString(2,"jobRole")=="appDeveloper" );
+      assert( file.fieldAsString(2,"skillSet")=="java" );
+      assert( file.fieldAsString(2,"LOB")=="AMS" );
+      assert( file.fieldAsString(2,"source")=="IBM" );
+      assert( file.periodAsInt(2) == 3 );
+      assert( file.fieldAsInt(2,"period") == 3 );
+      assert( file.supplyQuantityAsFloat(2) == 43.f );
+      assert( file.fieldAsFloat(2,"supplyQuantity") == 43.f );
+      assert( file.fieldAsFloat(2,"fixedCost") == 1.f );
+      
+      
+      // Test reading record by key   
+      std::vector<std::string> vals;
+      vals.push_back("architect");
+      vals.push_back("c++");
+      vals.push_back("eBHS");
+      vals.push_back("SUBCON");
+      vals.push_back("New York");
+      std::string key = file.key(vals,1);
+      assert( file.supplyQuantityAsFloat(key) == 10.0f );
+      
+      
+      // try to read month. This should throw and exception since the
+      // calendar is of type period.
+      bool exceptionCaught = false;
+      try {
+        file.monthAsInt(1);
+      }
+      catch ( SCOexception e ) {
+        exceptionCaught = true;
+      }
+      assert (exceptionCaught);
+      
+      // now try to read the year
+      exceptionCaught = false;
+      try {
+        file.yearAsInt(0);
+      }
+      catch ( SCOexception e ) {
+        exceptionCaught = true;
+      }
+      assert (exceptionCaught);
+    }
+    
+    // tests from resourceFile04Feb.h
+    {
+
+      RCPgnrlResourceFile file("../data/example04Feb/resource.csv",12,false,RcpOptCalendar::PERIOD);
+      
+      // Test reading first record
+      
+      assert( file.fieldAsString(0,"jobRole")=="j1" );
+      assert( file.fieldAsString(0,"skillSet")=="java" );
+      assert( file.fieldAsString(0,"LOB")=="AMS" );
+      assert( file.fieldAsString(0,"source")=="ibm" );
+      assert( file.fieldAsString(0,"region")=="emea" );
+      assert( file.fieldAsString(0,"country")=="gb" );
+      assert( file.fieldAsString(0,"city")=="london" );
+      assert( file.periodAsInt(0) == 0 );
+      assert( file.fieldAsString(0,"band") == "7" );
+      assert( file.supplyQuantityAsFloat(0) == 20.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="j1" );
+      assert( file.fieldAsString(1,"skillSet")=="java" );
+      assert( file.fieldAsString(1,"LOB")=="AMS" );
+      assert( file.fieldAsString(1,"source")=="ibm" );
+      assert( file.fieldAsString(1,"region")=="na" );
+      assert( file.fieldAsString(1,"country")=="gb" );
+      assert( file.fieldAsString(1,"city")=="london" );
+      assert( file.periodAsInt(1) == 0 );
+      assert( file.fieldAsString(1,"band") == "7" );
+      assert( file.supplyQuantityAsFloat(1) == 10.f );      
+      
+      // Test reading record by key    
+      std::vector<std::string> vals;
+      vals.push_back("j1");
+      vals.push_back("java");
+      vals.push_back("AMS");
+      vals.push_back("ibm");
+      vals.push_back("emea");
+      vals.push_back("gb");
+      vals.push_back("london");
+      vals.push_back("abc");
+      vals.push_back("7");
+      vals.push_back("global");
+      vals.push_back("foo");
+      vals.push_back("transportation");
+      std::string key = file.key(vals,0);
+      assert( file.supplyQuantityAsFloat(key) == 20.0f );
+      
+    }
+
+  
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+
+
+    std::vector<std::string> vals;
+    int f;
+    for ( f=0; f<numResourceIdFields_; ++f ) {
+      std::string fv = fieldNAsString(recNum,f);
+      vals.push_back(fv);
+    }
+    
+    int p = periodAsInt(recNum);
+    std::string retVal = key(vals, p );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  RCPgnrlResourceFile();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlResourceFile( const RCPgnrlResourceFile& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlResourceFile&
+  operator=(const RCPgnrlResourceFile& rhs);
+
+  int numResourceIdFields_;
+};
+
+
+
+class RCPgnrlResourceFileIterator : public SCOfileIterator {
+public:
+  
+ 
+  getIntFieldFileWithIteratorH(month);
+  getIntFieldFileWithIteratorH(year);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(supplyQuantity);
+  //getFloatFieldFileWithIteratorH(fixedCost);
+
+  // preferred constructor
+  RCPgnrlResourceFileIterator(const RCPgnrlResourceFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~RCPgnrlResourceFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    // tests from resourceFile.h
+    {
+      RCPgnrlResourceFile file("../data/example1/resource.csv",5,true,RcpOptCalendar::PERIOD);
+      RCPgnrlResourceFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="appDeveloper" );
+          assert( fileIter.fieldOnRecord("skillSet")=="java" );
+          assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+          assert( fileIter.fieldOnRecord("source")=="IBM" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="New York" );
+          assert( fileIter.periodAsInt() == 1 );
+          assert( fileIter.fieldOnRecordAsInt("period") == 1 );
+          assert( fileIter.supplyQuantityAsFloat() == 20.f );
+          assert( fileIter.fieldOnRecordAsFloat("supplyQuantity") == 20.f );
+          assert( fileIter.fieldOnRecordAsFloat("fixedCost") == 1.0f );
+
+          // try to read month. This should throw and exception since the
+          // calendar is of type period.
+          bool exceptionCaught = false;
+          try {
+            fileIter.monthAsInt();
+          }
+          catch ( SCOexception e ) {
+            exceptionCaught = true;
+          }
+          assert (exceptionCaught);
+
+          // now try to read the year
+          exceptionCaught = false;
+          try {
+            fileIter.yearAsInt();
+          }
+          catch ( SCOexception e ) {
+            exceptionCaught = true;
+          }
+          assert (exceptionCaught);
+
+          
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+    }
+    
+    // tests from resourceFile04Feb.h
+    {
+      RCPgnrlResourceFile file("../data/example04Feb/resource.csv",12,false,RcpOptCalendar::PERIOD);
+      RCPgnrlResourceFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="j1" );
+          assert( fileIter.fieldOnRecord("skillSet")=="java" );
+          assert( fileIter.fieldOnRecord("LOB")=="AMS" );
+          assert( fileIter.fieldOnRecord("source")=="ibm" );
+          assert( fileIter.fieldOnRecord("region")=="emea" );
+          assert( fileIter.periodAsInt() == 0 );
+          assert( fileIter.supplyQuantityAsFloat() == 20.f );
+          
+          
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+    }
+    
+
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  RCPgnrlResourceFileIterator();
+  
+  // copy constructor  -- don't use!
+  RCPgnrlResourceFileIterator( const RCPgnrlResourceFileIterator& source );
+  
+  // assignment operator -- don't use!
+  RCPgnrlResourceFileIterator&
+  operator=(const RCPgnrlResourceFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.9
+log
+@commented out assorted asserts and did things to make the eclipse compiler happy. Also for cleanliness, added "acquireTime" to readResourceFile.
+@
+text
+@d73 5
+a77 5
+      assert( file.fieldAsString(0,"jobRole")=="r1" );
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+      assert( file.fieldAsString(0,"source")=="src1" );
+      assert( file.fieldAsString(0,"resourceLocName")=="l1" );
+d84 4
+a87 4
+      assert( file.fieldAsString(1,"jobRole")=="r1" );
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+      assert( file.fieldAsString(1,"source")=="src1" );
+d95 4
+a98 4
+      assert( file.fieldAsString(2,"jobRole")=="r1" );
+      assert( file.fieldAsString(2,"skillSet")=="s1" );
+      assert( file.fieldAsString(2,"LOB")=="LOB1" );
+      assert( file.fieldAsString(2,"source")=="src1" );
+d108 5
+a112 5
+      vals.push_back("r2");
+      vals.push_back("s2");
+      vals.push_back("LOB2");
+      vals.push_back("src2");
+      vals.push_back("l1");
+d147 2
+a148 2
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+d158 2
+a159 2
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+d171 2
+a172 2
+      vals.push_back("s1");
+      vals.push_back("LOB1");
+d258 5
+a262 5
+          assert( fileIter.fieldOnRecord("jobRole")=="r1" );
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+          assert( fileIter.fieldOnRecord("source")=="src1" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="l1" );
+d310 2
+a311 2
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+@
+
+
+1.8
+log
+@New file:  resourceIdPriorityFile.h  defines a new input file format for resource identifier priorities
+and added code to read in this file in populate
+
+Changed the spelling of ...Identifer... to ...Identifier...
+
+Modified priorityGapGlut1(), but this is not invoked yet.
+@
+text
+@d49 1
+a49 1
+    assert( resourceIdValues.size() == numResourceIdFields_);
+@
+
+
+1.7
+log
+@use month/year format
+@
+text
+@d5 1
+a5 1
+#include "RcpOptCal.h"
+@
+
+
+1.6
+log
+@modified to include cassert instead of assert.h
+@
+text
+@d44 1
+a44 15
+#if 0
+  static std::string key( 
+    const std::string & jobRole,
+    const std::string & skillSet,
+    const std::string & LOB,
+    const std::string & source,
+    const std::string & locName,
+    int period) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = jobRole + "!@@#$%" + skillSet + "!@@#$%"+ LOB + "!@@#$%" + source + "!@@#$%" + locName + "!@@#$%" + periodchar ;
+    return retVal;
+  };
+#endif
+d196 1
+a196 10
+#if 0
+    std::string retVal = key(
+      jobRole(recNum),
+      skillSet(recNum),
+      LOB(recNum),
+      source(recNum),
+      resourceLocName(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+#endif
+d230 1
+a230 6
+  // fields 
+  //getFieldFileWithIteratorH(jobRole);
+  //getFieldFileWithIteratorH(skillSet);
+  //getFieldFileWithIteratorH(LOB);
+  //getFieldFileWithIteratorH(source);
+  //getFieldFileWithIteratorH(resourceLocName);
+@
+
+
+1.5
+log
+@trivial changes from int to unsigned int to make the compiler happier
+@
+text
+@d5 1
+d19 2
+d28 2
+a29 1
+    bool hasFixedCostField )
+d35 1
+a35 1
+    int numFields = numResourceIdFields + 2;
+d37 2
+d83 1
+a83 1
+      RCPgnrlResourceFile file("../data/example1/resource.csv",5,true);
+d129 22
+d156 1
+a156 1
+      RCPgnrlResourceFile file("../data/example04Feb/resource.csv",12,false);
+d259 2
+d278 1
+a278 1
+      RCPgnrlResourceFile file("../data/example1/resource.csv",5,true);
+d296 22
+d329 1
+a329 1
+      RCPgnrlResourceFile file("../data/example04Feb/resource.csv",12,false);
+@
+
+
+1.4
+log
+@fixed some unit test cases
+@
+text
+@d59 1
+a59 1
+    int i;
+@
+
+
+1.3
+log
+@iterator self-tests were using a non-existant directory
+@
+text
+@d173 1
+a173 4
+    // tests from resourceFileSimple.h
+    {
+            
+    }
+d302 1
+a302 3
+    // test from resourceFileSimple.h
+    {
+    }
+@
+
+
+1.2
+log
+@incremental changes in support of vector handling of resources
+@
+text
+@d175 1
+a175 47
+      RCPgnrlResourceFile file("../data/example_simple/resource.csv",5,false);
+      
+      // Test reading first record
+      
+      assert( file.fieldAsString(0,"jobRole")=="DetailA" );
+      assert( file.fieldAsString(0,"skillSet")=="s1" );
+      assert( file.fieldAsString(0,"LOB")=="LOB1" );
+      assert( file.fieldAsString(0,"source")=="src1" );
+      assert( file.fieldAsString(0,"resourceLocName")=="l1" );
+      assert( file.fieldAsInt(0,"period") == 0 );
+      assert( file.fieldAsFloat(0,"supplyQuantity") == 20.f );
+      assert( file.periodAsInt(0) == 0 );
+      assert( file.supplyQuantityAsFloat(0) == 20.f );
+      
+      assert( file.fieldAsString(1,"jobRole")=="DetailB" );
+      assert( file.fieldAsString(1,"skillSet")=="s1" );
+      assert( file.fieldAsString(1,"LOB")=="LOB1" );
+      assert( file.fieldAsString(1,"source")=="src1" );
+      assert( file.fieldAsInt(1,"period") == 0 );
+      assert( file.fieldAsFloat(1,"supplyQuantity") == 10.f );
+      assert( file.periodAsInt(1) == 0 );
+      assert( file.supplyQuantityAsFloat(1) == 10.f );
+      
+      assert( file.fieldAsString(2,"jobRole")=="DetailC" );
+      assert( file.fieldAsString(2,"skillSet")=="s1" );
+      assert( file.fieldAsString(2,"LOB")=="LOB1" );
+      assert( file.fieldAsString(2,"source")=="src1" );
+      assert( file.fieldAsInt(2,"period") == 0 );
+      assert( file.fieldAsFloat(2,"supplyQuantity") == 40.f );
+      assert( file.periodAsInt(2) == 0 );
+      assert( file.supplyQuantityAsFloat(2) == 40.f );
+      
+      
+      
+      // Test reading record by key      
+      std::vector<std::string> vals;
+      vals.push_back("DetailC");
+      vals.push_back("s1");
+      vals.push_back("LOB1");
+      vals.push_back("src1");
+      vals.push_back("l1");
+      std::string key = file.key(vals,1);
+      assert( file.supplyQuantityAsFloat(key) == 40.0f );
+      
+      //std::string key = file.key("DetailC","s1","LOB1","src1","l1",1);
+      //assert( file.supplyQuantityAsFloat(key) == 40.0f );
+      
+a306 22
+      RCPgnrlResourceFile file("../data/example_simple/resource.csv",5,false);
+      RCPgnrlResourceFileIterator fileIter(file);
+      
+      // loop once for each record
+      int recNo=0;
+      for ( ; fileIter()!=NULL; ) {    
+        if ( recNo == 0 ) {
+          
+          assert( fileIter.fieldOnRecord("jobRole")=="DetailA" );
+          assert( fileIter.fieldOnRecord("skillSet")=="s1" );
+          assert( fileIter.fieldOnRecord("LOB")=="LOB1" );
+          assert( fileIter.fieldOnRecord("source")=="src1" );
+          assert( fileIter.fieldOnRecord("resourceLocName")=="l1" );
+          assert( fileIter.periodAsInt() == 0 );
+          assert( fileIter.supplyQuantityAsFloat() == 20.f );
+          
+        }
+        recNo++;
+      }
+      
+      // number of records including comments
+      //assert( fileIter.recNum()==27);
+@
+
+
+1.1
+log
+@New file gnrlResourceFile.h with classes
+  RCPgnrlResourceFile
+  RCPgnrlResourceFileIterator
+These classes generalize the reading of the various resource files
+and replaces the use of files:
+  resourceFile04Feb.h
+  resourceFileSimple.h
+  resourceFileSimpleSubs.h
+  resourceFile.h
+These replaced files are still in cvs but are ifdef'ed out.
+
+RCPgnrlResourceFile's constructor is:
+  RCPgnrlResourceFile(fileName,numResourceIdFields,x)
+where x is true if the file contains fixedCost field.
+@
+text
+@d16 1
+@
+

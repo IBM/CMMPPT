@@ -1,0 +1,732 @@
+head	1.12;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.12
+date	2004.12.16.03.55.23;	author fasano;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.11.19.14.23.22;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2004.11.15.16.50.23;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2004.11.10.14.50.15;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2004.11.10.04.11.31;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.11.09.18.29.44;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.11.09.05.12.13;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.11.02.03.29.44;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.11.01.23.32.55;	author grzes;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.10.30.20.22.38;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.10.30.16.19.57;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.19.24.05;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.12
+log
+@added method:
+void getDemands(std::vector<std::string> & demandName,std::vector<std::string> & demandedPartName) const;
+@
+text
+@#ifndef SCO_PROBLEM_BASE_H
+#define SCO_PROBLEM_BASE_H
+
+//#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
+#include <cassert>
+#include "checkWitRC.h"
+
+#include <wit.h>
+
+extern "C" {typedef witReturnCode (STDCALL * witSetNameFloatStar) (
+   WitRun * const theWitRun,
+   const char * const name,
+   const float * const floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witSetDblNameIntStar) (
+   WitRun * const theWitRun,
+   const char * const partName,
+   const char * const demandName,
+   const int * const intVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameFloatStarStar) (
+   WitRun * const theWitRun,
+   const char * const name,
+   float ** floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witSetName3FloatStar) (
+   WitRun * const theWitRun,
+   const char * const operationName,
+   const float * const hardLower,
+   const float * const softLower,
+   const float * const hardUpper);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetName3FloatStar) (
+   WitRun * const theWitRun,
+   const char * const operationName,
+   float ** hardLower,
+   float ** softLower,
+   float ** hardUpper);}
+
+extern "C" {typedef witReturnCode (STDCALL * witSetNameIndexFloatStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,
+   const float * const floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witSetNameIndexIndexFloatStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,   
+   const int subEntryIndex,
+   const float * const floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexFloatStarStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,
+   float ** floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIntStarStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,
+   int ** intVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexFloatStarStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,   
+   const int subEntryIndex,
+   float ** floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexIntStarStar) (
+   WitRun * const theWitRun,
+   const char * const name,   
+   const int bopEntryIndex,   
+   const int subEntryIndex,
+   int ** intVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexIntStar) (
+   WitRun * const theWitRun,
+   const char * const consumingOperationName,
+   const int bomEntryIndex,
+   const int subsBomEntryIndex,
+   int * earliestPeriod);}
+
+extern "C" {typedef witReturnCode (STDCALL * witSetDblNameFloatStar) (
+   WitRun * const theWitRun,
+   const char * const partName,  
+   const char * const demandName, 
+   const float * const floatVec);}
+
+extern "C" {typedef witReturnCode (STDCALL * witGetDblNameFloatStarStar) (
+   WitRun * const theWitRun,
+   const char * const partName,
+   const char * const demandName,
+   float ** floatVec);}
+
+class SCOproblemBase  {
+public:
+
+  //----------------------------------
+  // Methods for global attributes.
+  //----------------------------------
+  // Set/Get String Describing Problem
+  void setTitle(const std::string & title);
+  std::string getTitle() const;
+
+  // Set/Get Number of Periods in Problem
+  void setNPeriods(int nP);
+  inline int getNPeriods() const
+  {
+    int retVal = nPeriods_;
+#ifndef NDEBUG
+    //std::cout <<"called getNPeriods()" <<std::endl;
+    int nP;
+    checkWitRC(witGetNPeriods(mutableWitRun(),&nP));
+    assert(nP==retVal);
+#endif
+    return retVal;
+  }
+
+
+  // File methods
+  void setOslMesgFileName(const std::string & name);
+  FILE * getWitMesgFilePtr()const ;
+  std::string getWitMesgFileName()const ;
+  
+
+  
+  //--------------------
+  // Key Performance Indicators
+  //--------------------
+  double getObjValue() const;
+
+
+  //----------------------------------------------------------------------
+
+  void writeWitData( std::string filename ) const;
+
+
+  // default constructor
+  SCOproblemBase();
+
+  // alternate constructor
+  SCOproblemBase(const std::string & outputDirectory );
+  
+  // copy constructor
+  SCOproblemBase( const SCOproblemBase& source );
+  
+  // assignment operator
+  SCOproblemBase&
+  operator=(const SCOproblemBase& rhs);
+  
+  // destructor
+  ~SCOproblemBase();
+  
+
+  // Self-test
+  static void test();
+
+protected:
+   
+  // Set element of Part/Operation float* attribute, given period and fltValue
+  void wwitSetNameAttribute(
+    witGetNameFloatStarStar witGetFunc,
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    int period, 
+    float supply ); 
+  
+  // Set Part/Operation float* attribute, given std::vector<float>
+  void wwitSetNameAttribute(
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    const std::vector<float> & value );
+
+  // Set Part/Operation float* attribute, given float
+  void wwitSetNameAttribute(
+    witSetNameFloatStar     witSetFunc,
+    const std::string & name,
+    float value );
+  
+  // Set Part/Operation bound attribute, given three std::vector<float> vectors
+  void wwitSetNameBoundAttribute(
+    witSetName3FloatStar     witSetFunc,
+    const std::string & name,
+    const std::vector<float> & hlb,
+    const std::vector<float> & slb,
+    const std::vector<float> & hub );
+
+  // Set element on bom/bop float* attribute, given period and fltValue
+  void wwitSetArcAttribute(
+    witGetNameIndexFloatStarStar witGetFunc,
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    int period, 
+    float flt );
+
+  // Set element on bom/bop float* attribute, given std::vector<float>
+  void wwitSetArcAttribute(
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    const std::vector<float> & value );
+
+  // Set element on bom/bop float* attribute, given float
+  void wwitSetArcAttribute(
+    witSetNameIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index,
+    float value );
+
+  // Set element on demand float* attribute, given period and fltValue
+  void wwitSetDemandAttribute(
+    witGetDblNameFloatStarStar      witGetFunc,
+    witSetDblNameFloatStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    int period, 
+    float flt );
+  
+  void wwitSetDemandAttribute(
+    witSetDblNameFloatStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    float flt );
+
+  void wwitSetDemandAttribute(
+    witSetDblNameFloatStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    const std::vector<float> & value );
+  
+  // Set an int * demand attribute
+  void wwitSetDemandAttribute(
+    witSetDblNameIntStar          witSetFunc,
+    const std::string & partName,
+    const std::string & demandName,
+    int i );
+  
+  // Get vector of wit part/Operation float* attribute
+  std::vector<float> wwitGetNameAttribute(
+    witGetNameFloatStarStar witGetFunc,
+    const std::string & name )const;
+
+  // Get vector of bom/bop float* attribute
+  std::vector<float> wwitGetArcAttribute(
+    witGetNameIndexFloatStarStar     witGetFunc,
+    const std::string & opName,
+    int index )const;
+  // Get vector of bom/bop int* attribute
+  std::vector<int> wwitGetArcAttribute(
+    witGetNameIndexIntStarStar     witGetFunc,
+    const std::string & opName,
+    int index )const;
+
+  
+  // Get vector of sub float* attribute
+  std::vector<float> wwitGetSubArcAttribute(
+    witGetNameIndexIndexFloatStarStar     witGetFunc,
+    const std::string & opName,
+    int index, int subIndex )const;
+  // Get vector of sub int* attribute
+  std::vector<int> wwitGetSubArcAttribute(
+    witGetNameIndexIndexIntStarStar     witGetFunc,
+    const std::string & opName,
+    int index, int subIndex )const;
+  // Get vector of sub int attribute
+  int wwitGetSubArcAttribute(
+    witGetNameIndexIndexIntStar     witGetFunc,
+    const std::string & opName,
+    int index, int subIndex )const;
+  
+  // Set sub float* attribute, given period and fltValue
+  void wwitSetSubArcAttribute(
+    witGetNameIndexIndexFloatStarStar witGetFunc,
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    int period, 
+    float flt );
+
+  // Set sub float* attribute
+  void wwitSetSubArcAttribute(
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    const std::vector<float> & fltVec );
+
+  void wwitSetSubArcAttribute(
+    witSetNameIndexIndexFloatStar     witSetFunc,
+    const std::string & opName,
+    int index, int subIndex,
+    float flt );
+
+  // Get vector of wit demand float* attribute
+  std::vector<float> wwitGetDemandAttribute(
+    witGetDblNameFloatStarStar witGetFunc,
+    const std::string & partName,
+    const std::string & demandName )const;
+
+  
+  // Get Part/Operation bound attributes, given three std::vector<float> vectors
+  void wwitGetNameBoundAttribute(
+    witGetName3FloatStar     witGetFunc,
+    const std::string & name,
+    std::vector<float> & hlb,
+    std::vector<float> & slb,
+    std::vector<float> & hub )const;
+
+  
+  // Set wit bounds and ensure that hlb<=slb<=hub
+  // This condition is not being met.
+  void setExecBounds(
+    const std::string opName,
+    std::vector<float> hlb,
+    std::vector<float> slb,
+    std::vector<float> hub );
+
+    
+  public:
+  inline std::vector<float> witFloatStarToStlVec(const float * inputVec ) const
+  {
+    std::vector<float>  retVal;
+    int np = getNPeriods();
+    int i;
+    for ( i=0; i<np; ++i ) retVal.push_back(inputVec[i]);
+    return retVal;
+  };
+
+  inline std::vector<int> witIntStarToStlVec(const int * inputVec ) const
+  {
+    std::vector<int>  retVal;
+    int np = getNPeriods();
+    int i;
+    for ( i=0; i<np; ++i ) retVal.push_back(inputVec[i]);
+    return retVal;
+  };
+
+  inline float * stlVecToFloatStar(const std::vector<float> & inputVector ) const
+  {
+    int len = inputVector.size();
+    float * retVal = NULL;
+    if ( len > 0 ) {
+      //retVal = (float *) malloc(len*sizeof(float));
+      retVal = new float[len];
+      int i;
+      for ( i=0; i<len; ++i ) retVal[i] = inputVector[i];
+    }
+    return retVal;
+  };
+  
+  inline float * floatToFloatStar(float input ) const
+  {
+    int len = getNPeriods();
+    //float * retVal = (float *) malloc(len*sizeof(float));
+    float * retVal = new float[len];
+    int i;
+    for ( i=0; i<len; ++i ) retVal[i] = input;
+    return retVal;
+  };
+
+  inline int * intToIntStar(int input ) const
+  {
+    int len = getNPeriods();
+    //float * retVal = (float *) malloc(len*sizeof(float));
+    int * retVal = new int[len];
+    int i;
+    for ( i=0; i<len; ++i ) retVal[i] = input;
+    return retVal;
+  };
+  
+  inline std::vector<float> floatToStlVec(float input ) const
+  {
+    int len = getNPeriods();
+    std::vector<float> retVal;
+    int i;
+    for ( i=0; i<len; ++i ) retVal.push_back(input);
+    return retVal;
+  };
+
+  
+  // String Utilities
+  static std::string textBetween(const std::string & src, const std::string & before,const std::string & after);
+  static std::string textAfter(const std::string & src, const std::string & before);
+  static bool beginsWith(const std::string & src, const std::string & begString);
+
+  protected:
+
+  //------------------------
+  bool wwitPartExists( const std::string & name ) const;
+  bool wwitGetDemandExists(const std::string & demandedPartName,const std::string & demandName) const;
+  bool wwitGetSubsBomEntryExists(
+    const std::string & operationName,
+    int bomEntry,
+    int subEntry) const;
+  bool wwitOperationExists( const std::string & name ) const;
+  
+  // Get Bom Entry Index
+  // Return first bomEntryIndex for specified operation and part
+  // -1 returned if bomEntryIndex does not exist
+  int getBomEntryIndex( 
+    const std::string & opName, 
+    const std::string & partName
+    ) const;
+
+  // Get Sub Bom Entry Index
+  // Return first substituteBomEntryIndex for specified operation and part
+  // -1 returned if bomEntryIndex does not exist
+  int getSubBomEntryIndex( 
+    const std::string & opName,
+	  const std::string & partName,
+    const std::string & subPartName
+    ) const;
+
+
+  // Get Bop Entry Index
+  // Return first bopEntryIndex for specified operation and part
+  // -1 returned if bopEntryIndex does not exist
+  int getBopEntryIndex( 
+    const std::string & opName, 
+    const std::string & partName
+    ) const;
+
+  
+  std::vector<std::string> getPartConsumingOperations(const std::string & partName ) const;
+  std::vector<std::string> getPartProducingOperations(const std::string & partName ) const;
+  std::vector<std::string> getOperationConsumedParts(const std::string & operationName ) const;
+  std::vector<std::string> getOperationProducedParts(const std::string & operationName ) const;
+
+  // get list of all operations
+  std::vector<std::string> getOperations() const;
+  std::vector<std::string> getMaterialParts() const;
+  void getDemands(std::vector<std::string> & demandName,std::vector<std::string> & demandedPartName) const;
+
+  static void compareWitSolutionsTimeVec(
+                                const std::string & id,
+                                const std::vector<float> & execTv1,
+                                const std::vector<float> & execTv2, 
+                                const std::vector<float> & costTv1,
+                                const std::vector<float> & costTv2 );
+  static void compareWitSolutions( const SCOproblemBase & p1,  const SCOproblemBase & p2 );
+  //------------------------
+
+
+  WitRun * mutableWitRun() const;
+  WitRun * witRun();
+
+  // return number of calls to witImplode
+  int implosionCount() const;
+
+  void gutsOfCopy( const SCOproblemBase& source );
+  void gutsOfDestructor();
+  void gutsOfConstructor(const std::string & outputDirectory );
+
+private:
+  mutable WitRun * wr_;
+  int implosionCount_;
+
+  int nPeriods_; // cached for performance
+
+
+};
+
+
+#endif
+@
+
+
+1.11
+log
+@added wwitSetDemandAttribute where attribute is stl vector of float
+@
+text
+@d439 1
+@
+
+
+1.10
+log
+@Added code to write a report describing the input model
+@
+text
+@d232 6
+@
+
+
+1.9
+log
+@added methods to get objective value when there is not scrap cost
+@
+text
+@d424 6
+@
+
+
+1.8
+log
+@added code to write output files.
+added code to set scrapVol
+@
+text
+@d426 1
+@
+
+
+1.7
+log
+@modified to have 3 logfiles: osl, wit, ovpt
+@
+text
+@d424 3
+@
+
+
+1.6
+log
+@Changes to have a witLog and oslLog file written to output directory.
+@
+text
+@d130 1
+@
+
+
+1.5
+log
+@modified some subArc code
+@
+text
+@d127 1
+a127 1
+  // Set OSL Logfile name
+d129 1
+d146 3
+d441 1
+@
+
+
+1.4
+log
+@New method  getSubBomEntryIndex has been added.
+I think need it to make ovptProblem design more flexible.
+@
+text
+@a400 1
+  // Added by GMS
+d406 2
+a407 2
+	const std::string & partName,
+    const int & bomEntryIndex
+@
+
+
+1.3
+log
+@added methods to class ECCovptProblem to add productionArcs and get and set their input attributes
+@
+text
+@d401 11
+@
+
+
+1.2
+log
+@Changed methods in problemBase that began with characters wit, to now beging with characters wwit (wrap wit).
+@
+text
+@d401 8
+@
+
+
+1.1
+log
+@Added skeleton to start
+@
+text
+@d163 1
+a163 1
+  void witSetNameAttribute(
+d171 1
+a171 1
+  void witSetNameAttribute(
+d177 1
+a177 1
+  void witSetNameAttribute(
+d183 1
+a183 1
+  void witSetNameBoundAttribute(
+d191 1
+a191 1
+  void witSetArcAttribute(
+d200 1
+a200 1
+  void witSetArcAttribute(
+d207 1
+a207 1
+  void witSetArcAttribute(
+d214 1
+a214 1
+  void witSetDemandAttribute(
+d222 1
+a222 1
+  void witSetDemandAttribute(
+d229 1
+a229 1
+  void witSetDemandAttribute(
+d236 1
+a236 1
+  std::vector<float> witGetNameAttribute(
+d241 1
+a241 1
+  std::vector<float> witGetArcAttribute(
+d246 1
+a246 1
+  std::vector<int> witGetArcAttribute(
+d253 1
+a253 1
+  std::vector<float> witGetSubArcAttribute(
+d258 1
+a258 1
+  std::vector<int> witGetSubArcAttribute(
+d263 1
+a263 1
+  int witGetSubArcAttribute(
+d269 1
+a269 1
+  void witSetSubArcAttribute(
+d278 1
+a278 1
+  void witSetSubArcAttribute(
+d284 1
+a284 1
+  void witSetSubArcAttribute(
+d291 1
+a291 1
+  std::vector<float> witGetDemandAttribute(
+d298 1
+a298 1
+  void witGetNameBoundAttribute(
+d385 3
+a387 3
+  bool witPartExists( const std::string & name ) const;
+  bool witGetDemandExists(const std::string & demandedPartName,const std::string & demandName) const;
+  bool witGetSubsBomEntryExists(
+d391 1
+a391 1
+  bool witOperationExists( const std::string & name ) const;
+@
+

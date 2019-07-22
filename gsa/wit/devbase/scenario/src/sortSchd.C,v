@@ -1,0 +1,2520 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	UsedBySCE:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.19.36.47;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.17;	author austel;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.53;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.53;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.42.36;	author rwToStl;	state Exp;
+branches;
+next	1.2.6.2;
+
+1.2.6.2
+date	2003.01.09.13.54.39;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+
+#include <scenario/src/sortSchd.h>
+#include <scenario/src/sortSchP.h>
+#include <scenario/src/schdStrt.h>
+#include <scenario/src/partSS.h>
+#include <scenario/src/pairComp.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/machdep.h>
+
+
+// Global variable used by qsort compare function
+LgFrSortingScheduleFloat *LgFrSortingScheduleFloatThisGlobalPtr;
+LgFrPairCompareFloat     *LgFrSortingScheduleFloatCompareStrategyGlobalPtr;
+
+// RW2STL - implement (RWGVector, LgFrSortingScheduleFloatSmartPointer) 
+
+// RW2STL - implement (RWGOrderedVector, LgFrSortingScheduleFloatSmartPointer) 
+
+
+
+// Regular function passed to qsort to perform comparison
+extern "C"
+int
+LgFrSortingScheduleFloatQsortCompare(
+   const void *i1ptr,
+   const void *i2ptr )
+{
+   assert( LgFrSortingScheduleFloatThisGlobalPtr != 0 );
+   assert( LgFrSortingScheduleFloatCompareStrategyGlobalPtr != 0 );
+   const size_t index1 (*    (  (const size_t *) i1ptr  )  
+			), 
+                index2 (*    (  (const size_t *) i2ptr  )  
+			);
+   return
+      LgFrSortingScheduleFloatCompareStrategyGlobalPtr->
+         itemTimeVecPairCompareFloat(
+            LgFrSortingScheduleFloatThisGlobalPtr->
+               LgFrScheduleFloat::operator[](index1),
+            LgFrSortingScheduleFloatThisGlobalPtr->
+               LgFrScheduleFloat::operator[](index2) );
+}
+
+
+// Do sort
+void
+LgFrSortingScheduleFloat::sort(
+   const LgFrPairCompareFloat* const comparisonStrategy,
+   const bool ascending)
+{
+  // Save compareStrategy
+  compareStrategy( comparisonStrategy );
+  ascending_ = ascending;
+
+  if ( compareStrategyPtr_ != 0 ) {
+
+     // Create permutation vector to be used by qsort
+     size_t *pv = new size_t[permutations_.size()];
+     size_t i = 0; // Pulled out of the for below by RW2STL
+     for ( i=0; i<permutations_.size(); i++ )
+        pv[i] = permutations_[i];
+
+     // Get lock on global variables.
+     // This function currently just returns.  The locking
+     // mechanism must be added if LgFr is running with multiple
+     // processes.
+     prepareToSort();
+
+     // Assign global variables
+     LgFrSortingScheduleFloatThisGlobalPtr = this;
+     LgFrSortingScheduleFloatCompareStrategyGlobalPtr = compareStrategyPtr_;
+
+     // Invoke qsort
+     qsort( 
+        pv,
+        permutations_.size(), 
+        sizeof(size_t),
+        LgFrSortingScheduleFloatQsortCompare );
+
+     // Set global variables to 0
+     LgFrSortingScheduleFloatThisGlobalPtr = 0;
+     LgFrSortingScheduleFloatCompareStrategyGlobalPtr = 0;
+
+     // Release lock on global variables.
+     // This function currently just returns.  The locking
+     // mechanism must be added if LgFr is running with multiple
+     // processes.
+     doneSorting();
+
+     // Assign sorted order to permutation vector
+     for ( i=0; i<permutations_.size(); i++ )
+        permutations_[i] = pv[i];
+     delete [] pv;
+
+  }
+  else
+  {
+     // Return to original unsorted order
+     size_t i = 0; // Pulled out of the for below by RW2STL
+     for ( i=0; i<permutations_.size(); i++ )
+        permutations_[i] = i;
+  }
+
+  // If sort order is not ascending then reverse order of permuation
+  // vector.
+  if ( !ascending ) {
+     size_t i,j,temp;
+     if ( permutations_.size() >0 ) {
+        for ( i=0, j=permutations_.size() - 1; 
+              i<j; 
+              i++, j-- ) {
+              temp = permutations_[i];
+              permutations_[i] = permutations_[j];
+              permutations_[j] = temp;
+        }
+     }
+  }
+
+}
+
+// Set comparison strategy
+void
+LgFrSortingScheduleFloat::compareStrategy (
+   const LgFrPairCompareFloat * const cs )
+{
+   if ( compareStrategyPtr_ != cs ) {
+      if ( compareStrategyPtr_ != 0 ) 
+         compareStrategyPtr_->removeDependent( this );
+      delete compareStrategyPtr_;
+      if ( cs != 0 )
+         compareStrategyPtr_ = cs->clone();
+      else
+         compareStrategyPtr_ = 0;
+      if ( compareStrategyPtr_ != 0 ) 
+         compareStrategyPtr_->addDependent( this );
+   }
+}
+
+// Get comparison strategy
+const LgFrPairCompareFloat * 
+LgFrSortingScheduleFloat::compareStrategy ()
+const
+{
+   return compareStrategyPtr_;
+}
+
+// Return true if schedule is in original unsorted order.
+bool
+LgFrSortingScheduleFloat::isInNaturalOrder()
+const
+{
+   if ( compareStrategyPtr_ == 0 && ascending_ ) return true;
+   else return false;
+#if 0
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<permutations_.size(); i++ )
+      if ( permutations_[i] != i ) return false;
+   return true;
+#endif
+}
+
+// Return true if schedule is sorted in ascending order
+bool
+LgFrSortingScheduleFloat::isSortAscending()
+const
+{
+   return ascending_;
+}
+
+// Fill in schedule using attributeScheduleStrategy
+
+// this has to be made a smart pointer method!!
+void
+LgFrSortingScheduleFloat::populate()
+{
+   assert ((attributeScheduleStrategyPtr_ != 0) && ("ERROR: cannot populate() a schedule without a ScheduleStragety assigned to it!"));
+   attributeScheduleStrategyPtr_->populate( *this );
+}
+
+// Set Filter Strategy
+void
+LgFrSortingScheduleFloat::filterStrategy(
+const LgFrFilterStrategy & filterStrategy )
+{
+   assert( filterStrategyPtr_ != 0 );
+   filterStrategyPtr_->removeDependent( this );
+   delete filterStrategyPtr_;
+   filterStrategyPtr_ = filterStrategy.clone();
+   filterStrategyPtr_->addDependent( this );
+}
+
+
+
+// Get Filter Strategy
+// If this object ceases to exist or the attributeScheduleStrategy is changed,
+// then the returned reference will be dangling
+const LgFrFilterStrategy &
+LgFrSortingScheduleFloat::filterStrategy()
+const
+{
+   assert (filterStrategyPtr_ != 0);
+   return *filterStrategyPtr_;
+}
+
+
+bool
+LgFrSortingScheduleFloat::isMutable ()
+{
+  return (
+	  (attributeScheduleStrategyPtr_ == 0)
+	  ? true
+	  : this->attributeScheduleStrategy()->isMutable()
+	  );
+}
+
+LgFrValidity
+LgFrSortingScheduleFloat::validity ( const LgFrTimeVecFloat& proposedTimeVec )
+{
+  return (
+	  (attributeScheduleStrategyPtr_ == 0)
+	  ? INVALID
+	  : this->attributeScheduleStrategy()->validity( proposedTimeVec )
+	  );
+}
+
+// Add new item to the end of the collection
+void
+LgFrSortingScheduleFloat::insert (const LgFrItemTimeVecPairFloat pair)
+{
+  assert (this->isMutable());
+  this->localInsert (pair);
+  this->propagateUpdate(pair); 
+  this->changed(0);
+}
+
+// Add new item to the end of the collection without propagating the change 
+// to other parts of the system
+void
+LgFrSortingScheduleFloat::localInsert (const LgFrItemTimeVecPairFloat & pair)
+{
+  if ( permutations_.size() == permutations_.capacity() )
+      permutations_.reserve( 2*capacity() + 1 ); // LgFrScheduleFloat::insert adjusts its own capacity
+
+  LgFrScheduleFloat::insert( pair );
+  permutations_.push_back( permutations_.size() );
+  assert( LgFrScheduleFloat::size() == permutations_.size() );
+}
+
+
+// Add new item to the collection at position index.  Everything afterwards
+// is shifted to a higher index.
+void
+LgFrSortingScheduleFloat::insertAt (const size_t index, 
+				    const LgFrItemTimeVecPairFloat pair)
+{
+  assert (this->isMutable());
+  this->localInsertAt (index, pair);
+  this->propagateUpdate(pair);
+  this->changed(0);
+}
+
+
+// Add new item to the collection at position index without propagating the
+// change to other parts of the system.  Everything afterwards
+// is shifted to a higher index.
+void
+LgFrSortingScheduleFloat::localInsertAt (const size_t index, 
+					 const LgFrItemTimeVecPairFloat& pair)
+{
+  if ( permutations_.size() == permutations_.capacity() )
+      permutations_.reserve( 2*capacity() + 1 ); // LgFrScheduleFloat::insert adjusts its own capacity
+
+   LgFrScheduleFloat::insertAt( index, pair );
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<permutations_.size(); i++ )
+      if ( permutations_[i] >= index ) permutations_[i]++;
+   assert (index < permutations_.size());
+   permutations_.insert(permutations_.begin()+index, index );
+}
+
+
+// Insert Item if it isn't already in the schedule.  In any case,
+// associate timeVec with item.
+void
+LgFrSortingScheduleFloat::insertKeyAndValue(
+   const LgFrItem& item, 
+   const LgFrTimeVecFloat& value)
+{
+  assert (this->isMutable());
+  localInsertKeyAndValue (item, value);
+  LgFrItemTimeVecPairFloat pair (item, value);
+  this->propagateUpdate(pair);
+  this->changed(0);
+}
+
+// Insert Item if it isn't already in the schedule without propagating
+// the change to other parts of the system.  In any case,
+// associate timeVec with item.
+void
+LgFrSortingScheduleFloat::localInsertKeyAndValue(
+   const LgFrItem& item, 
+   const LgFrTimeVecFloat& value)
+{
+  if (  LgFrScheduleFloat::contains(item)   ) {
+    // get the itemTimeVec and change it's timeVec part
+    (LgFrScheduleFloat::operator[](item)) . timeVecFloat (value);    
+  }
+  else {
+    this->localInsert (LgFrItemTimeVecPairFloat(item, value) );
+  }
+}
+
+
+// Make clone copy of object
+LgFrSortingScheduleFloat *
+LgFrSortingScheduleFloat::clone()
+const
+{
+  LgFrSortingScheduleFloat* newInst = 
+      new LgFrSortingScheduleFloat(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with new Scenario
+LgFrSortingScheduleFloat *
+LgFrSortingScheduleFloat::clone(LgFrScenario & newScenario)
+const
+{
+  LgFrSortingScheduleFloat* newInst = 
+      new LgFrSortingScheduleFloat(*this, newScenario);
+  return (newInst);
+}
+
+
+
+
+
+
+
+
+
+
+
+// Return the i'th ItemTimeVecPairFloat
+LgFrItemTimeVecPairFloat
+LgFrSortingScheduleFloat::operator[](const size_t& i )
+const
+{  
+   return LgFrScheduleFloat::operator[](permutations_[i]);
+}
+
+LgFrItemTimeVecPairFloat &
+LgFrSortingScheduleFloat::operator[](const size_t& i )
+{  
+   return LgFrScheduleFloat::operator[](permutations_[i]);
+}
+
+
+// Return the LgFrItemTimeVecPairFloat whose item matches item.
+// If there is no such LgFrItemTimeVecPairFloat, a new one is created
+// (using the default LgFrTimeVecFloat constructor) and inserted at
+// the end.
+LgFrItemTimeVecPairFloat &
+LgFrSortingScheduleFloat::operator[](const LgFrItem& item)
+{
+  if (  LgFrScheduleFloat::contains(item)   ) {
+    return LgFrScheduleFloat::operator[](item);
+  }
+  else {
+    this->insert (LgFrItemTimeVecPairFloat(item,
+					   LgFrTimeVecFloat())  // default t-v
+		  );
+    return (*this)[permutations_[ permutations_.size() - 1 ] ];
+  }
+}
+
+// Return the LgFrItemTimeVecPairFloat whose item matches item.
+// If there is no such LgFrItemTimeVecPairFloat, raise an assert error.
+const LgFrItemTimeVecPairFloat &
+LgFrSortingScheduleFloat::operator[](const LgFrItem& item)
+const
+{
+  assert ( LgFrScheduleFloat::contains(item) );
+  return LgFrScheduleFloat::operator[](item);
+}
+
+
+#if 0
+// Remove all pairs from schedule without propagating
+// the change to other parts of the system.
+// Pairs are PairsOfItemTimeVecFloat
+void
+LgFrSortingScheduleFloat::clear()
+{
+   assert (this->isMutable());
+   // Propagate the change through the attribute schedule strategy	
+   if (attributeScheduleStrategyPtr_ != 0) {
+      if ( this->size() > 0 ) {
+         LgFrTimeVecFloat zeroTV( (*this)[0].timeVecFloat().length(), 
+                                   0.0 );
+         int i = 0; // Pulled out of the for below by RW2STL
+         for (i = 0;  i < this->size(); ++i) {
+            LgFrItemTimeVecPairFloat pair ((*this)[i].part(),
+    	                                   zeroTV );
+            this->propagateUpdate(pair);	
+         }
+      }
+   }
+   this->localClear();
+}
+#endif
+
+// Remove all pairs from schedule.
+// Pairs are PairsOfItemTimeVecFloat
+void
+LgFrSortingScheduleFloat::localClear()
+{
+   LgFrScheduleFloat::clear();
+   permutations_.clear();
+}
+
+// Change the size of the schedule
+void
+LgFrSortingScheduleFloat::reserve (const size_t newCapacity)
+{
+   assert (newCapacity  >=  this->size());	// Not done yet: have to do 
+                                                // propagateUpdate on deleted
+                                                // entries
+   LgFrScheduleFloat::reserve(newCapacity);
+   permutations_.reserve(newCapacity);
+}
+
+
+// Assignment operator
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloat::operator=(
+			  const LgFrSortingScheduleFloat& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+    (this->LgFrScheduleFloat::operator= ) (rhs);
+
+    permutations_ = rhs.permutations_;
+    assert (permutations_.size() == rhs.permutations_.size());
+
+    if ( compareStrategyPtr_ != 0 ) 
+       compareStrategyPtr_->removeDependent( this );
+    delete compareStrategyPtr_;
+    if ( rhs.compareStrategyPtr_ != 0 )
+       compareStrategyPtr_ = rhs.compareStrategyPtr_->clone();
+    else
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+       compareStrategyPtr_->addDependent( this );
+
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+       attributeScheduleStrategyPtr_->removeDependent( this );
+    delete attributeScheduleStrategyPtr_;
+    if ( rhs.attributeScheduleStrategyPtr_ != 0 )
+       attributeScheduleStrategyPtr_ = rhs.attributeScheduleStrategyPtr_->clone();
+    else
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+       attributeScheduleStrategyPtr_->addDependent( this );
+
+    assert( filterStrategyPtr_ != 0 );
+    assert( rhs.filterStrategyPtr_ != 0 );
+    filterStrategyPtr_->removeDependent( this );
+    delete filterStrategyPtr_;
+    filterStrategyPtr_ = rhs.filterStrategyPtr_->clone();
+    filterStrategyPtr_->addDependent( this );
+
+    ascending_ = rhs.ascending_;
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrSortingScheduleFloat::LgFrSortingScheduleFloat (
+   const LgFrSortingScheduleFloat & source)
+:   LgFrScheduleFloat(source),
+    permutations_(source.permutations_),
+    compareStrategyPtr_(0),
+    attributeScheduleStrategyPtr_(0),
+    filterStrategyPtr_(0),
+    ascending_(source.ascending_)
+{
+    if ( source.compareStrategyPtr_ != 0 )
+       compareStrategyPtr_ = source.compareStrategyPtr_->clone();
+    else
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+       compareStrategyPtr_->addDependent( this );
+
+    if ( source.attributeScheduleStrategyPtr_ != 0 )
+       attributeScheduleStrategyPtr_ = source.attributeScheduleStrategyPtr_->clone();
+    else
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+       attributeScheduleStrategyPtr_->addDependent( this );
+
+    assert( source.filterStrategyPtr_ != 0 );
+    filterStrategyPtr_ = source.filterStrategyPtr_->clone();
+    filterStrategyPtr_->addDependent( this );
+
+}
+
+// Copy constructor with new Scenario
+LgFrSortingScheduleFloat::LgFrSortingScheduleFloat (
+   const LgFrSortingScheduleFloat & source,
+   LgFrScenario & newScenario)
+:   LgFrScheduleFloat(source),
+    permutations_(source.permutations_),
+    compareStrategyPtr_(0),
+    attributeScheduleStrategyPtr_(0),
+    filterStrategyPtr_(0),
+    ascending_(source.ascending_)
+{
+    if ( source.compareStrategyPtr_ != 0 )
+       compareStrategyPtr_ = source.compareStrategyPtr_->clone(newScenario);
+    else
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+       compareStrategyPtr_->addDependent( this );
+
+    if ( source.attributeScheduleStrategyPtr_ != 0 )
+       attributeScheduleStrategyPtr_ = 
+           source.attributeScheduleStrategyPtr_->clone(newScenario);
+    else
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+       attributeScheduleStrategyPtr_->addDependent( this );
+
+    assert( source.filterStrategyPtr_ != 0 );
+    filterStrategyPtr_ = source.filterStrategyPtr_->clone(newScenario);
+    filterStrategyPtr_->addDependent( this );
+
+}
+
+
+// Constructor for a set expected to have up to n parts
+LgFrSortingScheduleFloat::LgFrSortingScheduleFloat (const size_t n)
+: LgFrScheduleFloat(n),
+  compareStrategyPtr_(0),
+  attributeScheduleStrategyPtr_(0),
+  filterStrategyPtr_(0),
+  ascending_(true)
+{
+   permutations_.reserve(n);
+   filterStrategyPtr_ = new LgFrFilterStrategy;
+   filterStrategyPtr_->addDependent( this );
+}
+
+// Destructor
+LgFrSortingScheduleFloat::~LgFrSortingScheduleFloat ()
+{
+  if ( compareStrategyPtr_ != 0 ) 
+     compareStrategyPtr_->removeDependent( this );
+  delete compareStrategyPtr_;
+
+  if ( attributeScheduleStrategyPtr_ != 0 ) 
+     attributeScheduleStrategyPtr_->removeDependent( this );
+  delete attributeScheduleStrategyPtr_;
+
+  filterStrategyPtr_->removeDependent( this );
+  delete filterStrategyPtr_;
+
+}
+
+// Prepare to sort
+void
+LgFrSortingScheduleFloat::prepareToSort()
+{
+  // Currently do nothing.
+
+  // If and when LgFr is running in a multiprocess environment
+  // then this routine will implement a lock on the global
+  // variables used to implement sorting.
+}
+
+// Finished sorting
+void
+LgFrSortingScheduleFloat::doneSorting()
+{
+  // Currently do nothing.
+
+  // If and when LgFr is running in a multiprocess environment
+  // then this routine will implement an unlock on the global
+  // variables used to implement sorting.
+}
+
+
+// Print member data in class
+void
+LgFrSortingScheduleFloat::print()
+const
+{
+   std::cout <<"************************************************" <<std::endl;
+   std::cout <<"LgSortingFrSchedule" << std::endl;
+   int i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<size(); i++ )  {
+   std::cout <<" *********************************" <<std::endl;
+      std::cout <<" entry number " <<i <<":";
+      ((*this)[i]) . print();
+   }
+   std::cout <<"************************************************" <<std::endl;
+}
+
+// Set Schedule Strategy
+void
+LgFrSortingScheduleFloat::attributeScheduleStrategy(
+const LgFrAttributeScheduleStrategy & attributeScheduleStrategy )
+{
+   if ( attributeScheduleStrategyPtr_ != 0 ) 
+      attributeScheduleStrategyPtr_->removeDependent( this );
+   delete attributeScheduleStrategyPtr_;
+   attributeScheduleStrategyPtr_ = attributeScheduleStrategy.clone();
+   if ( attributeScheduleStrategyPtr_ != 0 ) 
+      attributeScheduleStrategyPtr_->addDependent( this );
+}
+
+
+// Get Schedule Strategy
+// If this object ceases to exist or the attributeScheduleStrategy is changed,
+// then the returned reference will be dangling
+const LgFrAttributeScheduleStrategy *
+LgFrSortingScheduleFloat::attributeScheduleStrategy()
+const
+{
+   return attributeScheduleStrategyPtr_;
+}
+
+// localUpdate - This method is invoked when the data used by the populate
+// method has changed.
+void
+LgFrSortingScheduleFloat::localUpdate (
+   LgFrModel * ,
+   void * )
+{
+    populate();
+}
+
+void
+LgFrSortingScheduleFloat::propagateUpdate(
+					  const LgFrItemTimeVecPairFloat & pair)
+{
+  if (attributeScheduleStrategyPtr_ != 0) {
+     attributeScheduleStrategyPtr_ -> update (pair);
+   }
+}
+
+
+
+// Perform diadic schedule operation.
+LgFrSortingScheduleFloat
+LgFrSortingScheduleFloat::op(
+   LgFrTimeVecFloatOpFunction vectorOp, 
+   const LgFrSortingScheduleFloat& rhs,
+   float defaultValue)
+const
+{
+   LgFrSortingScheduleFloat retVal;
+
+   kernalOfOp( vectorOp, rhs, retVal, defaultValue );
+
+   return retVal;
+}
+
+
+// perform scalar operation on column (period) in schedule
+LgFrSortingScheduleFloat
+LgFrSortingScheduleFloat::columnOp(
+  const size_t period,
+  float (*scalarOperation) (const float, const float),
+  const float rhs )
+const
+{
+   LgFrSortingScheduleFloat retVal;
+
+   kernalOfColumnOp(  period, scalarOperation, rhs, retVal );
+
+   return retVal;
+}
+
+// Addition operator
+LgFrSortingScheduleFloat
+operator+ (
+   const LgFrSortingScheduleFloat& lhs,
+   const LgFrSortingScheduleFloat& rhs)
+{
+  return lhs.op(&LgFrTimeVecFloat::add,rhs);
+}
+
+// Subtraction operator
+LgFrSortingScheduleFloat
+operator- (
+   const LgFrSortingScheduleFloat& lhs,
+   const LgFrSortingScheduleFloat& rhs)
+{
+  return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+}
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// test LgFrSortingScheduleFloat methods.
+void
+LgFrSortingScheduleFloat::test()
+{
+  // Make some parts for the test
+  LgFrPart p1( "part1" );
+  LgFrPart p2( "part2" );
+  LgFrPart p3( "part3" );
+  LgFrPart p4( "part4" );
+
+  // Make some timeVecFloat for the test
+  LgFrTimeVecFloat tvf1(10,1.11f);
+  LgFrTimeVecFloat tvf2(10,2.22f);
+
+  // Make some part timeVecFloat pairs for the test
+  LgFrItemTimeVecPairFloat ptvfp1( p1, tvf1 );
+  LgFrItemTimeVecPairFloat ptvfp2( p2, tvf1 );
+  LgFrItemTimeVecPairFloat ptvfp3( p3, tvf2 );
+  LgFrItemTimeVecPairFloat ptvfp4( p4, tvf1 );
+
+  // Test the insertion methods
+  LgFrSortingScheduleFloat ss (1);	// Make it a little small
+  				// to test automatic resizing
+  ss.insert(ptvfp4);
+  ss.insert(ptvfp3);
+  ss.insertAt(0, ptvfp2);
+  assert (3 == ss.size());
+  assert (ss[0].item().name() == "part2");
+  assert (ss[2].item().name() == "part3");
+  assert (ss[1].item().name() == "part4");
+
+  // Test the assignment operator and the copy constructor
+  LgFrSortingScheduleFloat ss1 (1);	// Make it a little small
+  				// to test resizing at assignment time
+  ss.insertKeyAndValue(p1,tvf1);		
+  ss1 = ss;
+  LgFrSortingScheduleFloat ss2 (ss);
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < ss.size(); i++) {
+    // Test result of assignment
+    assert (ss1[i] == ss[i]);
+    // Test result of copy
+    assert (ss2[i] == ss[i]);
+    // ss[i].print();
+    // std::cout << std::endl;
+  }
+
+  // Test indexing by item
+  assert( ss[p3] == ptvfp3 );
+  assert( ((const LgFrSortingScheduleFloat)ss)[p3] == ptvfp3 );
+
+  // Test resize
+  /*LgFrSortingScheduleFloat ss3(0);
+  ss3.resize(3);
+  assert (ss3.size() == 0);*/
+
+  // Test Getting Comparison Strategy
+  assert( ss.compareStrategy() == 0 );
+  assert( ss.isSortAscending() );
+
+  // Test sort
+  assert( ss.isInNaturalOrder() );
+  // std::cout <<"Unsorted" <<std::endl;
+  // ss.print();
+  LgFrPairCompareFloat standardCompareStrategy;
+  ss.sort(&standardCompareStrategy);
+  assert( !ss.isInNaturalOrder() );
+  assert( ss.isSortAscending() );
+
+  // Again test getting Comparison strategy
+  const LgFrPairCompareFloat * returnedCompareStrategy = ss.compareStrategy();
+  assert( returnedCompareStrategy != 0 );
+
+  assert( ss[p3] == ptvfp3 );       // Test indexing by part on sorted sched.
+  // std::cout <<"Sorted" <<std::endl;
+  // ss.print();
+
+  // Test descending sort
+  LgFrSortingScheduleFloat ds(ss);	
+  assert( !ds.isInNaturalOrder() );
+  ds.sort(&standardCompareStrategy,false);
+  assert( !ds.isInNaturalOrder() );
+  assert( !ds.isSortAscending() );
+  {
+  size_t i,j;
+  for ( i=0, j=ds.size()-1;
+        j<=0;
+        i++, j-- )
+     assert( ss[i] == ds[j] );
+  }
+  
+  // Put back in natural unsorted order 
+  ds.sort();
+  assert( ds.isInNaturalOrder() );
+  assert( ds.isSortAscending() );
+  {
+  size_t i;
+  for ( i=0;
+        i<ds.size();
+        i++ )
+     assert( ss1[i] == ds[i] );
+  }
+
+  // Test descending natural order
+  ds.sort(0,false);
+  assert( !ds.isInNaturalOrder() );
+  assert( !ds.isSortAscending() );
+  {
+  size_t i,j;
+  for ( i=0, j= ds.size()-1;
+        i<ds.size();
+        i++, j-- )
+     assert( ss1[j] == ds[i] );
+  }
+
+  // Test set/get of filter strategy
+  {
+  LgFrFilterStrategy defaultFilter;
+  LgFrZeroTimeVecFilterStrategy zeroFilter;
+  ss.filterStrategy( zeroFilter );
+  ss.filterStrategy( defaultFilter );
+  }
+
+  // Test operation-
+  {
+  LgFrPart p1 ("IBMPS2mod95");
+  LgFrPart p2 ("IBMPS2mod90serial45conf78");
+  LgFrSortingScheduleFloat lhs,rhs,diff;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p2, vec2 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  diff = lhs-rhs;
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 3 );
+  assert( diff[0].item() == p1 );
+  assert( diff[1].item() == p2 );
+  assert( diff[2].item() == p3 );
+  assert( diff[0].timeVecFloat() == vec1 );
+  assert( diff[1].timeVecFloat() == vec1-vec2 );
+  assert( diff[2].timeVecFloat() == 0.0 -vec2 );
+  }
+
+  // Test operation+
+  {
+  LgFrPart p1 ("IBMPS2mod95");
+  LgFrPart p2 ("IBMPS2mod90serial45conf78");
+  LgFrSortingScheduleFloat lhs,rhs,result;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p2, vec2 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  result = lhs+rhs;
+  // std::cout <<"result" <<std::endl;
+  // std::cout <<result.format() <<std::endl;
+  assert( result.size() == 3 );
+  assert( result[0].item() == p1 );
+  assert( result[1].item() == p2 );
+  assert( result[2].item() == p3 );
+  assert( result[0].timeVecFloat() == vec1 );
+  assert( result[1].timeVecFloat() == vec1+vec2 );
+  assert( result[2].timeVecFloat() == 0.0 +vec2 );
+  }
+
+  // Test columnOp
+  {
+  LgFrSortingScheduleFloat schedA;
+  float vA1[]={ 1., 2., 3., 4. };
+  float vA2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vecA1(4,vA1), vecA2(4,vA2);
+  schedA.insertKeyAndValue( p1, vecA1 );
+  schedA.insertKeyAndValue( p2, vecA2 );
+  LgFrSortingScheduleFloat schedB = schedA.columnOp( 2, ::LgFrAssign, 3.14f );
+  LgFrTimeVecFloat vecB1 = vecA1;
+  vecB1[2] = 3.14f;
+  LgFrTimeVecFloat vecB2 = vecA2;
+  vecB2[2] = 3.14f;
+  assert( schedB.size() == 2 );
+  assert( schedB[0].item() == p1 );
+  assert( schedB[1].item() == p2 );
+  assert( schedB[0].timeVecFloat() == vecB1 );
+  assert( schedB[1].timeVecFloat() == vecB2 );
+
+  LgFrSortingScheduleFloat schedC = schedB.columnOp( 2, ::LgFrMultiply, 2.0 );
+  LgFrTimeVecFloat vecC1 = vecB1;
+  vecC1[2] = 2 * vecB1[2];
+  LgFrTimeVecFloat vecC2 = vecB2;
+  vecC2[2] = 2 * vecB2[2];
+  assert( schedC.size() == 2 );
+  assert( schedC[0].item() == p1 );
+  assert( schedC[1].item() == p2 );
+  assert( schedC[0].timeVecFloat() == vecC1 );
+  assert( schedC[1].timeVecFloat() == vecC2 );
+  }
+}
+@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+a5 1
+#include <rw/gordvec.h>
+d20 4
+a23 2
+implement (RWGVector, LgFrSortingScheduleFloatSmartPointer) 
+implement (RWGOrderedVector, LgFrSortingScheduleFloatSmartPointer) 
+d33 2
+a34 2
+   assert( LgFrSortingScheduleFloatThisGlobalPtr != NULL );
+   assert( LgFrSortingScheduleFloatCompareStrategyGlobalPtr != NULL );
+d53 1
+a53 1
+   const RWBoolean ascending)
+d59 1
+a59 1
+  if ( compareStrategyPtr_ != NULL ) {
+d62 3
+a64 2
+     size_t *pv = new size_t[permutations_.entries()];
+     for ( size_t i=0; i<permutations_.entries(); i++ )
+d80 1
+a80 1
+        permutations_.entries(), 
+d84 3
+a86 3
+     // Set global variables to NULL
+     LgFrSortingScheduleFloatThisGlobalPtr = NULL;
+     LgFrSortingScheduleFloatCompareStrategyGlobalPtr = NULL;
+d95 1
+a95 1
+     for ( i=0; i<permutations_.entries(); i++ )
+d101 1
+d103 2
+a104 1
+     for ( size_t i=0; i<permutations_.entries(); i++ )
+d106 1
+d112 2
+a113 2
+     if ( permutations_.entries() >0 ) {
+        for ( i=0, j=permutations_.entries() - 1; 
+d131 1
+a131 1
+      if ( compareStrategyPtr_ != NULL ) 
+d134 1
+a134 1
+      if ( cs != NULL )
+d137 2
+a138 2
+         compareStrategyPtr_ = NULL;
+      if ( compareStrategyPtr_ != NULL ) 
+d151 2
+a152 2
+// Return TRUE if schedule is in original unsorted order.
+RWBoolean
+d156 2
+a157 2
+   if ( compareStrategyPtr_ == NULL && ascending_ ) return TRUE;
+   else return FALSE;
+d159 4
+a162 3
+   for ( size_t i=0; i<permutations_.entries(); i++ )
+      if ( permutations_[i] != i ) return FALSE;
+   return TRUE;
+d166 2
+a167 2
+// Return TRUE if schedule is sorted in ascending order
+RWBoolean
+d180 1
+a180 1
+   assert ((attributeScheduleStrategyPtr_ != NULL) && ("ERROR: cannot populate() a schedule without a ScheduleStragety assigned to it!"));
+d189 1
+a189 1
+   assert( filterStrategyPtr_ != NULL );
+d205 1
+a205 1
+   assert (filterStrategyPtr_ != NULL);
+d210 1
+a210 1
+RWBoolean
+d214 2
+a215 2
+	  (attributeScheduleStrategyPtr_ == NULL)
+	  ? TRUE
+d224 1
+a224 1
+	  (attributeScheduleStrategyPtr_ == NULL)
+d237 1
+a237 1
+  this->changed(NULL);
+d245 3
+a247 1
+  if ( permutations_.entries() >= capacity() ) resize( 2*capacity() );
+d249 2
+a250 2
+  permutations_.insert( permutations_.entries() );
+  assert( LgFrScheduleFloat::entries() == permutations_.entries() );
+d263 1
+a263 1
+  this->changed(NULL);
+d274 3
+a276 1
+   if ( permutations_.entries() >= capacity() ) resize( 2*capacity() );
+d278 2
+a279 1
+   for ( size_t i=0; i<permutations_.entries(); i++ )
+d281 2
+a282 2
+   assert (index < permutations_.entries());
+   permutations_.insertAt(index, index );
+d297 1
+a297 1
+  this->changed(NULL);
+d377 1
+a377 1
+    return (*this)[permutations_[ permutations_.entries() - 1 ] ];
+d401 2
+a402 2
+   if (attributeScheduleStrategyPtr_ != NULL) {
+      if ( this->entries() > 0 ) {
+d405 2
+a406 1
+         for (int i = 0;  i < this->entries(); ++i) {
+d428 1
+a428 1
+LgFrSortingScheduleFloat::resize (const size_t newCapacity)
+d430 1
+a430 1
+   assert (newCapacity  >=  this->entries());	// Not done yet: have to do 
+d433 2
+a434 2
+   LgFrScheduleFloat::resize(newCapacity);
+   permutations_.resize(newCapacity);
+d447 1
+a447 1
+    assert (permutations_.entries() == rhs.permutations_.entries());
+d449 1
+a449 1
+    if ( compareStrategyPtr_ != NULL ) 
+d452 1
+a452 1
+    if ( rhs.compareStrategyPtr_ != NULL )
+d455 2
+a456 2
+       compareStrategyPtr_ = NULL;
+    if ( compareStrategyPtr_ != NULL ) 
+d459 1
+a459 1
+    if ( attributeScheduleStrategyPtr_ != NULL ) 
+d462 1
+a462 1
+    if ( rhs.attributeScheduleStrategyPtr_ != NULL )
+d465 2
+a466 2
+       attributeScheduleStrategyPtr_ = NULL;
+    if ( attributeScheduleStrategyPtr_ != NULL ) 
+d469 2
+a470 2
+    assert( filterStrategyPtr_ != NULL );
+    assert( rhs.filterStrategyPtr_ != NULL );
+d487 3
+a489 3
+    compareStrategyPtr_(NULL),
+    attributeScheduleStrategyPtr_(NULL),
+    filterStrategyPtr_(NULL),
+d492 1
+a492 1
+    if ( source.compareStrategyPtr_ != NULL )
+d495 2
+a496 2
+       compareStrategyPtr_ = NULL;
+    if ( compareStrategyPtr_ != NULL ) 
+d499 1
+a499 1
+    if ( source.attributeScheduleStrategyPtr_ != NULL )
+d502 2
+a503 2
+       attributeScheduleStrategyPtr_ = NULL;
+    if ( attributeScheduleStrategyPtr_ != NULL ) 
+d506 1
+a506 1
+    assert( source.filterStrategyPtr_ != NULL );
+d518 3
+a520 3
+    compareStrategyPtr_(NULL),
+    attributeScheduleStrategyPtr_(NULL),
+    filterStrategyPtr_(NULL),
+d523 1
+a523 1
+    if ( source.compareStrategyPtr_ != NULL )
+d526 2
+a527 2
+       compareStrategyPtr_ = NULL;
+    if ( compareStrategyPtr_ != NULL ) 
+d530 1
+a530 1
+    if ( source.attributeScheduleStrategyPtr_ != NULL )
+d534 2
+a535 2
+       attributeScheduleStrategyPtr_ = NULL;
+    if ( attributeScheduleStrategyPtr_ != NULL ) 
+d538 1
+a538 1
+    assert( source.filterStrategyPtr_ != NULL );
+d548 4
+a551 5
+  permutations_(size_tMax(n,1)),
+  compareStrategyPtr_(NULL),
+  attributeScheduleStrategyPtr_(NULL),
+  filterStrategyPtr_(NULL),
+  ascending_(TRUE)
+d553 1
+d561 1
+a561 1
+  if ( compareStrategyPtr_ != NULL ) 
+d565 1
+a565 1
+  if ( attributeScheduleStrategyPtr_ != NULL ) 
+d602 6
+a607 5
+   cout <<"************************************************" <<endl;
+   cout <<"LgSortingFrSchedule" << endl;
+   for ( int i=0; i<entries(); i++ )  {
+   cout <<" *********************************" <<endl;
+      cout <<" entry number " <<i <<":";
+d610 1
+a610 1
+   cout <<"************************************************" <<endl;
+d618 1
+a618 1
+   if ( attributeScheduleStrategyPtr_ != NULL ) 
+d622 1
+a622 1
+   if ( attributeScheduleStrategyPtr_ != NULL ) 
+d651 1
+a651 1
+  if (attributeScheduleStrategyPtr_ != NULL) {
+d737 1
+a737 1
+  assert (3 == ss.entries());
+d749 2
+a750 1
+  for ( size_t i = 0; i < ss.entries(); i++) {
+d756 1
+a756 1
+    // cout << endl;
+d764 1
+a764 1
+  LgFrSortingScheduleFloat ss3(0);
+d766 1
+a766 1
+  assert (ss3.entries() == 0);
+d769 1
+a769 1
+  assert( ss.compareStrategy() == NULL );
+d774 1
+a774 1
+  // cout <<"Unsorted" <<endl;
+d783 1
+a783 4
+  assert( returnedCompareStrategy != NULL );
+  assert( returnedCompareStrategy->isA() == standardCompareStrategy.isA() );
+  assert( returnedCompareStrategy->isA() == __LGFRPAIRCOMPAREFLOAT );
+
+d786 1
+a786 1
+  // cout <<"Sorted" <<endl;
+d792 1
+a792 1
+  ds.sort(&standardCompareStrategy,FALSE);
+d797 1
+a797 1
+  for ( i=0, j=ds.entries()-1;
+d810 1
+a810 1
+        i<ds.entries();
+d816 1
+a816 1
+  ds.sort(NULL,FALSE);
+d821 2
+a822 2
+  for ( i=0, j= ds.entries()-1;
+        i<ds.entries();
+a830 1
+  assert( ss.filterStrategy().isA() == __LGFRFILTERSTRATEGY );
+a831 1
+  assert( ss.filterStrategy().isA() == __LGFRZEROTIMEVECFILTERSTRATEGY );
+a832 1
+  assert( ss.filterStrategy().isA() == __LGFRFILTERSTRATEGY );
+d848 3
+a850 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 3 );
+d872 3
+a874 3
+  // cout <<"result" <<endl;
+  // cout <<result.format() <<endl;
+  assert( result.entries() == 3 );
+d896 1
+a896 1
+  assert( schedB.entries() == 2 );
+d907 1
+a907 1
+  assert( schedC.entries() == 2 );
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d3 1
+d18 2
+a19 4
+// RW2STL - implement (RWGVector, LgFrSortingScheduleFloatSmartPointer) 
+
+// RW2STL - implement (RWGOrderedVector, LgFrSortingScheduleFloatSmartPointer) 
+
+d29 2
+a30 2
+   assert( LgFrSortingScheduleFloatThisGlobalPtr != 0 );
+   assert( LgFrSortingScheduleFloatCompareStrategyGlobalPtr != 0 );
+d49 1
+a49 1
+   const bool ascending)
+d55 1
+a55 1
+  if ( compareStrategyPtr_ != 0 ) {
+d58 2
+a59 3
+     size_t *pv = new size_t[permutations_.size()];
+     size_t i = 0; // Pulled out of the for below by RW2STL
+     for ( i=0; i<permutations_.size(); i++ )
+d75 1
+a75 1
+        permutations_.size(), 
+d79 3
+a81 3
+     // Set global variables to 0
+     LgFrSortingScheduleFloatThisGlobalPtr = 0;
+     LgFrSortingScheduleFloatCompareStrategyGlobalPtr = 0;
+d90 1
+a90 1
+     for ( i=0; i<permutations_.size(); i++ )
+a95 1
+  {
+d97 1
+a97 2
+     size_t i = 0; // Pulled out of the for below by RW2STL
+     for ( i=0; i<permutations_.size(); i++ )
+a98 1
+  }
+d104 2
+a105 2
+     if ( permutations_.size() >0 ) {
+        for ( i=0, j=permutations_.size() - 1; 
+d123 1
+a123 1
+      if ( compareStrategyPtr_ != 0 ) 
+d126 1
+a126 1
+      if ( cs != 0 )
+d129 2
+a130 2
+         compareStrategyPtr_ = 0;
+      if ( compareStrategyPtr_ != 0 ) 
+d143 2
+a144 2
+// Return true if schedule is in original unsorted order.
+bool
+d148 2
+a149 2
+   if ( compareStrategyPtr_ == 0 && ascending_ ) return true;
+   else return false;
+d151 3
+a153 4
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<permutations_.size(); i++ )
+      if ( permutations_[i] != i ) return false;
+   return true;
+d157 2
+a158 2
+// Return true if schedule is sorted in ascending order
+bool
+d171 1
+a171 1
+   assert ((attributeScheduleStrategyPtr_ != 0) && ("ERROR: cannot populate() a schedule without a ScheduleStragety assigned to it!"));
+d180 1
+a180 1
+   assert( filterStrategyPtr_ != 0 );
+d196 1
+a196 1
+   assert (filterStrategyPtr_ != 0);
+d201 1
+a201 1
+bool
+d205 2
+a206 2
+	  (attributeScheduleStrategyPtr_ == 0)
+	  ? true
+d215 1
+a215 1
+	  (attributeScheduleStrategyPtr_ == 0)
+d228 1
+a228 1
+  this->changed(0);
+d236 1
+a236 3
+  if ( permutations_.size() == permutations_.capacity() )
+      permutations_.reserve( 2*capacity() + 1 ); // LgFrScheduleFloat::insert adjusts its own capacity
+
+d238 2
+a239 2
+  permutations_.push_back( permutations_.size() );
+  assert( LgFrScheduleFloat::size() == permutations_.size() );
+d252 1
+a252 1
+  this->changed(0);
+d263 1
+a263 3
+  if ( permutations_.size() == permutations_.capacity() )
+      permutations_.reserve( 2*capacity() + 1 ); // LgFrScheduleFloat::insert adjusts its own capacity
+
+d265 1
+a265 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<permutations_.size(); i++ )
+d267 2
+a268 2
+   assert (index < permutations_.size());
+   permutations_.insert(permutations_.begin()+index, index );
+d283 1
+a283 1
+  this->changed(0);
+d363 1
+a363 1
+    return (*this)[permutations_[ permutations_.size() - 1 ] ];
+d387 2
+a388 2
+   if (attributeScheduleStrategyPtr_ != 0) {
+      if ( this->size() > 0 ) {
+d391 1
+a391 2
+         int i = 0; // Pulled out of the for below by RW2STL
+         for (i = 0;  i < this->size(); ++i) {
+d413 1
+a413 1
+LgFrSortingScheduleFloat::reserve (const size_t newCapacity)
+d415 1
+a415 1
+   assert (newCapacity  >=  this->size());	// Not done yet: have to do 
+d418 2
+a419 2
+   LgFrScheduleFloat::reserve(newCapacity);
+   permutations_.reserve(newCapacity);
+d432 1
+a432 1
+    assert (permutations_.size() == rhs.permutations_.size());
+d434 1
+a434 1
+    if ( compareStrategyPtr_ != 0 ) 
+d437 1
+a437 1
+    if ( rhs.compareStrategyPtr_ != 0 )
+d440 2
+a441 2
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+d444 1
+a444 1
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+d447 1
+a447 1
+    if ( rhs.attributeScheduleStrategyPtr_ != 0 )
+d450 2
+a451 2
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+d454 2
+a455 2
+    assert( filterStrategyPtr_ != 0 );
+    assert( rhs.filterStrategyPtr_ != 0 );
+d472 3
+a474 3
+    compareStrategyPtr_(0),
+    attributeScheduleStrategyPtr_(0),
+    filterStrategyPtr_(0),
+d477 1
+a477 1
+    if ( source.compareStrategyPtr_ != 0 )
+d480 2
+a481 2
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+d484 1
+a484 1
+    if ( source.attributeScheduleStrategyPtr_ != 0 )
+d487 2
+a488 2
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+d491 1
+a491 1
+    assert( source.filterStrategyPtr_ != 0 );
+d503 3
+a505 3
+    compareStrategyPtr_(0),
+    attributeScheduleStrategyPtr_(0),
+    filterStrategyPtr_(0),
+d508 1
+a508 1
+    if ( source.compareStrategyPtr_ != 0 )
+d511 2
+a512 2
+       compareStrategyPtr_ = 0;
+    if ( compareStrategyPtr_ != 0 ) 
+d515 1
+a515 1
+    if ( source.attributeScheduleStrategyPtr_ != 0 )
+d519 2
+a520 2
+       attributeScheduleStrategyPtr_ = 0;
+    if ( attributeScheduleStrategyPtr_ != 0 ) 
+d523 1
+a523 1
+    assert( source.filterStrategyPtr_ != 0 );
+d533 5
+a537 4
+  compareStrategyPtr_(0),
+  attributeScheduleStrategyPtr_(0),
+  filterStrategyPtr_(0),
+  ascending_(true)
+a538 1
+   permutations_.reserve(n);
+d546 1
+a546 1
+  if ( compareStrategyPtr_ != 0 ) 
+d550 1
+a550 1
+  if ( attributeScheduleStrategyPtr_ != 0 ) 
+d589 1
+a589 2
+   int i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<size(); i++ )  {
+d602 1
+a602 1
+   if ( attributeScheduleStrategyPtr_ != 0 ) 
+d606 1
+a606 1
+   if ( attributeScheduleStrategyPtr_ != 0 ) 
+d635 1
+a635 1
+  if (attributeScheduleStrategyPtr_ != 0) {
+d721 1
+a721 1
+  assert (3 == ss.size());
+d733 1
+a733 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < ss.size(); i++) {
+d747 1
+a747 1
+  /*LgFrSortingScheduleFloat ss3(0);
+d749 1
+a749 1
+  assert (ss3.size() == 0);*/
+d752 1
+a752 1
+  assert( ss.compareStrategy() == 0 );
+d766 4
+a769 1
+  assert( returnedCompareStrategy != 0 );
+d778 1
+a778 1
+  ds.sort(&standardCompareStrategy,false);
+d783 1
+a783 1
+  for ( i=0, j=ds.size()-1;
+d796 1
+a796 1
+        i<ds.size();
+d802 1
+a802 1
+  ds.sort(0,false);
+d807 2
+a808 2
+  for ( i=0, j= ds.size()-1;
+        i<ds.size();
+d817 1
+d819 1
+d821 1
+d839 1
+a839 1
+  assert( diff.size() == 3 );
+d863 1
+a863 1
+  assert( result.size() == 3 );
+d885 1
+a885 1
+  assert( schedB.size() == 2 );
+d896 1
+a896 1
+  assert( schedC.size() == 2 );
+@
+
+
+1.2.6.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d602 2
+a603 2
+   std::cout <<"************************************************" <<std::endl;
+   std::cout <<"LgSortingFrSchedule" << std::endl;
+d606 2
+a607 2
+   std::cout <<" *********************************" <<std::endl;
+      std::cout <<" entry number " <<i <<":";
+d610 1
+a610 1
+   std::cout <<"************************************************" <<std::endl;
+d756 1
+a756 1
+    // std::cout << std::endl;
+d774 1
+a774 1
+  // std::cout <<"Unsorted" <<std::endl;
+d786 1
+a786 1
+  // std::cout <<"Sorted" <<std::endl;
+d848 2
+a849 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d872 2
+a873 2
+  // std::cout <<"result" <<std::endl;
+  // std::cout <<result.format() <<std::endl;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d679 1
+a679 1
+  return lhs.op(LgFrTimeVecFloat::add,rhs);
+d688 1
+a688 1
+  return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

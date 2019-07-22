@@ -1,0 +1,503 @@
+head	1.2;
+access;
+symbols
+	abandoningEtnParts:1.1;
+locks; strict;
+comment	@// @;
+
+
+1.2
+date	2004.06.21.14.21.12;	author fasano;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2004.02.19.19.42.52;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Code restored to state before etnParts were added
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+
+//#include "wit.h"
+
+#include <map>
+#include <vector>
+
+#include <assert.h>
+#include <iostream>
+#include <float.h>
+#include <math.h>
+
+
+
+#include "CoinFloatEqual.h"
+#include "fileConvFeb04.h"
+#include "generalData.h"
+//#include "globalAttrData.h"
+//#include "mtmDemanBomData.h"
+//#include "partDemandData.h"
+//#include "mtmDemanBomData1.h"
+//#include "partDemandData1.h"
+#include "BCP_string.cpp"
+//#include "eso2Problem.h"
+
+
+typedef std::vector<BCP_string> StdStringVec;
+
+
+void removeRename( BCP_string fileName, BCP_string newFileName ) {
+  int rc;
+  rc=remove(fileName.c_str());
+  rc=rename(newFileName.c_str(),fileName.c_str());
+}
+
+int
+main (int argc, char * argv[])
+{
+  
+  std::cout <<"fileConvFeb04 Build date: " <<__DATE__ <<std::endl;
+  {
+    
+    // Put Parms into a vector
+    std::vector<BCP_string> args;
+    for (int i=0; i<argc; i++) 
+      args.push_back(argv[i]);
+    
+    {
+      // Check parm passed to program
+      bool parmError = false;
+      
+      if ( args.size()> 1 ) {
+        if (args[1]=="?" ) {
+          parmError = true; // set flag to provide usage info
+        }
+      }
+      
+      if ( ! parmError ) {
+        if ( args.size()!=2 ) {
+          // Wrong number of parms. Write message
+          std::cerr 
+            <<"-------------------------------------------------------"  <<std::endl
+            <<"Wrong number of parmeters specified"                      <<std::endl
+            <<"  Number parameters specified: " <<args.size()-1          <<std::endl
+            <<"  Expected number of parameters: 1"                       <<std::endl
+            <<"-------------------------------------------------------"  <<std::endl;
+          parmError = true;
+        }
+      }
+      
+      
+      
+      if ( parmError ) {
+        // Write correct usage
+        std::cerr 
+          <<"-------------------------------------------------------"  <<std::endl
+          <<argv[0] <<" dataDirectory "                                <<std::endl
+          <<"  where:"                                                 <<std::endl
+          <<"    dataDirectory:"                                       <<std::endl
+          <<"      Directory where input files are located and"        <<std::endl
+          <<"      output files are written."                          <<std::endl
+          <<"  example usage:"                                         <<std::endl
+          <<"    " <<argv[0] <<" ../example1"                          <<std::endl
+          <<"-------------------------------------------------------"  <<std::endl;
+        return 1;
+      }
+    }
+    
+    BCP_string outputDirectory=args[1];
+    BCP_string inputDirectory=args[1];
+    
+    BCP_string loosePartFileName = inputDirectory + "/loosePartData.csv";
+    BCP_string newLoosePartFileName = inputDirectory + "/newLoosePartData.csv";
+    
+    
+    BCP_string mtmDemanBomDataFileName    = outputDirectory + "/mtmDemanBomData.csv";
+    BCP_string newMtmDemanBomDataFileName = outputDirectory + "/newMtmDemanBomData.csv";
+
+    BCP_string featureXrefDataFileName    = outputDirectory + "/featureXrefData.csv";
+    BCP_string newFeatureXrefDataFileName = outputDirectory + "/newFeatureXrefData.csv";
+    
+    BCP_string featureConversionOverrideDataFileName    = outputDirectory + "/featureConversionOverrideData.csv";
+    BCP_string newFeatureConversionOverrideDataFileName = outputDirectory + "/newFeatureConversionOverrideData.csv";
+    
+    BCP_string altDataFileName    = outputDirectory + "/altData.csv";
+    BCP_string newAltDataFileName = outputDirectory + "/newAltData.csv";
+    
+    BCP_string altOverrideDataFileName    = outputDirectory + "/altOverrideData.csv";
+    BCP_string newAltOverrideDataFileName = outputDirectory + "/newAltOverrideData.csv";
+  
+    BCP_string altExcludeLocDataFileName    = outputDirectory + "/altExcludeLocData.csv";
+    BCP_string newAltExcludeLocDataFileName = outputDirectory + "/newAltExcludeLocData.csv";
+  
+    BCP_string partDemandDataFileName    = outputDirectory + "/partDemandData.csv";
+    BCP_string newPartDemandDataFileName = outputDirectory + "/newPartDemandData.csv";
+
+    // Convert loose part data
+    {
+      std::cout <<"Converting input file: loosePartData" <<std::endl;
+      ESO2generalData loosePartFile(loosePartFileName,5);
+      //ESO2generalDataIterator loosePartFileIter(loosePartFile,5);
+      
+      
+      FILE * newLoosePartFilePtr = fopen(newLoosePartFileName.c_str(),"w");
+      
+      // loop once for each record in loosePart file
+      int r;
+      for ( r=0; r<loosePartFile.numRecords(); ++r ) {
+        BCP_string loosePart = loosePartFile.fieldAsString(r,"field0");
+        BCP_string plantLoc = loosePartFile.fieldAsString(r,"field1");
+        BCP_string period = loosePartFile.fieldAsString(r,"field2");
+        BCP_string supply = loosePartFile.fieldAsString(r,"field3");
+        BCP_string wfmv = loosePartFile.fieldAsString(r,"field4");
+        
+        // Write feature new Record  
+        if ( r==0 ) {
+          fprintf(newLoosePartFilePtr,
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"etnFlag\"\n",
+            loosePart.c_str(),
+            plantLoc.c_str(),
+            period.c_str(),
+            supply.c_str(),
+            wfmv.c_str());
+        }
+        else {
+          fprintf(newLoosePartFilePtr,
+            "\"%s\",\"%s\",\"%s\",%s,%s,1\n",
+            loosePart.c_str(),
+            plantLoc.c_str(),
+            period.c_str(),
+            supply.c_str(),
+            wfmv.c_str());
+        }
+        
+      } // end loop reading loosePart file record
+      
+      fclose(newLoosePartFilePtr);
+    } // end of block reading loosePart file
+    
+    
+    // Read mtmDemanBomData
+    {
+      std::cout <<"Converting mtmDemanBomData" <<std::endl;
+      
+      ESO2generalData mtmDemanBomFile(mtmDemanBomDataFileName,5);   
+      
+      FILE * newMtmDemanBomDataFilePtr = fopen(newMtmDemanBomDataFileName.c_str(),"w");
+      
+      // loop once for each record in mtmDemanBomData file
+      int r;
+      for ( r=0; r<mtmDemanBomFile.numRecords(); ++r ) {
+        BCP_string mtm = mtmDemanBomFile.fieldAsString(r,"field0");
+        BCP_string part = mtmDemanBomFile.fieldAsString(r,"field1");
+        BCP_string srcLoc = mtmDemanBomFile.fieldAsString(r,"field2");
+        BCP_string period = mtmDemanBomFile.fieldAsString(r,"field3");
+        BCP_string attachRate = mtmDemanBomFile.fieldAsString(r,"field4");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newMtmDemanBomDataFilePtr,
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"etnFlag\"\n",
+            mtm.c_str(),
+            part.c_str(),
+            srcLoc.c_str(),
+            period.c_str(),
+            attachRate.c_str());
+        }
+        else {     
+          fprintf(newMtmDemanBomDataFilePtr,
+            "\"%s\",\"%s\",\"%s\",%s,%s,1\n",
+            mtm.c_str(),
+            part.c_str(),
+            srcLoc.c_str(),
+            period.c_str(),
+            attachRate.c_str());
+        }
+      }  
+      
+      fclose(newMtmDemanBomDataFilePtr);
+    }
+
+    // Read featureXref
+    {
+      std::cout <<"Converting featureXrefData" <<std::endl;
+      
+      ESO2generalData file(featureXrefDataFileName,5);   
+      
+      FILE * newFilePtr = fopen(newFeatureXrefDataFileName.c_str(),"w");
+      
+      // loop once for each record in mtmDemanBomData file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        BCP_string f3 = file.fieldAsString(r,"field3");
+        BCP_string f4 = file.fieldAsString(r,"field4");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"etnFlag\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",%s,%s,1\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    // Read featureConversionOverride
+    {
+      std::cout <<"Converting featureConversionOverrideData" <<std::endl;
+      
+      ESO2generalData file(featureConversionOverrideDataFileName,6);   
+      
+      FILE * newFilePtr = fopen(newFeatureConversionOverrideDataFileName.c_str(),"w");
+      
+      // loop once for each record in mtmDemanBomData file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        BCP_string f3 = file.fieldAsString(r,"field3");
+        BCP_string f4 = file.fieldAsString(r,"field4");
+        BCP_string f5 = file.fieldAsString(r,"field5");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"etnFlag\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str(),
+            f5.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",%s,%s,%s,1\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str(),
+            f5.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    // Read altData
+    {
+      std::cout <<"Converting altData" <<std::endl;
+      
+      ESO2generalData file(altDataFileName,4);   
+      
+      FILE * newFilePtr = fopen(newAltDataFileName.c_str(),"w");
+      
+      // loop once for each record in mtmDemanBomData file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        BCP_string f3 = file.fieldAsString(r,"field3");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"partEtnFlag\",\"%s\",\"altPartEtnFlag\",\"%s\",\"%s\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",1,\"%s\",1,%s,%s,1\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    // Read altOverride
+    {
+      std::cout <<"Converting altOverrideData" <<std::endl;
+      
+      ESO2generalData file(altOverrideDataFileName,5);   
+      
+      FILE * newFilePtr = fopen(newAltOverrideDataFileName.c_str(),"w");
+      
+      // loop once for each record in file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        BCP_string f3 = file.fieldAsString(r,"field3");
+        BCP_string f4 = file.fieldAsString(r,"field4");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"partEtnFlag\",\"%s\",\"altPartEtnFlag\",\"%s\",\"%s\",\"%s\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",1,\"%s\",1,\"%s\",%s,%s\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    // Read altExcludeLoc
+    {
+      std::cout <<"Converting altExcludeLocData" <<std::endl;
+      
+      ESO2generalData file(altExcludeLocDataFileName,3);   
+      
+      FILE * newFilePtr = fopen(newAltExcludeLocDataFileName.c_str(),"w");
+      
+      // loop once for each record in file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"partEtnFlag\",\"%s\",\"altPartEtnFlag\",\"%s\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",1,\"%s\",1,\"%s\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    // Read partDemandData
+    {
+      std::cout <<"Converting partDemandDataData" <<std::endl;
+      
+      ESO2generalData file(partDemandDataFileName,7);   
+      
+      FILE * newFilePtr = fopen(newPartDemandDataFileName.c_str(),"w");
+      
+      // loop once for each record in file
+      int r;
+      for ( r=0; r<file.numRecords(); ++r ) {
+        BCP_string f0 = file.fieldAsString(r,"field0");
+        BCP_string f1 = file.fieldAsString(r,"field1");
+        BCP_string f2 = file.fieldAsString(r,"field2");
+        BCP_string f3 = file.fieldAsString(r,"field3");
+        BCP_string f4 = file.fieldAsString(r,"field4");
+        BCP_string f5 = file.fieldAsString(r,"field5");
+        //BCP_string f6 = file.fieldAsString(r,"field6");
+        
+        // Write each record 
+        if ( r==0 ) {
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str(),
+            f5.c_str());
+        }
+        else {     
+          fprintf(newFilePtr,
+            "\"%s\",\"%s\",\"%s\",%s,%s,%s\n",
+            f0.c_str(),
+            f1.c_str(),
+            f2.c_str(),
+            f3.c_str(),
+            f4.c_str(),
+            f5.c_str());
+        }
+      }  
+      
+      fclose(newFilePtr);
+    }
+
+    
+
+    removeRename(loosePartFileName, newLoosePartFileName);
+    removeRename(mtmDemanBomDataFileName, newMtmDemanBomDataFileName);
+    removeRename(featureXrefDataFileName, newFeatureXrefDataFileName);
+    removeRename(featureConversionOverrideDataFileName, newFeatureConversionOverrideDataFileName);
+    removeRename(altDataFileName, newAltDataFileName);
+    removeRename(altOverrideDataFileName, newAltOverrideDataFileName);
+    removeRename(altExcludeLocDataFileName, newAltExcludeLocDataFileName);
+    removeRename(partDemandDataFileName, newPartDemandDataFileName);
+  }
+
+
+  std::cout <<"fileConvFeb04 application is finished." <<std::endl;
+  return 0;
+}
+@
+
+
+1.1
+log
+@Code for converting files to new format
+@
+text
+@@
+

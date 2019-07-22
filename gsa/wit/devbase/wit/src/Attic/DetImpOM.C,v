@@ -1,0 +1,1851 @@
+head	1.26;
+access;
+symbols
+	sce_5_01_20080919:1.2;
+locks; strict;
+comment	@ * @;
+
+
+1.26
+date	2010.08.19.18.00.11;	author rjw;	state dead;
+branches;
+next	1.25;
+
+1.25
+date	2010.03.31.20.38.52;	author rjw;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2010.03.29.21.34.22;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2010.03.24.21.31.01;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2010.03.18.22.46.28;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2010.03.18.22.35.01;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2010.03.16.22.59.36;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2010.03.16.22.42.24;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2010.03.16.20.39.21;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2010.03.16.20.22.38;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2010.03.13.00.35.49;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2010.01.29.23.53.00;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2010.01.25.19.45.17;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.01.09.00.12.04;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2010.01.08.22.51.54;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2010.01.06.23.20.48;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2010.01.06.22.13.16;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2010.01.06.21.13.11;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2010.01.06.00.27.30;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2010.01.04.22.11.23;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.11.19.21.05.10;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.11.17.23.45.47;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.11.17.22.54.48;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.11.13.19.01.24;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2008.02.29.23.24.28;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2008.02.27.23.43.41;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.26
+log
+@CPLEX
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "DetImpOM.C"
+//
+// Implementation of class DetImpOM.
+//------------------------------------------------------------------------------
+
+#include <DetImpOM.h>
+#include <ExecPerSch.h>
+#include <DetOptImpMgr.h>
+#include <DetVars.h>
+#include <DetCons.h>
+#include <Coeff.h>
+#include <OptComp.h>
+#include <GlobalComp.h>
+#include <Material.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <Demand.h>
+#include <BoundSet.h>
+#include <MultiObjMgr.h>
+#include <Objective.h>
+#include <Timing.h>
+#include <Session.h>
+#include <MsgFac.h>
+
+#include <float.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class DetImpOM.
+//------------------------------------------------------------------------------
+
+const double WitDetImpOM::solnEpsilon = 0.0005;
+
+//------------------------------------------------------------------------------
+
+WitDetImpOM::WitDetImpOM (WitProblem * theProblem):
+
+      WitOptModel     (theProblem),
+      myMultiObjVar_  (),
+      myMultiObjCon_  (),
+      myNtbvVar_      (NULL),
+      myTbvCon_       (NULL),
+      nSlbvVars_      (0),
+      solnFile_       (NULL),
+      myExecPerSched_ (NULL)
+   {
+   myExecPerSched_ = new WitExecPerSched <WitBillEntry> (myProblem ());
+
+   if (multiObjMode ())
+      {
+      myMultiObjVar_.allocate (myProblem ());
+      myMultiObjCon_.allocate (myProblem ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitDetImpOM::~WitDetImpOM ()
+   {
+   delete myExecPerSched_;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetImpOM::needDual ()
+   {
+   if (myOptComp ()->compPrices ())
+      return true;
+
+   if (myGlobalComp ()->computeCriticalList ())
+      return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::reportInfeasible ()
+   {
+   if (positiveHardLBsExist () or disallowedScrapExists ())
+      myMsgFac () ("infeasSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::reportUnbounded ()
+   {
+   if (myCompMgr ()->myOptComp ()->negativeCostsExist ())
+      myMsgFac () ("unboundedSmsg");
+   }
+
+//------------------------------------------------------------------------------
+// storeDerived functions.
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitScrapVar * theScrapVar)
+   {
+   insertInto (myScrapVar_, theScrapVar->myPart (), theScrapVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitNonSubVar * theNonSubVar)
+   {
+   insertInto (myNonSubVar_, theNonSubVar->myBomEnt (), theNonSubVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitSubVar * theSubVar)
+   {
+   insertInto (mySubVar_, theSubVar->mySub (), theSubVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitShipVar * theShipVar)
+   {
+   insertInto (myShipVar_, theShipVar->myDemand (), theShipVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitSlbvVar * theSlbvVar)
+   {
+   insertInto (mySlbvVar_, theSlbvVar->myBoundSet (), theSlbvVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitExecVar * theExecVar)
+   {
+   insertInto (myExecVar_, theExecVar->myOperation (), theExecVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitStockVar * theStockVar)
+   {
+   insertInto (myStockVar_, theStockVar->myMaterial (), theStockVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitCumShipVar * theCumShipVar)
+   {
+   insertInto (myCumShipVar_, theCumShipVar->myDemand (), theCumShipVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitMultiObjVar * theMultiObjVar)
+   {
+   WitObjective * theObj;
+
+   theObj = theMultiObjVar->myObj ();
+
+   witAssert (myMultiObjVar_ (theObj) == NULL);
+
+   myMultiObjVar_ (theObj) = theMultiObjVar;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitNtbvVar * theNtbvVar)
+   {
+   witAssert (multiObjMode ());
+
+   witAssert (myNtbvVar_ == NULL);
+
+   myNtbvVar_ = theNtbvVar;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitResourceCon * theResourceCon)
+   {
+   insertInto (myResourceCon_, theResourceCon->myPart (), theResourceCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitSubCon * theSubCon)
+   {
+   insertInto (mySubCon_, theSubCon->myBomEnt (), theSubCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitShipCon * theShipCon)
+   {
+   insertInto (myShipCon_, theShipCon->myDemand (), theShipCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitSlbCon * theSlbCon)
+   {
+   insertInto (mySlbCon_, theSlbCon->myBoundSet (), theSlbCon);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitMultiObjCon * theMultiObjCon)
+   {
+   WitObjective * theObj;
+
+   theObj = theMultiObjCon->myObj ();
+
+   witAssert (myMultiObjCon_ (theObj) == NULL);
+
+   myMultiObjCon_ (theObj) = theMultiObjCon;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeDerived (WitTbvCon * theTbvCon)
+   {
+   witAssert (multiObjMode ());
+
+   witAssert (myTbvCon_ == NULL);
+
+   myTbvCon_ = theTbvCon;
+   }
+
+//------------------------------------------------------------------------------
+// OptVC look-up functions.
+//------------------------------------------------------------------------------
+
+WitScrapVar * WitDetImpOM::myScrapVar (WitPart * thePart, WitPeriod thePer)
+   {
+   return lookUp (myScrapVar_, thePart, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitNonSubVar * WitDetImpOM::myNonSubVar (
+      WitBomEntry * theBomEnt,
+      WitPeriod     thePer)
+   {
+   return lookUp (myNonSubVar_, theBomEnt, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSubVar * WitDetImpOM::mySubVar (WitSubEntry * theSub, WitPeriod thePer)
+   {
+   return lookUp (mySubVar_, theSub, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitShipVar * WitDetImpOM::myShipVar (WitDemand * theDemand, WitPeriod thePer)
+   {
+   return lookUp (myShipVar_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitExecVar * WitDetImpOM::myExecVar (WitOperation * theOpn, WitPeriod thePer)
+   {
+   return lookUp (myExecVar_, theOpn, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitStockVar * WitDetImpOM::myStockVar (WitMaterial * theMat, WitPeriod thePer)
+   {
+   return lookUp (myStockVar_, theMat, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitCumShipVar * WitDetImpOM::myCumShipVar (
+      WitDemand * theDemand,
+      WitPeriod   thePer)
+   {
+   return lookUp (myCumShipVar_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitResourceCon * WitDetImpOM::myResourceCon (WitPart * thePart, WitPeriod thePer)
+   {
+   return lookUp (myResourceCon_, thePart, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSubCon * WitDetImpOM::mySubCon (WitBomEntry * theBomEnt, WitPeriod thePer)
+   {
+   return lookUp (mySubCon_, theBomEnt, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitShipCon * WitDetImpOM::myShipCon (WitDemand * theDemand, WitPeriod thePer)
+   {
+   return lookUp (myShipCon_, theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbvVar * WitDetImpOM::mySlbvVar (WitBoundedVar * theBoundedVar)
+   {
+   return
+      lookUp (
+         mySlbvVar_,
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbCon * WitDetImpOM::mySlbCon (WitBoundedVar * theBoundedVar)
+   {
+   return
+      lookUp (
+         mySlbCon_,
+         theBoundedVar->myBoundSet (),
+         theBoundedVar->myPeriod ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitMultiObjVar * WitDetImpOM::myMultiObjVar (WitObjective * theObj)
+   {
+   return myMultiObjVar_ (theObj);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitNode * theNode)
+   {
+   fprintf (
+      modelFile (),
+      itemFormat (),
+      theNode->nodeName ().myCstring (),
+      "",
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitBomEntry * theBomEnt)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theBomEnt->myOperationName ().myCstring (),
+      theBomEnt->myPartName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitSubEntry * theSub)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theSub->myOperationName ().myCstring (),
+      theSub->myBomEnt ()->myPartName ().myCstring (),
+      theSub->myPartName ().myCstring ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitDemand * theDemand)
+   {
+   fprintf (modelFile (), itemFormat (),
+      theDemand->demandedPartName ().myCstring (),
+      theDemand->demandName ().myCstring (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitBoundedVar * theBoundedVar)
+   {
+   fprintf (modelFile (),
+      " Var #%-7d BS #%-8d %-12s",
+      theBoundedVar->index (),
+      theBoundedVar->myBoundSet ()->mappingIndex (),
+      "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem (WitObjective * theObj)
+   {
+   fprintf (modelFile (), itemLongFormat (), theObj->myObjName ().myCstring ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printItem ()
+   {
+   fprintf (modelFile (), itemLongFormat (), "");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::storeBoundedVar (WitBoundedVar * theBoundedVar)
+   {
+   myBoundedVars_.append (theBoundedVar);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetImpOM::slbvVarsExist ()
+   {
+   return (nSlbvVars_ > 0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printPeriod (WitPeriod thePer)
+   {
+   fprintf (modelFile (), periodDFormat (), thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printNonPeriod ()
+   {
+   fprintf (modelFile (), periodSFormat (), "");
+   }
+
+//------------------------------------------------------------------------------
+// writeSoln prints out the primal solution from wit data structures.
+// Optionally prints the dual solution for resource allocation constraints.
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writeSoln (const char * fName)
+   {
+   WitTimer::enterSection ("extra");
+
+   myMsgFac () ("writeOptSolnMsg");
+
+   solnFile_ = openFile (fName, "w");
+
+   myProblem ()->mySession ()->writeHeading (solnFile ());
+
+   writePartSoln       ();
+   writeOperationSoln  ();
+   writeSubEntrySoln   ();
+   writeDemandSoln     ();
+   writeBoundedVarSoln ();
+
+   fclose (solnFile ());
+
+   solnFile_ = NULL;
+
+   WitTimer::leaveSection ("extra");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::generateVariables ()
+   {
+   WitPart *       thePart;
+   WitMaterial *   theMat;
+   WitOperation *  theOpn;
+   WitBomEntry *   theBomEnt;
+   WitSubEntry *   theSub;
+   WitDemand *     theDemand;
+   WitBoundedVar * theBoundedVar;
+   WitPeriod       thePer;
+   WitObjective *  theObj;
+
+   forEachMaterial (theMat, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theMat->canStock (thePer))
+            new WitStockVar (theMat, thePer, this);
+
+   forEachPart (thePart, myProblem ())
+      if (thePart->scrapAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitScrapVar (thePart, thePer, this);
+
+   forEachOperation (theOpn, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theOpn->executable ()[thePer])
+            new WitExecVar (theOpn, thePer, this);
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theBomEnt->hasSubsInEffect ()[thePer])
+            new WitNonSubVar (theBomEnt, thePer, this);
+
+   forEachSubEntry (theSub, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         if (theSub->inEffect (thePer))
+            new WitSubVar (theSub, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         new WitShipVar (theDemand, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitCumShipVar (theDemand, thePer, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (theBoundedVar->needsAnSlbvVar ())
+         {
+         new WitSlbvVar (theBoundedVar, this);
+
+         ++ nSlbvVars_;
+         }
+
+   if (multiObjMode ())
+      {
+      forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+         {
+         new WitMultiObjVar (theObj, this);
+         }
+
+      if (nSlbvVars_ > 0)
+         {
+         new WitNtbvVar (this);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::generateConstraints ()
+   {
+   WitPart *       thePart;
+   WitBomEntry *   theBomEnt;
+   WitDemand *     theDemand;
+   WitPeriod       thePer;
+   WitBoundedVar * theBoundedVar;
+   WitObjective *  theObj;
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         new WitResourceCon (thePart, thePer, this);
+
+   if (myCompMgr ()->hasSubEntries ())
+      forEachBomEntry (theBomEnt, myProblem ())
+         forEachPeriod (thePer, myProblem ())
+            if (theBomEnt->hasSubsInEffect ()[thePer])
+               new WitSubCon (theBomEnt, thePer, this);
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            new WitShipCon (theDemand, thePer, this);
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      if (mySlbvVar (theBoundedVar) != NULL)
+         new WitSlbCon (theBoundedVar, this);
+
+   if (multiObjMode ())
+      {
+      forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+         {
+         new WitMultiObjCon (theObj, this);
+         }
+
+      if (myNtbvVar_ != NULL)
+         {
+         new WitTbvCon (this);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::generateLexOptVarSeq (WitPtrVec <WitOptVar> & theOptVarSeq)
+   {
+   int            seqLength;
+   WitObjective * theObj;
+   int            theIdx;
+
+   stronglyAssert (multiObjMode ());
+
+   if (myNtbvVar_ == NULL)
+      {
+      seqLength = myMultiObjMgr ()->myObjectives ().nElements ();
+
+      theOptVarSeq.resize (seqLength);
+
+      forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+         {
+         theIdx = theObj->objectiveRank () - 1;
+
+         theOptVarSeq[theIdx] = myMultiObjVar_ (theObj);
+         }
+      }
+   else
+      {
+      seqLength = myMultiObjMgr ()->myObjectives ().nElements () + 1;
+
+      theOptVarSeq.resize (seqLength);
+
+      theOptVarSeq[0] = myNtbvVar_;
+
+      forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+         {
+         theIdx = theObj->objectiveRank ();
+
+         theOptVarSeq[theIdx] = myMultiObjVar_ (theObj);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::postGenFixed ()
+   {
+   delete myExecPerSched_;
+
+   myExecPerSched_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::postGenFlexible ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printOptVCHeading ()
+   {
+   fprintf (modelFile (), "Index    Class       ");
+
+   fprintf (modelFile (), itemFormat (),    "Item", "Item", "Item");
+   fprintf (modelFile (), periodSFormat (), "Per");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::displayDerived ()
+   {
+   int nBSSpec;
+
+   nBSSpec = myCompMgr ()->nBoundSetsSpecified ();
+
+   if (nBSSpec > 0)
+      myMsgFac () ("boundCountsMsg",
+         nBSSpec,
+         myBoundedVars_.nElements (),
+         nSlbvVars_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printDerived ()
+   {
+   printBoundedVars ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::initDepVars ()
+   {
+   initSlbvVars ();
+
+   if (multiObjMode ())
+      initMultiObjVars ();
+
+   if (myNtbvVar_ != NULL)
+      initNtbvVar ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::doScreening ()
+   {
+   if (myOptComp ()->printOptModel ())
+      saveBounds ();
+
+   screenImpCons ();
+
+   relaxCumShipNonNeg ();
+
+   screenSlbOptVCs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writePeSoln (WitOptVC * theOptVC)
+   {
+   double valJ;
+
+   valJ =
+      (theOptVC == NULL)?
+         0.0:
+         theOptVC->solnValue ();
+
+   if (fabs (valJ) > solnEpsilon)
+      fprintf (solnFile (), "%13.3f  ", valJ);
+   else
+      fprintf (solnFile (), "               ");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writePartSoln ()
+   {
+   WitPart *     thePart;
+   WitMaterial * theMat;
+   WitPeriod     t;
+
+   forEachPart (thePart, myProblem ())
+      {
+      fprintf (
+         solnFile (),
+         "\nPart %s:\n",
+         thePart->partName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period      Inventory          Scrap");
+
+      if (needDual ())
+         fprintf (solnFile (), "   Shadow Price");
+
+      fprintf (solnFile (), "\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         theMat = thePart->thisMat ();
+
+         writePeSoln (
+            (theMat != NULL)?
+               myStockVar (theMat, t):
+               NULL);
+
+         writePeSoln (myScrapVar (thePart, t));
+
+         if (needDual ())
+            writePeSoln (myResourceCon (thePart, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writeOperationSoln ()
+   {
+   WitOperation * theOpn;
+   WitPeriod      thePer;
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nOperation %s:\n",
+         theOpn->operationName ().myCstring ());
+
+      fprintf (solnFile (), "Period      Execution\n");
+
+      forEachPeriod (thePer, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", thePer);
+
+         writePeSoln (myExecVar (theOpn, thePer));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writeSubEntrySoln ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitPeriod t;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      if (not theBomEnt->mySubEntries ().isEmpty ())
+         {
+         fprintf (solnFile (),
+            "\n"
+            "Consuming Operation: %s,  Part Replaced: %s,  BOM Entry #%d:\n"
+            "\n",
+            theBomEnt->myOperationName ().myCstring (),
+            theBomEnt->myPartName ().myCstring (),
+            theBomEnt->localIndex ());
+
+         fprintf (solnFile (), "Period        Non-Sub\n");
+
+         forEachPeriod (t, myProblem ())
+            if (theBomEnt->inEffect (t))
+               {
+               fprintf (solnFile (), "   %3d  ", t);
+
+               writePeSoln (myNonSubVar (theBomEnt, t));
+
+               fprintf (solnFile (), "\n");
+               }
+
+         fprintf (solnFile (),
+            "\n"
+            "Period  Substitute       Sub #   Substitution\n");
+
+         forEachPeriod (t, myProblem ())
+            forEachEl (theSub, theBomEnt->mySubEntries ())
+               if (theSub->inEffect (t))
+                  {
+                  fprintf (solnFile (),
+                     "   %3d  %-12s  %8d  ",
+                     t,
+                     theSub->myPartName ().myCstring (),
+                     theSub->localIndex ());
+
+                  writePeSoln (mySubVar (theSub, t));
+
+                  fprintf (solnFile (), "\n");
+                  }
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writeDemandSoln ()
+   {
+   WitDemand * theDemand;
+   WitPeriod t;
+
+   forEachDemand (theDemand, myProblem ())
+      {
+      fprintf (solnFile (),
+         "\nPart %s,  Demand %s:\n",
+         theDemand->demandedPartName ().myCstring (),
+         theDemand->demandName ().myCstring ());
+
+      fprintf (solnFile (),
+          "Period       Shipment       Cum Ship\n");
+
+      forEachPeriod (t, myProblem ())
+         {
+         fprintf (solnFile (), "%6d  ", t);
+
+         writePeSoln (myShipVar    (theDemand, t));
+         writePeSoln (myCumShipVar (theDemand, t));
+
+         fprintf (solnFile (), "\n");
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::writeBoundedVarSoln ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (solnFile (),
+      "\n\nVar Index"
+      "   Hard LB"
+      "   Soft LB"
+      " Violation"
+      "     Value"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitDetImpOM::itemFormat ()
+   {
+   return " %-12s %-12s %-12s";
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitDetImpOM::itemLongFormat ()
+   {
+   return " %-38s";
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitDetImpOM::periodDFormat ()
+   {
+   return " %4d";
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitDetImpOM::periodSFormat ()
+   {
+   return " %4s";
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Item, typename DerOptVC>
+      void WitDetImpOM::insertInto (
+         WitPtrSched <Item, DerOptVC> & thePtrSched,
+         const Item *                   theItem,
+         DerOptVC *                     theDerOptVC)
+   {
+   if (thePtrSched.domainSize () == 0)
+      thePtrSched.allocate1D (myProblem ());
+
+   if (thePtrSched.myPtrTVecAt (theItem).length () == 0)
+       thePtrSched.myPtrTVecAt (theItem).allocate (myProblem ());
+
+   witAssert (
+      thePtrSched.myPtrAt (theItem, theDerOptVC->myPeriod ()) == NULL);
+
+   thePtrSched.myPtrAt (theItem, theDerOptVC->myPeriod ()) = theDerOptVC;
+   }
+
+//------------------------------------------------------------------------------
+
+template <typename Item, typename DerOptVC>
+      DerOptVC * WitDetImpOM::lookUp (
+         WitPtrSched <Item, DerOptVC> & thePtrSched,
+         const Item *                   theItem,
+         WitPeriod                      thePer)
+   {
+   if (thePtrSched.domainSize () == 0)
+      return NULL;
+
+   if (thePtrSched.myPtrTVecAt (theItem).length () == 0)
+      return NULL;
+
+   return thePtrSched.myPtrAt (theItem, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::initSlbvVars ()
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+   double          thePrimalVal;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbvVar = mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         thePrimalVal = 
+            positivePart (
+               theBoundedVar->softLB () - theBoundedVar->primalValue ());
+
+         theSlbvVar->setPrimalValue (thePrimalVal);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::initMultiObjVars ()
+   {
+   WitObjective *   theObj;
+   WitMultiObjVar * theMultiObjVar;
+   double           thePrimalVal;
+   WitCoeffItr      theCoeffItr;
+   WitCoeff *       theCoeff;
+
+   witAssert (multiObjMode ());
+
+   forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+      {
+      theMultiObjVar = myMultiObjVar_ (theObj);
+
+      thePrimalVal   = 0.0;
+
+      myMultiObjCon_ (theObj)->attachCoeffItr (theCoeffItr);
+
+      while (theCoeffItr.advance (theCoeff))
+         {
+         if (theCoeff->myVar () == theMultiObjVar)
+            continue;
+
+         thePrimalVal +=
+            theCoeff->myValue () * theCoeff->myVar ()->primalValue ();
+         }
+
+      theMultiObjVar->setPrimalValue (thePrimalVal);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::initNtbvVar ()
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+   double          thePrimalVal;
+
+   witAssert (myNtbvVar_ != NULL);
+
+   thePrimalVal = 0.0;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbvVar = mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         thePrimalVal -= theSlbvVar->primalValue ();
+         }
+      }
+
+   myNtbvVar_->setPrimalValue (thePrimalVal);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::screenImpCons ()
+   {
+   WitPart *   thePart;
+   WitDemand * theDemand;
+   WitPeriod   t;
+   int         nVarsFixed = 0; // # variables fixed.
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myResourceCon (thePart, t));
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (t, myProblem ())
+         nVarsFixed += screen (myShipCon (theDemand, t));
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nVarsFixedMsg", nVarsFixed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::relaxCumShipNonNeg ()
+   {
+   WitDemand *     theDemand;
+   WitPeriod       thePer;
+   WitCumShipVar * theCumShipVar;
+   int             nRelaxed;
+
+   nRelaxed = 0;
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->shipLateAllowed ())
+         forEachPeriod (thePer, myProblem ())
+            {
+            theCumShipVar = myCumShipVar (theDemand, thePer);
+
+            if (theCumShipVar->bounds ().upper () > 0.0)
+               if (theCumShipVar->bounds ().lower () == 0.0)
+                  {
+                  theCumShipVar->bounds ().lower () = - DBL_MAX;
+
+                  ++ nRelaxed;
+                  }
+            }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nCshipRelaxedMsg", nRelaxed);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::screenSlbOptVCs ()
+   {
+   WitBoundedVar * theBoundedVar;
+   WitSlbCon *     theSlbCon;
+   int             nScreened = 0;
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbCon = mySlbCon (theBoundedVar);
+
+      if (theSlbCon != NULL)
+         if (theBoundedVar->softLB () <=
+             theBoundedVar->hardLB () + FLOAT_EPSILON)
+            {
+            theSlbCon->bounds ().lower () = - DBL_MAX;
+
+            mySlbvVar (theBoundedVar)->bounds ().upper () = 0.0;
+
+            ++ nScreened;
+            }
+      }
+
+   if (DEVELOPMENT)
+      myMsgFac () ("nSlbScreenedMsg", nScreened);
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetImpOM::positiveHardLBsExist ()
+   {
+   WitMaterial *  theMat;
+   WitDemand *    theDemand;
+   WitOperation * theOpn;
+
+   forEachMaterial (theMat, myProblem ())
+      if (theMat->stockBounds ()->hasPositiveHardLB ())
+         return true;
+
+   forEachDemand (theDemand, myProblem ())
+      if (theDemand->cumShipBounds ()->hasPositiveHardLB ())
+         return true;
+
+   forEachOperation (theOpn, myProblem ())
+      if (theOpn->execBounds ()->hasPositiveHardLB ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetImpOM::disallowedScrapExists ()
+   {
+   WitPart * thePart;
+
+   forEachPart (thePart, myProblem ())
+      if (not thePart->scrapAllowed ())
+         return true;
+
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetImpOM::printBoundedVars ()
+   {
+   WitBoundedVar * theBoundedVar;
+
+   fprintf (modelFile (),
+      "\n\n"
+      "Bound Data\n"
+      "===== ====\n\n\n");
+
+   fprintf (modelFile (),
+      "# Bounded Variables: %8d\n",   myBoundedVars_.nElements ());
+
+   fprintf (modelFile (), "# Slbv Variables:    %8d\n\n", nSlbvVars_);
+
+   fprintf (modelFile (),
+        "Variable"
+      "   Hard LB"
+      "   Soft LB"
+      "   Hard UB"
+      "\n");
+
+   forEachEl (theBoundedVar, myBoundedVars_)
+      theBoundedVar->printBoundInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitDetImpOM::multiObjMode ()
+   {
+   return myOptComp ()->multiObjMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitMultiObjMgr * WitDetImpOM::myMultiObjMgr ()
+   {
+   return myOptComp ()->myMultiObjMgr ();
+   }
+@
+
+
+1.25
+log
+@Multi-Obj Mode.
+@
+text
+@@
+
+
+1.24
+log
+@Multi-Obj Mode
+@
+text
+@d589 3
+a591 1
+   seqLength = myMultiObjMgr ()->myObjectives ().nElements ();
+d593 1
+a593 2
+   if (myNtbvVar_ != NULL)
+      seqLength ++;
+d595 3
+a597 1
+   theOptVarSeq.resize (seqLength);
+d599 4
+a602 1
+   if (myNtbvVar_ != NULL)
+d604 4
+a608 1
+      }
+d610 3
+a612 3
+   forEachEl (theObj, myMultiObjMgr ()->myObjectives ())
+      {
+      theIdx = theObj->objectiveRank () - 1;
+d614 1
+a614 3
+      if (myNtbvVar_ != NULL)
+         {
+         theIdx ++;
+a615 2
+
+      theOptVarSeq[theIdx] = myMultiObjVar_ (theObj);
+@
+
+
+1.23
+log
+@Removed OptObj classes.
+@
+text
+@d603 1
+a603 1
+      theIdx = theObj->objectiveSeqNo () - 1;
+@
+
+
+1.22
+log
+@Removed class PrimaryObj.
+@
+text
+@a20 1
+#include <DetObjs.h>
+a49 3
+
+      myDetObj_       (NULL),
+
+a580 14
+WitOptObj * WitDetImpOM::generateObjectives ()
+   {
+   if (multiObjMode ())
+      {
+      return new WitZeroObj (this);
+      }
+
+   myDetObj_ = new WitDetObj (this);
+
+   return myDetObj ();
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.21
+log
+@Removed class BoundsObj.
+@
+text
+@a51 1
+      myPrimaryObj_   (NULL),
+d592 1
+a592 2
+   myPrimaryObj_ = new WitPrimaryObj (this);
+   myDetObj_     = new WitDetObj     (this);
+@
+
+
+1.20
+log
+@Multi-Obj Mode
+@
+text
+@a51 1
+      myBoundsObj_    (NULL),
+a592 3
+   if (slbvVarsExist ())
+      myBoundsObj_ = new WitBoundsObj (this);
+
+@
+
+
+1.19
+log
+@Changed source file names:
+   Global.h ==> GlobalComp.h
+   Global.C ==> GlobalComp.C
+@
+text
+@d627 1
+a627 1
+      theIdx = theObj->objectiveSeqNo ();
+d629 1
+a629 1
+      if (myNtbvVar_ == NULL)
+d631 1
+a631 1
+         theIdx --;
+@
+
+
+1.18
+log
+@Multi-Obj Mode
+@
+text
+@d24 1
+a24 1
+#include <Global.h>
+@
+
+
+1.17
+log
+@Multi-Obj Mode
+@
+text
+@d58 1
+a58 1
+      myTbvVar_       (NULL),
+d182 1
+a182 1
+void WitDetImpOM::storeDerived (WitTbvVar * theTbvVar)
+d186 1
+a186 1
+   witAssert (myTbvVar_ == NULL);
+d188 1
+a188 1
+   myTbvVar_ = theTbvVar;
+d536 1
+a536 1
+         new WitTbvVar (this);
+d578 1
+a578 1
+      if (myTbvVar_ != NULL)
+d615 1
+a615 1
+   if (myTbvVar_ != NULL)
+d620 1
+a620 1
+   if (myTbvVar_ != NULL)
+d622 1
+a622 1
+      theOptVarSeq[0] = myTbvVar_;
+d629 1
+a629 1
+      if (myTbvVar_ == NULL)
+d694 2
+a695 2
+   if (myTbvVar_ != NULL)
+      initTbvVar ();
+d1022 1
+a1022 1
+void WitDetImpOM::initTbvVar ()
+d1028 1
+a1028 1
+   witAssert (myTbvVar_ != NULL);
+d1042 1
+a1042 1
+   myTbvVar_->setPrimalValue (thePrimalVal);
+@
+
+
+1.16
+log
+@Multi-Obj Mode
+@
+text
+@d1038 1
+a1038 1
+         thePrimalVal += theSlbvVar->primalValue ();
+@
+
+
+1.15
+log
+@Multi-objective mode
+@
+text
+@d58 2
+d182 11
+d233 11
+d410 7
+d533 5
+d577 5
+d607 1
+d613 11
+a623 1
+   theOptVarSeq.resize (myMultiObjMgr ()->myObjectives ().nElements ());
+d627 6
+a632 1
+      theIdx = theObj->objectiveSeqNo () - 1;
+d693 3
+d1022 25
+@
+
+
+1.14
+log
+@Multi-objective mode
+@
+text
+@d381 1
+a381 2
+   fprintf (modelFile (), itemLongFormat (),
+      theObj->objectiveName ().myCstring ());
+@
+
+
+1.13
+log
+@Multi-objective mode
+@
+text
+@d418 1
+a418 1
+void WitDetImpOM::writeSoln (const WitString & fName)
+d424 1
+a424 1
+   solnFile_ = openFile (fName.myCstring (), "w");
+@
+
+
+1.12
+log
+@Multi-objective mode
+@
+text
+@d499 1
+a499 1
+      forEachEl (theObj, myOptComp ()->myMultiObjMgr ()->myObjectives ())
+d538 1
+a538 1
+      forEachEl (theObj, myOptComp ()->myMultiObjMgr ()->myObjectives ())
+d565 19
+d940 1
+a940 1
+   forEachEl (theObj, myOptComp ()->myMultiObjMgr ()->myObjectives ())
+d1109 7
+@
+
+
+1.11
+log
+@Multi-objective mode
+@
+text
+@d22 1
+d57 1
+d67 1
+d207 13
+d614 1
+a614 3
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+   double          newPrimalVal;
+d616 2
+a617 13
+   forEachEl (theBoundedVar, myBoundedVars_)
+      {
+      theSlbvVar = mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         newPrimalVal = 
+            positivePart (
+               theBoundedVar->softLB () - theBoundedVar->primalValue ());
+
+         theSlbvVar->setPrimalValue (newPrimalVal);
+         }
+      }
+d888 56
+d946 1
+a946 1
+   WitPart * thePart;
+d948 2
+a949 2
+   WitPeriod t;
+   int nVarsFixed = 0; // # variables fixed.
+@
+
+
+1.10
+log
+@Multi-objective mode
+@
+text
+@d62 1
+a62 1
+   if (myOptComp ()->multiObjMode ())
+d481 1
+a481 1
+   if (myOptComp ()->multiObjMode ())
+d520 1
+a520 1
+   if (myOptComp ()->multiObjMode ())
+d533 5
+d1024 7
+@
+
+
+1.9
+log
+@Multi-objective mode
+@
+text
+@d365 2
+a366 4
+   fprintf (modelFile (), itemFormat (),
+      theObj->objectiveName  ().myCstring (),
+      "",
+      "");
+d822 7
+@
+
+
+1.8
+log
+@Multi-objective mode
+@
+text
+@a203 7
+
+void WitDetImpOM::storeDerived (WitMultiObjCon * theMultiObjCon)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+d501 1
+d521 8
+@
+
+
+1.7
+log
+@Multi-objective mode
+@
+text
+@d204 7
+@
+
+
+1.6
+log
+@Obj1Obj ==> DetObj
+@
+text
+@d31 2
+d55 1
+d61 5
+d79 1
+a79 1
+   if (myCompMgr ()->myOptComp ()->compPrices ())
+d82 1
+a82 1
+   if (myCompMgr ()->myGlobalComp ()->computeCriticalList ())
+d164 13
+d303 7
+d363 10
+d387 1
+a387 1
+void WitDetImpOM::printPeriod (WitPeriod t)
+d389 8
+a396 1
+   fprintf (modelFile (), periodDFormat (), t);
+d439 1
+d482 8
+@
+
+
+1.5
+log
+@Removing objective #2.
+@
+text
+@d51 1
+a51 1
+      myObj1Obj_      (NULL),
+d476 1
+a476 1
+      myObj1Obj_ = new    WitObj1Obj (this);
+d478 1
+a478 1
+   return myObj1Obj ();
+@
+
+
+1.4
+log
+@Removing objective #2.
+@
+text
+@d475 2
+a476 7
+   if (myCompMgr ()->myOptComp ()->myObjFunc1 ()->isChosen ())
+      {
+      myPrimaryObj_ = new WitPrimaryObj (this);
+         myObj1Obj_ = new    WitObj1Obj (this);
+
+      return myObj1Obj ();
+      }
+d478 1
+a478 1
+   return NULL;
+@
+
+
+1.3
+log
+@Removing objective #2.
+@
+text
+@d92 1
+a92 1
+   if (myCompMgr ()->myOptComp ()->objChoice ()->negativeObj1CostsExist ())
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@a51 5
+      myRevObj_       (NULL),
+      myInvObj_       (NULL),
+      myServObj_      (NULL),
+      mySubObj_       (NULL),
+      myObj2Obj_      (NULL),
+a482 11
+   if (myCompMgr ()->myOptComp ()->myObjFunc2 ()->isChosen ())
+      {
+       myRevObj_ = new  WitRevObj (this);
+       myInvObj_ = new  WitInvObj (this);
+      myServObj_ = new WitServObj (this);
+       mySubObj_ = new  WitSubObj (this);
+      myObj2Obj_ = new WitObj2Obj (this);
+
+      return myObj2Obj ();
+      }
+
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d290 1
+a290 1
+      optProbFile (),
+d301 1
+a301 1
+   fprintf (optProbFile (), itemFormat (),
+d311 1
+a311 1
+   fprintf (optProbFile (), itemFormat (),
+d321 1
+a321 1
+   fprintf (optProbFile (), itemFormat (),
+d331 1
+a331 1
+   fprintf (optProbFile (),
+d356 1
+a356 1
+   fprintf (optProbFile (), periodDFormat (), t);
+d521 1
+a521 1
+   fprintf (optProbFile (), "Index    Class       ");
+d523 2
+a524 2
+   fprintf (optProbFile (), itemFormat (),    "Item", "Item", "Item");
+   fprintf (optProbFile (), periodSFormat (), "Per");
+d952 1
+a952 1
+   fprintf (optProbFile (),
+d957 1
+a957 1
+   fprintf (optProbFile (),
+d960 1
+a960 1
+   fprintf (optProbFile (), "# Slbv Variables:    %8d\n\n", nSlbvVars_);
+d962 1
+a962 1
+   fprintf (optProbFile (),
+@
+

@@ -1,0 +1,2673 @@
+head	1.5;
+access;
+symbols
+	nextGenBranch:1.4.0.2
+	nextGenRoot:1.4
+	sce_3_30_20030627:1.4
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	UsedBySCE:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2003.08.05.13.05.16;	author dpc;	state dead;
+branches;
+next	1.4;
+
+1.4
+date	2003.01.15.23.05.48;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.45;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.17;	author austel;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.52;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.42.35;	author rwToStl;	state Exp;
+branches;
+next	1.2.6.2;
+
+1.2.6.2
+date	2003.01.09.13.54.40;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Removed sched.h and sched.C to avoid naming conflicts on GCC Linux. These were renamed to schedLF.h and schedLF.C.
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <map>
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+#include <float.h>
+
+#include <scenario/src/sched.h>
+#include <scenario/src/demdSchd.h>
+#include <scenario/src/demdNmFS.h>
+#include <scenario/src/machdep.h>
+#include <scenario/src/hashUtil.h>
+
+
+// Create and initialize emptySchedule
+const LgFrScheduleFloat  LgFrScheduleFloat::emptySched;
+const LgFrFilterStrategy LgFrScheduleFloat::defaultFilterStrategy;
+
+
+// Format a schedule for display.
+// Returns a string representing the schedule.
+std::string 
+LgFrScheduleFloat::format(
+   const LgFrScheduleFloat & highLight,
+   const bool truncate, 
+   const char highLightFlag,
+   const int width,
+   const int precision )//,
+   //const long iosFlags )
+const
+{
+   std::string retVal;
+   LgFrTimeVecFloat hlVec;
+
+   // Loop once for each itemTimeVec pair in schedule
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<schedule_.size(); i++ ) {
+
+      // Check to see if highlighting information exits for i'th entry
+      if ( highLight.contains( (*this)[i].item() ) ) {
+         // Highlighting information does exist, so get it
+         hlVec =  highLight[ (*this)[i].item() ].timeVecFloat();
+      }
+      else {
+         // Highlighting information does not exist
+         hlVec =  LgFrTimeVecFloat();
+      }
+ 
+      // Format i'th itemTimeVecPairFloat
+      retVal = retVal + 
+               (*this)[i].format( 
+                  hlVec,
+                  truncate,
+                  highLightFlag,
+                  width,
+                  precision 
+                  //iosFlags
+               );  
+ 
+      // Add new line character at end of itemTimeVec pair
+      retVal = retVal + "\n";
+   }
+
+   return retVal;
+}
+
+  
+// Is item in the schedule?
+bool
+LgFrScheduleFloat::contains (const LgFrItem& item)
+	const
+{
+    // For some reason find insists on being a non-const method, so here we go...
+    ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+    return ( it == itemToEntry_.end() ? false : true );
+//  return itemToEntry_.contains(&item);
+}
+
+// If item is in the table, set tv to be its timeVec and return true,
+// else return false.
+bool
+LgFrScheduleFloat::findValue (const LgFrItem& item, 
+			      LgFrTimeVecFloat& retVal)
+     const
+{
+  ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+  if( it == itemToEntry_.end() )
+      return false;
+
+  retVal = it->second->timeVecFloat();
+  return true;
+
+/*  LgFrItemTimeVecPairFloat *p = (LgFrItemTimeVecPairFloat*) (itemToEntry_.findValue(&item));
+  if (p != 0) 
+  {
+    retVal = p->timeVecFloat();
+    return true;
+  }
+  return false;*/
+}
+
+// Add new item to the end of the collection
+void
+LgFrScheduleFloat::insert (const LgFrItemTimeVecPairFloat pair)
+{
+  if ( schedule_.size() + 1 >= capacity() ) reserve( 2*capacity() + 1);
+  schedule_.push_back( pair );
+  // Ensure schedule only has one type of item
+  assert( schedule_[0].item().isAPart() && pair.item().isAPart() ||
+          schedule_[0].item().isADemand() && pair.item().isADemand());
+
+  // Update itemToEntry_.  Note that the only reason the whole dictionary
+  // doesn't have to be cleared and refilled is that 
+  // schedule_.push_back(...) could not have caused a resize of the schedule
+  // because the beginning of this routine makes sure that this class'
+  // resize is called if schedule_ is full.
+  size_t loc  =  schedule_.size() - 1;
+  LgFrItemTimeVecPairFloat* itv = & (schedule_[loc]);
+  // insertKeyAndValue requires const cast-away for argument 1
+  bool didIt = itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) ).second;
+  if (!didIt) 
+  {
+    // The key just inserted was already in the dictionary, so it
+    // didn't get inserted this time.  Searches for key key will
+    // find the itemTimeVec associated with the key previously inserted
+    std::cerr << "WARNING: Searches will not find value just inserted" << std::endl;
+  }
+}
+
+
+
+// Add new item to the collection at position index.  Everything afterwards
+// is shifted to a higher index.
+void
+LgFrScheduleFloat::insertAt (const size_t index, 
+			  const LgFrItemTimeVecPairFloat pair)
+{
+  // Test for valid index
+  assert (index < this->size());
+
+  // Everthing that itemToEntry_ points to after and including element index
+  // of schedule_ will be moved, so delete all of the entries.  (This isn't
+  // the most efficient thing to do, but it probably won't happen often.)
+  itemToEntry_.clear();
+
+  if (  this->contains(pair.item())  ) {
+    std::cerr << "WARNING: Searches will not find one of the itemTimeVec\'s for "
+      << pair.item().printingName()  
+	 << "; multiple entries have been inserted" << std::endl;
+  }
+  schedule_.insert(schedule_.begin()+index, pair);
+  // Ensure schedule only has one type of item
+  assert( schedule_[0].item().isAPart() && pair.item().isAPart() ||
+          schedule_[0].item().isADemand() && pair.item().isADemand());
+
+  // Update itemToEntry_
+  size_t loc  =  schedule_.size() - 1;
+  LgFrItemTimeVecPairFloat* itv = & (schedule_[loc]);
+
+  /* no point doing this since we are going to refresh the whole thing anyway
+  bool didIt = itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) ).second;
+  if (!didIt) 
+  {
+    // The key just inserted was already in the dictionary, so it
+    // didn't get inserted this time.  Searches for key key will
+    // find the itemTimeVec associated with the key previously inserted
+    std::cerr << "WARNING: Searches will not find item just passed to insertAt" << std::endl;
+  }*/
+
+  // Since the whole dictionary was cleared, refill it.
+  this->fillDictionary();
+}
+
+// Insert Item if it isn't already in the schedule.  In any case,
+// associate timeVec with item.
+void
+LgFrScheduleFloat::insertKeyAndValue(const LgFrItem& item, 
+				     const LgFrTimeVecFloat& value)
+{
+  ((*this)[item]) . timeVecFloat (value);
+}
+
+
+// Return the i'th ItemTimeVecPairFloat
+LgFrItemTimeVecPairFloat
+LgFrScheduleFloat::operator[](const size_t& i )
+const
+{  
+   return ( schedule_[i] );
+}
+
+LgFrItemTimeVecPairFloat &
+LgFrScheduleFloat::operator[](const size_t& i )
+{  
+   return ( schedule_[i] );
+}
+
+
+// Return the LgFrItemTimeVecPairFloat whose item matches item.
+// If there is no such LgFrItemTimeVecPairFloat, a new one is created
+// (using the default LgFrTimeVecFloat constructor) and inserted at
+// the end.
+LgFrItemTimeVecPairFloat &
+LgFrScheduleFloat::operator[](const LgFrItem& item)
+{
+  LgFrItemTimeVecPairFloat *p = 0;
+  ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+  if( it != itemToEntry_.end() )
+  {
+      return *(it->second);
+  }
+  insert( LgFrItemTimeVecPairFloat( item, LgFrTimeVecFloat() ) );
+
+  it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+
+  return *(it->second);
+
+/*
+  LgFrItemTimeVecPairFloat *p 
+    = (LgFrItemTimeVecPairFloat *) (itemToEntry_.findValue(&item));
+  if (  p != 0  )
+    return *p;
+  else {
+    this->insert (LgFrItemTimeVecPairFloat(item,
+					   LgFrTimeVecFloat())  // default t-v
+		  );
+    return schedule_[this->size() - 1];	// insert is done at end
+  }*/
+}
+
+// Return the LgFrItemTimeVecPairFloat whose item matches item.
+// If there is no such LgFrItemTimeVecPairFloat, throw an assert exception.
+const LgFrItemTimeVecPairFloat &
+LgFrScheduleFloat::operator[](const LgFrItem& item)
+const
+{
+  assert ( this->contains(item) );
+  // OK to cast away const, because item is contained in schedule_.
+  return ((LgFrScheduleFloat*)this)->operator[](item);
+}
+
+// Remove all pairs from schedule.
+// This is a protected member function.
+// Pairs are PairsOfItemTimeVecFloat
+void
+LgFrScheduleFloat::clear()
+{
+  itemToEntry_.clear();
+  schedule_.clear();
+}
+
+// Return number of pairs in schedule
+size_t
+LgFrScheduleFloat::size()
+const
+{  
+   return ( schedule_.size() );
+}
+
+// return schedule capacity, the number of
+// itemTimeVec entries the schedule can contain before
+// resizing is needed.
+size_t 
+LgFrScheduleFloat::capacity()
+const
+{
+  return capacity_;
+}
+
+// Change the size of the schedule
+void
+LgFrScheduleFloat::reserve (const size_t newCapacity)
+{
+  itemToEntry_.clear();	// Old pointers will become invalid
+  schedule_.reserve(newCapacity);
+  capacity_ = newCapacity;
+
+  // resize and insert correct pointers into itemToEntry_
+  this->fillDictionary();
+}
+
+void
+LgFrScheduleFloat::fillDictionary()
+{
+//  itemToEntry_.resize(goodSize(capacity_)); can't resize a std::map<>
+  size_t n = schedule_.size();
+  size_t loc = 0; // Pulled out of the for below by RW2STL
+  for (loc = 0;  loc < n;  ++loc) 
+  {
+    LgFrItemTimeVecPairFloat* itv = & (schedule_[loc]);
+
+    itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) );
+  }
+}
+
+// Do real work of diadic schedule operation.
+void
+LgFrScheduleFloat::kernalOfOp(
+   LgFrTimeVecFloatOpFunction vectorOp,
+   const LgFrScheduleFloat& rhs,
+   LgFrScheduleFloat & retVal,
+   float defaultValue )
+const
+{
+   // Determine length of TimeVecs in schedule
+   size_t vecLen(0);
+   if ( this->size() > 0 )
+      vecLen = (*this)[0].timeVecFloat().length();
+   else if ( rhs.size() > 0 )
+      vecLen = rhs[0].timeVecFloat().length();
+   
+   // Create vector of zeros to be used when an item is abscent from
+   // rhs or (this)
+   LgFrTimeVecFloat zeroVec( vecLen, defaultValue );
+   LgFrTimeVecFloat resultVec;
+
+   // Loop once for each item in (this)
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+	  const LgFrItemTimeVecPairFloat & ithItemTimeVecFloat = (*this)[i];
+      const LgFrTimeVecFloat & ithTimeVecFloat = ithItemTimeVecFloat.timeVecFloat();
+      
+      int contains = rhs.contains( (*this)[i].item() );	// Is item in rhs?
+      if (contains)
+         // Item is in rhs, apply vectorOp to lhs and rhs.
+         resultVec = ( ithTimeVecFloat .*vectorOp )
+                       ( rhs[ (*this)[i].item() ].timeVecFloat() );
+      else {
+         // Item is not in rhs, use zeroVec for rhs
+         resultVec = ( ithTimeVecFloat .*vectorOp ) (zeroVec);
+	  }
+
+      // Add computed itemTimeVecPair to schedule
+      retVal.insertKeyAndValue ( (*this)[i].item(), resultVec );
+   }
+
+   // Loop once for each item in rhs
+   for ( i=0; i<rhs.size(); i++ ) {
+      // Is the i'th item in rhs, but not (this)
+      if ( ! (*this).contains( rhs[i].item() ) ) {
+         // Use zeroVec for (this)
+         resultVec = ( zeroVec.*vectorOp )
+                        ( rhs[i].timeVecFloat() );
+         retVal.insertKeyAndValue ( rhs[i].item(), resultVec );
+      }
+   }
+}
+
+// Do real work of diadic schedule operation.
+// schedule operation float
+void
+LgFrScheduleFloat::kernalOfOp(
+   LgFrTimeVecFloatRhsScalarOpFunction scalarOp,
+   const float rhs,
+   LgFrScheduleFloat & retVal)
+const
+{
+   LgFrTimeVecFloat resultVec;
+
+   // Loop once for each item in (this)
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+
+	  const LgFrItemTimeVecPairFloat & ithItemTimeVecFloat = (*this)[i];
+      const LgFrTimeVecFloat & ithTimeVecFloat = ithItemTimeVecFloat.timeVecFloat();
+      
+      resultVec = ( scalarOp ) ( ithTimeVecFloat, rhs );
+
+      // Add computed itemTimeVecPair to schedule
+      retVal.insertKeyAndValue ( (*this)[i].item(), resultVec );
+   }
+
+}
+
+void
+LgFrScheduleFloat::kernalOfOp(
+   const float lhs,
+   LgFrTimeVecFloatLhsScalarOpFunction scalarOp,
+   LgFrScheduleFloat & retVal)
+const
+{
+   LgFrTimeVecFloat resultVec;
+
+   // Loop once for each item in (this)
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+
+	  const LgFrItemTimeVecPairFloat & ithItemTimeVecFloat = (*this)[i];
+      const LgFrTimeVecFloat & ithTimeVecFloat = ithItemTimeVecFloat.timeVecFloat();
+      
+      resultVec = ( scalarOp ) ( lhs, ithTimeVecFloat );
+
+      // Add computed itemTimeVecPair to schedule
+      retVal.insertKeyAndValue ( (*this)[i].item(), resultVec );
+   }
+
+}
+// Perform diadic schedule operation.
+LgFrScheduleFloat
+LgFrScheduleFloat::op(
+   LgFrTimeVecFloatOpFunction vectorOp,
+   const LgFrScheduleFloat& rhs,
+   float defaultValue )
+const
+{
+   LgFrScheduleFloat retVal;
+
+   kernalOfOp(  vectorOp, rhs, retVal, defaultValue );
+
+   return retVal;
+}
+
+
+// Do real work of columnOp method.
+void
+LgFrScheduleFloat::kernalOfColumnOp(
+   const size_t period,
+   float (*scalarOperation) (const float, const float),
+   const float rhs,
+   LgFrScheduleFloat & retVal)
+const
+{
+
+ LgFrTimeVecFloat resultVec; 
+  
+ // Loop once for each item in (this)
+ size_t i = 0; // Pulled out of the for below by RW2STL
+ for (i=0; i<this->size(); i++ ) {
+
+   const LgFrItemTimeVecPairFloat & ithItemTimeVecFloat = (*this)[i];
+   const LgFrTimeVecFloat & ithTimeVecFloat = ithItemTimeVecFloat.timeVecFloat();
+   
+   resultVec = ithTimeVecFloat;
+   resultVec[period] = ( scalarOperation ) ( ithTimeVecFloat[period], rhs );
+
+      // Add computed itemTimeVecPair to schedule
+   retVal.insertKeyAndValue ( (*this)[i].item(), resultVec );
+   }
+
+}
+
+// perform scalar operation on column (period) in schedule
+LgFrScheduleFloat
+LgFrScheduleFloat::columnOp(
+  const size_t period,
+  float (*scalarOperation) (const float, const float),
+  const float rhs )
+const
+{
+   LgFrScheduleFloat retVal;
+
+   kernalOfColumnOp(  period, scalarOperation, rhs, retVal );
+
+   return retVal;
+}
+
+// Perform reduceItems schedule operation.
+LgFrTimeVecFloat
+LgFrScheduleFloat::reduceItems(
+   float (*scalarOp) ( const float, const float),
+   const LgFrFilterStrategy & filter )
+const
+{
+   LgFrTimeVecFloat retVal;
+
+   // Determine length of TimeVecs in schedule &
+   // Get first TimeVec from schedule which is to be included in the
+   // reduction.
+   size_t length(0);
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<this->size(); i++ ) {
+      if ( !filter.exclude( (*this)[i] ) ) {
+         retVal = (*this)[i].timeVecFloat();
+         length = retVal.length();
+         break;
+      }
+   }
+   
+   // Loop on itemTimeVecs in schedule starting with first itemTimeVec after
+   // after the one assigned to retVal
+   for ( i++; i<this->size(); i++ )
+
+      // Check to see if the itemTimeVec is to be included in the reduction
+      if (  !filter.exclude( (*this)[i] )  )
+      {
+         // Loop once for each element of the timeVec
+         size_t p = 0; // Pulled out of the for below by RW2STL
+         for ( p=0; p<length; p++ ) 
+            // Perform reduction operation
+            retVal[p] = scalarOp( retVal[p], (*this)[i].timeVecFloat()[p] );
+      }
+
+   return retVal;
+}
+
+// Determine if two schedules are equal.
+// Return true if both schedules contain the same itemTimeVec pairs.
+bool
+LgFrScheduleFloat::isEqual(
+   const LgFrScheduleFloat& rhs)
+const
+{
+
+   // To be equal must have same number of entries
+   if ( this->size() != rhs.size() ) return false;
+
+   // Test that itemTimeVecs are equal and in the same order
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<this->size(); i++ ) 
+      if ( ! ( (*this)[i] == rhs[i] )  ) return false;
+
+   return true;
+}
+
+bool
+LgFrScheduleFloat::operator==(
+   const LgFrScheduleFloat& rhs)
+const
+{
+   return this->isEqual(rhs);
+}
+
+
+bool
+LgFrScheduleFloat::operator!=(
+   const LgFrScheduleFloat& rhs)
+const
+{
+   return !(this->isEqual(rhs));
+}
+
+
+
+// Assignment operator
+LgFrScheduleFloat &
+LgFrScheduleFloat::operator=(
+			  const LgFrScheduleFloat& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+#if 0
+    schedule_ = rhs.schedule_;
+#else
+    // Try doing assignment w/o operator= because OrderPartVector does not support
+    // operator=.
+    {
+      // Clear the vector contents and change its size
+      schedule_.clear();
+      schedule_.reserve( rhs.size() );
+      int j = 0; // Pulled out of the for below by RW2STL
+      for (j = 0;  j < rhs.size();  ++j) {
+        schedule_.push_back( rhs[j] );
+      }        
+      capacity_ = rhs.size();
+      // Clear the dictionary contents and refill it
+      itemToEntry_.clear();
+      this -> fillDictionary();
+    }
+#endif    
+    assert (schedule_.size() == rhs.schedule_.size());
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrScheduleFloat::LgFrScheduleFloat (const LgFrScheduleFloat & source)
+:   schedule_(source.schedule_),
+    capacity_(source.capacity_)//,
+    //itemToEntry_(goodSize (source.capacity_))
+{
+  this->fillDictionary();
+}
+
+
+// Constructor for a set expected to have up to n parts
+LgFrScheduleFloat::LgFrScheduleFloat (const size_t n)
+: //schedule_( n ), //size_tMax(n,1) ),
+  capacity_( n ) //size_tMax(n,1) )//,
+  //itemToEntry_(  goodSize( size_tMax(n,1) )  )
+{
+    schedule_.reserve( n );
+}
+
+// Destructor
+LgFrScheduleFloat::~LgFrScheduleFloat ()
+{
+  // Nothing to do in here
+}
+
+
+// Print member data in class
+void
+LgFrScheduleFloat::print()
+const
+{
+   std::cout <<"************************************************" <<std::endl;
+   std::cout <<"LgFrSchedule" << std::endl;
+   int i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<size(); i++ )  {
+   std::cout <<" *********************************" <<std::endl;
+      std::cout <<" entry number " <<i <<":";
+      schedule_[i].print();
+   }
+   std::cout <<"************************************************" <<std::endl;
+}
+
+// Addition operator
+LgFrScheduleFloat
+operator+ (const LgFrScheduleFloat& lhs, const LgFrScheduleFloat& rhs)
+{
+  return lhs.op(&LgFrTimeVecFloat::add,rhs);
+}
+
+// Subtraction operator
+LgFrScheduleFloat
+operator- (const LgFrScheduleFloat& lhs, const LgFrScheduleFloat& rhs)
+{
+  return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+}
+
+// maximum 
+LgFrScheduleFloat
+LgFrScheduleFloat::maximum (
+  const LgFrScheduleFloat& rhs)
+const
+{
+  return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrScheduleFloat methods.
+void
+LgFrScheduleFloat::test()
+{
+  // Make some parts for the test
+  LgFrPart p1( "part1" );
+  LgFrPart p2( "part2" );
+  LgFrPart p3( "part3" );
+
+  // Make some timeVecFloat for the test
+  LgFrTimeVecFloat tvf1(10,1.11f);
+  LgFrTimeVecFloat tvf2(10,2.22f);
+
+  // Make some part timeVecFloat pairs for the test
+  LgFrItemTimeVecPairFloat ptvfp1( p1, tvf1 );
+  LgFrItemTimeVecPairFloat ptvfp2( p2, tvf1 );
+  LgFrItemTimeVecPairFloat ptvfp3( p3, tvf2 );
+  LgFrItemTimeVecPairFloat ptvfp4( p1, tvf2 );
+
+  // Test the insertion methods
+  LgFrScheduleFloat ss;// (1);	// Make it a little small
+  				// to test automatic resizing
+  ss.insert(ptvfp2);
+  ss.insert(ptvfp3);
+  ss.insertAt(0, ptvfp1);
+  assert (3 == ss.size());
+  assert (ss[0].item().name() == "part1");
+  assert (ss[2].item().name() == "part3");
+  assert (ss[1].item().name() == "part2");
+
+  // Test the assignment operator and the copy constructor
+  LgFrScheduleFloat ss1 (1);	// Make it a little small
+  				// to test resizing at assignment time
+  assert( !ss1.isEqual(ss) );
+  ss1.insert(ptvfp4);		// Give it something that should go away
+  ss1 = ss;
+  LgFrScheduleFloat ss2 (ss);
+
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < ss.size(); i++) {
+    // Test result of assignment
+    assert (ss1[i] == ss[i]);
+    // Test result of copy
+    assert (ss2[i] == ss[i]);
+    // Print the contents of the OrderedVector part of sop
+    // ss[i].print();
+    // std::cout << std::endl;
+  }
+
+  // Test isEqual method
+  assert( ss1.isEqual(ss) );
+  assert( ss2.isEqual(ss) );
+  assert( ss1 == ss );
+  assert( ss2 == ss );
+
+  // Test indexing by item
+  assert( ss[p3] == ptvfp3 );
+  const LgFrScheduleFloat constSs(ss);
+  assert( constSs[p3] == ptvfp3 );
+
+
+  // Test resize and capacity
+/*  LgFrScheduleFloat ss3(0);
+  assert( ss3.capacity() == 1 );
+  ss3.reserve(2);
+  assert( ss3.capacity() == 2 );
+  assert (ss3.size() == 0);
+
+  ss3.insertKeyAndValue( p1, LgFrTimeVecFloat( 3, "1 2 3" ) );
+  assert( ss3.capacity() == 2 );
+  assert (ss3.size() == 1);
+
+  ss3.insertKeyAndValue( p2, LgFrTimeVecFloat( 3, "1 2 3" ) );
+  assert( ss3.capacity() == 2 );
+  assert (ss3.size() == 2);
+
+  ss3.insertKeyAndValue( p3, LgFrTimeVecFloat( 3, "1 2 3" ) );
+  assert( ss3.capacity() == 4 );
+  assert (ss3.size() == 3);*/
+
+  // Test format
+  std::cout <<"LgFrSchedule.format()" <<std::endl;
+  std::cout <<ss.format() <<std::endl;
+
+  LgFrScheduleFloat hl(ss);
+  size_t vecLength = hl[0].timeVecFloat().length();
+  LgFrTimeVecFloat   hlVec(vecLength,0.0);
+  for ( i=0; i<hl.size(); i++ ) {
+     hlVec[ i%vecLength ] = 1.0;
+     hl[i].timeVecFloat( hlVec );
+  }
+  std::cout <<"LgFrSchedule.format(hl,true,'X')" <<std::endl;
+  std::cout <<ss.format(hl,true,'X') <<std::endl;
+
+  LgFrScheduleFloat hl2(1);
+  for ( i=0; i<hl.size(); i=i+2 ) {
+     hl2.insert( hl[i] );
+  }
+  std::cout <<"LgFrSchedule.format(hl2,false,'+')" <<std::endl;
+  std::cout <<ss.format(hl2,false,'+') <<std::endl;
+
+  // More testing of isEqual
+  assert( !hl2.isEqual(hl) );
+  assert( !(hl2 == hl) );
+  assert( hl2 == hl2 );
+
+  // Test op method
+  {
+  LgFrScheduleFloat lhs,rhs,diff;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p2, vec2 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 3 );
+  assert( diff[0].item() == p1 );
+  assert( diff[1].item() == p2 );
+  assert( diff[2].item() == p3 );
+  assert( diff[0].timeVecFloat() == vec1 );
+  assert( diff[1].timeVecFloat() == vec1-vec2 );
+  assert( diff[2].timeVecFloat() == 0.0 -vec2 );
+  }
+  {  // empty rhs
+  LgFrScheduleFloat lhs,rhs,diff;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec2 );
+  diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 2 );
+  assert( diff[0].item() == p1 );
+  assert( diff[1].item() == p2 );
+  assert( diff[0].timeVecFloat() == vec1 );
+  assert( diff[1].timeVecFloat() == vec2 );
+  }
+  {   // empty lhs
+  LgFrScheduleFloat lhs,rhs,diff;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  rhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 2 );
+  assert( diff[0].item() == p2 );
+  assert( diff[1].item() == p3 );
+  assert( diff[0].timeVecFloat() == 0.0-vec1 );
+  assert( diff[1].timeVecFloat() == 0.0 -vec2 );
+  }
+  {  // empty rhs and lhs
+  LgFrScheduleFloat lhs,rhs,diff;
+  diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 0 );
+  }
+  
+  
+  // Test operation- method
+  {
+  LgFrScheduleFloat lhs,rhs,diff;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p2, vec2 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  diff = lhs - rhs;
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+  assert( diff.size() == 3 );
+  assert( diff[0].item() == p1 );
+  assert( diff[1].item() == p2 );
+  assert( diff[2].item() == p3 );
+  assert( diff[0].timeVecFloat() == vec1 );
+  assert( diff[1].timeVecFloat() == vec1-vec2 );
+  assert( diff[2].timeVecFloat() == 0.0 -vec2 );
+  }
+  
+  // Test operation+ method
+  {
+  LgFrScheduleFloat lhs,rhs,result;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  lhs.insertKeyAndValue( p1, vec1 );
+  lhs.insertKeyAndValue( p2, vec1 );
+  rhs.insertKeyAndValue( p2, vec2 );
+  rhs.insertKeyAndValue( p3, vec2 );
+  result = lhs + rhs;
+  // std::cout <<"Add" <<std::endl;
+  // std::cout <<result.format() <<std::endl;
+  assert( result.size() == 3 );
+  assert( result[0].item() == p1 );
+  assert( result[1].item() == p2 );
+  assert( result[2].item() == p3 );
+  assert( result[0].timeVecFloat() == vec1 );
+  assert( result[1].timeVecFloat() == vec1+vec2 );
+  assert( result[2].timeVecFloat() == 0.0 +vec2 );
+  }
+
+
+  // maximum method
+  {
+  LgFrScheduleFloat rhs,lhs,result;
+  float v1a[]={ -1., 0.,  5. };
+  float v2a[]={  1., 1., -5. };
+  float v1b[]={ -2., 1.,  6. };
+  float v3b[]={  3.,-1.,  6. };
+  LgFrTimeVecFloat vec1a(3,v1a), vec2a(3,v2a);
+  LgFrTimeVecFloat vec1b(3,v1b), vec3b(3,v3b);
+  lhs.insertKeyAndValue( p1, vec1a );
+  lhs.insertKeyAndValue( p2, vec2a );
+  rhs.insertKeyAndValue( p1, vec1b );
+  rhs.insertKeyAndValue( p3, vec3b );
+  result=lhs.maximum(rhs);
+  // std::cout <<"Add" <<std::endl;
+  // std::cout <<sched.format() <<std::endl;
+  assert( result.size() == 3 );
+  assert( result[0].item() == p1 );
+  assert( result[1].item() == p2 );
+  assert( result[2].item() == p3 );
+  assert( result[0].timeVecFloat() == LgFrTimeVecFloat(3,"-1  1  6") );
+  assert( result[1].timeVecFloat() == LgFrTimeVecFloat(3," 1  1 -5") );
+  assert( result[2].timeVecFloat() == LgFrTimeVecFloat(3," 3 -1  6") );
+  }
+
+ 
+  // Test reduceItems method
+  {
+  // Make some demands for the test
+  LgFrDemand d1( "demand1", &p1);
+  LgFrDemand d2( "demand2", &p2);
+  LgFrDemand d3( "demand3", &p3);
+
+  LgFrSortingDemandScheduleFloat sched;
+  float v1[]={ 1., 2., 3., 4. };
+  float v2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vec1(4,v1), vec2(4,v2);
+  sched.insertKeyAndValue( d1, vec1 );
+  sched.insertKeyAndValue( d2, vec1 );
+  sched.insertKeyAndValue( d3, vec2 );
+  LgFrTimeVecFloat redSched(sched.reduceItems(LgFrAdd,LgFrFilterStrategy())); 
+  assert( redSched.length() == 4 );
+  assert( redSched[0]== v1[0]+v1[0]+v2[0] );
+  assert( redSched[1]== v1[1]+v1[1]+v2[1] );
+  assert( redSched[2]== v1[2]+v1[2]+v2[2] );
+  assert( redSched[3]== v1[3]+v1[3]+v2[3] );
+
+  LgFrDemandNameFilterStrategy fs(".*","demand3");
+  redSched = sched.reduceItems( LgFrAdd, fs );
+  assert( redSched.length() == 4 );
+  assert( redSched[0]== v2[0] );
+  assert( redSched[1]== v2[1] );
+  assert( redSched[2]== v2[2] );
+  assert( redSched[3]== v2[3] );
+
+  }
+  
+  // Test columnOp
+  {
+  LgFrScheduleFloat schedA;
+  float vA1[]={ 1., 2., 3., 4. };
+  float vA2[]={ 4., 3., 2., 1. };
+  LgFrTimeVecFloat vecA1(4,vA1), vecA2(4,vA2);
+  schedA.insertKeyAndValue( p1, vecA1 );
+  schedA.insertKeyAndValue( p2, vecA2 );
+  LgFrScheduleFloat schedB = schedA.columnOp( 2, ::LgFrAssign, 3.14f );
+  LgFrTimeVecFloat vecB1 = vecA1;
+  vecB1[2] = 3.14f;
+  LgFrTimeVecFloat vecB2 = vecA2;
+  vecB2[2] = 3.14f;
+  assert( schedB.size() == 2 );
+  assert( schedB[0].item() == p1 );
+  assert( schedB[1].item() == p2 );
+  assert( schedB[0].timeVecFloat() == vecB1 );
+  assert( schedB[1].timeVecFloat() == vecB2 );
+
+  LgFrScheduleFloat schedC = schedB.columnOp( 2, ::LgFrMultiply, 2.0 );
+  LgFrTimeVecFloat vecC1 = vecB1;
+  vecC1[2] = 2 * vecB1[2];
+  LgFrTimeVecFloat vecC2 = vecB2;
+  vecC2[2] = 2 * vecB2[2];
+  assert( schedC.size() == 2 );
+  assert( schedC[0].item() == p1 );
+  assert( schedC[1].item() == p2 );
+  assert( schedC[0].timeVecFloat() == vecC1 );
+  assert( schedC[1].timeVecFloat() == vecC2 );
+  }
+}
+@
+
+
+1.4
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d1 6
+a6 1
+#include <iostream.h>
+d23 1
+a23 1
+RWCString 
+d26 1
+a26 1
+   const RWBoolean truncate, 
+d29 2
+a30 2
+   const int precision,
+   const long iosFlags )
+d33 1
+a33 1
+   RWCString retVal;
+d37 2
+a38 1
+   for ( size_t i=0; i<schedule_.entries(); i++ ) {
+d57 2
+a58 2
+                  precision,
+                  iosFlags
+d70 1
+a70 1
+RWBoolean
+d74 4
+a77 1
+  return itemToEntry_.contains(&item);
+d80 3
+a82 3
+// If item is in the table, set tv to be its timeVec and return TRUE,
+// else return FALSE.
+RWBoolean
+d87 10
+a96 3
+  LgFrItemTimeVecPairFloat *p 
+    =  (LgFrItemTimeVecPairFloat*) (itemToEntry_.findValue(&item));
+  if (p != NULL) {
+d98 1
+a98 1
+    return TRUE;
+d100 1
+a100 1
+  else return FALSE;
+d107 2
+a108 2
+  if ( schedule_.entries() >= capacity() ) resize( 2*capacity() );
+  schedule_.insert( pair );
+d110 2
+a111 1
+  assert( schedule_[0].item().isA() == pair.item().isA() );
+d113 3
+a115 3
+  // Update itemToEntry_.  Note that the only reason the whole hash
+  // table doesn't have to be cleared and refilled is that 
+  // schedule_.insert(...) could not have caused a resize of the schedule
+d118 1
+a118 1
+  size_t loc  =  schedule_.entries() - 1;
+d121 4
+a124 6
+  RWCollectable * p 
+    = itemToEntry_.insertKeyAndValue( (RWCollectable *) (& (itv->item()) ),
+				      itv
+				    );
+  if (p == NULL) {
+    // The key just inserted was already in the hash table, so it
+d127 1
+a127 1
+    cerr << "WARNING: Searches will not find value just inserted" << endl;
+d140 1
+a140 3
+  assert (index < this->entries());
+
+  if ( schedule_.entries() >= capacity() ) resize( 2*capacity() );
+d148 1
+a148 1
+    cerr << "WARNING: Searches will not find one of the itemTimeVec\'s for "
+d150 1
+a150 1
+	 << "; multiple entries have been inserted" << endl;
+d152 1
+a152 1
+  schedule_.insertAt(index, pair);
+d154 2
+a155 1
+  assert( schedule_[0].item().isA() == pair.item().isA() );
+d158 1
+a158 1
+  size_t loc  =  schedule_.entries() - 1;
+d160 6
+a165 6
+  RWCollectable * p 
+    = itemToEntry_.insertKeyAndValue( (RWCollectable *) (& (itv->item()) ),
+				      itv
+				    );
+  if (p == NULL) {
+    // The key just inserted was already in the hash table, so it
+d168 2
+a169 2
+    cerr << "WARNING: Searches will not find item just passed to insertAt" << endl;
+  }
+d171 2
+a172 2
+  // Since the whole hash table was cleared, refill it.
+  this->fillHashTable();
+d207 13
+d222 1
+a222 1
+  if (  p != NULL  )
+d228 2
+a229 2
+    return schedule_[this->entries() - 1];	// insert is done at end
+  }
+d255 1
+a255 1
+LgFrScheduleFloat::entries()
+d258 1
+a258 1
+   return ( schedule_.entries() );
+d273 1
+a273 1
+LgFrScheduleFloat::resize (const size_t newCapacity)
+a274 1
+  assert ( newCapacity  >=  schedule_.entries() );
+d276 1
+a276 1
+  schedule_.resize(newCapacity);
+d280 1
+a280 1
+  this->fillHashTable();
+d284 1
+a284 1
+LgFrScheduleFloat::fillHashTable()
+d286 8
+a293 9
+  itemToEntry_.resize(goodSize(capacity_));
+  LgFrItemTimeVecPairFloat* itv;
+  RWCollectable * p;
+  size_t n = schedule_.entries();
+  for (size_t loc = 0;  loc < n;  ++loc) {
+    itv = & (schedule_[loc]);
+    p = itemToEntry_.insertKeyAndValue( (RWCollectable *) (& (itv->item()) ),
+					itv
+				      );
+d308 1
+a308 1
+   if ( this->entries() > 0 )
+d310 1
+a310 1
+   else if ( rhs.entries() > 0 )
+d319 2
+a320 1
+   for (size_t i=0; i<this->entries(); i++ ) {
+d339 1
+a339 1
+   for ( i=0; i<rhs.entries(); i++ ) {
+d362 2
+a363 1
+   for (size_t i=0; i<this->entries(); i++ ) {
+d386 2
+a387 1
+   for (size_t i=0; i<this->entries(); i++ ) {
+d428 2
+a429 1
+ for (size_t i=0; i<this->entries(); i++ ) {
+d471 2
+a472 1
+   for ( size_t i=0; i<this->entries(); i++ ) {
+d482 1
+a482 1
+   for ( i++; i<this->entries(); i++ )
+d486 1
+a486 1
+
+d488 2
+a489 2
+         for ( size_t p=0; p<length; p++ ) 
+
+d492 1
+d499 1
+a499 1
+RWBoolean
+d506 1
+a506 1
+   if ( this->entries() != rhs.entries() ) return FALSE;
+d509 3
+a511 2
+   for ( size_t i=0; i<this->entries(); i++ ) 
+      if ( ! ( (*this)[i] == rhs[i] )  ) return FALSE;
+d513 1
+a513 1
+   return TRUE;
+d516 1
+a516 1
+RWBoolean
+d525 1
+a525 1
+RWBoolean
+d549 4
+a552 3
+      schedule_.resize( rhs.entries() );
+      for (int j = 0;  j < rhs.entries();  ++j) {
+        schedule_.insert( rhs[j] );
+d554 2
+a555 2
+      capacity_ = rhs.entries();
+      // Clear the hash table contents and refill it
+d557 1
+a557 1
+      this -> fillHashTable();
+d560 1
+a560 1
+    assert (schedule_.entries() == rhs.schedule_.entries());
+d569 2
+a570 2
+    capacity_(source.capacity_),
+    itemToEntry_(goodSize (source.capacity_))
+d572 1
+a572 1
+  this->fillHashTable();
+d578 3
+a580 3
+: schedule_( size_tMax(n,1) ),
+  capacity_( size_tMax(n,1) ),
+  itemToEntry_(  goodSize( size_tMax(n,1) )  )
+d582 1
+a582 1
+  // Nothing to do in here
+d597 6
+a602 5
+   cout <<"************************************************" <<endl;
+   cout <<"LgFrSchedule" << endl;
+   for ( int i=0; i<entries(); i++ )  {
+   cout <<" *********************************" <<endl;
+      cout <<" entry number " <<i <<":";
+d605 1
+a605 1
+   cout <<"************************************************" <<endl;
+d655 1
+a655 1
+  LgFrScheduleFloat ss (1);	// Make it a little small
+d660 1
+a660 1
+  assert (3 == ss.entries());
+d673 2
+a674 1
+  for ( size_t i = 0; i < ss.entries(); i++) {
+d681 1
+a681 1
+    // cout << endl;
+d697 1
+a697 1
+  LgFrScheduleFloat ss3(0);
+d699 1
+a699 1
+  ss3.resize(2);
+d701 1
+a701 1
+  assert (ss3.entries() == 0);
+d705 1
+a705 1
+  assert (ss3.entries() == 1);
+d709 1
+a709 1
+  assert (ss3.entries() == 2);
+d713 1
+a713 1
+  assert (ss3.entries() == 3);
+d716 2
+a717 2
+  cout <<"LgFrSchedule.format()" <<endl;
+  cout <<ss.format() <<endl;
+d722 1
+a722 1
+  for ( i=0; i<hl.entries(); i++ ) {
+d726 2
+a727 2
+  cout <<"LgFrSchedule.format(hl,TRUE,'X')" <<endl;
+  cout <<ss.format(hl,TRUE,'X') <<endl;
+d730 1
+a730 1
+  for ( i=0; i<hl.entries(); i=i+2 ) {
+d733 2
+a734 2
+  cout <<"LgFrSchedule.format(hl2,FALSE,'+')" <<endl;
+  cout <<ss.format(hl2,FALSE,'+') <<endl;
+d752 3
+a754 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 3 );
+d770 3
+a772 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 2 );
+d786 3
+a788 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 2 );
+d797 3
+a799 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 0 );
+d814 3
+a816 3
+  // cout <<"diff" <<endl;
+  // cout <<diff.format() <<endl;
+  assert( diff.entries() == 3 );
+d836 3
+a838 3
+  // cout <<"Add" <<endl;
+  // cout <<result.format() <<endl;
+  assert( result.entries() == 3 );
+d862 3
+a864 3
+  // cout <<"Add" <<endl;
+  // cout <<sched.format() <<endl;
+  assert( result.entries() == 3 );
+d918 1
+a918 1
+  assert( schedB.entries() == 2 );
+d929 1
+a929 1
+  assert( schedC.entries() == 2 );
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 6
+// RW2STL -- inserted:
+#include <map>
+#include <scenario/src/RWToSTLHelpers.h>
+#include <string>
+// End of RW2STL -- inserted includes.
+#include <ostream.h>
+d18 1
+a18 1
+std::string 
+d21 1
+a21 1
+   const bool truncate, 
+d28 1
+a28 1
+   std::string retVal;
+d32 1
+a32 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<schedule_.size(); i++ ) {
+d64 1
+a64 1
+bool
+d68 1
+a68 4
+    // For some reason find insists on being a non-const method, so here we go...
+    ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+    return ( it == itemToEntry_.end() ? false : true );
+//  return itemToEntry_.contains(&item);
+d71 3
+a73 3
+// If item is in the table, set tv to be its timeVec and return true,
+// else return false.
+bool
+d78 3
+a80 10
+  ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+  if( it == itemToEntry_.end() )
+      return false;
+
+  retVal = it->second->timeVecFloat();
+  return true;
+
+/*  LgFrItemTimeVecPairFloat *p = (LgFrItemTimeVecPairFloat*) (itemToEntry_.findValue(&item));
+  if (p != 0) 
+  {
+d82 1
+a82 1
+    return true;
+d84 1
+a84 1
+  return false;*/
+d91 2
+a92 2
+  if ( schedule_.size() + 1 >= capacity() ) reserve( 2*capacity() + 1);
+  schedule_.push_back( pair );
+d94 1
+a94 2
+  assert( schedule_[0].item().isAPart() && pair.item().isAPart() ||
+          schedule_[0].item().isADemand() && pair.item().isADemand());
+d96 3
+a98 3
+  // Update itemToEntry_.  Note that the only reason the whole dictionary
+  // doesn't have to be cleared and refilled is that 
+  // schedule_.push_back(...) could not have caused a resize of the schedule
+d101 1
+a101 1
+  size_t loc  =  schedule_.size() - 1;
+d104 6
+a109 4
+  bool didIt = itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) ).second;
+  if (!didIt) 
+  {
+    // The key just inserted was already in the dictionary, so it
+d125 3
+a127 1
+  assert (index < this->size());
+d139 1
+a139 1
+  schedule_.insert(schedule_.begin()+index, pair);
+d141 1
+a141 2
+  assert( schedule_[0].item().isAPart() && pair.item().isAPart() ||
+          schedule_[0].item().isADemand() && pair.item().isADemand());
+d144 1
+a144 1
+  size_t loc  =  schedule_.size() - 1;
+d146 6
+a151 6
+
+  /* no point doing this since we are going to refresh the whole thing anyway
+  bool didIt = itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) ).second;
+  if (!didIt) 
+  {
+    // The key just inserted was already in the dictionary, so it
+d155 1
+a155 1
+  }*/
+d157 2
+a158 2
+  // Since the whole dictionary was cleared, refill it.
+  this->fillDictionary();
+a192 13
+  LgFrItemTimeVecPairFloat *p = 0;
+  ItemItemTimeVecDictionary::const_iterator it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+  if( it != itemToEntry_.end() )
+  {
+      return *(it->second);
+  }
+  insert( LgFrItemTimeVecPairFloat( item, LgFrTimeVecFloat() ) );
+
+  it = ((LgFrScheduleFloat*)this)->itemToEntry_.find( ( LgFrItem *const) &item);
+
+  return *(it->second);
+
+/*
+d195 1
+a195 1
+  if (  p != 0  )
+d201 2
+a202 2
+    return schedule_[this->size() - 1];	// insert is done at end
+  }*/
+d228 1
+a228 1
+LgFrScheduleFloat::size()
+d231 1
+a231 1
+   return ( schedule_.size() );
+d246 1
+a246 1
+LgFrScheduleFloat::reserve (const size_t newCapacity)
+d248 1
+d250 1
+a250 1
+  schedule_.reserve(newCapacity);
+d254 1
+a254 1
+  this->fillDictionary();
+d258 1
+a258 1
+LgFrScheduleFloat::fillDictionary()
+d260 9
+a268 8
+//  itemToEntry_.resize(goodSize(capacity_)); can't resize a std::map<>
+  size_t n = schedule_.size();
+  size_t loc = 0; // Pulled out of the for below by RW2STL
+  for (loc = 0;  loc < n;  ++loc) 
+  {
+    LgFrItemTimeVecPairFloat* itv = & (schedule_[loc]);
+
+    itemToEntry_.insert( ItemItemTimeVecPair( (LgFrItem*)& (itv->item() ), itv ) );
+d283 1
+a283 1
+   if ( this->size() > 0 )
+d285 1
+a285 1
+   else if ( rhs.size() > 0 )
+d294 1
+a294 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+d313 1
+a313 1
+   for ( i=0; i<rhs.size(); i++ ) {
+d336 1
+a336 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+d359 1
+a359 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for (i=0; i<this->size(); i++ ) {
+d400 1
+a400 2
+ size_t i = 0; // Pulled out of the for below by RW2STL
+ for (i=0; i<this->size(); i++ ) {
+d442 1
+a442 2
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<this->size(); i++ ) {
+d452 1
+a452 1
+   for ( i++; i<this->size(); i++ )
+d456 1
+a456 1
+      {
+d458 2
+a459 2
+         size_t p = 0; // Pulled out of the for below by RW2STL
+         for ( p=0; p<length; p++ ) 
+a461 1
+      }
+d468 1
+a468 1
+bool
+d475 1
+a475 1
+   if ( this->size() != rhs.size() ) return false;
+d478 2
+a479 3
+   size_t i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<this->size(); i++ ) 
+      if ( ! ( (*this)[i] == rhs[i] )  ) return false;
+d481 1
+a481 1
+   return true;
+d484 1
+a484 1
+bool
+d493 1
+a493 1
+bool
+d517 3
+a519 4
+      schedule_.reserve( rhs.size() );
+      int j = 0; // Pulled out of the for below by RW2STL
+      for (j = 0;  j < rhs.size();  ++j) {
+        schedule_.push_back( rhs[j] );
+d521 2
+a522 2
+      capacity_ = rhs.size();
+      // Clear the dictionary contents and refill it
+d524 1
+a524 1
+      this -> fillDictionary();
+d527 1
+a527 1
+    assert (schedule_.size() == rhs.schedule_.size());
+d536 2
+a537 2
+    capacity_(source.capacity_)//,
+    //itemToEntry_(goodSize (source.capacity_))
+d539 1
+a539 1
+  this->fillDictionary();
+d545 3
+a547 3
+: //schedule_( n ), //size_tMax(n,1) ),
+  capacity_( n ) //size_tMax(n,1) )//,
+  //itemToEntry_(  goodSize( size_tMax(n,1) )  )
+d549 1
+a549 1
+    schedule_.reserve( n );
+d566 1
+a566 2
+   int i = 0; // Pulled out of the for below by RW2STL
+   for ( i=0; i<size(); i++ )  {
+d621 1
+a621 1
+  LgFrScheduleFloat ss;// (1);	// Make it a little small
+d626 1
+a626 1
+  assert (3 == ss.size());
+d639 1
+a639 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i = 0; i < ss.size(); i++) {
+d662 1
+a662 1
+/*  LgFrScheduleFloat ss3(0);
+d664 1
+a664 1
+  ss3.reserve(2);
+d666 1
+a666 1
+  assert (ss3.size() == 0);
+d670 1
+a670 1
+  assert (ss3.size() == 1);
+d674 1
+a674 1
+  assert (ss3.size() == 2);
+d678 1
+a678 1
+  assert (ss3.size() == 3);*/
+d687 1
+a687 1
+  for ( i=0; i<hl.size(); i++ ) {
+d691 2
+a692 2
+  cout <<"LgFrSchedule.format(hl,true,'X')" <<endl;
+  cout <<ss.format(hl,true,'X') <<endl;
+d695 1
+a695 1
+  for ( i=0; i<hl.size(); i=i+2 ) {
+d698 2
+a699 2
+  cout <<"LgFrSchedule.format(hl2,false,'+')" <<endl;
+  cout <<ss.format(hl2,false,'+') <<endl;
+d719 1
+a719 1
+  assert( diff.size() == 3 );
+d737 1
+a737 1
+  assert( diff.size() == 2 );
+d753 1
+a753 1
+  assert( diff.size() == 2 );
+d764 1
+a764 1
+  assert( diff.size() == 0 );
+d781 1
+a781 1
+  assert( diff.size() == 3 );
+d803 1
+a803 1
+  assert( result.size() == 3 );
+d829 1
+a829 1
+  assert( result.size() == 3 );
+d883 1
+a883 1
+  assert( schedB.size() == 2 );
+d894 1
+a894 1
+  assert( schedC.size() == 2 );
+@
+
+
+1.2.6.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d6 1
+a6 1
+#include <iostream>
+d29 2
+a30 2
+   const int precision )//,
+   //const long iosFlags )
+d57 2
+a58 2
+                  precision 
+                  //iosFlags
+d127 1
+a127 1
+    std::cerr << "WARNING: Searches will not find value just inserted" << std::endl;
+d148 1
+a148 1
+    std::cerr << "WARNING: Searches will not find one of the itemTimeVec\'s for "
+d150 1
+a150 1
+	 << "; multiple entries have been inserted" << std::endl;
+d168 1
+a168 1
+    std::cerr << "WARNING: Searches will not find item just passed to insertAt" << std::endl;
+d597 2
+a598 2
+   std::cout <<"************************************************" <<std::endl;
+   std::cout <<"LgFrSchedule" << std::endl;
+d601 2
+a602 2
+   std::cout <<" *********************************" <<std::endl;
+      std::cout <<" entry number " <<i <<":";
+d605 1
+a605 1
+   std::cout <<"************************************************" <<std::endl;
+d681 1
+a681 1
+    // std::cout << std::endl;
+d716 2
+a717 2
+  std::cout <<"LgFrSchedule.format()" <<std::endl;
+  std::cout <<ss.format() <<std::endl;
+d726 2
+a727 2
+  std::cout <<"LgFrSchedule.format(hl,true,'X')" <<std::endl;
+  std::cout <<ss.format(hl,true,'X') <<std::endl;
+d733 2
+a734 2
+  std::cout <<"LgFrSchedule.format(hl2,false,'+')" <<std::endl;
+  std::cout <<ss.format(hl2,false,'+') <<std::endl;
+d752 2
+a753 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d770 2
+a771 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d786 2
+a787 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d797 2
+a798 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d814 2
+a815 2
+  // std::cout <<"diff" <<std::endl;
+  // std::cout <<diff.format() <<std::endl;
+d836 2
+a837 2
+  // std::cout <<"Add" <<std::endl;
+  // std::cout <<result.format() <<std::endl;
+d862 2
+a863 2
+  // std::cout <<"Add" <<std::endl;
+  // std::cout <<sched.format() <<std::endl;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d578 1
+a578 1
+  return lhs.op(LgFrTimeVecFloat::add,rhs);
+d585 1
+a585 1
+  return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+d594 1
+a594 1
+  return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+d716 1
+a716 1
+  diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+d734 1
+a734 1
+  diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+d750 1
+a750 1
+  diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+d761 1
+a761 1
+  diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

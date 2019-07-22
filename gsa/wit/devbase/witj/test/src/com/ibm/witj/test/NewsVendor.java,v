@@ -1,0 +1,659 @@
+head	1.13;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.13
+date	2011.05.04.22.15.53;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.05.02.18.32.43;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.04.22.20.00.44;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.03.03.23.32.48;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.02.25.16.07.25;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2009.10.28.21.47.37;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2009.06.15.15.54.13;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2009.05.08.22.13.13;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2009.04.20.19.32.28;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2009.04.20.18.24.10;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2009.04.20.18.00.04;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2009.04.20.17.43.59;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2009.04.20.16.09.13;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.13
+log
+@setValue ==> set
+getValue ==> get
+@
+text
+@
+//==============================================================================
+// WIT-J/Test Source File NewsVendor.java.
+//==============================================================================
+
+package       com.ibm.witj.test;
+
+import        com.ibm.witj.*;
+import static com.ibm.witj.Attribute.*;
+import static com.ibm.witj.Part.Category.*;
+
+//==============================================================================
+// Class NewsVendor
+//
+// Responsible for testing the use of stochastic implosion accessed through
+// WIT-J:
+// Formulates a simple news vendor problem, solves it, and displays the
+// solution.
+//==============================================================================
+
+final class NewsVendor
+{
+//==============================================================================
+// Package-Internal Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// performTest ().
+//
+// Formulates a simple news vendor problem, solves it, and displays the
+// solution.
+//------------------------------------------------------------------------------
+
+   static void performTest ()
+      {
+      NewsVendor theNewsVendor;
+
+      theNewsVendor = new NewsVendor ();
+
+      theNewsVendor.performTestInt ();
+      }
+
+//==============================================================================
+// Private Constructor
+//==============================================================================
+
+   private NewsVendor ()
+      {
+      }
+
+//==============================================================================
+// Private Methods
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// performTestInt ().
+//
+// Internal implementation of performTest ().
+//------------------------------------------------------------------------------
+
+   private void performTestInt ()
+      {
+      System.out.printf (
+         "\n"
+       + "-------------------------------------------------\n"
+       + " News Vendor Test\n"
+       + "-------------------------------------------------\n");
+
+      setUpProblem           ();
+      buildCoreProblem       ();
+
+      enterStochData         (false);
+      myProblem.stochImplode ();
+      displaySoln            ();
+
+      enterStochData         (true);
+      myProblem.stochImplode ();
+      displaySoln            ();
+
+      myProblem.deactivate   ();
+      }
+
+//------------------------------------------------------------------------------
+// setUpProblem ()
+//
+// Creates and sets up myProblem.
+//------------------------------------------------------------------------------
+
+   private void setUpProblem ()
+      {
+      myProblem = Problem.newInstance ();
+
+      myProblem.getMessageMgr ().setMesgFileAccessMode ("a");
+      myProblem.getMessageMgr ().setMesgFileName       ("UnitTester.output");
+      }
+
+//------------------------------------------------------------------------------
+// buildCoreProblem ()
+//
+// Populates myProblem with the core deterministic portion of the stochastic
+// implosion formulation.
+//------------------------------------------------------------------------------
+
+   private void buildCoreProblem ()
+      {
+      myProblem.set (nPeriods, 2);
+
+      myProblem.setOptInitMethod (OptInitMethod.CRASH);
+
+      source = Part     .newInstance (myProblem, "Source", CAPACITY);
+      buy    = Operation.newInstance (myProblem, "Buy");
+               BomEntry .newInstance (buy,        source);
+      hold   = Part     .newInstance (myProblem, "Hold",   MATERIAL);
+               BopEntry .newInstance (buy,        hold);
+      sell   = Demand   .newInstance (hold,      "Sell");
+
+      source.set               (supplyVol,  new double[] {500, 0});
+      buy   .setVectorToScalar (execCost,   0.6);
+      sell  .setVectorToScalar (shipReward, 1.0);
+      }
+
+//------------------------------------------------------------------------------
+// enterStochData (byObject)
+//
+// Populates myProblem with the stochastic portion of the stochastic implosion
+// formulation.
+// Uses stage-by-object, iff myObject is true.
+//------------------------------------------------------------------------------
+
+   private void enterStochData (boolean byObject)
+      {
+      myProblem.set (nScenarios,    3);
+      myProblem.set (stageByObject, byObject);
+      myProblem.set (stochMode,     true);
+
+      if (byObject)
+         {
+         source.set (objectStage, 0);
+         buy   .set (objectStage, 0);
+         hold  .set (objectStage, 1);
+         }
+      else
+         myProblem.set (periodStage, new int[] {0, 1});
+
+      enterScenarioData (0, 0.25, 200);
+      enterScenarioData (1, 0.50, 300);
+      enterScenarioData (2, 0.25, 400);
+      }
+
+
+//------------------------------------------------------------------------------
+// enterScenarioData (theScenario, theProbability, demandVolPer1)
+//
+// Sets the probability and demandVol in period 1 for theScenario.
+//------------------------------------------------------------------------------
+
+   private void enterScenarioData (
+         int    theScenario,
+         double theProbability,
+         double demandVolPer1)
+      {
+      double[] theDemandVol;
+
+      theDemandVol    = new double[2];
+      theDemandVol[0] = 0;
+      theDemandVol[1] = demandVolPer1;
+
+      myProblem.set (currentScenario, theScenario);
+      myProblem.set (probability,     theProbability);
+      sell     .set (demandVol,       theDemandVol);
+      }
+
+//------------------------------------------------------------------------------
+// displaySoln ()
+//
+// Extracts the solution to the newsvendor problem from WIT-J and displays it.
+//------------------------------------------------------------------------------
+
+   private void displaySoln ()
+      {
+      boolean  byObject;
+      double[] execVolArr;
+      int      theScen;
+      double[] demandVolArr;
+      double[] shipVolArr;
+      double   profit;
+
+      byObject = myProblem.get (stageByObject);
+
+      System.out.printf (
+         "\n"
+       + "Stage-By-%s Model\n"
+       + "\n",
+         byObject? "Object": "Period");
+
+      execVolArr = buy.get (execVol);
+
+      System.out.printf (
+         "Buy %.0f papers.\n"
+       + "\n",
+         execVolArr[0]);
+
+      for (theScen = 0; theScen < 3; theScen ++)
+         {
+         myProblem.set (currentScenario, theScen);
+
+         demandVolArr = sell.get (demandVol);
+         shipVolArr   = sell.get (shipVol);
+
+         System.out.printf (
+            "If the demand is for %.0f papers, sell %.0f papers.\n",
+            demandVolArr[1],
+            shipVolArr  [1]);
+         }
+
+      profit = myProblem.get (objValue);
+
+      System.out.printf (
+         "\n"
+       + "The expected profit is $%.2f.\n"
+       + "\n"
+       + "-------------------------------------------------\n",
+         profit);
+
+      myProblem.clearStochSoln ();
+
+      myProblem .set (stochMode, false);
+      }
+
+//==============================================================================
+// Private Fields
+//==============================================================================
+
+   Problem   myProblem = null;
+   Part      source    = null;
+   Operation buy       = null;
+   Part      hold      = null;
+   Demand    sell      = null;
+
+//------------------------------------------------------------------------------
+}
+@
+
+
+1.12
+log
+@Reduced heading comments.
+@
+text
+@d106 1
+a106 1
+      myProblem.setValue (nPeriods, 2);
+d117 1
+a117 1
+      source.setValue          (supplyVol,  new double[] {500, 0});
+d132 3
+a134 3
+      myProblem.setValue (nScenarios,    3);
+      myProblem.setValue (stageByObject, byObject);
+      myProblem.setValue (stochMode,     true);
+d138 3
+a140 3
+         source.setValue (objectStage, 0);
+         buy   .setValue (objectStage, 0);
+         hold  .setValue (objectStage, 1);
+d143 1
+a143 1
+         myProblem.setValue (periodStage, new int[] {0, 1});
+d168 3
+a170 3
+      myProblem.setValue (currentScenario, theScenario);
+      myProblem.setValue (probability,     theProbability);
+      sell     .setValue (demandVol,       theDemandVol);
+d188 1
+a188 1
+      byObject = myProblem.getValue (stageByObject);
+d196 1
+a196 1
+      execVolArr = buy.getValue (execVol);
+d205 1
+a205 1
+         myProblem.setValue (currentScenario, theScen);
+d207 2
+a208 2
+         demandVolArr = sell.getValue (demandVol);
+         shipVolArr   = sell.getValue (shipVol);
+d216 1
+a216 1
+      profit = myProblem.getValue (objValue);
+d227 1
+a227 1
+      myProblem .setValue (stochMode, false);
+@
+
+
+1.11
+log
+@Cleared up some of the code that was flagged with warnings by Eclipse.
+@
+text
+@a3 2
+//
+// Contains the declaration of class NewsVendor.
+@
+
+
+1.10
+log
+@Revised for optInitMethod.
+@
+text
+@a13 2
+import       java.util.*;
+
+@
+
+
+1.9
+log
+@Moved GlobalAspect responsibilities to class Problem.
+Removed class GlobalAspect.
+@
+text
+@d112 2
+@
+
+
+1.8
+log
+@Changed the extensions of test output files from out to output.
+@
+text
+@a98 2
+
+      myGlobal = myProblem.getGlobalAspect ();
+d110 1
+a110 1
+      myGlobal.setValue (nPeriods, 2);
+d134 3
+a136 3
+      myGlobal.setValue (nScenarios,    3);
+      myGlobal.setValue (stageByObject, byObject);
+      myGlobal.setValue (stochMode,     true);
+d145 1
+a145 1
+         myGlobal.setValue (periodStage, new int[] {0, 1});
+d170 3
+a172 3
+      myGlobal.setValue (currentScenario, theScenario);
+      myGlobal.setValue (probability,     theProbability);
+      sell    .setValue (demandVol,       theDemandVol);
+d190 1
+a190 1
+      byObject = myGlobal.getValue (stageByObject);
+d207 1
+a207 1
+         myGlobal.setValue (currentScenario, theScen);
+d218 1
+a218 1
+      profit = myGlobal.getValue (objValue);
+d229 1
+a229 1
+      myGlobal .setValue (stochMode, false);
+d236 5
+a240 6
+   Problem      myProblem = null;
+   GlobalAspect myGlobal  = null;
+   Part         source    = null;
+   Operation    buy       = null;
+   Part         hold      = null;
+   Demand       sell      = null;
+@
+
+
+1.7
+log
+@Replaced public accessor methods for the Attributes with piublic fields.
+@
+text
+@d98 1
+a98 1
+      myProblem.getMessageMgr ().setMesgFileName       ("UnitTester.out");
+@
+
+
+1.6
+log
+@Removed the "enabled" concept from WIT-J.
+@
+text
+@d112 1
+a112 1
+      myGlobal.setValue (nPeriods (), 2);
+d121 3
+a123 3
+      source.setValue          (supplyVol  (), new double[] {500, 0});
+      buy   .setVectorToScalar (execCost   (), 0.6);
+      sell  .setVectorToScalar (shipReward (), 1.0);
+d136 3
+a138 3
+      myGlobal.setValue (nScenarios    (), 3);
+      myGlobal.setValue (stageByObject (), byObject);
+      myGlobal.setValue (stochMode     (), true);
+d142 3
+a144 3
+         source.setValue (objectStage (), 0);
+         buy   .setValue (objectStage (), 0);
+         hold  .setValue (objectStage (), 1);
+d147 1
+a147 1
+         myGlobal.setValue (periodStage (), new int[] {0, 1});
+d172 3
+a174 3
+      myGlobal.setValue (currentScenario (), theScenario);
+      myGlobal.setValue (probability     (), theProbability);
+      sell    .setValue (demandVol       (), theDemandVol);
+d192 1
+a192 1
+      byObject = myGlobal.getValue (stageByObject ());
+d200 1
+a200 1
+      execVolArr = buy.getValue (execVol ());
+d209 1
+a209 1
+         myGlobal.setValue (currentScenario (), theScen);
+d211 2
+a212 2
+         demandVolArr = sell.getValue (demandVol ());
+         shipVolArr   = sell.getValue (shipVol   ());
+d220 1
+a220 1
+      profit = myGlobal.getValue (objValue ());
+d231 1
+a231 1
+      myGlobal .setValue (stochMode (), false);
+@
+
+
+1.5
+log
+@Added a stage-by-object case to the News Vendor test.
+@
+text
+@a96 1
+      myProblem.getMessageMgr ().setQuiet              (true);
+a99 2
+      myProblem.enable ();
+
+@
+
+
+1.4
+log
+@Made some public methods package internal.
+@
+text
+@d67 6
+d75 2
+a76 1
+      enterStochData         ();
+d79 5
+d130 1
+a130 1
+// enterStochData ()
+d134 1
+d137 1
+a137 1
+   private void enterStochData ()
+d140 1
+a140 1
+      myGlobal.setValue (stageByObject (), false);
+d142 9
+a150 1
+      myGlobal.setValue (periodStage   (), new int[] {0, 1});
+d157 1
+d188 1
+d195 8
+d206 1
+a206 6
+         "\n"
+       + "--------------------------\n"
+       + " News Vendor Test Results\n"
+       + "--------------------------\n"
+       + "\n"
+       + "Buy %.0f papers.\n"
+d231 4
+@
+
+
+1.3
+log
+@News Vendor Test
+@
+text
+@d38 1
+a38 1
+   public static void performTest ()
+@
+
+
+1.2
+log
+@NewsVendor test.
+@
+text
+@d19 2
+a20 2
+// Responsible for demonstrating the use of stochastic implosion accessed
+// through WIT-J:
+d32 1
+a32 1
+// doDemo ().
+d38 1
+a38 1
+   public static void doDemo ()
+d44 1
+a44 1
+      theNewsVendor.doDemoInt ();
+d60 1
+a60 1
+// doDemoInt ().
+d62 1
+a62 1
+// Internal implementation of doDemo ().
+d65 1
+a65 1
+   private void doDemoInt ()
+d176 3
+a178 3
+       + "------------------------------------\n"
+       + " Solution to the Newsvendor Problem\n"
+       + "------------------------------------\n"
+@
+
+
+1.1
+log
+@Changed the name of class NewsVender to NewsVendor.
+Further implementation of class NewsVendor.
+@
+text
+@d91 1
+a91 1
+      myGlobalAspect = myProblem.getGlobalAspect ();
+d103 1
+a103 1
+      myGlobalAspect.setValue (nPeriods (), 2);
+d126 4
+a129 4
+      myGlobalAspect.setValue (nScenarios    (), 3);
+      myGlobalAspect.setValue (stageByObject (), false);
+      myGlobalAspect.setValue (stochMode     (), true);
+      myGlobalAspect.setValue (periodStage   (), new int[] {0, 1});
+d153 3
+a155 3
+      myGlobalAspect.setValue (currentScenario (), theScenario);
+      myGlobalAspect.setValue (probability     (), theProbability);
+      sell          .setValue (demandVol       (), theDemandVol);
+d167 4
+d180 2
+a181 1
+       + "Buy %.0f papers.\n",
+d184 15
+d201 4
+a204 1
+       + "------------------------------------\n");
+d211 6
+a216 6
+   Problem      myProblem      = null;
+   GlobalAspect myGlobalAspect = null;
+   Part         source         = null;
+   Operation    buy            = null;
+   Part         hold           = null;
+   Demand       sell           = null;
+@
+

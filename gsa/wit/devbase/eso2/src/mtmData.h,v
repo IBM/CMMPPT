@@ -1,0 +1,485 @@
+head	1.11;
+access;
+symbols
+	abandoningEtnParts:1.10
+	beforeEtnParts:1.10
+	eso2InitialFileFormats:1.6
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.11
+date	2005.01.29.18.27.38;	author fasano;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2003.10.29.19.16.01;	author fasano;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2003.10.08.19.00.04;	author fasano;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2003.04.15.20.19.25;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2003.04.12.01.21.18;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2003.02.07.19.24.49;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2003.02.07.17.04.19;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2003.02.06.18.32.14;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2002.11.02.03.00.13;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.02.02.47.51;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.11.01.17.14.25;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.11.01.17.14.25;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.11
+log
+@changed code to use std::string rather than BCP_string
+@
+text
+@#ifndef ESO2_MtmData_h
+#define ESO2_MtmData_h
+
+#include "scoFile.h"
+
+
+class ESO2mtmData : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(mtm);
+  getFieldH(plantLoc);
+  getIntFieldH(period);
+  getFloatFieldH(supply);
+  getFloatFieldH(wfmv);
+  
+  // preferred constructor
+  ESO2mtmData(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("mtm");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("supply");
+    //insertField("wfmv");
+    hasHeaderRecord(5);
+    commentRecords(true);
+  };
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & mtm, 
+    const std::string & plantLoc, 
+    int period ) 
+  {
+    char periodchar[100];
+    sprintf( periodchar, "%d", period );
+    std::string retVal = mtm+"$+&"+plantLoc+"$+&"+periodchar;
+    return retVal;
+  };
+  
+  // destructor
+  ~ESO2mtmData(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2mtmData file("../data/example1/mtmData.csv");
+    
+    // Test reading first record
+
+    std::string mtm = file.mtm(0);
+    assert( mtm=="m1");
+    assert( file.plantLoc(0) == "pok" );
+    assert( file.periodAsInt(0) == 1 );
+    assert( file.supplyAsFloat(0) == 20.0f );
+    assert( file.wfmvAsFloat(0) == 5.4f );
+
+    assert( file.mtm(1) == "m1" );
+    assert( file.plantLoc(1) == "pok" );
+    assert( file.periodAsInt(1) == 2 );
+    assert( file.supplyAsFloat(1) == /*21.0f*/ 0.0f );
+    assert( file.wfmvAsFloat(1) == 5.4f );
+    
+    // Test reading record by key    
+    assert( file.wfmvAsFloat(file.key("m2","wat",3)) == 5.0f );
+    assert( file.supplyAsFloat(file.key("m2","wat",3)) == /*30.0f*/ 0.0f );
+
+    assert( file.numRecords() == 16 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      mtm(recNum),
+      plantLoc(recNum),
+      periodAsInt(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ESO2mtmData();
+  
+  // copy constructor  -- don't use!
+  ESO2mtmData( const ESO2mtmData& source );
+  
+  // assignment operator -- don't use!
+  ESO2mtmData&
+  operator=(const ESO2mtmData& rhs);
+
+  
+};
+
+
+
+class ESO2mtmDataIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  getFieldFileWithIteratorH(mtm);
+  getFieldFileWithIteratorH(plantLoc);
+  getIntFieldFileWithIteratorH(period);
+  getFloatFieldFileWithIteratorH(supply);
+  getFloatFieldFileWithIteratorH(wfmv);
+  
+  // preferred constructor
+  ESO2mtmDataIterator(const ESO2mtmData & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ESO2mtmDataIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ESO2mtmData file("../data/example1/mtmData.csv");
+    ESO2mtmDataIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        
+        assert( fileIter.mtm() == "m1" );
+        assert( fileIter.plantLoc() == "pok" );
+        assert( fileIter.periodAsInt() == 1 );
+        assert( fileIter.supplyAsFloat() == 20.0f );
+        assert( fileIter.wfmvAsFloat() == 5.4f );
+
+        //assert( fileIter.recNum() == 11 );
+          
+      }
+      recNo++;
+    }
+    
+    // number of records including comments
+    //assert( fileIter.recNum()==27);
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ESO2mtmDataIterator();
+  
+  // copy constructor  -- don't use!
+  ESO2mtmDataIterator( const ESO2mtmDataIterator& source );
+  
+  // assignment operator -- don't use!
+  ESO2mtmDataIterator&
+  operator=(const ESO2mtmDataIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.10
+log
+@Replaced std::string with BCP_string to work around VAC compiler problem
+@
+text
+@d18 1
+a18 1
+  ESO2mtmData(BCP_string filename)
+d33 3
+a35 3
+  static BCP_string key( 
+    const BCP_string & mtm, 
+    const BCP_string & plantLoc, 
+d40 1
+a40 1
+    BCP_string retVal = mtm+"$+&"+plantLoc+"$+&"+periodchar;
+d54 1
+a54 1
+    BCP_string mtm = file.mtm(0);
+d78 1
+a78 1
+  virtual BCP_string key( unsigned int recNum ) const
+d80 1
+a80 1
+    BCP_string retVal = key(
+@
+
+
+1.9
+log
+@Modified so there there is a scrap cost on all parts (except for parts created from demanufacturing).
+This is an attempt to ensure all acquired parts are consumed.
+@
+text
+@d18 1
+a18 1
+  ESO2mtmData(std::string filename)
+d33 3
+a35 3
+  static std::string key( 
+    const std::string & mtm, 
+    const std::string & plantLoc, 
+d40 1
+a40 1
+    std::string retVal = mtm+"$+&"+plantLoc+"$+&"+periodchar;
+d54 1
+a54 1
+    std::string mtm = file.mtm(0);
+d78 1
+a78 1
+  virtual std::string key( unsigned int recNum ) const
+d80 1
+a80 1
+    std::string retVal = key(
+@
+
+
+1.8
+log
+@Updated to have deman and demanOverride input files
+@
+text
+@d59 1
+a59 1
+    assert( file.wfmvAsFloat(0) == 5.0f );
+d64 1
+a64 1
+    assert( file.supplyAsFloat(1) == 21.0f );
+d69 1
+a69 1
+    assert( file.supplyAsFloat(file.key("m2","wat",3)) == 30.0f );
+d137 1
+a137 1
+        assert( fileIter.wfmvAsFloat() == 5.0f );
+@
+
+
+1.7
+log
+@Updated to change 1 to be the first period.
+Added additional test to see if objValue has changed
+@
+text
+@a15 2
+  getFloatFieldH(demanCost);
+  getFloatFieldH(demanTime);
+d28 1
+a28 1
+    hasHeaderRecord(7);
+a59 2
+    assert( file.demanCostAsFloat(0) == 12.0f );
+    assert( file.demanTimeAsFloat(0) == 0.0f );
+a65 2
+    assert( file.demanCostAsFloat(1) == 13.0f );
+    assert( file.demanTimeAsFloat(1) == 1.0f );
+a112 3
+  getFloatFieldFileWithIteratorH(demanCost);
+  getFloatFieldFileWithIteratorH(demanTime);
+
+a137 2
+        assert( fileIter.demanCostAsFloat() == 12.0f );
+        assert( fileIter.demanTimeAsFloat() == 0.0f );
+d139 1
+a139 1
+        assert( fileIter.recNum() == 11 );
+d146 1
+a146 1
+    assert( fileIter.recNum()==27);
+@
+
+
+1.6
+log
+@fixed up data files so periods are not greater than 3 (ie removed records for period 4)
+@
+text
+@d59 1
+a59 1
+    assert( file.periodAsInt(0) == 0 );
+d67 1
+a67 1
+    assert( file.periodAsInt(1) == 1 );
+d144 1
+a144 1
+        assert( fileIter.periodAsInt() == 0 );
+@
+
+
+1.5
+log
+@updated to add eso2Problem class and eso2 main program
+@
+text
+@d74 2
+a75 2
+    assert( file.wfmvAsFloat(file.key("m2","wat",4)) == 6.0f );
+    assert( file.supplyAsFloat(file.key("m2","wat",4)) == 36.0f );
+d77 1
+a77 1
+    assert( file.numRecords() == 20 );
+d157 1
+a157 1
+    assert( fileIter.recNum()==31);
+@
+
+
+1.4
+log
+@Updated to match current understanding of file formats
+@
+text
+@d150 1
+a150 1
+        assert( fileIter.recNum() == 10 );
+d157 1
+a157 1
+    assert( fileIter.recNum()==30);
+@
+
+
+1.3
+log
+@Added code to read featureData file
+@
+text
+@d16 2
+d30 1
+a30 1
+    hasHeaderRecord(5);
+d62 2
+d70 2
+d119 2
+d147 2
+d150 1
+a150 1
+        assert( fileIter.recNum() == 8 );
+d157 1
+a157 1
+    assert( fileIter.recNum()==28);
+@
+
+
+1.2
+log
+@changed pdf to be plantLoc or custLoc
+@
+text
+@d1 2
+a2 2
+#ifndef ILS_CONTRSUBSFILE_h
+#define ILS_CONTRSUBSFILE_h
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d12 1
+a12 1
+  getFieldH(pdf);
+d24 1
+a24 1
+    //insertField("pdf");
+d35 1
+a35 1
+    const std::string & pdf, 
+d40 1
+a40 1
+    std::string retVal = mtm+"$+&"+pdf+"$+&"+periodchar;
+d56 1
+a56 1
+    assert( file.pdf(0) == "pok" );
+d62 1
+a62 1
+    assert( file.pdf(1) == "pok" );
+d82 1
+a82 1
+      pdf(recNum),
+d109 1
+a109 1
+  getFieldFileWithIteratorH(pdf);
+d135 1
+a135 1
+        assert( fileIter.pdf() == "pok" );
+@
+
+
+1.1.1.1
+log
+@Initial Import
+@
+text
+@@

@@ -1,0 +1,2319 @@
+head	1.30;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.30
+date	2006.01.09.20.02.31;	author rjw;	state dead;
+branches;
+next	1.29;
+
+1.29
+date	2006.01.05.22.53.46;	author rjw;	state Exp;
+branches;
+next	1.28;
+
+1.28
+date	2006.01.05.22.27.11;	author rjw;	state Exp;
+branches;
+next	1.27;
+
+1.27
+date	2006.01.05.18.38.20;	author rjw;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2006.01.04.23.07.40;	author rjw;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2006.01.03.20.44.06;	author rjw;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2006.01.03.19.00.03;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2006.01.03.17.12.43;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2005.12.30.23.37.56;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2005.12.30.20.40.54;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2005.12.30.19.32.04;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2005.12.29.23.22.24;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2005.12.29.21.36.34;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2005.12.29.20.55.12;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2005.12.28.22.58.58;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2005.12.28.18.57.50;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2005.12.27.19.43.40;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2005.12.23.21.12.02;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2005.12.23.18.16.33;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2005.12.23.16.49.53;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2005.12.22.23.17.30;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2005.12.22.22.07.05;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2005.12.22.21.30.50;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2005.12.21.23.46.09;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2005.12.21.22.56.47;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2005.12.21.22.44.46;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.12.20.22.48.24;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.12.20.20.38.56;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.12.20.19.45.38;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.12.20.19.04.55;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.30
+log
+@[shared-resource pegging]
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "SrpExpSync.C"
+//
+// Contains the implementation of the following classes:
+//
+//    SrpExpSync
+//    SrpSyncBldr
+//------------------------------------------------------------------------------
+
+#include <SrpExpSync.h>
+#include <SrpSyncBldr.h>
+#include <SrpExpSpec.h>
+#include <PipSeqMgr.h>
+#include <ReqSched.h>
+#include <Part.h>
+#include <Demand.h>
+#include <BopEntry.h>
+#include <Opn.h>
+#include <BomEntry.h>
+#include <Global.h>
+#include <PairStack.h>
+#include <DblDblStack.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpExpSync.
+//------------------------------------------------------------------------------
+
+WitSrpExpSync::WitSrpExpSync (WitPipSeqMgr *  thePipSeqMgr):
+
+      WitProbAssoc     (thePipSeqMgr->myProblem ()),
+
+      myShipSyncPairs_ (myProblem ()),
+      myConsSyncPairs_ (myProblem ())
+   {
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+   WitPeriod     thePer;
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myShipSyncPairs_.myPtrAt (theDemand, thePer) =
+            new WitDblDblStack (myProblem ());
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myConsSyncPairs_.myPtrAt (theBomEnt, thePer) =
+            new WitDblDblStack (myProblem ());
+
+   WitSrpSyncBldr theSrpSyncBldr (
+      thePipSeqMgr,
+      myShipSyncPairs_,
+      myConsSyncPairs_);
+
+   theSrpSyncBldr.buildSync ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpExpSync::~WitSrpExpSync ()
+   {
+   WitBomEntry * theBomEnt;
+   WitDemand *   theDemand;
+   WitPeriod     thePer;
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         delete myConsSyncPairs_.myPtrAt (theBomEnt, thePer);
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         delete myShipSyncPairs_.myPtrAt (theDemand, thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::print ()
+   {
+   fprintf (solnFile (),
+      "\n\n"
+      "Explosion Synchronization:\n");
+
+   prtShipSyncPairs ();
+   prtConsSyncPairs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::getShipReqPairs (
+      WitDemand *      theDemand,
+      WitPeriod        shipPer,
+      WitDblDblStack & theReqPairs)
+   {
+   theReqPairs.
+      revCopyFrom (
+         myShipSyncPairs_.
+            myElemAt (theDemand, shipPer));
+
+   theReqPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::getConsReqPairs (
+      WitBomEntry *    theBomEnt,
+      WitPeriod        execPer,
+      double           consReqVol,
+      double           consPriorVol,
+      WitDblDblStack & theReqPairs)
+   {
+   getConsReqPairsNoPrior (
+      theBomEnt,
+      execPer,
+      consPriorVol + consReqVol,
+      theReqPairs);
+
+   if (consPriorVol > NET_TOL)
+      remPriorConsReqPairs (consPriorVol, theReqPairs);
+
+   if (myGlobalComp ()->printSrpDB ())
+      prtConsReqPairs (
+         theBomEnt,
+         execPer,
+         consReqVol,
+         consPriorVol,
+         theReqPairs);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::getConsReqPairsNoPrior (
+      WitBomEntry *    theBomEnt,
+      WitPeriod        execPer,
+      double           consReqVol,
+      WitDblDblStack & theReqPairs)
+   {
+   WitDblDblStItr theItr;
+   double         incReqVol;
+   double         priorVol;
+   double         netReqVol;
+   bool           advOK;
+
+   witAssert (consReqVol > NET_TOL);
+
+   netReqVol = consReqVol;
+
+   theReqPairs.clear ();
+
+   myConsSyncPairs_.myElemAt (theBomEnt, execPer).attach (theItr);
+
+   while (netReqVol > NET_TOL)
+      {
+      advOK = theItr.advance (incReqVol, priorVol);
+
+      if (not advOK)
+         {
+         stronglyAssert (netReqVol <= 2.0 * FEAS_TOL);
+
+         break;
+         }
+
+      setToMin (incReqVol, netReqVol);
+
+      theReqPairs.push (incReqVol, priorVol);
+
+      netReqVol -= incReqVol;
+      }
+
+   theReqPairs.reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::remPriorConsReqPairs (
+      double           consPriorVol,
+      WitDblDblStack & theReqPairs)
+   {
+   double netConsPriorVol;
+   double incReqVol;
+   double priorVol;
+
+   witAssert (consPriorVol > NET_TOL);
+
+   netConsPriorVol = consPriorVol;
+
+   while (true)
+      {
+      stronglyAssert (theReqPairs.isNonEmpty ());
+
+      theReqPairs.pop (incReqVol, priorVol);
+
+      if (incReqVol >= netConsPriorVol)
+         break;
+
+      netConsPriorVol -= incReqVol;
+      }
+
+   incReqVol -= netConsPriorVol;
+
+   if (incReqVol > NET_TOL)
+      theReqPairs.push (incReqVol, priorVol + netConsPriorVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::prtShipSyncPairs ()
+   {
+   WitDemand *    theDemand;
+   WitPeriod      shipPer;
+   WitDblDblStItr theItr;
+   double         incReqVol;
+   double         priorVol;
+
+   fprintf (solnFile (),
+      "\n"
+      "   ------------------------------\n"
+      "   Dem  Per  IncReqVol   PriorVol\n"
+      "   ------------------------------\n");
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (shipPer, myProblem ())
+         {
+         myShipSyncPairs_.myElemAt (theDemand, shipPer).attach (theItr);
+
+         while (theItr.advance (incReqVol, priorVol))
+            {
+            fprintf (solnFile (),
+               "   %3s  %3d  %9.3f  %9.3f\n",
+               theDemand->demandName ().myCstring (),
+               shipPer,
+               incReqVol,
+               priorVol);
+            }
+         }
+
+   fprintf (solnFile (),
+      "   ------------------------------\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::prtConsSyncPairs ()
+   {
+   WitBomEntry *  theBomEnt;
+   WitPeriod      execPer;
+   WitDblDblStItr theItr;
+   double         incReqVol;
+   double         priorVol;
+
+   fprintf (solnFile (),
+      "\n"
+      "   -----------------------------------\n"
+      "   Opn  Idx  Per  IncReqVol   PriorVol\n"
+      "   -----------------------------------\n");
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         myConsSyncPairs_.myElemAt (theBomEnt, execPer).attach (theItr);
+
+         while (theItr.advance (incReqVol, priorVol))
+            {
+            fprintf (solnFile (),
+               "   %3s  %3d  %3d  %9.3f  %9.3f\n",
+               theBomEnt->myOperationName ().myCstring (),
+               theBomEnt->localIndex (),
+               execPer,
+               incReqVol,
+               priorVol);
+            }
+         }
+
+   fprintf (solnFile (),
+      "   -----------------------------------\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::prtConsReqPairs (
+      WitBomEntry *          theBomEnt,
+      WitPeriod              execPer,
+      double                 consReqVol,
+      double                 consPriorVol,
+      const WitDblDblStack & theReqPairs)
+   {
+   WitDblDblStItr theItr;
+   double         incReqVol;
+   double         priorVol;
+
+   witAssert (myGlobalComp ()->printSrpDB ());
+
+   fprintf (msgFile (),
+      "\n"
+      "ConsReq Pairs:\n"
+      "   BOM Entry:    %s #%d\n"
+      "   ExecPer:       %3d\n"
+      "   ConsReqVol:    %3.0f\n"
+      "   ConsPriorVol : %3.0f\n"
+      "\n"
+      "   IncReqVol  PriorVol\n",
+      theBomEnt->myOperation ()->operationName ().myCstring (),
+      theBomEnt->localIndex (),
+      execPer,
+      consReqVol,
+      consPriorVol);
+
+   theReqPairs.attach (theItr);
+
+   while (theItr.advance (incReqVol, priorVol))
+      fprintf (msgFile (),
+         "         %3.0f       %3.0f\n",
+         incReqVol,
+         priorVol);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SrpSyncBldr.
+//------------------------------------------------------------------------------
+
+WitSrpSyncBldr::WitSrpSyncBldr (
+         WitPipSeqMgr *                              thePipSeqMgr,
+         WitPtrSched <WitDemand,   WitDblDblStack> & theShipSyncPairs,
+         WitPtrSched <WitBomEntry, WitDblDblStack> & theConsSyncPairs):
+
+      WitProbAssoc     (thePipSeqMgr->myProblem ()),
+
+      myPipSeqMgr_     (thePipSeqMgr),
+      mySrpExpSpec_    (NULL),
+      myShipSyncPairs_ (theShipSyncPairs),
+      myConsSyncPairs_ (theConsSyncPairs),
+      myReqSched_      (NULL),
+      filledReqVol_    (),
+      sharingMode_     (),
+      sharedExecVol_   (),
+      usedExecVol_     ()
+   {
+   mySrpExpSpec_ = new WitSrpExpSpec (myProblem ());
+
+   myReqSched_   = new WitReqSched (myProblem ());
+
+   setUpSharing ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpSyncBldr::~WitSrpSyncBldr ()
+   {
+   delete myReqSched_;
+   delete mySrpExpSpec_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::buildSync ()
+   {
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+   double      incShipVol;
+
+   WitDemTripStack theShipSeq (myProblem ());
+
+   filledReqVol_.allocate (myProblem (), 0.0);
+
+   myPipSeqMgr_->get (theShipSeq);
+
+   while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+      explodeShipment (theDemand, shipPer, incShipVol);
+
+   filledReqVol_.clear ();
+
+   reverseSyncPairs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::setUpSharing ()
+   {
+   WitOperation * theOpn;
+   int            nExpBopEnts;
+   WitBopEntry *  theBopEnt;
+
+   sharingMode_.allocate (myProblem (), false);
+
+   sharedExecVol_.allocate1D (myProblem ());
+   usedExecVol_  .allocate1D (myProblem ());
+
+   forEachOperation (theOpn, myProblem ())
+      {
+      nExpBopEnts = 0;
+
+      forEachEl (theBopEnt, theOpn->bop ())
+         if (theBopEnt->expAllowed ())
+            nExpBopEnts ++;
+
+      if (nExpBopEnts > 1)
+         {
+         sharingMode_ (theOpn) = true;
+
+         sharedExecVol_ (theOpn).allocate (myProblem (), 0.0);
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            usedExecVol_ (theBopEnt).allocate (myProblem (), 0.0);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::explodeShipment (
+      WitDemand * theDemand,
+      WitPeriod   shipPer,
+      double      incShipVol)
+   {
+   WitPart * demPart;
+   WitPart * thePart;
+   WitPeriod firstPerVal;
+   WitPeriod lastPerVal;
+   WitPeriod thePer;
+
+   witAssert (incShipVol > NET_TOL);
+
+   demPart = theDemand->demandedPart ();
+
+   myReqSched_->addTo (demPart, shipPer, incShipVol);
+
+   pushOrMerge (
+      myShipSyncPairs_.myElemAt (theDemand, shipPer),
+      incShipVol,
+      filledReqVol_ (demPart)[shipPer]);
+
+   forEachElDense (thePart, demPart->belowList ())
+      {
+      firstPerVal = myReqSched_->firstPer (thePart);
+      lastPerVal  = myReqSched_->lastPer  (thePart);
+
+      for (thePer = lastPerVal; thePer >= firstPerVal; thePer --)
+         fillReqs (thePart, thePer);
+      }
+
+   myReqSched_->clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::fillReqs (WitPart * thePart, WitPeriod thePer)
+   {
+   double theReqVol;
+   double prevReqVol;
+
+   theReqVol = myReqSched_->reqVol (thePart, thePer);
+
+   if (theReqVol <= NET_TOL)
+      return;
+
+   prevReqVol = filledReqVol_ (thePart)[thePer];
+
+   mySrpExpSpec_->specifyExplosion (thePart, thePer, theReqVol, prevReqVol);
+
+   netWithSupply (thePart, thePer);
+   explodeToProd (thePart, thePer);
+
+   mySrpExpSpec_->unspecifyExplosion ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::netWithSupply (WitPart * thePart, WitPeriod thePer)
+   {
+   double fillVol;
+
+   fillVol = mySrpExpSpec_->suppFillVol ();
+
+   if (fillVol <= NET_TOL)
+      return;
+
+   filledReqVol_ (thePart)[thePer] += fillVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::explodeToProd (WitPart * thePart, WitPeriod expPer)
+   {
+   double         fillVol;
+   WitBopEntry *  theBopEnt;
+   WitPeriod      execPer;
+   WitOperation * theOpn;
+   double         incExecVol;
+   WitBomEntry *  theBomEnt;
+
+   fillVol = mySrpExpSpec_->prodFillVol ();
+
+   if (fillVol <= NET_TOL)
+      return;
+
+   filledReqVol_ (thePart)[expPer] += fillVol;
+
+   stronglyAssert (thePart->producingBopEntries ().nElements () == 1);
+
+   theBopEnt = thePart->producingBopEntries ().first ();
+
+   stronglyAssert (theBopEnt->expEligible (expPer));
+
+   execPer      = expPer;
+
+   incExecVol = fillVol;
+
+   stronglyAssert (theBopEnt->impactPeriod ()[execPer] == expPer);
+
+   theOpn = theBopEnt->myOperation ();
+
+   if (sharingMode_ (theOpn))
+      {
+      shareExecVol (theBopEnt, execPer, incExecVol);
+
+      if (incExecVol <= NET_TOL)
+         return;
+      }
+
+   forEachEl (theBomEnt, theOpn->bom ())
+      explodeBomEntry (theBomEnt, execPer, incExecVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::shareExecVol (
+      WitBopEntry * theBopEnt,
+      WitPeriod     execPer,
+      double &      incExecVol)
+   {
+   WitOperation * theOpn;
+
+   theOpn = theBopEnt->myOperation ();
+
+   witAssert (sharingMode_ (theOpn));
+
+   witAssert (incExecVol > NET_TOL);
+
+   theOpn = theBopEnt->myOperation ();
+
+   usedExecVol_ (theBopEnt)[execPer] += incExecVol;
+
+   incExecVol =
+      positivePart (
+           usedExecVol_   (theBopEnt)[execPer]
+         - sharedExecVol_ (theOpn)   [execPer]);
+
+   setToMax (
+      sharedExecVol_ (theOpn)   [execPer],
+      usedExecVol_   (theBopEnt)[execPer]);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::explodeBomEntry (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      double        incExecVol)
+   {
+   WitPart * consPart;
+   WitPeriod consPer;
+   double    incConsVol;
+   double    prevConsVol;
+
+   witAssert (incExecVol > NET_TOL);
+
+   consPart    = theBomEnt->myPart ();
+
+   consPer     = execPer;
+
+   incConsVol  = incExecVol;
+
+   prevConsVol =
+        filledReqVol_       (consPart)[consPer]
+      + myReqSched_->reqVol (consPart, consPer);
+
+   myReqSched_->addTo (consPart, consPer, incConsVol);
+
+   pushOrMerge (
+      myConsSyncPairs_.myElemAt (theBomEnt, execPer),
+      incConsVol,
+      prevConsVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::pushOrMerge (
+      WitDblDblStack & thePairs,
+      double           incVol,
+      double           prevVol)
+   {
+   double incVol1;
+   double prevVol1;
+
+   if (thePairs.isEmpty ())
+      thePairs.push (incVol, prevVol);
+   else
+      {
+      thePairs.pop (incVol1, prevVol1);
+
+      witAssert (prevVol >= prevVol1 + incVol1 - FEAS_TOL);
+
+      if (prevVol <= prevVol1 + incVol1 + NET_TOL)
+         thePairs.push (incVol1 + incVol, prevVol1);
+      else
+         {
+         thePairs.push (incVol1, prevVol1);
+         thePairs.push (incVol,  prevVol);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::reverseSyncPairs ()
+   {
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+   WitPeriod     thePer;
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myShipSyncPairs_.myElemAt (theDemand, thePer).reverse ();
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myConsSyncPairs_.myElemAt (theBomEnt, thePer).reverse ();
+   }
+@
+
+
+1.29
+log
+@[shared-resource pegging]
+@
+text
+@@
+
+
+1.28
+log
+@[shared-resource pegging]
+@
+text
+@d434 1
+a434 1
+   addTo (
+d586 4
+a589 2
+   myConsSyncPairs_.myElemAt (theBomEnt, execPer).
+      push (incConsVol, prevConsVol);
+d594 1
+a594 1
+void WitSrpSyncBldr::addTo (
+@
+
+
+1.27
+log
+@[shared-resource pegging]
+@
+text
+@a422 1
+   double    priorVol;
+d434 4
+a437 3
+   priorVol = filledReqVol_ (demPart)[shipPer];
+
+   myShipSyncPairs_.myElemAt (theDemand, shipPer).push (incShipVol, priorVol);
+d592 28
+@
+
+
+1.26
+log
+@[shared-resource pegging]
+@
+text
+@d119 26
+a144 1
+   double         netConsPriorVol;
+d153 3
+a155 1
+   netConsPriorVol = consPriorVol;
+d159 1
+a159 1
+   while (true)
+d163 3
+a165 1
+      stronglyAssert (advOK);
+a166 1
+      if (incReqVol >= netConsPriorVol)
+d168 3
+d172 3
+a174 1
+      netConsPriorVol -= incReqVol;
+d177 2
+a178 1
+   incReqVol -= netConsPriorVol;
+d180 1
+a180 1
+   priorVol  += netConsPriorVol;
+d182 7
+a188 3
+   if (incReqVol <= NET_TOL)
+      {
+      advOK = theItr.advance (incReqVol, priorVol);
+d190 1
+a190 2
+      stronglyAssert (advOK);
+      }
+d192 1
+a192 3
+   theReqPairs.clear ();
+
+   netReqVol = consReqVol;
+d196 1
+a196 1
+      setToMin (incReqVol, netReqVol);
+d198 1
+a198 1
+      theReqPairs.push (incReqVol, priorVol);
+d200 1
+a200 3
+      netReqVol -= incReqVol;
+
+      if (netReqVol <= NET_TOL)
+d203 1
+a203 4
+      advOK = theItr.advance (incReqVol, priorVol);
+
+      if (not advOK)
+         break;
+d206 1
+a206 1
+   theReqPairs.reverse ();
+d208 2
+a209 6
+   prtConsReqPairs (
+      theBomEnt,
+      execPer,
+      consReqVol,
+      consPriorVol,
+      theReqPairs);
+a293 3
+   if (not myGlobalComp ()->printSrpDB ())
+      return;
+
+d298 2
+@
+
+
+1.25
+log
+@[shared-resource pegging]
+@
+text
+@d29 1
+d132 1
+a132 1
+   while (theItr.advance (incReqVol, priorVol))
+d134 1
+a134 1
+      net (netConsPriorVol, incReqVol);
+d136 3
+a138 1
+      if (incReqVol > NET_TOL)
+d140 2
+d144 10
+a153 1
+   stronglyAssert (netConsPriorVol == 0.0);
+d177 7
+d260 40
+d315 4
+a318 1
+      filledReqVol_    ()
+d322 3
+a324 1
+   myReqSched_ = new WitReqSched (myProblem ());
+d359 33
+d470 1
+d478 2
+d486 3
+a488 1
+   execPer   = expPer;
+d492 9
+a500 1
+   theOpn    = theBopEnt->myOperation ();
+d503 2
+a504 1
+      explodeBomEntry (theBomEnt, execPer, fillVol);
+d506 27
+a532 1
+   filledReqVol_ (thePart)[expPer] += fillVol;
+@
+
+
+1.24
+log
+@[shared-resource pegging]
+@
+text
+@d343 2
+a344 5
+   if (mySrpExpSpec_->suppFillVol () > NET_TOL)
+      netWithSupply (thePart, thePer, mySrpExpSpec_->suppFillVol ());
+
+   if (mySrpExpSpec_->prodFillVol () > NET_TOL)
+      explodeToProd (thePart, thePer, mySrpExpSpec_->prodFillVol ());
+d351 1
+a351 4
+void WitSrpSyncBldr::netWithSupply (
+      WitPart * thePart,
+      WitPeriod thePer,
+      double    fillVol)
+d353 6
+a358 1
+   witAssert (fillVol > NET_TOL);
+d365 1
+a365 4
+void WitSrpSyncBldr::explodeToProd (
+      WitPart * thePart,
+      WitPeriod expPer,
+      double    fillVol)
+d367 1
+d373 4
+a376 1
+   witAssert (fillVol > NET_TOL);
+@
+
+
+1.23
+log
+@[shared-resource pegging]
+@
+text
+@a21 1
+#include <SrpFillMeth.h>
+d36 1
+a36 3
+WitSrpExpSync::WitSrpExpSync (
+         WitPipSeqMgr *  thePipSeqMgr,
+         WitSrpOldSpec * theSrpOldSpec):
+a58 1
+      theSrpOldSpec,
+a243 1
+         WitSrpOldSpec *                             theSrpOldSpec,
+d247 1
+a247 1
+      WitProbAssoc     (theSrpOldSpec->myProblem ()),
+a249 1
+      mySrpOldSpec_    (theSrpOldSpec),
+a353 40
+void WitSrpSyncBldr::fillReqsOld (WitPart * thePart, WitPeriod thePer)
+   {
+   double                 theReqVol;
+   double                 prevReqVol;
+   double                 prevFillVol;
+   WitSrpFillMethDblStack theFillMethPairs (myProblem ());
+   WitSrpFillMeth *       theSrpFillMeth;
+   double                 fillVol;
+
+   theReqVol = myReqSched_->reqVol (thePart, thePer);
+
+   if (theReqVol <= NET_TOL)
+      return;
+
+   prevReqVol = filledReqVol_ (thePart)[thePer];
+
+   mySrpOldSpec_->
+      getFillMethPairs (
+         thePart,
+         thePer,
+         theReqVol,
+         prevReqVol,
+         prevFillVol,
+         theFillMethPairs);
+
+   while (theFillMethPairs.pop (theSrpFillMeth, fillVol))
+      {
+      if (theSrpFillMeth->byNetWithSupp ())
+         netWithSupply (thePart, thePer, fillVol);
+
+      else if (theSrpFillMeth->byExpToProd ())
+         explodeToProd (thePart, thePer, fillVol);
+
+      else
+         stronglyAssert (false);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.22
+log
+@[shared-resource pegging]
+@
+text
+@d256 1
+d262 2
+d272 1
+d337 25
+a394 2
+
+      filledReqVol_ (thePart)[thePer] += fillVol;
+d406 2
+d438 2
+@
+
+
+1.21
+log
+@[shared-resource pegging]
+@
+text
+@d39 1
+a39 1
+         WitSrpExpSpec * theSrpExpSpec):
+d62 1
+a62 1
+      theSrpExpSpec,
+d248 1
+a248 1
+         WitSrpExpSpec *                             theSrpExpSpec,
+d252 1
+a252 1
+      WitProbAssoc     (theSrpExpSpec->myProblem ()),
+d255 1
+a255 1
+      mySrpExpSpec_    (theSrpExpSpec),
+d347 1
+a347 1
+   mySrpExpSpec_->
+@
+
+
+1.20
+log
+@[shared-resource pegging]
+@
+text
+@d421 1
+a421 1
+   double    priorVol;
+d425 1
+a425 1
+   consPart   = theBomEnt->myPart ();
+d427 1
+a427 1
+   consPer    = execPer;
+d429 1
+a429 1
+   incConsVol = incExecVol;
+d431 1
+a431 1
+   priorVol   =
+d437 2
+a438 1
+   myConsSyncPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, priorVol);
+@
+
+
+1.19
+log
+@[shared-resource pegging]
+@
+text
+@d334 2
+a335 1
+   double                 prevVol;
+d345 1
+a345 1
+   prevVol = filledReqVol_ (thePart)[thePer];
+d352 2
+a353 1
+         prevVol,
+d366 2
+a378 2
+
+   filledReqVol_ (thePart)[thePer] += fillVol;
+a406 2
+   filledReqVol_ (thePart)[expPer] += fillVol;
+
+@
+
+
+1.18
+log
+@[shared-resource pegging]
+@
+text
+@d41 1
+a41 1
+      WitProbAssoc    (thePipSeqMgr->myProblem ()),
+d43 2
+a44 2
+      myShipDefPairs_ (myProblem ()),
+      myConsDefPairs_ (myProblem ())
+d52 1
+a52 1
+         myShipDefPairs_.myPtrAt (theDemand, thePer) =
+d57 1
+a57 1
+         myConsDefPairs_.myPtrAt (theBomEnt, thePer) =
+d63 2
+a64 2
+      myShipDefPairs_,
+      myConsDefPairs_);
+d79 1
+a79 1
+         delete myConsDefPairs_.myPtrAt (theBomEnt, thePer);
+d83 1
+a83 1
+         delete myShipDefPairs_.myPtrAt (theDemand, thePer);
+d94 2
+a95 2
+   prtShipDefPairs ();
+   prtConsDefPairs ();
+d107 1
+a107 1
+         myShipDefPairs_.
+a124 2
+   double         deferVol;
+   double         cumReqVol;
+d126 1
+d133 1
+a133 3
+   myConsDefPairs_.
+      myElemAt (theBomEnt, execPer).
+         attach (theItr);
+d135 1
+a135 1
+   while (theItr.advance (incReqVol, deferVol))
+d145 1
+a145 1
+   cumReqVol = 0.0;
+d147 1
+a147 1
+   theReqPairs.clear ();
+d151 1
+a151 3
+      priorVol = cumReqVol + deferVol;
+
+      setToMin (incReqVol, consReqVol - cumReqVol);
+d155 1
+a155 1
+      cumReqVol += incReqVol;
+d157 1
+a157 1
+      if (cumReqVol >= consReqVol - NET_TOL)
+d160 1
+a160 1
+      advOK = theItr.advance (incReqVol, deferVol);
+a162 3
+         {
+         witAssert (cumReqVol >= consReqVol - 2.0 * FEAS_TOL);
+
+a163 1
+         }
+d171 1
+a171 1
+void WitSrpExpSync::prtShipDefPairs ()
+d177 1
+a177 1
+   double         deferVol;
+d182 1
+a182 1
+      "   Dem  Per  IncReqVol   DeferVol\n"
+d188 1
+a188 1
+         myShipDefPairs_.myElemAt (theDemand, shipPer).attach (theItr);
+d190 1
+a190 1
+         while (theItr.advance (incReqVol, deferVol))
+d197 1
+a197 1
+               deferVol);
+d207 1
+a207 1
+void WitSrpExpSync::prtConsDefPairs ()
+d213 1
+a213 1
+   double         deferVol;
+d218 1
+a218 1
+      "   Opn  Idx  Per  IncReqVol   DeferVol\n"
+d224 1
+a224 1
+         myConsDefPairs_.myElemAt (theBomEnt, execPer).attach (theItr);
+d226 1
+a226 1
+         while (theItr.advance (incReqVol, deferVol))
+d234 1
+a234 1
+               deferVol);
+d249 2
+a250 2
+         WitPtrSched <WitDemand,   WitDblDblStack> & theShipDefPairs,
+         WitPtrSched <WitBomEntry, WitDblDblStack> & theConsDefPairs):
+d252 1
+a252 1
+      WitProbAssoc    (theSrpExpSpec->myProblem ()),
+d254 6
+a259 6
+      myPipSeqMgr_    (thePipSeqMgr),
+      mySrpExpSpec_   (theSrpExpSpec),
+      myShipDefPairs_ (theShipDefPairs),
+      myConsDefPairs_ (theConsDefPairs),
+      myReqSched_     (NULL),
+      filledReqVol_   ()
+d290 1
+a290 1
+   reverseDefPairs ();
+d301 1
+a301 1
+   double    deferVol;
+d313 1
+a313 1
+   deferVol = filledReqVol_ (demPart)[shipPer];
+d315 1
+a315 1
+   myShipDefPairs_.myElemAt (theDemand, shipPer).push (incShipVol, deferVol);
+d421 1
+a421 1
+   double    deferVol;
+d431 1
+a431 1
+   deferVol   =
+d437 1
+a437 1
+   myConsDefPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, deferVol);
+d442 1
+a442 1
+void WitSrpSyncBldr::reverseDefPairs ()
+d450 1
+a450 1
+         myShipDefPairs_.myElemAt (theDemand, thePer).reverse ();
+d454 1
+a454 1
+         myConsDefPairs_.myElemAt (theBomEnt, thePer).reverse ();
+@
+
+
+1.17
+log
+@[shared-resource pegging]
+@
+text
+@a398 4
+   WitPart *      consPart;
+   WitPeriod      consPer;
+   double         incConsVol;
+   double         deferVol;
+d417 18
+a434 2
+      {
+      consPart   = theBomEnt->myPart ();
+d436 1
+a436 1
+      consPer    = execPer;
+d438 1
+a438 1
+      incConsVol = fillVol;
+d440 3
+a442 3
+      deferVol   =
+           filledReqVol_       (consPart)[consPer]
+         + myReqSched_->reqVol (consPart, consPer);
+d444 1
+a444 1
+      myReqSched_->addTo (consPart, consPer, incConsVol);
+d446 1
+a446 2
+      myConsDefPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, deferVol);
+      }
+@
+
+
+1.16
+log
+@[shared-resource pegging]
+@
+text
+@d130 1
+a130 1
+   witAssert (consReqVol >= NET_TOL);
+d142 1
+a142 1
+      if (incReqVol >= NET_TOL)
+d298 2
+d316 1
+a316 1
+   witAssert (incShipVol >= NET_TOL);
+d350 1
+a350 1
+   if (theReqVol < NET_TOL)
+d383 1
+a383 1
+   witAssert (fillVol >= NET_TOL);
+d404 1
+a404 1
+   witAssert (fillVol >= NET_TOL);
+d420 5
+a424 2
+   if (theOpn->bom ().isEmpty ())
+      return;
+d426 1
+a426 1
+   stronglyAssert (theOpn->bom ().nElements () == 1);
+d428 3
+a430 1
+   theBomEnt  = theOpn->bom ().first ();
+d432 1
+a432 1
+   consPart   = theBomEnt->myPart ();
+d434 3
+a436 1
+   consPer    = execPer;
+d438 1
+a438 1
+   incConsVol = fillVol;
+d440 5
+a444 1
+   myReqSched_->addTo (consPart, consPer, incConsVol);
+d446 3
+a448 1
+   deferVol   = filledReqVol_ (consPart)[consPer];
+d450 3
+a452 1
+   myConsDefPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, deferVol);
+@
+
+
+1.15
+log
+@[shared-resource peging]
+@
+text
+@d100 1
+a100 1
+void WitSrpExpSync::getShipDefPairs (
+d103 1
+a103 1
+      WitDblDblStack & theDefPairs)
+d105 1
+a105 1
+   theDefPairs.
+d110 66
+a175 1
+   theDefPairs.reverse ();
+d261 1
+a261 1
+      WitProbAssoc     (theSrpExpSpec->myProblem ()),
+d263 6
+a268 6
+      myPipSeqMgr_     (thePipSeqMgr),
+      mySrpExpSpec_    (theSrpExpSpec),
+      itsShipDefPairs_ (theShipDefPairs),
+      itsConsDefPairs_ (theConsDefPairs),
+      myReqSched_      (NULL),
+      filledReqVol_    ()
+d322 1
+a322 1
+   itsShipDefPairs_.myElemAt (theDemand, shipPer).push (incShipVol, deferVol);
+d400 1
+d433 3
+a435 1
+   itsConsDefPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, 0.0);
+@
+
+
+1.14
+log
+@[shared-resource pegging]
+@
+text
+@d100 15
+a221 5
+   WitPart *   demPart;
+   WitPart *   thePart;
+   WitPeriod   firstPerVal;
+   WitPeriod   lastPerVal;
+   WitPeriod   thePer;
+d230 20
+a249 3
+      {
+      if (incShipVol < NET_TOL)
+         continue;
+d251 1
+a251 1
+      demPart = theDemand->demandedPart ();
+d253 1
+a253 1
+      myReqSched_->addTo (demPart, shipPer, incShipVol);
+d255 1
+a255 1
+      itsShipDefPairs_.myElemAt (theDemand, shipPer).push (incShipVol, 0.0);
+d257 1
+a257 4
+      forEachElDense (thePart, demPart->belowList ())
+         {
+         firstPerVal = myReqSched_->firstPer (thePart);
+         lastPerVal  = myReqSched_->lastPer  (thePart);
+d259 4
+a262 3
+         for (thePer = lastPerVal; thePer >= firstPerVal; thePer --)
+            fillReqs (thePart, thePer);
+         }
+d264 2
+a265 1
+      myReqSched_->clear ();
+d268 1
+a268 1
+   filledReqVol_.clear ();
+d275 5
+a279 5
+   double           theReqVol;
+   WitSrpFillMeth * theSrpFillMeth;
+   double           fillVol;
+
+   WitPairStack <WitSrpFillMeth, double> theFillMethPairs (myProblem ());
+d286 2
+d293 1
+a293 1
+         0.0,
+@
+
+
+1.13
+log
+@[shared-resource pegging]
+@
+text
+@d21 1
+a21 1
+#include <SrpExpGuide.h>
+d38 2
+a39 2
+         WitPipSeqMgr *   thePipSeqMgr,
+         WitSrpExpGuide * theSrpExpGuide):
+d62 1
+a62 1
+      theSrpExpGuide,
+d177 1
+a177 1
+         WitSrpExpGuide *                            theSrpExpGuide,
+d181 1
+a181 1
+      WitProbAssoc     (theSrpExpGuide->myProblem ()),
+d184 1
+a184 1
+      mySrpExpGuide_   (theSrpExpGuide),
+d260 1
+a260 1
+   mySrpExpGuide_->
+@
+
+
+1.12
+log
+@[shared-resource pegging]
+@
+text
+@d22 1
+d30 1
+d188 1
+a188 3
+      filledReqVol_    (),
+      unusedExecVol_   (),
+      unusedSupplyVol_ ()
+a203 42
+   setUp ();
+
+   explodeShipments ();
+
+   filledReqVol_   .clear ();
+   unusedExecVol_  .clear ();
+   unusedSupplyVol_.clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::setUp ()
+   {
+   WitOperation * theOpn;
+   WitPart *      thePart;
+   WitPeriod      supPer;
+   double         consSuppVol;
+
+   filledReqVol_   .allocate (myProblem (), 0.0);
+   unusedExecVol_  .allocate (myProblem (), 0.0);
+   unusedSupplyVol_.allocate (myProblem (), 0.0);
+
+   forEachOperation (theOpn, myProblem ())
+      unusedExecVol_ (theOpn) = theOpn->execVol ();
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (supPer, myProblem ())
+         {
+         consSuppVol = thePart->supplyVol ()[supPer];
+
+         consSuppVol -= positivePart (thePart->residualVol ()[supPer]);
+
+         setToMax (consSuppVol, 0.0);
+
+         unusedSupplyVol_ (thePart)[supPer] = consSuppVol;
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSrpSyncBldr::explodeShipments ()
+   {
+d215 2
+d241 2
+d249 5
+a253 1
+   double netReqVol;
+d255 1
+a255 1
+   netReqVol = myReqSched_->reqVol (thePart, thePer);
+d257 1
+a257 1
+   if (netReqVol < NET_TOL)
+d260 7
+a266 1
+   netWithSupply (thePart, thePer, netReqVol);
+d268 4
+a271 2
+   if (netReqVol < NET_TOL)
+      return;
+d273 2
+a274 1
+   explodeToProd (thePart, thePer, netReqVol);
+d276 3
+a278 4
+   if (netReqVol < NET_TOL)
+      return;
+
+   witAssert (netReqVol <= 2.0 * FEAS_TOL);
+d286 1
+a286 1
+      double &  netReqVol)
+d288 1
+a288 1
+   double fillVol;
+d290 1
+a290 12
+   witAssert (netReqVol >= NET_TOL);
+
+   if (unusedSupplyVol_ (thePart)[thePer] < NET_TOL)
+      return;
+
+   fillVol = min (netReqVol, unusedSupplyVol_ (thePart)[thePer]);
+
+   netReqVol                          -= fillVol;
+
+   unusedSupplyVol_ (thePart)[thePer] -= fillVol;
+
+   filledReqVol_    (thePart)[thePer] += fillVol;
+d298 1
+a298 1
+      double &  netReqVol)
+a302 1
+   double         fillVol;
+d308 1
+a308 4
+   witAssert (netReqVol >= NET_TOL);
+
+   if (thePart->producingBopEntries ().isEmpty ())
+      return;
+d322 1
+a322 7
+   fillVol   = min (netReqVol, unusedExecVol_ (theOpn)[execPer]);
+
+   netReqVol                        -= fillVol;
+
+   unusedExecVol_ (theOpn)[execPer] -= fillVol;
+
+   filledReqVol_ (thePart)[expPer]  += fillVol;
+@
+
+
+1.11
+log
+@[shared-resource pegging]
+@
+text
+@d186 1
+d208 1
+d222 1
+d232 3
+a234 3
+         consSuppVol =
+              thePart->supplyVol   ()[supPer]
+            - thePart->residualVol ()[supPer];
+a237 2
+         setToMin (consSuppVol, thePart->supplyVol ()[supPer]);
+
+d314 1
+a314 1
+   double incSuppVol;
+d321 1
+a321 1
+   incSuppVol = min (netReqVol, unusedSupplyVol_ (thePart)[thePer]);
+d323 1
+a323 1
+   netReqVol                          -= incSuppVol;
+d325 3
+a327 1
+   unusedSupplyVol_ (thePart)[thePer] -= incSuppVol;
+d340 1
+a340 1
+   double         incExecVol;
+d353 1
+a353 1
+   theBopEnt  = thePart->producingBopEntries ().first ();
+d357 1
+a357 1
+   execPer    = expPer;
+d361 3
+a363 1
+   theOpn     = theBopEnt->myOperation ();
+d365 1
+a365 1
+   incExecVol = min (netReqVol, unusedExecVol_ (theOpn)[execPer]);
+d367 1
+a367 1
+   netReqVol                        -= incExecVol;
+d369 1
+a369 1
+   unusedExecVol_ (theOpn)[execPer] -= incExecVol;
+d382 1
+a382 1
+   incConsVol = incExecVol;
+@
+
+
+1.10
+log
+@[shared-resource pegging]
+@
+text
+@a227 7
+         unusedSupplyVol_ (thePart)[supPer] =
+            positivePart (
+                 thePart->supplyVol   ()[supPer]
+               - thePart->residualVol ()[supPer]);
+
+   forEachPart (thePart, myProblem ())
+      forEachPeriod (supPer, myProblem ())
+@
+
+
+1.9
+log
+@[shared-resource pegging]
+@
+text
+@d36 2
+a37 2
+         WitSrpExpGuide * theSrpExpGuide,
+         WitPipSeqMgr *   thePipSeqMgr):
+a47 2
+   WitSrpSyncBldr theSrpSyncBldr (theSrpExpGuide);
+
+d58 7
+a64 1
+   theSrpSyncBldr.buildSync (thePipSeqMgr, myShipDefPairs_, myConsDefPairs_);
+d173 15
+a187 10
+WitSrpSyncBldr::WitSrpSyncBldr (WitSrpExpGuide * theSrpExpGuide):
+
+      WitProbAssoc       (theSrpExpGuide->myProblem ()),
+
+      mySrpExpGuide_     (theSrpExpGuide),
+      myShipDefPairsPtr_ (NULL),
+      myConsDefPairsPtr_ (NULL),
+      myReqSched_        (NULL),
+      unusedExecVol_     (),
+      unusedSupplyVol_   ()
+d201 1
+a201 4
+void WitSrpSyncBldr::buildSync (
+      WitPipSeqMgr *                              thePipSeqMgr,
+      WitPtrSched <WitDemand,   WitDblDblStack> & theShipDefPairs,
+      WitPtrSched <WitBomEntry, WitDblDblStack> & theConsDefPairs)
+a202 5
+   WitDemTripStack theShipSeq (myProblem ());
+
+   myShipDefPairsPtr_ = & theShipDefPairs;
+   myConsDefPairsPtr_ = & theConsDefPairs;
+
+d205 1
+a205 3
+   thePipSeqMgr->get (theShipSeq);
+
+   explodeShipments (theShipSeq);
+a208 3
+
+   myConsDefPairsPtr_ = NULL;
+   myShipDefPairsPtr_ = NULL;
+d250 1
+a250 1
+void WitSrpSyncBldr::explodeShipments (WitDemTripStack & theShipSeq)
+d261 4
+d274 1
+a274 1
+      myShipDefPairsPtr_->myElemAt (theDemand, shipPer).push (incShipVol, 0.0);
+d388 1
+a388 1
+   myConsDefPairsPtr_->myElemAt (theBomEnt, execPer).push (incConsVol, 0.0);
+@
+
+
+1.8
+log
+@[shared-resource pegging]
+@
+text
+@d21 1
+a21 1
+#include <SrpCoord.h>
+d35 3
+a37 1
+WitSrpExpSync::WitSrpExpSync (WitPipSeqMgr * thePipSeqMgr):
+d44 5
+a48 4
+   WitDemand *    theDemand;
+   WitBomEntry *  theBomEnt;
+   WitPeriod      thePer;
+   WitSrpSyncBldr theSrpSyncBldr (myProblem ());
+d169 1
+a169 1
+WitSrpSyncBldr::WitSrpSyncBldr (WitProblem * theProblem):
+d171 1
+a171 1
+      WitProbAssoc       (theProblem),
+d173 1
+@
+
+
+1.7
+log
+@[shared-resource pegging]
+@
+text
+@d42 4
+a45 3
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+   WitPeriod     thePer;
+d57 1
+a57 1
+   WitSrpSyncBldr::buildSync (myShipDefPairs_, myConsDefPairs_, thePipSeqMgr);
+d166 1
+a166 19
+void WitSrpSyncBldr::buildSync (
+      WitPtrSched <WitDemand, WitDblDblStack>   & theShipDefPairs,
+      WitPtrSched <WitBomEntry, WitDblDblStack> & theConsDefPairs,
+      WitPipSeqMgr *                              thePipSeqMgr)
+   {
+   WitSrpSyncBldr theSrpSyncBldr (
+      thePipSeqMgr->myProblem (),
+      theShipDefPairs,
+      theConsDefPairs);
+
+   theSrpSyncBldr.buildSync (thePipSeqMgr);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSrpSyncBldr::WitSrpSyncBldr (
+         WitProblem *                                theProblem,
+         WitPtrSched <WitDemand, WitDblDblStack>   & theShipDefPairs,
+         WitPtrSched <WitBomEntry, WitDblDblStack> & theConsDefPairs):
+d168 1
+a168 1
+      WitProbAssoc     (theProblem),
+d170 5
+a174 5
+      myShipDefPairs_  (theShipDefPairs),
+      myConsDefPairs_  (theConsDefPairs),
+      myReqSched_      (NULL),
+      unusedExecVol_   (myProblem (), 0.0),
+      unusedSupplyVol_ (myProblem (), 0.0)
+d188 4
+a191 1
+void WitSrpSyncBldr::buildSync (WitPipSeqMgr * thePipSeqMgr)
+d193 1
+a193 8
+   WitDemand * theDemand;
+   WitPeriod   shipPer;
+   double      incShipVol;
+   WitPart *   demPart;
+   WitPart *   thePart;
+   WitPeriod   firstPerVal;
+   WitPeriod   lastPerVal;
+   WitPeriod   thePer;
+d195 2
+a196 1
+   WitDemTripStack theShipSeq (myProblem ());
+d202 1
+a202 6
+   while (theShipSeq.pop (theDemand, shipPer, incShipVol))
+      {
+      if (incShipVol < NET_TOL)
+         continue;
+
+      demPart = theDemand->demandedPart ();
+d204 2
+a205 12
+      myReqSched_->addTo (demPart, shipPer, incShipVol);
+
+      myShipDefPairs_.myElemAt (theDemand, shipPer).push (incShipVol, 0.0);
+
+      forEachElDense (thePart, demPart->belowList ())
+         {
+         firstPerVal = myReqSched_->firstPer (thePart);
+         lastPerVal  = myReqSched_->lastPer  (thePart);
+
+         for (thePer = lastPerVal; thePer >= firstPerVal; thePer --)
+            fillReqs (thePart, thePer);
+         }
+d207 2
+a208 2
+      myReqSched_->clear ();
+      }
+d220 3
+d250 37
+d384 1
+a384 1
+   myConsDefPairs_.myElemAt (theBomEnt, execPer).push (incConsVol, 0.0);
+@
+
+
+1.6
+log
+@[shared-resource pegging]
+@
+text
+@d37 1
+a37 1
+      WitProbAssoc (thePipSeqMgr->myProblem ()),
+d39 2
+a40 2
+      myShipReqs_  (myProblem ()),
+      myConsReqs_  (myProblem ())
+d48 1
+a48 1
+         myShipReqs_.myPtrAt (theDemand, thePer) =
+d53 1
+a53 1
+         myConsReqs_.myPtrAt (theBomEnt, thePer) =
+d56 1
+a56 1
+   WitSrpSyncBldr::buildSync (myShipReqs_, myConsReqs_, thePipSeqMgr);
+d69 1
+a69 1
+         delete myConsReqs_.myPtrAt (theBomEnt, thePer);
+d73 1
+a73 1
+         delete myShipReqs_.myPtrAt (theDemand, thePer);
+d84 2
+a85 2
+   prtShipReqs ();
+   prtConsReqs ();
+d90 1
+a90 1
+void WitSrpExpSync::prtShipReqs ()
+d95 2
+a96 2
+   double         theReqVol;
+   double         thePriorVol;
+d101 1
+a101 1
+      "   Dem  Per     ReqVol   PriorVol\n"
+d107 1
+a107 1
+         myShipReqs_.myElemAt (theDemand, shipPer).attach (theItr);
+d109 1
+a109 1
+         while (theItr.advance (theReqVol, thePriorVol))
+d115 2
+a116 2
+               theReqVol,
+               thePriorVol);
+d126 1
+a126 1
+void WitSrpExpSync::prtConsReqs ()
+d131 2
+a132 2
+   double         theReqVol;
+   double         thePriorVol;
+d137 1
+a137 1
+      "   Opn  Idx  Per     ReqVol   PriorVol\n"
+d143 1
+a143 1
+         myConsReqs_.myElemAt (theBomEnt, execPer).attach (theItr);
+d145 1
+a145 1
+         while (theItr.advance (theReqVol, thePriorVol))
+d152 2
+a153 2
+               theReqVol,
+               thePriorVol);
+d166 2
+a167 2
+      WitPtrSched <WitDemand, WitDblDblStack>   & theShipReqs,
+      WitPtrSched <WitBomEntry, WitDblDblStack> & theConsReqs,
+d172 2
+a173 2
+      theShipReqs,
+      theConsReqs);
+d182 2
+a183 2
+         WitPtrSched <WitDemand, WitDblDblStack>   & theShipReqs,
+         WitPtrSched <WitBomEntry, WitDblDblStack> & theConsReqs):
+d187 2
+a188 2
+      myShipReqs_      (theShipReqs),
+      myConsReqs_      (theConsReqs),
+d231 1
+a231 1
+      myShipReqs_.myElemAt (theDemand, shipPer).push (incShipVol, 0.0);
+d379 1
+a379 1
+   myConsReqs_.myElemAt (theBomEnt, execPer).push (incConsVol, 0.0);
+@
+
+
+1.5
+log
+@[shared-resource pegging]
+@
+text
+@d35 6
+a40 1
+WitSrpExpSync * WitSrpExpSync::builtExpSync (WitPipSeqMgr * thePipSeqMgr)
+d42 3
+a44 1
+   WitSrpExpSync * theSrpExpSync;
+d46 4
+a49 1
+   theSrpExpSync = new WitSrpExpSync (thePipSeqMgr->myProblem ());
+d51 4
+a54 4
+   WitSrpSyncBldr::buildSync (
+      theSrpExpSync->myShipReqs_,
+      theSrpExpSync->myConsReqs_,
+      thePipSeqMgr);
+d56 1
+a56 1
+   return theSrpExpSync;
+a89 24
+WitSrpExpSync::WitSrpExpSync (WitProblem * theProblem):
+
+      WitProbAssoc (theProblem),
+
+      myShipReqs_  (myProblem ()),
+      myConsReqs_  (myProblem ())
+   {
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+   WitPeriod     thePer;
+
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myShipReqs_.myPtrAt (theDemand, thePer) =
+            new WitDblDblStack (myProblem ());
+
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         myConsReqs_.myPtrAt (theBomEnt, thePer) =
+            new WitDblDblStack (myProblem ());
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.4
+log
+@[shared-resource pegging]
+@
+text
+@d35 1
+a35 1
+WitSrpExpSync * WitSrpExpSync::builtExpSync (WitSrpCoord * theSrpCoord)
+d39 1
+a39 1
+   theSrpExpSync = new WitSrpExpSync (theSrpCoord);
+a41 1
+      theSrpCoord,
+d43 2
+a44 1
+      theSrpExpSync->myConsReqs_);
+d80 1
+a80 1
+WitSrpExpSync::WitSrpExpSync (WitSrpCoord * theSrpCoord):
+d82 1
+a82 1
+      WitProbAssoc (theSrpCoord->myProblem ()),
+a83 1
+      mySrpCoord_  (theSrpCoord),
+a179 1
+      WitSrpCoord *                               theSrpCoord,
+d181 2
+a182 1
+      WitPtrSched <WitBomEntry, WitDblDblStack> & theConsReqs)
+d184 4
+a187 1
+   WitSrpSyncBldr theSrpSyncBldr (theSrpCoord, theShipReqs, theConsReqs);
+d189 1
+a189 1
+   theSrpSyncBldr.buildSync ();
+d195 1
+a195 1
+         WitSrpCoord *                               theSrpCoord,
+d199 1
+a199 1
+      WitProbAssoc     (theSrpCoord->myProblem ()),
+a202 1
+      mySrpCoord_      (theSrpCoord),
+d219 1
+a219 1
+void WitSrpSyncBldr::buildSync ()
+d234 1
+a234 1
+   mySrpCoord_->myPipSeqMgr ()->get (theShipSeq);
+@
+
+
+1.3
+log
+@[shared-resource pegging]
+@
+text
+@d35 3
+a37 3
+WitSrpExpSync::WitSrpExpSync (WitSrpCoord * theCoord):
+
+      WitProbAssoc (theCoord->myProblem ()),
+d39 1
+a39 9
+      myCoord_     (theCoord),
+      building_    (false),
+      built_       (false),
+      serShipReqs_ (myProblem ()),
+      serConsReqs_ (myProblem ())
+   {
+   WitDemand *   theDemand;
+   WitBomEntry * theBomEnt;
+   WitPeriod     thePer;
+d41 4
+a44 4
+   forEachDemand (theDemand, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         serShipReqs_.myPtrAt (theDemand, thePer) =
+            new WitDblDblStack (myProblem ());
+d46 1
+a46 4
+   forEachBomEntry (theBomEnt, myProblem ())
+      forEachPeriod (thePer, myProblem ())
+         serConsReqs_.myPtrAt (theBomEnt, thePer) =
+            new WitDblDblStack (myProblem ());
+d59 1
+a59 1
+         delete serConsReqs_.myPtrAt (theBomEnt, thePer);
+d63 1
+a63 1
+         delete serShipReqs_.myPtrAt (theDemand, thePer);
+d68 1
+a68 1
+void WitSrpExpSync::build ()
+d70 3
+a72 6
+   stronglyAssert (not building_);
+   stronglyAssert (not built_);
+
+   building_ = true;
+
+   WitSrpSyncBldr::buildExpSync (this);
+d74 2
+a75 2
+   building_ = false;
+   built_    = true;
+d80 1
+a80 10
+void WitSrpExpSync::recordPlaceReq (
+      WitDemand * theDemand,
+      WitPeriod   shipPer,
+      double      theReqVol,
+      double      thePriorVol)
+   {
+   witAssert (building_);
+
+   serShipReqs_.myElemAt (theDemand, shipPer).push (theReqVol, thePriorVol);
+   }
+d82 1
+a82 1
+//------------------------------------------------------------------------------
+d84 3
+a86 5
+void WitSrpExpSync::recordPlaceReq (
+      WitBomEntry * theBomEnt,
+      WitPeriod     execPer,
+      double        theReqVol,
+      double        thePriorVol)
+d88 3
+a90 1
+   witAssert (building_);
+d92 4
+a95 2
+   serConsReqs_.myElemAt (theBomEnt, execPer).push (theReqVol, thePriorVol);
+   }
+d97 4
+a100 10
+//------------------------------------------------------------------------------
+
+void WitSrpExpSync::print ()
+   {
+   fprintf (solnFile (),
+      "\n\n"
+      "Explosion Synchronization:\n");
+
+   prtSerShipReqs ();
+   prtSerConsReqs ();
+d105 1
+a105 1
+void WitSrpExpSync::prtSerShipReqs ()
+d122 1
+a122 1
+         serShipReqs_.myElemAt (theDemand, shipPer).attach (theItr);
+d141 1
+a141 1
+void WitSrpExpSync::prtSerConsReqs ()
+d158 1
+a158 1
+         serConsReqs_.myElemAt (theBomEnt, execPer).attach (theItr);
+d180 4
+a183 1
+void WitSrpSyncBldr::buildExpSync (WitSrpExpSync * theSrpExpSync)
+d185 1
+a185 1
+   WitSrpSyncBldr theSrpSyncBldr (theSrpExpSync);
+d187 1
+a187 1
+   theSrpSyncBldr.build ();
+d192 4
+a195 1
+WitSrpSyncBldr::WitSrpSyncBldr (WitSrpExpSync * theSrpExpSync):
+d197 1
+a197 1
+      WitProbAssoc     (theSrpExpSync->myProblem ()),
+d199 3
+a201 1
+      mySrpExpSync_    (theSrpExpSync),
+d218 1
+a218 1
+void WitSrpSyncBldr::build ()
+d233 1
+a233 1
+   mySrpExpSync_->myCoord ()->myPipSeqMgr ()->get (theShipSeq);
+d244 1
+a244 1
+      mySrpExpSync_->recordPlaceReq (theDemand, shipPer, incShipVol, 0.0);
+d392 1
+a392 1
+   mySrpExpSync_->recordPlaceReq (theBomEnt, execPer, incConsVol, 0.0);
+@
+
+
+1.2
+log
+@[shared-resource pegging]
+@
+text
+@a131 9
+const WitDblDblStack & WitSrpExpSync::serShipReqs (
+      WitDemand * theDemand,
+      WitPeriod   shipPer)
+   {
+   return serShipReqs_.myElemAt (theDemand, shipPer);
+   }
+
+//------------------------------------------------------------------------------
+
+@
+
+
+1.1
+log
+@[shared-resource pegging]
+@
+text
+@d16 1
+a16 1
+//    SrpLocPgr
+d20 1
+a20 1
+#include <SrpLocPgr.h>
+d86 1
+a86 1
+   WitSrpLocPgr::buildExpSync (this);
+d213 1
+a213 1
+// Implementation of class SrpLocPgr.
+d216 1
+a216 1
+void WitSrpLocPgr::buildExpSync (WitSrpExpSync * theSrpExpSync)
+d218 1
+a218 1
+   WitSrpLocPgr theSrpLocPgr (theSrpExpSync);
+d220 1
+a220 1
+   theSrpLocPgr.build ();
+d225 1
+a225 1
+WitSrpLocPgr::WitSrpLocPgr (WitSrpExpSync * theSrpExpSync):
+d239 1
+a239 1
+WitSrpLocPgr::~WitSrpLocPgr ()
+d246 1
+a246 1
+void WitSrpLocPgr::build ()
+d289 1
+a289 1
+void WitSrpLocPgr::setUp ()
+d323 1
+a323 1
+void WitSrpLocPgr::fillReqs (WitPart * thePart, WitPeriod thePer)
+d347 1
+a347 1
+void WitSrpLocPgr::netWithSupply (
+d368 1
+a368 1
+void WitSrpLocPgr::explodeToProd (
+@
+

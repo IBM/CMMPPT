@@ -1,0 +1,428 @@
+// Copyright (C) 2002, International Business Machines
+// Corporation and others.  All Rights Reserved.
+#if defined(_MSC_VER)
+// Turn off compiler warning about long names
+#  pragma warning(disable:4786)
+#endif
+#include <cassert>
+#include <cmath>
+#include <cfloat>
+
+#include "OsiSolverInterface.hpp"
+#include "SbbModel.hpp"
+#include "SbbMessage.hpp"
+#include "SbbHeuristicUser.hpp"
+#include "SbbBranchActual.hpp"
+// Default Constructor
+SbbLocalSearch::SbbLocalSearch() 
+  :SbbHeuristic()
+{
+  numberSolutions_=0;
+  swap_=0;
+}
+
+// Constructor with model - assumed before cuts
+
+SbbLocalSearch::SbbLocalSearch(SbbModel & model)
+  :SbbHeuristic(model)
+{
+  numberSolutions_=0;
+  swap_=0;
+  // Get a copy of original matrix
+  assert(model.solver());
+  matrix_ = *model.solver()->getMatrixByCol();
+}
+
+// Destructor 
+SbbLocalSearch::~SbbLocalSearch ()
+{
+}
+
+// Clone
+SbbHeuristic *
+SbbLocalSearch::clone() const
+{
+  return new SbbLocalSearch(*this);
+}
+
+// Copy constructor 
+SbbLocalSearch::SbbLocalSearch(const SbbLocalSearch & rhs)
+:
+  SbbHeuristic(rhs),
+  matrix_(rhs.matrix_),
+  numberSolutions_(rhs.numberSolutions_),
+  swap_(rhs.swap_)
+{
+}
+/*
+  First tries setting a variable to better value.  If feasible then
+  tries setting others.  If not feasible then tries swaps
+  Returns 1 if solution, 0 if not */
+int
+SbbLocalSearch::solution(double & solutionValue,
+			 double * betterSolution)
+{
+
+  if (numberSolutions_==model_->getSolutionCount())
+    return 0;
+
+  // worth trying
+  numberSolutions_=model_->getSolutionCount();
+
+  OsiSolverInterface * solver = model_->solver();
+  const double * rowLower = solver->getRowLower();
+  const double * rowUpper = solver->getRowUpper();
+  const double * solution = model_->bestSolution();
+  const double * objective = solver->getObjCoefficients();
+  double primalTolerance;
+  assert(solver->getDblParam(OsiPrimalTolerance,primalTolerance));
+
+  int numberRows = matrix_.getNumRows();
+
+  int numberIntegers = model_->numberIntegers();
+  const int * integerVariable = model_->integerVariable();
+  
+  int i;
+  double direction = solver->getObjSense();
+  double newSolutionValue = model_->getObjValue()*direction;
+  int returnCode = 0;
+
+  // Column copy
+  const double * element = matrix_.getElements();
+  const int * row = matrix_.getIndices();
+  const int * columnStart = matrix_.getVectorStarts();
+  const int * columnLength = matrix_.getVectorLengths();
+
+  // Get solution array for heuristic solution
+  int numberColumns = solver->getNumCols();
+  double * newSolution = new double [numberColumns];
+  memcpy(newSolution,solution,numberColumns*sizeof(double));
+
+  // way is 1 if down possible, 2 if up possible, 3 if both possible
+  char * way = new char[numberIntegers];
+  // corrected costs
+  double * cost = new double[numberIntegers];
+  // for array to mark infeasible rows after iColumn branch
+  char * mark = new char[numberRows];
+  memset(mark,0,numberRows);
+  // space to save values so we don't introduce rounding errors
+  double * save = new double[numberRows];
+
+  // clean solution
+  for (i=0;i<numberIntegers;i++) {
+    int iColumn = integerVariable[i];
+    const SbbObject * object = model_->object(i);
+    const SbbSimpleInteger * integerObject = 
+      dynamic_cast<const  SbbSimpleInteger *> (object);
+    assert(integerObject);
+    // get original bounds
+    double originalLower = integerObject->originalLowerBound();
+    double originalUpper = integerObject->originalUpperBound();
+
+    double value=newSolution[iColumn];
+    double nearest=floor(value+0.5);
+    assert(fabs(value-nearest)<10.0*primalTolerance);
+    value=nearest;
+    newSolution[iColumn]=nearest;
+    cost[i] = direction*objective[iColumn];
+    int iway=0;
+    
+    if (value>originalLower+0.5) 
+      iway = 1;
+    if (value<originalUpper-0.5) 
+      iway |= 2;
+    way[i]=iway;
+  }
+
+  // get row activities
+  double * rowActivity = new double[numberRows];
+  memset(rowActivity,0,numberRows*sizeof(double));
+
+  for (i=0;i<numberColumns;i++) {
+    int j;
+    double value = newSolution[i];
+    if (value) {
+      for (j=columnStart[i];
+	   j<columnStart[i]+columnLength[i];j++) {
+	int iRow=row[j];
+	rowActivity[iRow] += value*element[j];
+      }
+    }
+  }
+  // check was feasible - if not adjust (cleaning may move)
+  // if very infeasible then give up
+  bool tryHeuristic=true;
+  for (i=0;i<numberRows;i++) {
+    if(rowActivity[i]<rowLower[i]) {
+      if (rowActivity[i]<rowLower[i]-10.0*primalTolerance)
+	tryHeuristic=false;
+      rowActivity[i]=rowLower[i];
+    } else if(rowActivity[i]>rowUpper[i]) {
+      if (rowActivity[i]<rowUpper[i]+10.0*primalTolerance)
+	tryHeuristic=false;
+      rowActivity[i]=rowUpper[i];
+    }
+  }
+  if (tryHeuristic) {
+    
+    // best change in objective
+    double bestChange=0.0;
+    
+    for (i=0;i<numberIntegers;i++) {
+      int iColumn = integerVariable[i];
+      
+      double objectiveCoefficient = cost[i];
+      int k;
+      int j;
+      int goodK=-1;
+      int wayK=-1,wayI=-1;
+      if ((way[i]&1)!=0) {
+	int numberInfeasible=0;
+	// save row activities and adjust
+	for (j=columnStart[iColumn];
+	     j<columnStart[iColumn]+columnLength[iColumn];j++) {
+	  int iRow = row[j];
+	  save[iRow]=rowActivity[iRow];
+	  rowActivity[iRow] -= element[j];
+	  if(rowActivity[iRow]<rowLower[iRow]-primalTolerance||
+	     rowActivity[iRow]>rowUpper[iRow]+primalTolerance) {
+	    // mark row
+	    mark[iRow]=1;
+	    numberInfeasible++;
+	  }
+	}
+	// try down
+	for (k=i+1;k<numberIntegers;k++) {
+	  if ((way[k]&1)!=0) {
+	    // try down
+	    if (-objectiveCoefficient-cost[k]<bestChange) {
+	      // see if feasible down
+	      bool good=true;
+	      int numberMarked=0;
+	      int kColumn = integerVariable[k];
+	      for (j=columnStart[kColumn];
+		   j<columnStart[kColumn]+columnLength[kColumn];j++) {
+		int iRow = row[j];
+		double newValue = rowActivity[iRow] - element[j];
+		if(newValue<rowLower[iRow]-primalTolerance||
+		   newValue>rowUpper[iRow]+primalTolerance) {
+		  good=false;
+		  break;
+		} else if (mark[iRow]) {
+		  // made feasible
+		  numberMarked++;
+		}
+	      }
+	      if (good&&numberMarked==numberInfeasible) {
+		// better solution
+		goodK=k;
+		wayK=-1;
+		wayI=-1;
+		bestChange = -objectiveCoefficient-cost[k];
+	      }
+	    }
+	  }
+	  if ((way[k]&2)!=0) {
+	    // try up
+	    if (-objectiveCoefficient+cost[k]<bestChange) {
+	      // see if feasible up
+	      bool good=true;
+	      int numberMarked=0;
+	      int kColumn = integerVariable[k];
+	      for (j=columnStart[kColumn];
+		   j<columnStart[kColumn]+columnLength[kColumn];j++) {
+		int iRow = row[j];
+		double newValue = rowActivity[iRow] + element[j];
+		if(newValue<rowLower[iRow]-primalTolerance||
+		   newValue>rowUpper[iRow]+primalTolerance) {
+		  good=false;
+		  break;
+		} else if (mark[iRow]) {
+		  // made feasible
+		  numberMarked++;
+		}
+	      }
+	      if (good&&numberMarked==numberInfeasible) {
+		// better solution
+		goodK=k;
+		wayK=1;
+		wayI=-1;
+		bestChange = -objectiveCoefficient+cost[k];
+	      }
+	    }
+	  }
+	}
+	// restore row activities
+	for (j=columnStart[iColumn];
+	     j<columnStart[iColumn]+columnLength[iColumn];j++) {
+	  int iRow = row[j];
+	  rowActivity[iRow] = save[iRow];
+	  mark[iRow]=0;
+	}
+      }
+      if ((way[i]&2)!=0) {
+	int numberInfeasible=0;
+	// save row activities and adjust
+	for (j=columnStart[iColumn];
+	     j<columnStart[iColumn]+columnLength[iColumn];j++) {
+	  int iRow = row[j];
+	  save[iRow]=rowActivity[iRow];
+	  rowActivity[iRow] += element[j];
+	  if(rowActivity[iRow]<rowLower[iRow]-primalTolerance||
+	     rowActivity[iRow]>rowUpper[iRow]+primalTolerance) {
+	    // mark row
+	    mark[iRow]=1;
+	    numberInfeasible++;
+	  }
+	}
+	// try up
+	for (k=i+1;k<numberIntegers;k++) {
+	  if ((way[k]&1)!=0) {
+	    // try down
+	    if (objectiveCoefficient-cost[k]<bestChange) {
+	      // see if feasible down
+	      bool good=true;
+	      int numberMarked=0;
+	      int kColumn = integerVariable[k];
+	      for (j=columnStart[kColumn];
+		   j<columnStart[kColumn]+columnLength[kColumn];j++) {
+		int iRow = row[j];
+		double newValue = rowActivity[iRow] - element[j];
+		if(newValue<rowLower[iRow]-primalTolerance||
+		   newValue>rowUpper[iRow]+primalTolerance) {
+		  good=false;
+		  break;
+		} else if (mark[iRow]) {
+		  // made feasible
+		  numberMarked++;
+		}
+	      }
+	      if (good&&numberMarked==numberInfeasible) {
+		// better solution
+		goodK=k;
+		wayK=-1;
+		wayI=1;
+		bestChange = objectiveCoefficient-cost[k];
+	      }
+	    }
+	  }
+	  if ((way[k]&2)!=0) {
+	    // try up
+	    if (objectiveCoefficient+cost[k]<bestChange) {
+	      // see if feasible up
+	      bool good=true;
+	      int numberMarked=0;
+	      int kColumn = integerVariable[k];
+	      for (j=columnStart[kColumn];
+		   j<columnStart[kColumn]+columnLength[kColumn];j++) {
+		int iRow = row[j];
+		double newValue = rowActivity[iRow] + element[j];
+		if(newValue<rowLower[iRow]-primalTolerance||
+		   newValue>rowUpper[iRow]+primalTolerance) {
+		  good=false;
+		  break;
+		} else if (mark[iRow]) {
+		  // made feasible
+		  numberMarked++;
+		}
+	      }
+	      if (good&&numberMarked==numberInfeasible) {
+		// better solution
+		goodK=k;
+		wayK=1;
+		wayI=1;
+		bestChange = objectiveCoefficient+cost[k];
+	      }
+	    }
+	  }
+	}
+	// restore row activities
+	for (j=columnStart[iColumn];
+	     j<columnStart[iColumn]+columnLength[iColumn];j++) {
+	  int iRow = row[j];
+	  rowActivity[iRow] = save[iRow];
+	  mark[iRow]=0;
+	}
+      }
+      if (goodK>=0) {
+	// we found something - update solution
+	for (j=columnStart[iColumn];
+	     j<columnStart[iColumn]+columnLength[iColumn];j++) {
+	  int iRow = row[j];
+	  rowActivity[iRow]  += wayI * element[j];
+	}
+	newSolution[iColumn] += wayI;
+	int kColumn = integerVariable[goodK];
+	for (j=columnStart[kColumn];
+	     j<columnStart[kColumn]+columnLength[kColumn];j++) {
+	  int iRow = row[j];
+	  rowActivity[iRow]  += wayK * element[j];
+	}
+	newSolution[kColumn] += wayK;
+	// See if k can go further ?
+	const SbbObject * object = model_->object(goodK);
+	const SbbSimpleInteger * integerObject = 
+	  dynamic_cast<const  SbbSimpleInteger *> (object);
+	// get original bounds
+	double originalLower = integerObject->originalLowerBound();
+	double originalUpper = integerObject->originalUpperBound();
+	
+	double value=newSolution[kColumn];
+	int iway=0;
+	
+	if (value>originalLower+0.5) 
+	  iway = 1;
+	if (value<originalUpper-0.5) 
+	  iway |= 2;
+	way[goodK]=iway;
+      }
+    }
+    if (bestChange+newSolutionValue<solutionValue) {
+      // new solution
+      memcpy(betterSolution,newSolution,numberColumns*sizeof(double));
+      returnCode=1;
+      solutionValue = newSolutionValue + bestChange;
+      printf("Local search heuristic improved solution by %g\n",
+	     -bestChange);
+      // paranoid check
+      memset(rowActivity,0,numberRows*sizeof(double));
+      
+      for (i=0;i<numberColumns;i++) {
+	int j;
+	double value = newSolution[i];
+	if (value) {
+	  for (j=columnStart[i];
+	       j<columnStart[i]+columnLength[i];j++) {
+	    int iRow=row[j];
+	    rowActivity[iRow] += value*element[j];
+	  }
+	}
+      }
+      // check was approximately feasible
+      for (i=0;i<numberRows;i++) {
+	if(rowActivity[i]<rowLower[i]) {
+	  assert (rowActivity[i]>rowLower[i]-10.0*primalTolerance);
+	} else if(rowActivity[i]>rowUpper[i]) {
+	  assert (rowActivity[i]<rowUpper[i]+10.0*primalTolerance);
+	}
+      }
+    }
+  }
+  delete [] newSolution;
+  delete [] rowActivity;
+  delete [] way;
+  delete [] cost;
+  delete [] save;
+  delete [] mark;
+  return returnCode;
+}
+// update model
+void SbbLocalSearch::setModel(SbbModel * model)
+{
+  model_ = model;
+  // Get a copy of original matrix
+  assert(model_->solver());
+  matrix_ = *model_->solver()->getMatrixByCol();
+}
+
+  

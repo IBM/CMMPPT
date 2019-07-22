@@ -1,0 +1,1731 @@
+head	1.4;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.6
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.2.0.4
+	Root-of-EndWitRw:1.2
+	RwToStl-branch:1.2.0.2
+	Root-of-RwToStl:1.2
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2010.04.20.14.31.16;	author ervolina;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.28;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.07.19.01.11;	author austel;	state Exp;
+branches
+	1.2.6.1;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.6.1
+date	2003.01.08.17.42.25;	author rwToStl;	state Exp;
+branches;
+next	1.2.6.2;
+
+1.2.6.2
+date	2003.01.09.13.54.43;	author rwToStl;	state Exp;
+branches;
+next	1.2.6.3;
+
+1.2.6.3
+date	2003.01.14.19.05.41;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@new function to support variablePeriods in SCE
+@
+text
+@#ifndef  LGFRCALENDAR_H
+#define  LGFRCALENDAR_H
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+
+// file: calendar.h
+// author: tom
+
+
+#include <iostream>
+#include <scenario/src/dateTime.h>
+
+#include <scenario/src/generVc.h>
+
+//  Calendar object:  Used to map real dates/times to periods.
+//  It maintins a vector of periodStartTimes using LgFrDatetime.
+//  LgFrDatetime works hand-in-hand with LgFrDatetime.  Holidays or plant
+//  shutdowns are NOT considered by this object.  However, it
+//  does provide a user-settable vector of floats that can be
+//  used to store the number of workingTimeUnits available
+//  during each period.  This data is NOT used by the calendar
+//  and is only provided for the convenience of the client.
+//  In addition, the Calendar object defines an enumerated type
+//  for distinguishing timeUnits.  This is only used to make a
+//  convenient means for constructing an instance with fixed
+//  interval time periods.  The object will retain the timeUnitType
+//  but only for the convenience of the client.
+
+typedef enum {LgFrQuarter, LgFrMonth, LgFrDay, LgFrWeek, LgFrHour,
+              LgFrMinute, LgFrSecond}
+        LgFrTimeUnit;
+
+typedef enum {TimeVecPeriodStarts}
+        LgFrCalendarFormatStyle;
+
+class LgFrCalendar {
+
+public:
+
+
+  // fairly general constructor:
+  LgFrCalendar(size_t         nPeriods,
+	       const LgFrDatetime&  horizonStart,
+	       LgFrTimeUnit   intervalUnit = LgFrWeek,
+	       unsigned       intervalUnitMultiplier = 1);
+  // Create a calendar with "nPeriods", the first period beginning at
+  // horizonStart, and each subsequent period beginning exactly
+  // intervalUnitMultiplier intervalUnits after its predecessor.
+  // Note: since months and quarters don't necessarily match up, the
+  // convention is used that each subsequent period begins on the
+  // same dayNumber of the month.  If this causes an invalid date,
+  // say, Feb 30, then the dayNumber is "rewound" to a valid one.
+  // Examples:
+  //   LgFrCalendar myCal(6,
+  //                      LgFrDatetime(LgFrDatetime("7/15/94")),
+  //                      LgFrMonth,
+  //                      2);
+  // 6 periods, 2 month intervals, period 0 starts 7/15/94 
+  //
+  //   LgFrCalendar myCal(9,                                       
+  //                      LgFrDatetime(LgFrDatetime("7/15/94"), "08:00"),
+  //                      LgFrHour,
+  //                      8);
+  // 9 periods, 8-hour shifts, the first shift starts at 8am on 7/15/94
+
+
+  // a more than fairly general constructor.
+  // This constructor takes a vector of periodStartTimes.
+  // Note: This vector must have length nPeriods+1.
+  //       The last entry is the starting time of what would be the next period.
+  //       This is used to calculate the size of the last period.
+  // The intervalUnit and intervalUnit multiplier seem to only be used if the
+  // number of periods in the calendar is increased.
+  LgFrCalendar(
+	       size_t   nPeriods,
+	       const LgFrDatetimeVector&  periodStartTimes,
+	       LgFrTimeUnit   intervalUnit = LgFrWeek,
+	       unsigned       intervalUnitMultiplier = 1);
+  
+  // Return the period in which a specified Date/Time falls.
+  // Returned values:
+  //     0 <= nPeriods()-1   ==> date is within the horizon
+  //     -1                  ==> date is earlier than period 0
+  //     nPeriods()          ==> date is later than the end of the horizon
+  virtual
+  int
+  period(const LgFrDatetime&)
+    const;
+
+
+  // This routine is similar to period() except that it rounds to the 
+  // nearest period start date.  For example, if the PeriodStarts are
+  // 1/1/95, 2/1/95, and you enter 1/27/95, then it will return the 
+  // period for 2/1/95, since your target is more than halfway thru the
+  // the period.
+  //
+  //  Returns  k  such that:
+  //
+  //  startTime[k-1] + 1/2 length(k-1) <= aTime < startTime[k] + 1/2 * length(k)
+  //  and   -1 <= k <= nPeriods
+  //  
+  //  where:
+  //     length[k] is interpreted as the length of period k,
+  //     length[-1] = length[0],
+  //     length[nPeriods] = length[nPeriods - 1]
+  //     and startTime[-1] is interpreted as startTime[0] - length[0]
+  int 
+  roundedPeriod(const LgFrDatetime& aTime)
+    const;
+
+
+  // Mapping dates to periods:  EARLY and LATE EFFECTIVITY DATES
+  // A note about effectivity dates.  These methods, earlyEffectivePeriod() and 
+  // lateEffectivePeriod() will round a date(time) to a period.  The following 
+  // is assumed about the dates:  
+  //   --  An early effective date is INCLUSIVE    (consistent with WIT)
+  //   --  A  late  effective date is EXCLUSIVE    (not consistent with WIT)
+  //   --  The early effective period is INCLUSIVE (consistent with WIT)
+  //   --  The late  effective period is INCLUSIVE (consistent with WIT)
+  // 
+  // Translate (and round) a date into a period for purposes of 
+  // early effectivity records.  
+  // Returns k st   0 <= k ,+ nPeriods
+  virtual
+  int 
+  earlyEffectivePeriod(const LgFrDatetime& aTime)
+    const;
+
+
+  // Translate (and round) a date into a period for purposes of 
+  // late effectivity records.
+  // Returns k st   -1 <= k <= nPeriods - 1
+  virtual
+  int 
+  lateEffectivePeriod(const LgFrDatetime& aTime)
+    const;
+
+
+
+  // resize the calendar.  If you make it smaller, it gets
+  // truncated.  If it gets bigger, then it will be extended.
+  // Extending the calendar simply uses the calendars setting of
+  // timeUnitType and intervalUnitMultiplier and then makes
+  // the first  new periodStartDate offset that amount from
+  // the periodStartDate of the last period of the original
+  // calendar.  If you want the horizon end date to be other than
+  // the offset fromthe last period start date, then you must set it
+  // "manually" with the horizonEnd() method.  Although, this method
+  // should return a valid calendar (assuming the existing calendar was
+  // already valid), it is not guaranteed and you  should check it 
+  // with the  isValid() method.
+  virtual
+  void
+  nPeriods(size_t nPeriods);
+
+  // get the nPeriods
+  virtual
+  size_t
+  nPeriods()
+    const;
+
+  // check the validity of the calendar:
+  virtual
+  bool
+  isValid()
+    const;
+
+  // set the start date/time of a period
+  virtual
+  void
+  periodStart(size_t period, const LgFrDatetime& startTime);
+
+  // get the start date/time of a period
+  virtual
+  LgFrDatetime
+  periodStart(size_t period)
+    const;
+
+  // get the number of workTime units of a period
+  virtual
+  void
+  workUnits(size_t period, float workAmt);
+
+  // get the number of workTime units of a period
+  virtual
+  float
+  workUnits(size_t period)
+    const;
+
+
+  float
+  numWorkingDaysInPeriodOverInterval(int period, 
+				     const LgFrDatetime & intervalStart, 
+				     const LgFrDatetime & intervalEnd)
+    const;
+
+
+
+
+  // calendar utility to convert a std::string date in the form
+  // "YYYYMMDD" to a LgFrDatetime and vice versa.
+  // NOTE:  the method does check the date validity  you should
+  // check the returned LgFrDatetime with isValid()
+  virtual
+  LgFrDatetime
+  yyyymmdd(const std::string & aDateString)
+    const;
+
+  virtual
+  std::string
+  yyyymmdd(const LgFrDatetime & aDate)
+    const;
+
+#if 0
+  // calendar utility to convert a std::string date in the form
+  // "ddmonyy" (e.g. 24 Mar 98) to a LgFrDatetime and vice versa.
+  // NOTE:  the method does NOT check the date validity.
+  // Check the returned LgFrDatetime with isValid().
+  virtual
+  LgFrDatetime
+  ddmonyy(const std::string & aDateString)
+    const;
+
+  virtual
+  std::string
+  ddmonyy(const LgFrDatetime & aDate)
+    const;
+#endif
+
+
+  // set/get the end of Last Period Date/Time
+  virtual
+  LgFrDatetime
+  horizonEnd()
+    const;
+
+  virtual
+  void
+  horizonEnd(const LgFrDatetime& theEnd);
+
+  // set/get the interval unit identifier
+  virtual
+  LgFrTimeUnit
+  timeUnitType()
+    const;
+
+  virtual
+  void
+  timeUnitType(LgFrTimeUnit);
+
+  // set/get the interval unit multiplier
+  unsigned
+  intervalUnitMultiplier()
+    const;
+
+  void
+  intervalUnitMultiplier(unsigned intervalUnitMultiplier);
+
+
+  // return a (legal) time,  numMonthsOut in the future from a
+  // given date (Utility function)
+  LgFrDatetime
+  addMonths(const LgFrDatetime& aTime, unsigned numMonthsOut,
+			  unsigned newDay)
+    const;
+
+
+  // Return a copy in the heap
+  LgFrCalendar*
+  clone()
+    const;
+
+  // default constructor 0 periods ==> generates an invalid
+  LgFrCalendar();
+
+  // copy constructor
+  LgFrCalendar(const LgFrCalendar& source);
+
+  // assignment operator
+  LgFrCalendar&
+  operator=(const LgFrCalendar& rhs);
+
+  // destructor
+  virtual
+  ~LgFrCalendar();
+
+  // simple cout of calendar start dates
+  // Use the features of LgFrDatetime and LgFrDatetime to create
+  // fancier displays.     
+  virtual     
+  void
+  display()
+    const;
+
+  // Format a LgFrCalendar into a std::string.
+  // Return a std::string representing the calendar, in the format
+  //        specified by the formatStyle.
+  //
+  // width: ios width used to format each number in vector.
+  //
+  // precision: ios precision used to format each number in vector.
+  //
+  // iosFlags: ios formating flags used to format each number in vector.
+  //
+  std::string format( 
+		   const LgFrCalendarFormatStyle formatStyle )/*,
+		   const int width = 10,
+		   const int precision = 1,
+		   const long iosFlags = ios::fixed | std::showpoint | std::right )*/
+    const;
+
+
+  // self-test
+  static void test();
+
+private:
+
+
+  // set the effective start date/time for all periods
+  virtual
+  void
+  effectivePeriodStart();
+
+  // Initizlize member data ordered vectors. Used by constructors.
+  virtual
+  void
+  initializeOrderedVectors();
+  
+  // number of periods 
+  size_t            nPeriods_;
+
+  // vector of period starting times/dates
+  LgFrDatetimeVector    startTimes_;
+
+
+  // vector of period startingTimes for Rounding
+  LgFrDatetimeVector    effectiveStartTimes_;
+
+  // vector of period workUnits available per period
+  LgFrFloatVector   workUnits_;
+
+  // interval Unit identifier
+  LgFrTimeUnit      intervalUnit_;
+
+  // interval Unit multiplier
+  unsigned          intervalUnitMultiplier_;
+
+
+};
+
+
+#endif
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d192 9
+@
+
+
+1.2
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d1 6
+a9 2
+#ifndef  LGFRCALENDAR_H
+#define  LGFRCALENDAR_H
+d11 3
+a13 4
+#include <iostream.h>
+#include <rw/rwdate.h>
+#include <rw/rwtime.h>
+#include <rw/cstring.h>
+d17 2
+a18 2
+//  It maintins a vector of periodStartTimes using RWTime.
+//  RWTime works hand-in-hand with RWDate.  Holidays or plant
+d44 1
+a44 1
+	       const RWTime&  horizonStart,
+d56 1
+a56 1
+  //                      RWTime(RWDate("7/15/94")),
+d62 1
+a62 1
+  //                      RWTime(RWDate("7/15/94"), "08:00"),
+d77 1
+a77 1
+	       const LgFrVectorRWTime&  periodStartTimes,
+d88 1
+a88 1
+  period(const RWTime&)
+d109 1
+a109 1
+  roundedPeriod(const RWTime& aTime)
+d127 1
+a127 1
+  earlyEffectivePeriod(const RWTime& aTime)
+d136 1
+a136 1
+  lateEffectivePeriod(const RWTime& aTime)
+d165 1
+a165 1
+  RWBoolean
+d172 1
+a172 1
+  periodStart(size_t period, const RWTime& startTime);
+d176 1
+a176 1
+  RWTime
+d192 2
+a193 2
+  // calendar utility to convert a RWCString date in the form
+  // "YYYYMMDD" to a RWDate and vice versa.
+d195 1
+a195 1
+  // check the returned RWDate with isValid()
+d197 2
+a198 2
+  RWDate
+  yyyymmdd(const RWCString & aDateString)
+d202 2
+a203 2
+  RWCString
+  yyyymmdd(const RWDate & aDate)
+d207 2
+a208 2
+  // calendar utility to convert a RWCString date in the form
+  // "ddmonyy" (e.g. 24 Mar 98) to a RWDate and vice versa.
+d210 1
+a210 1
+  // Check the returned RWDate with isValid().
+d212 2
+a213 2
+  RWDate
+  ddmonyy(const RWCString & aDateString)
+d217 2
+a218 2
+  RWCString
+  ddmonyy(const RWDate & aDate)
+d225 1
+a225 1
+  RWTime
+d231 1
+a231 1
+  horizonEnd(const RWTime& theEnd);
+d254 2
+a255 2
+  RWTime
+  addMonths(const RWTime& aTime, unsigned numMonthsOut,
+d280 1
+a280 1
+  // Use the features of RWTime and RWDate to create
+d287 2
+a288 2
+  // Format a LgFrCalendar into a RWCString.
+  // Return a RWCString representing the calendar, in the format
+d297 2
+a298 2
+  RWCString format( 
+		   const LgFrCalendarFormatStyle formatStyle,
+d301 1
+a301 1
+		   const long iosFlags = ios::fixed | ios::showpoint | ios::right )
+d322 1
+a322 1
+  size_t                            nPeriods_;
+d325 1
+a325 1
+  LgFrOrderedVectorRWTime           startTimes_;
+d329 1
+a329 1
+  LgFrOrderedVectorRWTime           effectiveStartTimes_;
+d332 1
+a332 1
+  LgFrOrderedVectorFloat            workUnits_;
+d335 1
+a335 1
+  LgFrTimeUnit  intervalUnit_;
+d338 1
+a338 1
+  unsigned      intervalUnitMultiplier_;
+a342 56
+#ifndef RW_NO_LOCALE
+//---------------------------------------------------------------------------
+//
+//  Modify Locale to display dates with the format ddmonyy
+//
+//---------------------------------------------------------------------------
+class LgFrLocaleDdmonyy : 
+  public RWLocaleSnapshot
+{
+
+public:
+
+  virtual RWCString asString(long) const;
+  virtual RWCString asString(unsigned long) const;
+  virtual RWCString asString(
+			     double f, int precision = 6, RWBoolean showpoint = 0) const;
+
+  // asString(tm*, format): format is one of [aAbBcdHIjmMpSUwWxXyYZ],
+  //                        as in ANSI C Library function strftime().
+  virtual RWCString asString(const struct tm* tmbuf, char format,
+			     const RWZone& = RWZone::local()) const;
+
+#if 0
+  virtual
+  RWBoolean
+  stringToDate(
+	       const RWCString &,
+	       struct tm* )
+    const;
+#endif
+
+
+  // default constructor
+  LgFrLocaleDdmonyy(
+		    const char * localeName = 0);
+
+  // destructor
+  virtual
+  ~LgFrLocaleDdmonyy();
+
+
+  // self-test
+  static void test();
+
+private:
+
+
+  // copy constructor
+  LgFrLocaleDdmonyy(const LgFrLocaleDdmonyy& source);
+
+  // assignment operator
+  LgFrLocaleDdmonyy&
+  operator=(const LgFrLocaleDdmonyy& rhs);
+
+};
+#endif /* RW_NO_LOCALE */
+@
+
+
+1.2.6.1
+log
+@Roguewave is gone
+@
+text
+@a0 6
+#ifndef  LGFRCALENDAR_H
+#define  LGFRCALENDAR_H
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+
+d4 2
+d7 4
+a10 3
+#include <iostream>
+#include <scenario/src/dateTime.h>
+
+d14 2
+a15 2
+//  It maintins a vector of periodStartTimes using SCETime.
+//  SCETime works hand-in-hand with SCEDate.  Holidays or plant
+d41 1
+a41 1
+	       const SCETime&  horizonStart,
+d53 1
+a53 1
+  //                      SCETime(SCEDate("7/15/94")),
+d59 1
+a59 1
+  //                      SCETime(SCEDate("7/15/94"), "08:00"),
+d74 1
+a74 1
+	       const LgFrTimeVector&  periodStartTimes,
+d85 1
+a85 1
+  period(const SCETime&)
+d106 1
+a106 1
+  roundedPeriod(const SCETime& aTime)
+d124 1
+a124 1
+  earlyEffectivePeriod(const SCETime& aTime)
+d133 1
+a133 1
+  lateEffectivePeriod(const SCETime& aTime)
+d162 1
+a162 1
+  bool
+d169 1
+a169 1
+  periodStart(size_t period, const SCETime& startTime);
+d173 1
+a173 1
+  SCETime
+d189 2
+a190 2
+  // calendar utility to convert a std::string date in the form
+  // "YYYYMMDD" to a SCEDate and vice versa.
+d192 1
+a192 1
+  // check the returned SCEDate with isValid()
+d194 2
+a195 2
+  SCEDate
+  yyyymmdd(const std::string & aDateString)
+d199 2
+a200 2
+  std::string
+  yyyymmdd(const SCEDate & aDate)
+d204 2
+a205 2
+  // calendar utility to convert a std::string date in the form
+  // "ddmonyy" (e.g. 24 Mar 98) to a SCEDate and vice versa.
+d207 1
+a207 1
+  // Check the returned SCEDate with isValid().
+d209 2
+a210 2
+  SCEDate
+  ddmonyy(const std::string & aDateString)
+d214 2
+a215 2
+  std::string
+  ddmonyy(const SCEDate & aDate)
+d222 1
+a222 1
+  SCETime
+d228 1
+a228 1
+  horizonEnd(const SCETime& theEnd);
+d251 2
+a252 2
+  SCETime
+  addMonths(const SCETime& aTime, unsigned numMonthsOut,
+d277 1
+a277 1
+  // Use the features of SCETime and SCEDate to create
+d284 2
+a285 2
+  // Format a LgFrCalendar into a std::string.
+  // Return a std::string representing the calendar, in the format
+d294 1
+a294 1
+  std::string format( 
+d319 1
+a319 1
+  size_t            nPeriods_;
+d322 1
+a322 1
+  LgFrTimeVector    startTimes_;
+d326 1
+a326 1
+  LgFrTimeVector    effectiveStartTimes_;
+d329 1
+a329 1
+  LgFrFloatVector   workUnits_;
+d332 1
+a332 1
+  LgFrTimeUnit      intervalUnit_;
+d335 1
+a335 1
+  unsigned          intervalUnitMultiplier_;
+d340 56
+@
+
+
+1.2.6.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d298 1
+a298 1
+		   const LgFrCalendarFormatStyle formatStyle )/*,
+d301 1
+a301 1
+		   const long iosFlags = ios::fixed | std::showpoint | std::right )*/
+@
+
+
+1.2.6.3
+log
+@New LgFrDatetime class
+@
+text
+@d17 2
+a18 2
+//  It maintins a vector of periodStartTimes using LgFrDatetime.
+//  LgFrDatetime works hand-in-hand with LgFrDatetime.  Holidays or plant
+d44 1
+a44 1
+	       const LgFrDatetime&  horizonStart,
+d56 1
+a56 1
+  //                      LgFrDatetime(LgFrDatetime("7/15/94")),
+d62 1
+a62 1
+  //                      LgFrDatetime(LgFrDatetime("7/15/94"), "08:00"),
+d77 1
+a77 1
+	       const LgFrDatetimeVector&  periodStartTimes,
+d88 1
+a88 1
+  period(const LgFrDatetime&)
+d109 1
+a109 1
+  roundedPeriod(const LgFrDatetime& aTime)
+d127 1
+a127 1
+  earlyEffectivePeriod(const LgFrDatetime& aTime)
+d136 1
+a136 1
+  lateEffectivePeriod(const LgFrDatetime& aTime)
+d172 1
+a172 1
+  periodStart(size_t period, const LgFrDatetime& startTime);
+d176 1
+a176 1
+  LgFrDatetime
+d193 1
+a193 1
+  // "YYYYMMDD" to a LgFrDatetime and vice versa.
+d195 1
+a195 1
+  // check the returned LgFrDatetime with isValid()
+d197 1
+a197 1
+  LgFrDatetime
+d203 1
+a203 1
+  yyyymmdd(const LgFrDatetime & aDate)
+d208 1
+a208 1
+  // "ddmonyy" (e.g. 24 Mar 98) to a LgFrDatetime and vice versa.
+d210 1
+a210 1
+  // Check the returned LgFrDatetime with isValid().
+d212 1
+a212 1
+  LgFrDatetime
+d218 1
+a218 1
+  ddmonyy(const LgFrDatetime & aDate)
+d225 1
+a225 1
+  LgFrDatetime
+d231 1
+a231 1
+  horizonEnd(const LgFrDatetime& theEnd);
+d254 2
+a255 2
+  LgFrDatetime
+  addMonths(const LgFrDatetime& aTime, unsigned numMonthsOut,
+d280 1
+a280 1
+  // Use the features of LgFrDatetime and LgFrDatetime to create
+d325 1
+a325 1
+  LgFrDatetimeVector    startTimes_;
+d329 1
+a329 1
+  LgFrDatetimeVector    effectiveStartTimes_;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d252 1
+a252 1
+  LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+d281 1
+a281 1
+  LgFrCalendar::display()
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@

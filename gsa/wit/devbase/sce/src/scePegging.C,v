@@ -1,0 +1,5017 @@
+head	1.20;
+access;
+symbols
+	sce_5_01_20080919:1.19
+	latest_sce_4_20_20060523:1.17.0.4
+	sce_4_20_20060523:1.17
+	latest_sce4_20_OSL:1.17.0.2
+	sce_4_20_OSL:1.17
+	sce_4_20_20051222:1.17
+	sce_4_10_30050426:1.17
+	sce_4_05_20040511:1.16
+	sce_4_00_20040201:1.12
+	nextGenBranch:1.10.0.2
+	nextGenRoot:1.10
+	sce_3_30_20030627:1.10
+	EndRw-branch:1.9.0.2
+	Root-of-EndRw:1.9
+	EndWitRw-branch:1.7.0.4
+	Root-of-EndWitRw:1.7
+	RwToStl-branch:1.7.0.2
+	Root-of-RwToStl:1.7
+	latest_sce_3_10_20010924:1.3.0.2
+	sce_3_10_20010924:1.3;
+locks; strict;
+comment	@ * @;
+
+
+1.20
+date	2009.12.08.13.58.36;	author ervolina;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2008.06.23.19.07.12;	author ervolina;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2007.05.29.20.03.33;	author ervolina;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2005.02.15.20.45.01;	author ervolina;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2004.04.07.19.58.33;	author ervolina;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2004.03.04.20.28.11;	author fasano;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2004.03.04.14.19.29;	author ervolina;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2004.02.06.21.53.47;	author ervolina;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2004.01.22.02.47.48;	author ervolina;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2004.01.10.17.56.11;	author ervolina;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2003.01.15.19.36.58;	author rwToStl;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2002.12.17.13.52.34;	author fasano;	state Exp;
+branches
+	1.9.2.1;
+next	1.8;
+
+1.8
+date	2002.12.17.01.10.30;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2002.11.07.19.01.09;	author austel;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2002.06.18.21.10.27;	author ervolina;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.12.03.02.42.40;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.10.16.17.44.30;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.09.17.14.09.41;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.09.14.21.58.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.09.13.20.44.34;	author fasano;	state Exp;
+branches;
+next	;
+
+1.9.2.1
+date	2003.01.08.17.43.18;	author rwToStl;	state Exp;
+branches;
+next	1.9.2.2;
+
+1.9.2.2
+date	2003.01.09.13.14.30;	author rwToStl;	state Exp;
+branches;
+next	1.9.2.3;
+
+1.9.2.3
+date	2003.01.09.13.52.08;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.20
+log
+@more fixes for 6.1
+@
+text
+@#include <mcl/src/mdsPragma.h>
+// RW2STL - inserted:
+#include <map>
+#include <string>
+#include <iostream>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+#include <wit/src/wit.h>
+
+
+#include <assert.h>
+#include <stdlib.h>
+#include <math.h>
+#include <scenario/src/part.h>
+#include <scenario/src/timeVecs.h>
+#include <scenario/src/partSchd.h>
+#include <scenario/src/pairComp.h>
+
+#include <sce/src/scePegging.h>
+#include <sce/src/mPlantH.h>
+#include <iostream>
+#include <fstream>
+
+// #define DEBUG_INTERPLANT_PEG
+
+
+
+//------------------------------------------------------------
+// Update the dictionary of consVols.
+// Key is (consumedPartName,consumptionPeriod).
+// Value is consVol.
+// If the entry does not exist, then a new entry in dictionary
+// is created with deltaConsVol.
+// If an entry exists then it is updated by adding deltaConsVol
+//
+//-------------------------------------------------------------
+void ScePIP::updateConsDict(
+                                 PartNamePeriodConsVolDictionary & consDict,
+                                 char * consumedPartName,
+                                 int consPeriod,
+                                 double deltaConsVol)
+{
+
+  // Create Dictionary Key from partName and period
+  SceConstCharStar_Int key(consumedPartName,consPeriod);
+  SceCollectableDouble newConsVol(deltaConsVol);
+  
+  // insert key and consVol into dicionary
+  bool inserted = consDict.insert( PartNamePeriodConsVolPair( key,
+                                                            newConsVol ) ).second;
+
+  // Did the insert fail because the key already exists?
+  if( !inserted )
+  {        
+    PartNamePeriodConsVolDictionary::iterator it = consDict.find(key);
+
+    SceCollectableDouble& val = (*it).second;
+    double updatedConsVol = val.dbl() + deltaConsVol;
+    val.dbl(updatedConsVol);
+  }
+}
+
+
+//----------------------------------------------------------------------
+// Update ConsDict given consumed part name, consRate, impactPeriod,
+// execVolOrSubVol, execPeriod, incrementConsVol flag.
+// This is used 3 times:
+//   increment bom consumed part for execVol
+//   decrement bom consumed part for subVol
+//   increment subs consumed part for subVol
+//-----------------------------------------------------------------------
+void ScePIP::computeConsVolAndUpdateConsDict(
+  WitRun * wr,
+  char * consumedPartName,
+  float * consRate,
+  float fallout,
+  int * impactPeriod,
+  float execOrSubVol,
+  int execPeriod,
+  bool increment,
+  PartNamePeriodConsVolDictionary & consDict )
+{
+   
+  // Test to see if bom is effective in execution period
+  if ( impactPeriod[execPeriod] == -1 ) 
+    return;
+ 
+  int consPeriod = impactPeriod[execPeriod];
+  double incrConsVol = execOrSubVol * consRate[consPeriod]/(1.0-fallout);
+  //double incrConsVol = execOrSubVol * consRate[execPeriod]/(1.0-fallout);
+  if ( !increment ) {
+    incrConsVol = -incrConsVol;
+  }
+  updateConsDict(consDict,consumedPartName,consPeriod,incrConsVol);
+}
+
+
+//-----------------------------------------------------------------------
+// ConsVol for a consumed part connected to a bom is computed from
+// the the operations exexVol less any subVols associated with the Bom.
+// The process for working with execVol and subVols is the same execpt
+// that execVols add to the consVol and subVols subtract from the consVol.
+// This function handles both of these operations.
+//-----------------------------------------------------------------------
+void ScePIP::updateConsDictFromExecOrSubVolAndBom(
+                                     WitRun * wr, 
+                                     const char * opName,
+                                     int bomEntryIndex,
+                                     int execPeriod,
+                                     float execOrSubVol,
+                                     bool isExecVol,
+                                     PartNamePeriodConsVolDictionary & consDict)
+{
+  
+  // get name of consumed part
+  char * consumedPartName;
+  witGetBomEntryConsumedPart ( wr, opName, bomEntryIndex, &consumedPartName );
+  
+  // get consumption rate
+  float * consRate;
+  witGetBomEntryConsRate ( wr, opName, bomEntryIndex, &consRate );
+
+  // get consumption rate
+  float falloutRate;
+  witGetBomEntryFalloutRate ( wr, opName, bomEntryIndex, &falloutRate );
+  
+  // get impact periods
+  int * impactPeriod;
+  witGetBomEntryImpactPeriod ( wr, opName, bomEntryIndex, &impactPeriod );
+  
+  computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+    execOrSubVol, execPeriod, isExecVol, consDict );
+  
+  witFree(impactPeriod);
+  witFree(consRate);
+}
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===========================================
+//---------------------------------------------------------------------------
+// Populate HashDictionary with DemandConsVol PIP
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getDemandConsVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   bool sceConsVol,
+                                                   bool ignoreSubstituteUsage,
+                                                   PartNamePeriodConsVolDictionary & consDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged supplyVol
+    int lenPartList,pn;
+    char ** partNameList;
+    int * periodList;
+    float * pipDemandConsVolList;
+    retVal = witGetDemandConsVolPip(wr,partName,demandName,sp,
+      &lenPartList,&partNameList,&periodList,&pipDemandConsVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per part  with an pipDemandConsVol
+    for ( pn=0; pn<lenPartList; pn++ ){     
+      updateConsDict(consDict,partNameList[pn],periodList[pn],pipDemandConsVolList[pn]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(partNameList);
+    witFree(periodList);
+    witFree(pipDemandConsVolList);
+    
+    if( ignoreSubstituteUsage ) {
+      //----------------------------------------------------
+      // Get SubVol. Update existing consVol and compute new consVols
+      //----------------------------------------------------
+    // Call wit to get PIP execVol
+      int lenOpList,op;
+      char ** opNameList;
+      int * execPeriodList;
+
+
+      float * PIPSubVolList;
+      int * bomEntryIndexList;
+      int * subsBomEntryIndexList;
+      witGetDemandSubVolPip (wr,partName,demandName,sp,
+			     &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+			     &execPeriodList,&PIPSubVolList);
+      
+      // Loop once per operation with an SubVol
+      for ( op=0; op<lenOpList; op++ ){
+	
+	// The consVol of the part connected to the bom is now decremented
+	updateConsDictFromExecOrSubVolAndBom( wr, 
+					      opNameList[op],
+					      bomEntryIndexList[op],
+					      execPeriodList[op],
+					      PIPSubVolList[op],
+					      true,
+					      consDict);
+      
+	// Now increment consVol due to subVol 
+	// get name of consumed part
+	char * consumedPartName;
+	witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+					 bomEntryIndexList[op], subsBomEntryIndexList[op], 
+					 &consumedPartName );    
+      
+	// get consumption rate
+	float * consRate;
+	witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+				     bomEntryIndexList[op], subsBomEntryIndexList[op], 
+				     &consRate );
+      
+	// get fallout rate
+	float falloutRate;
+	witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+					bomEntryIndexList[op], subsBomEntryIndexList[op], 
+					&falloutRate );
+	
+	// get impact periods
+	int * impactPeriod;
+	witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+					 bomEntryIndexList[op], subsBomEntryIndexList[op], 
+					 &impactPeriod );
+      
+	computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+					 PIPSubVolList[op], execPeriodList[op], false, consDict );
+      
+	witFree(impactPeriod);
+	witFree(consRate);
+      }
+    }      
+    
+ 
+
+    //------------------------------------------------------
+    // If computing the sce definition of consVol,
+    // then add in the shipVol.
+    //------------------------------------------------------
+    if ( sceConsVol ) {
+      char * pn; 
+      witMalloc(strlen(partName)+1,(void**)&pn);
+      strcpy(pn,partName);
+      updateConsDict(consDict,pn,sp,shipVol[sp]);
+    }
+    
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+// demand cons volume PIP code: Called by SCENARIO
+//---------------------------------------------------------------------------
+witReturnCode ScePIP::getDemandConsVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps,
+   bool sceConsVol,
+   bool ignoreSubstituteUsage   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+  
+  // Create dictionary which will contain partName and period as key and supplyVol as value
+  PartNamePeriodConsVolDictionary consDict;
+
+  retVal = getDemandConsVolPIP (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod, sceConsVol, ignoreSubstituteUsage, consDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = consDict.begin();
+        it != consDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+
+  
+  return retVal;
+}
+// ==========================================
+
+
+// tomtom
+//---------------------------------------------------------------------------
+// Populate HashDictionary with ProdVol PIP Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getProdVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & prodDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged prodVol
+    int lenPartList,pn;
+    char ** partNameList;
+    int * periodList;
+    float * pipProdVolList;
+    retVal = witGetDemandProdVolPip(wr,partName,demandName,sp,
+      &lenPartList,&partNameList,&periodList,&pipProdVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per part  with an pipSupplyVol
+    for ( pn=0; pn<lenPartList; pn++ ){     
+      updateConsDict(prodDict,partNameList[pn],periodList[pn],pipProdVolList[pn]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(partNameList);
+    witFree(periodList);
+    witFree(pipProdVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+// prodVol PIP code: Called by SCENARIO
+//---------------------------------------------------------------------------
+witReturnCode ScePIP::getProdVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain partName and period as key and supplyVol as value
+  PartNamePeriodConsVolDictionary prodDict;
+
+  retVal = getProdVolPIP (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod, prodDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = prodDict.begin();
+        it != prodDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+
+  
+  return retVal;
+}
+
+// tomtom
+
+
+
+
+//---------------------------------------------------------------------------
+// Populate HashDictionary with SideVol PIP Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getSideVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & sideDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged sideVol
+    int lenPartList,pn;
+    char ** partNameList;
+    int * periodList;
+    float * pipSideVolList;
+    retVal = witGetDemandSideVolPip(wr,partName,demandName,sp,
+      &lenPartList,&partNameList,&periodList,&pipSideVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per part  with an pipSupplyVol
+    for ( pn=0; pn<lenPartList; pn++ ){     
+      updateConsDict(sideDict,partNameList[pn],periodList[pn],pipSideVolList[pn]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(partNameList);
+    witFree(periodList);
+    witFree(pipSideVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+// sideVol PIP code: Called by SCENARIO
+//---------------------------------------------------------------------------
+witReturnCode ScePIP::getSideVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain partName and period as key and supplyVol as value
+  PartNamePeriodConsVolDictionary sideDict;
+
+  retVal = getSideVolPIP (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod, sideDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = sideDict.begin();
+        it != sideDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+
+  
+  return retVal;
+}
+
+// tomtom
+
+
+
+//---------------------------------------------------------------------------
+// Populate HashDictionary with SupplyPIP Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getSupplyVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & supplyDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged supplyVol
+    int lenPartList,pn;
+    char ** partNameList;
+    int * periodList;
+    float * pipSupplyVolList;
+    retVal = witGetDemandSupplyVolPip(wr,partName,demandName,sp,
+      &lenPartList,&partNameList,&periodList,&pipSupplyVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per part  with an pipSupplyVol
+    for ( pn=0; pn<lenPartList; pn++ ){     
+      updateConsDict(supplyDict,partNameList[pn],periodList[pn],pipSupplyVolList[pn]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(partNameList);
+    witFree(periodList);
+    witFree(pipSupplyVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+// supply volume PIP code: Called by SCENARIO
+//---------------------------------------------------------------------------
+witReturnCode ScePIP::getSupplyVolPIP (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps
+   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain partName and period as key and supplyVol as value
+  PartNamePeriodConsVolDictionary supplyDict;
+
+  retVal = getSupplyVolPIP (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod, supplyDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = supplyDict.begin();
+        it != supplyDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+
+  
+  return retVal;
+}
+
+
+
+
+
+
+//---------------------------------------------------------------------------
+// Populate HashDictionary with Exec Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getDemandExecVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & execDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to PIP
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get PIP execVol
+    int lenOpList,op;
+    char ** opNameList;
+    int * execPeriodList;
+    float * PIPExecVolList;
+    retVal = witGetDemandExecVolPip(wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&execPeriodList,&PIPExecVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per operation with an execVol
+    for ( op=0; op<lenOpList; op++ ){     
+      updateConsDict(execDict,opNameList[op],execPeriodList[op],PIPExecVolList[op]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPIP
+
+    //    for ( op=0; op<lenOpList; op++ )  {
+    //      witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    //    }
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(PIPExecVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+witReturnCode ScePIP::getDemandExecVolPIP (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   LgFrSortingPartScheduleFloat & os
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain operationName and period as key
+  // and execVol as value
+  PartNamePeriodConsVolDictionary execDict;
+
+  retVal = getDemandExecVolPIP (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,
+   execDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = execDict.begin();
+        it != execDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart o(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (os.findValue(o,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    os.insertKeyAndValue(o,tv);
+  }
+
+
+  
+  return retVal;
+}
+
+
+
+// =============================
+//---------------------------------------------------------------------------
+// Populate HashDictionary with Exec Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePIP::getDemandInterplantVolPIP (
+                                                   WitRun * const wr,
+						   LgFrMultiPlantHelper * mpHelper,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & execDict,
+						   bool supplierPerspectiveInterplantPeg
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+
+  float supplierExecVol = 0.0;
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to PIP
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get PIP execVol
+    int lenOpList,op;
+    char ** opNameList;
+    int * execPeriodList;
+    float * PIPInterplantVolList;
+    retVal = witGetDemandExecVolPip(wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&execPeriodList,&PIPInterplantVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per operation with an execVol
+    // Only keep those execVols for operations which are SCE Interplant Operations
+    for ( op=0; op<lenOpList; op++ ){     
+      std::string destination;
+      std::string destinationPdf;
+      std::string source;
+      std::string sourcePdf;
+
+
+#ifdef DEBUG_INTERPLANT_PEG
+      std::cout << "fitering operations for special Interplant: " << opNameList[op];
+#endif
+      
+      if (mpHelper->isOperationSpecialInterplant(wr, opNameList[op], destination, destinationPdf, source, sourcePdf)) {
+#ifdef DEBUG_INTERPLANT_PEG
+	std::cout << "YES" << std::endl;
+#endif
+	// modify the data so that it gives customer or supplier perspective
+	if (supplierPerspectiveInterplantPeg) {
+	  // get the pegging with respect to supplier part
+	  int nPeriods;
+	  witGetNPeriods(wr,&nPeriods);
+	  
+	  supplierExecVol = 0.0;
+	  int nBom;
+	  witGetOperationNBomEntries(wr, opNameList[op], &nBom);
+	  assert(nBom == 1);
+	  
+	  // get impact periods
+	  int * impactPeriod;
+	  witGetBomEntryImpactPeriod ( wr, opNameList[op], 0, &impactPeriod );
+	  
+	  // get consumption rate
+	  float * consRate;
+	  witGetBomEntryConsRate ( wr, opNameList[op], 0, &consRate );
+	  
+	  // get consumption rate
+	  float falloutRate;
+	  witGetBomEntryFalloutRate ( wr, opNameList[op], 0, &falloutRate );
+	  
+	  int ip = impactPeriod[execPeriodList[op]];
+	  assert (ip > -1);
+	  supplierExecVol += PIPInterplantVolList[op] 
+	    * consRate[execPeriodList[op]] 
+	    * (1.0 - falloutRate);
+	    
+	  witFree(consRate);
+	  witFree(impactPeriod);
+	  PIPInterplantVolList[op] = supplierExecVol;	  
+	  execPeriodList[op] = ip;
+	}   // end if supplierPerspective ==1
+
+	// update the peg schedule regardless of supplierPerspective
+	updateConsDict(execDict,opNameList[op],execPeriodList[op],PIPInterplantVolList[op]);      
+
+      }   // end if (isOperationSpecialInterplant)
+
+      // otherwise, the operation is not Special Interplant and we  ignore
+      else {   
+#ifdef DEBUG_INTERPLANT_PEG
+	std::cout << "NO" << std::endl;
+#endif
+	witFree(opNameList[op]);
+      }
+
+    }   // end of the for (op=0; op<lenOpList; op+)
+    
+
+  
+    // Free storage allocated by witGetDemandExecVolPIP
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(PIPInterplantVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+witReturnCode ScePIP::getDemandInterplantVolPIP ( WitRun * const wr,
+						  LgFrMultiPlantHelper * mpHelper,
+						  const char * const partName,
+						  const char * const demandName,
+						  const int firstShipPeriod,
+						  const int lastShipPeriod,
+						  LgFrSortingPartScheduleFloat & os,
+						  bool supplierPerspectiveInterplantPeg
+						  )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain operationName and period as key
+  // and execVol as value
+  PartNamePeriodConsVolDictionary execDict;
+
+  retVal = getDemandInterplantVolPIP (wr, mpHelper,
+				      partName,demandName,
+				      firstShipPeriod,lastShipPeriod,
+				      execDict,
+				      supplierPerspectiveInterplantPeg);
+
+  for( PartNamePeriodConsVolDictionary::iterator it = execDict.begin();
+        it != execDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart o(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (os.findValue(o,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    os.insertKeyAndValue(o,tv);
+  }
+
+
+  
+  return retVal;
+}
+// =================
+
+
+
+
+
+
+
+// constructor
+ScePIP::ScePIP()
+{  
+  // notthing to do here
+}
+
+// copy constructor
+ScePIP::ScePIP( const ScePIP& source )
+{
+  assert(0 == "Do not use this method");
+}
+
+// assignment operator
+ScePIP&
+ScePIP::operator=(const ScePIP& rhs) {
+  assert(0 == "Do not use this method");
+  return *this;
+}
+
+
+// destructor
+ScePIP::~ScePIP()
+{
+  
+  // nothing to do here
+}
+
+
+
+
+
+//---------------------------------------------------------------------------
+// Testing
+//---------------------------------------------------------------------------
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+void
+ScePIP::test()
+{
+#if 0
+  std::string filenames[46];  
+  const int nFiles=46;   
+  filenames[1]="/u/wit/wit-data/examples/wutltest/wit.data";
+  filenames[0]="/u/wit/wit-data/anet/anet/wit.data";
+  //  filenames[x]="/u/wit/wit-data/anet/anet/wit34.data",     //WIT READ DATA FAILS
+  filenames[2]="/u/wit/wit-data/brenda/vern929/wit.data";
+  filenames[3]="/u/wit/wit-data/brenda/denise/wit.data";
+  filenames[4]="/u/wit/wit-data/brenda/cmos26/wit.data";
+  filenames[5]="/u/wit/wit-data/brenda/benson/wit.data";
+  filenames[6]="/u/wit/wit-data/brenda/rch818/wit.data";
+  filenames[7]="/u/wit/wit-data/brenda/rochrun1/wit.data";
+  filenames[8]="/u/wit/wit-data/brenda/karen/wit.data";
+  filenames[9]="/u/wit/wit-data/brenda/rch0110/wit.data";
+  filenames[10]="/u/wit/wit-data/brenda/test103/wit.data";
+  filenames[11]="/u/wit/wit-data/brenda/samp2/wit.data";
+  filenames[12]="/u/wit/wit-data/brenda/samp2b/wit.data";
+  filenames[13]="/u/wit/wit-data/brenda/bcase10b/wit.data";
+  filenames[14]="/u/wit/wit-data/brenda/case10b/wit.data";
+  filenames[15]="/u/wit/wit-data/csi/case10/wit.data";
+  filenames[16]="/u/wit/wit-data/csi/case11/wit.data";
+  filenames[17]="/u/wit/wit-data/csi/case09/wit.data";
+  filenames[18]="/u/wit/wit-data/examples/diner/wit.data";
+  std::string & diner = filenames[18];
+  filenames[19]="/u/wit/wit-data/examples/neglead/wit.data";
+  filenames[20]="/u/wit/wit-data/examples/diner12/wit.data";
+  filenames[21]="/u/wit/wit-data/examples/chal1/wit.data";
+  filenames[22]="/u/wit/wit-data/examples/difWit/wit.data";
+  filenames[23]="/u/wit/wit-data/examples/bldAhead/wit.data";
+  filenames[24]="/u/wit/wit-data/examples/subs/wit.data";
+  filenames[25]="/u/wit/wit-data/examples/twoprod/wit.data";
+  filenames[26]="/u/wit/wit-data/examples/chal2/wit.data";
+  filenames[27]="/u/wit/wit-data/examples/dillen/wit.data";
+  filenames[28]="/u/wit/wit-data/examples/ex1/wit.data";
+  // filenames[x]="/u/wit/wit-data/examples/ex1/supply.data",    //WIT READ DATA FAILS
+  filenames[29]="/u/wit/wit-data/examples/wutltest/wit2.data";
+  filenames[30]="/u/wit/wit-data/examples/diner12a/wit.data";
+  filenames[31]="/u/wit/wit-data/holder/lh/wit.data";
+  filenames[32]="/u/wit/wit-data/holder/lht/wit.data";
+  filenames[33]="/u/wit/wit-data/standard/obj1/wit.data";
+  filenames[34]="/u/wit/wit-data/standard/obj1.bounds/wit.data";
+  filenames[35]="/u/wit/wit-data/standard/obj2/wit.data";
+  filenames[36]="/u/wit/wit-data/standard/obj2.nobounds/wit.data";
+  filenames[37]="/u/wit/wit-data/wally/simple2/wit.data";
+  filenames[38]="/u/wit/wit-data/wally/simple/wit.data";
+  filenames[39]="/u/wit/wit-data/wally/obj1s2d1/wit.data";
+  filenames[40]="/u/wit/wit-data/wally/obj1twodemands/wit.data";
+  filenames[41]="/u/wit/wit-data/wally/deniseLps/wit.data";
+  filenames[42]="/u/wit/wit-data/operations/case2/wit.data";
+  filenames[43]="/u/wit/wit-data/operations/case3/wit.data";
+  filenames[44]="/u/wit/wit-data/operations/case4/wit.data";
+  filenames[45]="/u/wit/wit-data/xwit/wit.data";
+
+  int f;
+#if defined(_MSC_VER)
+  for ( f=0; f<nFiles; ++f ) {
+    filenames[f].replace(0,6,"../../../..");
+  }
+#endif
+  
+  // loop once for each wit.data file
+  WitRun * wr;
+  int nPeriods;
+  for (f=0; f<2 /*nFiles*/; ++f )  {
+    
+    fprintf(stderr, "  %d: using file: %s \n",f,filenames[f].c_str());
+
+    // Do two loops, one for sceConsVol and the other wit consVol
+    int consVolType;
+    for ( consVolType=0; consVolType<2; consVolType++ ) {
+       bool sceConsVol=false;
+       if (consVolType==1) sceConsVol = true;
+      
+      witNewRun(&wr);
+      witSetMesgTimesPrint(wr, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+      witSetMesgTimesPrint(wr, WitTRUE, 338, 0);
+      witSetMesgTimesPrint(wr, WitTRUE, 538, 0);
+      witInitialize(wr);
+      witSetPerfPIP(wr,true);
+      witReadData(wr, filenames[f].c_str());
+      
+      witGetNPeriods(wr,&nPeriods);
+      
+      witHeurImplode(wr);
+    
+      // Create a dictionary containing wit computed consVols.
+      // The key is the part name and consumption period, the value is the consVols
+      char  ** partList;
+      int      nParts,p;
+      witGetParts(wr,&nParts,&partList);
+
+      LgFrSortingPartScheduleFloat consVolScheds[5];
+      int fwa=0; // fromWitAttributes computed here from witConsVol 
+                 // and optionally shipVol.
+      int sa1=1; // from getDemandConsVolPIP with schedule arg & 1 period
+      int saa=2; // from getDemandConsVolPIP with schedule arg & all periods
+      int sl1=3; // from getDemandConsVolPIP with lists arg & 1 period
+      int sla=4; // from getDemandConsVolPIP with lists arg & all periods
+
+      double maxConsVol=0;
+      {
+        for ( p=0; p<nParts; p++ ){
+          // Get ConsVol of part
+          float * consVol;
+          witGetPartConsVol(wr,partList[p],&consVol);
+          
+          LgFrPart pn(partList[p]);
+          LgFrTimeVecFloat tv(nPeriods,consVol);
+          if ( tv!=0.0 ) {         
+            if (tv.max()>maxConsVol) maxConsVol=tv.max();
+            LgFrItemTimeVecPairFloat itv(pn,tv);
+            consVolScheds[fwa].insert(itv);
+          }
+          
+          witFree(consVol);
+          
+          // If this is an sceConsVol then must add shipVol to dictionary
+          if ( sceConsVol ) {
+            char ** demList;
+            int nDems,d;
+            witGetPartDemands(wr,partList[p],&nDems,&demList);
+            for ( d=0; d<nDems; d++ ) {
+              
+              float * shipVol;
+              witGetDemandShipVol(wr,partList[p],demList[d],&shipVol);
+              
+              
+              {
+                LgFrPart pn(partList[p]);
+                LgFrTimeVecFloat shipVolTv(nPeriods,shipVol);
+                if ( shipVolTv!=0.0 ) {
+                  
+                  LgFrTimeVecFloat cv;
+                  // Is part already in schedule
+                  if (consVolScheds[fwa].findValue(pn,cv)) {
+                    // part is in schedule, update timeVec
+                    cv = cv + shipVolTv;
+                  }
+                  else {
+                    cv = shipVolTv;
+                  }
+                  consVolScheds[fwa].insertKeyAndValue(pn,cv);
+                }
+              }
+              witFree(shipVol);
+              witFree(demList[d]);
+            }
+            witFree(demList);
+          }
+        }
+      }
+      double consVolEps = fabs(maxConsVol) * 0.000001;
+      
+      // Loop over all demands
+      for ( p=0; p<nParts; p++ ){
+          
+        if( p == 225 )
+            p = 225;
+        char ** demList;
+        int nDems,d;
+        witGetPartDemands(wr,partList[p],&nDems,&demList);
+        for ( d=0; d<nDems; d++ ) {
+          
+          float * shipVol;
+          witGetDemandShipVol(wr,partList[p],demList[d],&shipVol);
+          
+          // loop once for each period
+          int t;
+          for ( t=0; t<nPeriods; t++ ) {
+            
+            if (shipVol[t] == 0.0 ) continue;
+            
+            char ** consPartList;
+            float * consVolList;
+            int * consPerList;
+            int nConsParts;
+            
+            ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],t,t,
+              &nConsParts,&consPartList,&consPerList,&consVolList,
+              sceConsVol);
+
+            {
+              //LgFrSortingPartScheduleFloat temp;
+              ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],t,t,
+                consVolScheds[sa1], //temp,
+                sceConsVol);
+              //consVolScheds[sa1] = consVolScheds[sa1] + temp;
+            }
+            
+            int cp;
+            for( cp=0; cp<nConsParts; cp++ ) { 
+              LgFrPart p(consPartList[cp]);
+              LgFrTimeVecFloat tv(nPeriods);
+              int t=consPerList[cp];
+              consVolScheds[sl1].findValue(p,tv);
+              tv[t] = tv[t] + consVolList[cp];
+              consVolScheds[sl1].insertKeyAndValue(p,tv);
+              free(consPartList[cp]);
+            }
+            free(consPartList);
+            free(consPerList);
+            free(consVolList);
+          }
+          
+          witFree(shipVol);
+          
+          //-----------------
+          // Do consVol pegging over all periods
+          { 
+            char ** consPartList;
+            float * consVolList;
+            int * consPerList;
+            int nConsParts;
+            
+            ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+              &nConsParts,&consPartList,&consPerList,&consVolList,
+              sceConsVol);
+            
+            {
+              //LgFrSortingPartScheduleFloat temp;
+              ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+                consVolScheds[saa], //temp,
+                sceConsVol);
+              //consVolScheds[saa] = consVolScheds[saa] + temp;
+            }
+            
+            int cp;
+            for( cp=0; cp<nConsParts; cp++ ) {   
+              LgFrPart p(consPartList[cp]);
+              LgFrTimeVecFloat tv(nPeriods);
+              int t=consPerList[cp];
+              consVolScheds[sla].findValue(p,tv);
+              tv[t] = tv[t] + consVolList[cp];
+              consVolScheds[sla].insertKeyAndValue(p,tv);
+              
+              free(consPartList[cp]);
+            }
+            free(consPartList);
+            free(consPerList);
+            free(consVolList);
+          }
+          //-----------------
+          witFree(demList[d]);
+        }
+        witFree(demList);
+      }      
+    
+      /* Test that all consVol schedules are equal */
+      int s;
+      for ( s=1; s<5; s++ ) {
+        const LgFrSortingPartScheduleFloat temp = consVolScheds[0]-consVolScheds[s];
+        //std::cout 
+        //  <<"============================" << std::endl
+        //  <<"S=" <<s << std::endl
+        //  <<temp.format() << std::endl;
+        size_t e;
+        for ( e=0; e<temp.size() ; e++ ) {
+          const LgFrItemTimeVecPairFloat & itv = temp[e];
+          float tvSum = itv.timeVecFloat().sum();
+          assert( fabs(tvSum) <= consVolEps );
+        }
+      }
+      
+      for ( p=0; p<nParts; p++ ){
+        witFree(partList[p]);
+      }
+      witFree(partList);
+    } // for each consVolType
+  } // for each file
+
+  // test getDemandConsVolPIP without considering substitutes
+  {
+    
+    LgFrSortingPartScheduleFloat ps;
+    // Get parts
+    char  ** partList;
+    int      nParts,p;
+    witGetParts(wr,&nParts,&partList);
+    
+    // loop over all demands and store consVol in appData
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+        
+        ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+          ps,true,false);
+        
+        witFree(demList[d]);
+      }
+      witFree(demList);
+      witFree(partList[p]);
+    }
+    witFree(partList);
+  }
+
+
+  // Test execVol pegging
+  {    
+    // Pegged Exec Volumes from method in this class
+    LgFrSortingPartScheduleFloat pev;
+
+    // Pegged Exec Volumes from wit execVol attribute
+    LgFrSortingPartScheduleFloat wev;
+
+    // Get parts
+    char  ** partList;
+    int      nParts,p;
+    witGetParts(wr,&nParts,&partList);
+    
+    // loop over all demands and store consVol in appData
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+        
+        // Get demands pegged consVol and directly store in appData
+        ScePIP::getDemandExecVolPIP(wr,partList[p],demList[d],0,nPeriods-1,pev);
+        
+        witFree(demList[d]);
+      }
+      witFree(demList);
+      witFree(partList[p]);
+    }
+    witFree(partList);
+    
+    // Get operations
+    char  ** opList;
+    int      nOps,o;
+    witGetOperations(wr,&nOps,&opList);
+
+    // loop once for each operation
+    double maxExecVol=0;
+    for ( o=0; o<nOps; ++o ) {
+      float *ev;
+      witGetOperationExecVol(wr,opList[o],&ev);
+      
+      LgFrPart on(opList[o]);
+      LgFrTimeVecFloat tv(nPeriods,ev);
+      if ( tv!=0.0 ) {         
+        if (tv.max()>maxExecVol) maxExecVol=tv.max();
+        LgFrItemTimeVecPairFloat itv(on,tv);
+        wev.insert(itv);
+      }
+      witFree(ev);
+      witFree(opList[o]);
+    }
+    witFree(opList);
+
+    // Test to ensure that the 2 execVol schedules are equal
+    
+    const LgFrSortingPartScheduleFloat temp = pev-wev;
+    //std::cout 
+    //  <<"============================" << std::endl
+    //  <<temp.format() << std::endl;
+    size_t e;    
+    double execVolEps = fabs(maxExecVol) * 0.000001;
+    for ( e=0; e<temp.size() ; e++ ) {
+      const LgFrItemTimeVecPairFloat & itv = temp[e];
+      float tvSum = itv.timeVecFloat().sum();
+      assert( fabs(tvSum) <= execVolEps );
+    }
+  }
+
+  witDeleteRun(wr);
+
+
+  //A possible SCE like usage
+  {
+    class DemandAppData {
+    public:
+      LgFrSortingPartScheduleFloat ps1;
+      LgFrSortingPartScheduleFloat ps2;
+      LgFrSortingPartScheduleFloat execVolSched1;
+      LgFrSortingPartScheduleFloat execVolSched2;
+    };
+    
+    WitRun * wr;
+    
+    witNewRun(&wr);
+    witSetMesgTimesPrint(wr, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+    witSetMesgTimesPrint(wr, WitTRUE, 338, 0);
+    witSetMesgTimesPrint(wr, WitTRUE, 538, 0);
+    witInitialize(wr);
+    witSetPerfPIP(wr,true);
+    witReadData(wr, diner.c_str());
+    
+    // Get periods
+    int nPeriods;
+    witGetNPeriods(wr,&nPeriods);
+    
+    // Get parts
+    char  ** partList;
+    int      nParts,p;
+    witGetParts(wr,&nParts,&partList);
+    
+    // Do a heuristic implosion
+    witSetExecEmptyBom(wr,WitTRUE);
+    witHeurImplode(wr);
+    
+    // loop over all demands and store consVol in appData
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+
+        // Initialize demand app data
+        DemandAppData * dad = new DemandAppData;
+        witSetDemandAppData(wr,partList[p],demList[d],dad);
+        
+        // Get demands pegged consVol and directly store in appData
+        ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+          dad->ps1, true);
+
+        // Get demands pegged execVol and directly store in appData
+        ScePIP::getDemandExecVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+          dad->execVolSched1);
+        
+        witFree(demList[d]);
+      }
+      witFree(demList);
+    }
+
+    // Do a different heuristic implosion
+    witSetExecEmptyBom(wr,WitFALSE);
+    witHeurImplode(wr);
+    
+    // loop over all demands and store consVol in appData
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+
+        // Initialize demand app data
+        DemandAppData * dad;
+        witGetDemandAppData(wr,partList[p],demList[d],(void**)&dad);
+        
+        // Get demands pegged consVol and directly store in appData
+        ScePIP::getDemandConsVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+          dad->ps2, true);
+
+        // Get demands pegged execVol and directly store in appData
+        ScePIP::getDemandExecVolPIP(wr,partList[p],demList[d],0,nPeriods-1,
+          dad->execVolSched2);
+        
+        witFree(demList[d]);
+      }
+      witFree(demList);
+    }
+    
+    // loop over all demands and access consVols and execVol
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+
+        std::cout 
+          <<"--------------------" << std::endl
+          <<"Demand: " <<demList[d]  <<" Part: " <<partList[p] << std::endl;
+
+        // Initialize demand app data
+        DemandAppData * dad;
+        witGetDemandAppData(wr,partList[p],demList[d],(void**)&dad);
+
+        // Get const references to the 2 schedules stored in app data
+        const LgFrSortingPartScheduleFloat & ps1Const = dad->ps1;
+        const LgFrSortingPartScheduleFloat & ps2Const = dad->ps2;
+        const LgFrSortingPartScheduleFloat & ev1Const = dad->execVolSched1;
+        const LgFrSortingPartScheduleFloat & ev2Const = dad->execVolSched2;
+
+        // Compute combined consVol
+        const LgFrSortingPartScheduleFloat total = ps1Const + ps2Const;
+
+        // Loop over each consumed part
+        int ncp = total.size();
+        int cp = 0; // Pulled out of the for below by RW2STL
+        for ( cp=0; cp<ncp; cp++ ) {
+          // get part
+          const LgFrPart part = total.part(cp);
+          std::cout <<"  Consumed part: " <<part.name() << std::endl;
+
+          // Get this part consVol for 1st and 2nd implosions and total
+          const LgFrTimeVecFloat & tv1 = ps1Const[part].timeVecFloat();
+          const LgFrTimeVecFloat & tv2 = ps2Const[part].timeVecFloat();
+          LgFrTimeVecFloat tvT = total[cp].timeVecFloat();
+
+          // Print consVols of each implosion and total
+          int t;
+          std::cout <<"    implosion 1: ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tv1[t];
+          std::cout << std::endl;
+          
+          std::cout <<"    implosion 2: ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tv2[t];
+          std::cout << std::endl;
+
+          std::cout <<"    total:       ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tvT[t];
+          std::cout << std::endl;
+        }
+
+        // execVol Schedule
+        std::cout 
+          <<"ExecVol Sched for demand: "
+          <<demList[d] << std::endl <<ev1Const.format() << std::endl;
+
+        delete dad;
+        witFree(demList[d]);
+      }
+      witFree(demList);
+    }    
+    
+    for ( p=0; p<nParts; p++ ){
+      witFree(partList[p]);
+    }
+    witFree(partList);
+    witDeleteRun(wr);
+    
+  }
+#endif  
+} 
+
+@
+
+
+1.19
+log
+@Last commit for maxForAtp
+@
+text
+@d9 1
+a9 1
+//#include <witutil/src/machdep.h>
+@
+
+
+1.18
+log
+@added function to report interplantPeg from perspective of supplier location.   basically, this shifts the interplant peg earlier to accomodate interplant lead-times
+@
+text
+@d736 4
+a739 1
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+@
+
+
+1.17
+log
+@preping for release 4.1
+@
+text
+@d18 1
+d20 1
+a20 1
+
+d24 1
+a24 1
+
+d803 187
+@
+
+
+1.16
+log
+@added ProdVol from ProdVol Peg files
+@
+text
+@d463 113
+@
+
+
+1.15
+log
+@Modified to reduce microsoft compiler warning messages
+@
+text
+@d347 116
+@
+
+
+1.14
+log
+@added subDB output file
+@
+text
+@d1 1
+a1 1
+
+@
+
+
+1.13
+log
+@pip for LP engine
+@
+text
+@d26 1
+@
+
+
+1.12
+log
+@permanently replaced Concurrent Pegging with Post Implosion pegging.
+Parameters stay the same though.
+@
+text
+@d25 1
+@
+
+
+1.11
+log
+@first level of PIP
+@
+text
+@a22 643
+//------------------------------------------------------------
+// Update the dictionary of consVols.
+// Key is (consumedPartName,consumptionPeriod).
+// Value is consVol.
+// If the entry does not exist, then a new entry in dictionary
+// is created with deltaConsVol.
+// If an entry exists then it is updated by adding deltaConsVol
+//
+//-------------------------------------------------------------
+void ScePegging::updateConsDict(
+                                 PartNamePeriodConsVolDictionary & consDict,
+                                 char * consumedPartName,
+                                 int consPeriod,
+                                 double deltaConsVol)
+{
+
+  // Create Dictionary Key from partName and period
+  SceConstCharStar_Int key(consumedPartName,consPeriod);
+  SceCollectableDouble newConsVol(deltaConsVol);
+  
+  // insert key and consVol into dicionary
+  bool inserted = consDict.insert( PartNamePeriodConsVolPair( key,
+                                                            newConsVol ) ).second;
+
+  // Did the insert fail because the key already exists?
+  if( !inserted )
+  {        
+    PartNamePeriodConsVolDictionary::iterator it = consDict.find(key);
+
+    SceCollectableDouble& val = (*it).second;
+    double updatedConsVol = val.dbl() + deltaConsVol;
+    val.dbl(updatedConsVol);
+
+//    SCECollectable * existingConsVolCol;
+//    SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+//    double updatedConsVol = existingConsVol->dbl() + deltaConsVol;
+//    existingConsVol->dbl(updatedConsVol);
+//    witFree(consumedPartName);
+    //delete key;
+    //delete newConsVol;
+  }
+}
+
+
+//----------------------------------------------------------------------
+// Update ConsDict given consumed part name, consRate, impactPeriod,
+// execVolOrSubVol, execPeriod, incrementConsVol flag.
+// This is used 3 times:
+//   increment bom consumed part for execVol
+//   decrement bom consumed part for subVol
+//   increment subs consumed part for subVol
+//-----------------------------------------------------------------------
+void ScePegging::computeConsVolAndUpdateConsDict(
+  WitRun * wr,
+  char * consumedPartName,
+  float * consRate,
+  float fallout,
+  int * impactPeriod,
+  float execOrSubVol,
+  int execPeriod,
+  bool increment,
+  PartNamePeriodConsVolDictionary & consDict )
+{
+   
+  // Test to see if bom is effective in execution period
+  if ( impactPeriod[execPeriod] == -1 ) 
+    return;
+ 
+  int consPeriod = impactPeriod[execPeriod];
+  double incrConsVol = execOrSubVol * consRate[consPeriod]/(1.0-fallout);
+  //double incrConsVol = execOrSubVol * consRate[execPeriod]/(1.0-fallout);
+  if ( !increment ) {
+    incrConsVol = -incrConsVol;
+  }
+  updateConsDict(consDict,consumedPartName,consPeriod,incrConsVol);
+}
+
+
+//-----------------------------------------------------------------------
+// ConsVol for a consumed part connected to a bom is computed from
+// the the operations exexVol less any subVols associated with the Bom.
+// The process for working with execVol and subVols is the same execpt
+// that execVols add to the consVol and subVols subtract from the consVol.
+// This function handles both of these operations.
+//-----------------------------------------------------------------------
+void ScePegging::updateConsDictFromExecOrSubVolAndBom(
+                                     WitRun * wr, 
+                                     const char * opName,
+                                     int bomEntryIndex,
+                                     int execPeriod,
+                                     float execOrSubVol,
+                                     bool isExecVol,
+                                     PartNamePeriodConsVolDictionary & consDict)
+{
+  
+  // get name of consumed part
+  char * consumedPartName;
+  witGetBomEntryConsumedPart ( wr, opName, bomEntryIndex, &consumedPartName );
+  
+  // get consumption rate
+  float * consRate;
+  witGetBomEntryConsRate ( wr, opName, bomEntryIndex, &consRate );
+
+  // get consumption rate
+  float falloutRate;
+  witGetBomEntryFalloutRate ( wr, opName, bomEntryIndex, &falloutRate );
+  
+  // get impact periods
+  int * impactPeriod;
+  witGetBomEntryImpactPeriod ( wr, opName, bomEntryIndex, &impactPeriod );
+  
+  computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+    execOrSubVol, execPeriod, isExecVol, consDict );
+  
+  witFree(impactPeriod);
+  witFree(consRate);
+}
+    
+
+//---------------------------------------------------------------------------
+// Populate HashDictionary with Consumption Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePegging::getDemandConsVolPegging (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   bool sceConsVol,
+                                                   bool ignoreSubstituteUsage,
+                                                   PartNamePeriodConsVolDictionary & consDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged execVol
+    int lenOpList,op;
+    char ** opNameList;
+    int * execPeriodList;
+    float * peggedExecVolList;
+    retVal = witGetDemandExecVolPegging(wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&execPeriodList,&peggedExecVolList);
+    
+    // Loop once per operation with an execVol
+    for ( op=0; op<lenOpList; op++ ){
+      
+      // loop once for each bom associated with op
+      int nBomEntries,b;
+      witGetOperationNBomEntries ( wr, opNameList[op], &nBomEntries );
+      for ( b=0; b<nBomEntries; b++ ) {
+        
+        updateConsDictFromExecOrSubVolAndBom( wr, 
+          opNameList[op],b,execPeriodList[op],peggedExecVolList[op],true,
+          consDict);
+      }
+      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    for ( op=0; op<lenOpList; op++ ){
+      witFree(opNameList[op]);
+    }
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(peggedExecVolList);
+    
+    if( ignoreSubstituteUsage ) {
+        //----------------------------------------------------
+        // Get SubVol. Update existing consVol and compute new consVols
+        //----------------------------------------------------
+        float * peggedSubVolList;
+        int * bomEntryIndexList;
+        int * subsBomEntryIndexList;
+        witGetDemandSubVolPegging (wr,partName,demandName,sp,
+          &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+          &execPeriodList,&peggedSubVolList);
+    
+        // Loop once per operation with an SubVol
+        for ( op=0; op<lenOpList; op++ ){
+      
+          // The consVol of the part connected to the bom is now decremented
+          updateConsDictFromExecOrSubVolAndBom( wr, 
+            opNameList[op],bomEntryIndexList[op],execPeriodList[op],peggedSubVolList[op],false,
+            consDict);
+      
+          // Now increment consVol due to subVol 
+          // get name of consumed part
+          char * consumedPartName;
+          witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &consumedPartName );    
+      
+          // get consumption rate
+          float * consRate;
+          witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &consRate );
+      
+          // get fallout rate
+          float falloutRate;
+          witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &falloutRate );
+
+          // get impact periods
+          int * impactPeriod;
+          witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &impactPeriod );
+      
+          computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+            peggedSubVolList[op], execPeriodList[op], true, consDict );
+      
+          witFree(impactPeriod);
+          witFree(consRate);
+        }
+        // Free storage allocated by witGetDemandExecVolPegging
+        witFree(bomEntryIndexList);
+        witFree(subsBomEntryIndexList);
+        witFree(peggedSubVolList);
+
+        for ( op=0; op<lenOpList; op++ ){
+          witFree(opNameList[op]);
+        }
+        witFree(opNameList);
+        witFree(execPeriodList);
+
+    }
+    //------------------------------------------------------
+    // If computing the sce definition of consVol,
+    // then add in the shipVol.
+    //------------------------------------------------------
+    if ( sceConsVol ) {
+      char * pn; 
+      witMalloc(strlen(partName)+1,(void**)&pn);
+      strcpy(pn,partName);
+      updateConsDict(consDict,pn,sp,shipVol[sp]);
+    }
+  }
+  witFree(shipVol);
+  return retVal;
+}
+
+//---------------------------------------------------------------------------
+// consumption volume pegging code
+//---------------------------------------------------------------------------
+witReturnCode ScePegging::getDemandConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * peggedConsVolList,
+   bool sceConsVol,
+   bool ignoreSubstituteUsage
+   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  //----------------------------------------------------
+  // Give return parms an initial value
+  //----------------------------------------------------
+  *lenLists =0;
+  *partNameList = 0;
+  *consPeriodList = 0;
+  *peggedConsVolList = 0;
+
+  // Create dictionary which will contain partName and period as key and consVol as value
+  PartNamePeriodConsVolDictionary consDict;
+
+  retVal = getDemandConsVolPegging (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,ignoreSubstituteUsage,
+   consDict );
+
+  //----------------------------------------------------
+  // Set up and define return values
+  //----------------------------------------------------
+#if 1
+  *lenLists = consDict.size();
+  if ( *lenLists>0 ) {
+    *partNameList = (char **)malloc((*lenLists)*sizeof(char *));
+    *consPeriodList = (int *)malloc((*lenLists)*sizeof(int));
+    *peggedConsVolList = (float *)malloc((*lenLists)*sizeof(float));
+  }
+#else
+  int np;
+  witGetNPeriods(wr,&np);
+  int maxLenList = ps.size()*np;
+  if ( maxLenList>0 ) {
+    *partNameList = (char **)malloc((maxLenList)*sizeof(char *));
+    *consPeriodList = (int *)malloc((maxLenList)*sizeof(int));
+    *peggedConsVolList = (float *)malloc((maxLenList)*sizeof(float));
+  }
+#endif
+
+#if 1
+  int i=0;
+  for( PartNamePeriodConsVolDictionary::iterator it = consDict.begin();
+        it != consDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+    {
+      (*lenLists)--;
+      continue;
+    }
+
+    (*partNameList)[i] = strdup(key.getCharStar());
+    (*consPeriodList)[i] = key.getInt();
+    (*peggedConsVolList)[i] = (float)v.dbl();
+    i++;
+  }
+#else
+  int e; 
+  int ne=ps.size();
+  const LgFrSortingPartScheduleFloat & psc = ps;
+  for ( e=0; e<ne; ++e ) {
+     const LgFrItemTimeVecPairFloat & itv = psc[e];
+     const LgFrPart & pn = itv.part();
+     const LgFrTimeVecFloat & tv = itv.timeVecFloat();
+     int t;
+     for ( t=0; t<np; ++t ) {
+       if ( tv[t]<=0.0 ) continue; 
+       (*consPeriodList)[*lenLists] = t;
+       (*peggedConsVolList)[*lenLists] = tv[t];
+       (*partNameList)[*lenLists] = strdup(pn.name()); 
+       (*lenLists)++;
+     }
+  }
+#endif
+
+  return retVal;
+};
+
+
+//---------------------------------------------------------------------------
+// consumption volume pegging code
+//---------------------------------------------------------------------------
+witReturnCode ScePegging::getDemandConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   LgFrSortingPartScheduleFloat & ps,
+   bool sceConsVol,
+   bool ignoreSubstituteUsage
+   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  //{
+  //  int nE = ps.size();
+  //  if ( nE>0 )
+  //     ps.localClear();
+  //}
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain partName and period as key and consVol as value
+  PartNamePeriodConsVolDictionary consDict;
+
+  retVal = getDemandConsVolPegging (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,ignoreSubstituteUsage,
+   consDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = consDict.begin();
+        it != consDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+
+  
+  return retVal;
+}
+
+
+//---------------------------------------------------------------------------
+// Populate HashDictionary with Exec Volume
+//---------------------------------------------------------------------------                                    
+witReturnCode ScePegging::getDemandExecVolPegging (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   PartNamePeriodConsVolDictionary & execDict
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+    // Call wit to get pegged execVol
+    int lenOpList,op;
+    char ** opNameList;
+    int * execPeriodList;
+    float * peggedExecVolList;
+    retVal = witGetDemandExecVolPegging(wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&execPeriodList,&peggedExecVolList);
+    
+    // Size consDict hashtable if first loop iteration
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+    // Loop once per operation with an execVol
+    for ( op=0; op<lenOpList; op++ ){     
+      updateConsDict(execDict,opNameList[op],execPeriodList[op],peggedExecVolList[op]);      
+    }
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    //for ( op=0; op<lenOpList; op++ )witFree(opNameList[op]);  //Don't free because char* are referenced by schedule
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(peggedExecVolList);
+  }  
+  
+  witFree(shipVol);
+  return retVal;
+}
+
+
+witReturnCode ScePegging::getDemandExecVolPegging (
+                                                   WitRun * const wr,
+                                                   const char * const partName,
+                                                   const char * const demandName,
+                                                   const int firstShipPeriod,
+                                                   const int lastShipPeriod,
+                                                   LgFrSortingPartScheduleFloat & os
+                                                   )
+{
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+
+  int nPeriods;
+  witGetNPeriods(wr,&nPeriods);
+
+  // Create dictionary which will contain operationName and period as key
+  // and execVol as value
+  PartNamePeriodConsVolDictionary execDict;
+
+  retVal = getDemandExecVolPegging (
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,
+   execDict );
+
+  for( PartNamePeriodConsVolDictionary::iterator it = execDict.begin();
+        it != execDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart o(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (os.findValue(o,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    os.insertKeyAndValue(o,tv);
+  }
+  return retVal;
+}
+
+
+#if 0
+witReturnCode ScePegging::getDemandSubsConsVolPegging (
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod
+   )
+{
+  RWHashDictionary consDict;
+  witReturnCode retVal = WitINFORMATIONAL_MESSAGES;
+  
+  // Get shipVol of input demand
+  float * shipVol;
+  witGetDemandShipVol(wr,partName,demandName,&shipVol);
+  
+  // Loop once for each shipPeriod
+  int sp;
+  for ( sp=firstShipPeriod; sp<=lastShipPeriod; sp++ ) {
+    
+    // If shipVol is zero, then there is nothing to peg
+    if (shipVol[sp]==0) continue;
+    
+
+    
+    //----------------------------------------------------
+    // Get pegged SubVol. Update existing consVol and compute new consVols
+    //----------------------------------------------------
+    
+    int lenOpList,op;
+    char ** opNameList;
+    int * execPeriodList;
+    float * peggedSubVolList;
+    int * bomEntryIndexList;
+    int * subsBomEntryIndexList;
+    witGetDemandSubVolPegging (wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+      &execPeriodList,&peggedSubVolList);
+    
+    // Loop once per operation with an SubVol
+    for ( op=0; op<lenOpList; op++ ){
+      
+      // Now increment consVol due to subVol 
+      // get name of consumed part
+      char * consumedPartName;
+      witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &consumedPartName );    
+      
+      // get consumption rate
+      float * consRate;
+      witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &consRate );
+      
+      // get fallout rate
+      float falloutRate;
+      witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &falloutRate );
+      
+      // get impact periods
+      int * impactPeriod;
+      witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &impactPeriod );
+      
+      computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+        peggedSubVolList[op], execPeriodList[op], TRUE, consDict );
+      
+      witFree(impactPeriod);
+      witFree(consRate);
+    }
+    
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    for ( op=0; op<lenOpList; op++ ){
+      witFree(opNameList[op]);
+    }
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(bomEntryIndexList);
+    witFree(subsBomEntryIndexList);
+    witFree(peggedSubVolList);
+    
+  }
+  witFree(shipVol);
+  return retVal;;
+}
+#endif
+
+// constructor
+ScePegging::ScePegging()
+{  
+  // notthing to do here
+}
+
+// copy constructor
+ScePegging::ScePegging( const ScePegging& source )
+{
+  assert(0 == "Do not use this method");
+}
+
+// assignment operator
+ScePegging&
+ScePegging::operator=(const ScePegging& rhs) {
+  assert(0 == "Do not use this method");
+  return *this;
+}
+
+
+// destructor
+ScePegging::~ScePegging()
+{
+  
+  // nothing to do here
+}
+
+
+d610 1
+a610 1
+ScePegging::test()
+d612 1
+d690 1
+a690 1
+      witSetPerfPegging(wr,true);
+d706 4
+a709 4
+      int sa1=1; // from getDemandConsVolPegging with schedule arg & 1 period
+      int saa=2; // from getDemandConsVolPegging with schedule arg & all periods
+      int sl1=3; // from getDemandConsVolPegging with lists arg & 1 period
+      int sla=4; // from getDemandConsVolPegging with lists arg & all periods
+d789 1
+a789 1
+            ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],t,t,
+d795 1
+a795 1
+              ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],t,t,
+d826 1
+a826 1
+            ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d832 1
+a832 1
+              ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d882 1
+a882 1
+  // test getDemandConsVolPegging without considering substitutes
+d898 1
+a898 1
+        ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d931 1
+a931 1
+        ScePegging::getDemandExecVolPegging(wr,partList[p],demList[d],0,nPeriods-1,pev);
+d998 1
+a998 1
+    witSetPerfPegging(wr,true);
+d1026 1
+a1026 1
+        ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d1030 1
+a1030 1
+        ScePegging::getDemandExecVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d1054 1
+a1054 1
+        ScePegging::getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d1058 1
+a1058 1
+        ScePegging::getDemandExecVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d1136 1
+a1136 1
+  
+@
+
+
+1.10
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@a353 25
+/*RWHashDictionaryIterator  iter(consDict);
+  int i=0;
+  while ( iter() ) {
+    SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+    SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    //    if ( v->dbl()<=0.0 ) {
+    if ( (v->dbl() > -0.0001) && (v->dbl() < 0.0001) ) {
+      (*lenLists)--;
+      witFree((char*)key->getCharStar());
+      delete key;
+      delete v;
+      continue;
+    }
+
+    (*partNameList)[i] = strdup(key->getCharStar());
+    (*consPeriodList)[i] = key->getInt();
+    (*peggedConsVolList)[i] = (float)v->dbl();
+    i++;
+    witFree((char*)key->getCharStar());
+    delete key;
+    delete v;
+  }*/
+a435 35
+  /*RWHashDictionaryIterator  iter(consDict);
+  //int i=0;
+  while ( iter() ) {
+    SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+    SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    //    if ( v->dbl()<=0.0 ) {
+    if ( (v->dbl() > -0.0001) && (v->dbl() < 0.0001) ) {
+      //(*lenLists)--;
+      witFree((char*)key->getCharStar());
+      delete key;
+      delete v;
+      continue;
+    }
+
+    //(*partNameList)[i] = strdup(key->getCharStar());
+    LgFrPart p(key->getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key->getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v->dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v->dbl();
+    }
+    ps.insert(p,tv);
+    witFree((char*)key->getCharStar());
+    delete key;
+    delete v;
+  }*/
+a542 38
+
+
+/*  RWHashDictionaryIterator  iter(execDict);
+  //int i=0;
+  while ( iter() ) {
+    SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+    SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    //    if ( v->dbl()<=0.0 ) {
+    if ( (v->dbl() > -0.0001) && (v->dbl() < 0.0001) ) {
+      //(*lenLists)--;
+      witFree((char*)key->getCharStar());
+      delete key;
+      delete v;
+      continue;
+    }
+
+    // Using an LgFrPart because LgFrOperation does not exist
+    LgFrPart o(key->getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key->getInt();
+    // Is operaion already in schedule
+    if (os.findValue(o,tv)) {
+      // operation is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v->dbl();
+    }
+    else {
+      // operation is not in schedule, so insert it
+      tv[t] = (float)v->dbl();
+    }
+    os.insert(o,tv);
+    //witFree((char*)key->getCharStar());
+    //delete key;
+    //delete v;
+  }*/
+  
+d660 576
+@
+
+
+1.9
+log
+@added code to ignore subs when pegging
+@
+text
+@d1 7
+a9 2
+#include <rw/collect.h>
+#include <rw/hashdict.h>
+a18 128
+#if defined(STD_CPP_LIB)
+#  include <iostream>
+#  include <fstream>
+#else
+#  include <iostream.h>
+#  include <fstream.h>
+#endif
+
+//---------------------------------------------------------------------------
+// Define a RWCollectable class that contains the pair const char * and an int
+//---------------------------------------------------------------------------
+class SceConstCharStar_Int : public RWCollectable 
+{
+  RWDECLARE_COLLECTABLE(SceConstCharStar_Int);
+
+  const char * getCharStar()const{return charStar_;};
+  void setCharStar(const char * cs){charStar_=cs;};
+
+  int getInt()const{return int_;};
+  void setInt(int i){int_=i;};
+
+  int compareTo(const RWCollectable* col) const
+  {  
+    const SceConstCharStar_Int* rhs = (const SceConstCharStar_Int*)col;
+    int compareString = strcmp(getCharStar(),rhs->getCharStar());
+    if ( compareString != 0 ) return compareString;
+    if (getInt() == rhs->getInt()) return 0;
+    return getInt() > rhs->getInt() ? 1 : -1;
+  };
+  
+  RWBoolean isEqual(const RWCollectable* col) const
+  {  
+    return compareTo(col) == 0;
+  }
+
+  unsigned hash() const
+  {
+    RWCString s(getCharStar());
+    return (s.hash()+128*getInt());
+  }
+
+  // Constructors
+  SceConstCharStar_Int():RWCollectable(),charStar_(NULL),int_(0){};
+  SceConstCharStar_Int(const char * cs, int i):RWCollectable(),charStar_(cs),int_(i){};
+
+  
+  SceConstCharStar_Int(const SceConstCharStar_Int& ci):RWCollectable(ci),charStar_(ci.charStar_),int_(ci.int_){};
+  SceConstCharStar_Int& operator=(const SceConstCharStar_Int& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+      (this->RWCollectable::operator= ) (ci);
+      charStar_ = ci.charStar_;
+      int_ = ci.int_;
+    }
+    return *this;
+  };
+
+  virtual ~SceConstCharStar_Int(){};
+private:
+  const char * charStar_;
+  int int_;
+};
+
+//RWDEFINE_COLLECTABLE(SceConstCharStar_Int, 200)
+RWDEFINE_NAMED_COLLECTABLE (SceConstCharStar_Int, "SceConstCharStar_Int");
+
+
+
+//---------------------------------------------------------------------------
+// Define a RWCollectable class that contains a double
+//---------------------------------------------------------------------------
+class SceCollectableDouble : public RWCollectable {
+
+  RWDECLARE_COLLECTABLE(SceCollectableDouble)
+
+public:
+
+  SceCollectableDouble():RWCollectable(),dbl_(0.0){};
+  SceCollectableDouble(double f):RWCollectable(),dbl_(f){};
+  SceCollectableDouble(const SceCollectableDouble& ci):RWCollectable(ci),dbl_(ci.dbl_){};
+  SceCollectableDouble& operator=(const SceCollectableDouble& ci)
+  {
+    if (this != &ci) {           // Check for assignment to self
+      (this->RWCollectable::operator= ) (ci);
+      dbl_ = ci.dbl_;
+    }
+    return *this;
+  };
+
+  virtual ~SceCollectableDouble(){};
+
+
+  virtual int compareTo(const RWCollectable*c)const
+  { 
+    const SceCollectableDouble* rhs = (const SceCollectableDouble*)c;
+    
+    return
+      (
+      ( fabs( dbl() - rhs->dbl() ) <= /*dblEps_*/ 0.0 )
+      ? 0
+      : ( ( dbl() < rhs->dbl() )
+      ? -1 
+      : 1
+      )
+      );
+  }
+  
+  virtual RWBoolean operator==(const SceCollectableDouble& c) const
+  { return isEqual(&c); };
+  
+  virtual RWBoolean isEqual(const RWCollectable* c) const
+  { 
+    return compareTo(c) == 0;
+  }
+
+  virtual double	dbl() const {return dbl_;};
+
+  virtual double dbl(double value){dbl_=value;return value;};
+
+  virtual unsigned hash() const{return (unsigned)(10.*dbl());};
+
+private:
+  double dbl_;
+  
+  //static double dblEps_;
+};	  
+RWDEFINE_NAMED_COLLECTABLE (SceCollectableDouble, "SceCollectableDouble");
+//double SceCollectableDouble::dblEps_ = .00001;
+d20 2
+d33 1
+a33 1
+                                 RWHashDictionary & consDict,
+d40 2
+a41 3
+  SceConstCharStar_Int * key = 
+              new SceConstCharStar_Int(consumedPartName,consPeriod);
+  SceCollectableDouble * newConsVol = new SceCollectableDouble(deltaConsVol);
+d44 3
+a46 2
+  RWCollectable* insertRc=consDict.insertKeyAndValue(key,newConsVol);
+  
+d48 15
+a62 10
+  if ( insertRc==NULL ){        
+    RWCollectable * existingConsVolCol;
+    consDict.findKeyAndValue(key, existingConsVolCol);
+    SceCollectableDouble * existingConsVol = 
+              (SceCollectableDouble *) existingConsVolCol;
+    double updatedConsVol = existingConsVol->dbl() + deltaConsVol;
+    existingConsVol->dbl(updatedConsVol);
+    witFree(consumedPartName);
+    delete key;
+    delete newConsVol;
+d83 2
+a84 2
+  RWBoolean increment,
+  RWHashDictionary & consDict )
+d114 2
+a115 2
+                                     RWBoolean isExecVol,
+                                     RWHashDictionary & consDict)
+d151 3
+a153 3
+                                                   RWBoolean sceConsVol,
+                                                   RWBoolean ignoreSubstituteUsage,
+                                                   RWHashDictionary & consDict
+a176 3
+    // Size consDict hashtable if first loop iteration
+    if ( sp==firstShipPeriod )consDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+    
+d186 1
+a186 1
+          opNameList[op],b,execPeriodList[op],peggedExecVolList[op],TRUE,
+d200 43
+a242 1
+    if ( ignoreSubstituteUsage ) {
+d244 2
+a245 60
+      //----------------------------------------------------
+      // Get SubVol. Update existing consVol and compute new consVols
+      //----------------------------------------------------
+      float * peggedSubVolList=NULL;
+      int * bomEntryIndexList=NULL;
+      int * subsBomEntryIndexList=NULL;
+      witGetDemandSubVolPegging (wr,partName,demandName,sp,
+        &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+        &execPeriodList,&peggedSubVolList);
+      
+      // Loop once per operation with an SubVol
+      for ( op=0; op<lenOpList; op++ ){
+        
+        // The consVol of the part connected to the bom is now decremented
+        updateConsDictFromExecOrSubVolAndBom( wr, 
+          opNameList[op],bomEntryIndexList[op],execPeriodList[op],peggedSubVolList[op],FALSE,
+          consDict);
+        
+        // Now increment consVol due to subVol 
+        // get name of consumed part
+        char * consumedPartName;
+        witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+          bomEntryIndexList[op], subsBomEntryIndexList[op], 
+          &consumedPartName );    
+        
+        // get consumption rate
+        float * consRate;
+        witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+          bomEntryIndexList[op], subsBomEntryIndexList[op], 
+          &consRate );
+        
+        // get fallout rate
+        float falloutRate;
+        witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+          bomEntryIndexList[op], subsBomEntryIndexList[op], 
+          &falloutRate );
+        
+        // get impact periods
+        int * impactPeriod;
+        witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+          bomEntryIndexList[op], subsBomEntryIndexList[op], 
+          &impactPeriod );
+        
+        computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+          peggedSubVolList[op], execPeriodList[op], TRUE, consDict );
+        
+        witFree(impactPeriod);
+        witFree(consRate);
+      }
+      witFree(bomEntryIndexList);
+      witFree(subsBomEntryIndexList);
+      witFree(peggedSubVolList);
+      
+      
+      // Free storage allocated by witGetDemandExecVolPegging
+      for ( op=0; op<lenOpList; op++ ){
+        witFree(opNameList[op]);
+      }
+      witFree(opNameList);
+      witFree(execPeriodList);
+d247 14
+d290 2
+a291 2
+   RWBoolean sceConsVol,
+   RWBoolean ignoreSubstituteUsage
+d300 3
+a302 4
+  *partNameList = NULL;
+  *consPeriodList = NULL;
+  *peggedConsVolList = NULL;
+
+d305 1
+a305 1
+  RWHashDictionary consDict;
+d314 2
+a315 1
+  *lenLists = consDict.entries();
+d321 27
+d349 6
+a354 1
+  RWHashDictionaryIterator  iter(consDict);
+d378 17
+d396 1
+d412 2
+a413 2
+   RWBoolean sceConsVol,
+   RWBoolean ignoreSubstituteUsage
+d419 1
+a419 1
+  //  int nE = ps.entries();
+d428 1
+a428 1
+  RWHashDictionary consDict;
+d434 11
+d446 16
+a461 1
+  RWHashDictionaryIterator  iter(consDict);
+a466 1
+
+d491 1
+a491 1
+    ps.insertKeyAndValue(p,tv);
+d495 1
+a495 1
+  }
+d510 1
+a510 1
+                                                   RWHashDictionary & execDict
+d535 2
+a536 1
+    if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+d571 1
+a571 1
+  RWHashDictionary execDict;
+d577 11
+d589 17
+a605 1
+  RWHashDictionaryIterator  iter(execDict);
+d635 1
+a635 1
+    os.insertKeyAndValue(o,tv);
+d639 1
+a639 1
+  }
+d777 1
+a777 1
+  RWCString filenames[46];  
+d799 1
+a799 1
+  RWCString & diner = filenames[18];
+d841 1
+a841 1
+    fprintf(stderr, "  %d: using file: %s \n",f,filenames[f].data());
+d846 2
+a847 2
+       RWBoolean sceConsVol=FALSE;
+       if (consVolType==1) sceConsVol = TRUE;
+d854 2
+a855 2
+      witSetPerfPegging(wr,TRUE);
+      witReadData(wr, filenames[f].data());
+a877 1
+          
+d931 3
+d1022 1
+a1022 2
+      
+      
+d1027 4
+a1030 4
+        //cout 
+        //  <<"============================" <<endl
+        //  <<"S=" <<s <<endl
+        //  <<temp.format() <<endl;
+d1032 1
+a1032 1
+        for ( e=0; e<temp.entries() ; e++ ) {
+d1043 2
+a1044 3
+    }
+  //}
+
+d1063 1
+a1063 1
+          ps,TRUE,FALSE);
+d1130 3
+a1132 3
+    //cout 
+    //  <<"============================" <<endl
+    //  <<temp.format() <<endl;
+d1135 1
+a1135 1
+    for ( e=0; e<temp.entries() ; e++ ) {
+a1142 1
+  }
+d1162 2
+a1163 2
+    witSetPerfPegging(wr,TRUE);
+    witReadData(wr, diner.data());
+d1191 1
+a1191 1
+          dad->ps1, TRUE);
+d1219 1
+a1219 1
+          dad->ps2, TRUE);
+d1237 3
+a1239 3
+        cout 
+          <<"--------------------" <<endl
+          <<"Demand: " <<demList[d]  <<" Part: " <<partList[p] <<endl;
+d1255 3
+a1257 2
+        int ncp = total.entries();
+        for ( int cp=0; cp<ncp; cp++ ) {
+d1260 1
+a1260 1
+          cout <<"  Consumed part: " <<part.name() <<endl;
+d1269 3
+a1271 3
+          cout <<"    implosion 1: ";
+          for ( t=0; t<nPeriods; ++t ) cout <<" " <<tv1[t];
+          cout <<endl;
+d1273 7
+a1279 7
+          cout <<"    implosion 2: ";
+          for ( t=0; t<nPeriods; ++t ) cout <<" " <<tv2[t];
+          cout <<endl;
+
+          cout <<"    total:       ";
+          for ( t=0; t<nPeriods; ++t ) cout <<" " <<tvT[t];
+          cout <<endl;
+d1283 1
+a1283 1
+        cout 
+d1285 1
+a1285 1
+          <<demList[d] <<endl <<ev1Const.format() <<endl;
+@
+
+
+1.9.2.1
+log
+@Roguewave is gone
+@
+text
+@a0 7
+
+// RW2STL - inserted:
+#include <map>
+#include <string>
+#include <ostream.h>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+d3 2
+d22 122
+d154 1
+a154 1
+                                 PartNamePeriodConsVolDictionary & consDict,
+d161 3
+a163 2
+  SceConstCharStar_Int key(consumedPartName,consPeriod);
+  SceCollectableDouble newConsVol(deltaConsVol);
+d166 2
+a167 3
+  bool inserted = consDict.insert( PartNamePeriodConsVolPair( key,
+                                                            newConsVol ) ).second;
+
+d169 10
+a178 15
+  if( !inserted )
+  {        
+    PartNamePeriodConsVolDictionary::iterator it = consDict.find(key);
+
+    SceCollectableDouble& val = (*it).second;
+    double updatedConsVol = val.dbl() + deltaConsVol;
+    val.dbl(updatedConsVol);
+
+//    SCECollectable * existingConsVolCol;
+//    SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+//    double updatedConsVol = existingConsVol->dbl() + deltaConsVol;
+//    existingConsVol->dbl(updatedConsVol);
+//    witFree(consumedPartName);
+    //delete key;
+    //delete newConsVol;
+d199 2
+a200 2
+  bool increment,
+  PartNamePeriodConsVolDictionary & consDict )
+d230 2
+a231 2
+                                     bool isExecVol,
+                                     PartNamePeriodConsVolDictionary & consDict)
+d267 3
+a269 3
+                                                   bool sceConsVol,
+                                                   bool ignoreSubstituteUsage,
+                                                   PartNamePeriodConsVolDictionary & consDict
+d293 3
+d305 1
+a305 1
+          opNameList[op],b,execPeriodList[op],peggedExecVolList[op],true,
+d319 1
+a319 43
+    if( ignoreSubstituteUsage ) {
+        //----------------------------------------------------
+        // Get SubVol. Update existing consVol and compute new consVols
+        //----------------------------------------------------
+        float * peggedSubVolList;
+        int * bomEntryIndexList;
+        int * subsBomEntryIndexList;
+        witGetDemandSubVolPegging (wr,partName,demandName,sp,
+          &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+          &execPeriodList,&peggedSubVolList);
+    
+        // Loop once per operation with an SubVol
+        for ( op=0; op<lenOpList; op++ ){
+      
+          // The consVol of the part connected to the bom is now decremented
+          updateConsDictFromExecOrSubVolAndBom( wr, 
+            opNameList[op],bomEntryIndexList[op],execPeriodList[op],peggedSubVolList[op],false,
+            consDict);
+      
+          // Now increment consVol due to subVol 
+          // get name of consumed part
+          char * consumedPartName;
+          witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &consumedPartName );    
+      
+          // get consumption rate
+          float * consRate;
+          witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &consRate );
+      
+          // get fallout rate
+          float falloutRate;
+          witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &falloutRate );
+
+          // get impact periods
+          int * impactPeriod;
+          witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+            bomEntryIndexList[op], subsBomEntryIndexList[op], 
+            &impactPeriod );
+d321 60
+a380 2
+          computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+            peggedSubVolList[op], execPeriodList[op], true, consDict );
+a381 14
+          witFree(impactPeriod);
+          witFree(consRate);
+        }
+        // Free storage allocated by witGetDemandExecVolPegging
+        witFree(bomEntryIndexList);
+        witFree(subsBomEntryIndexList);
+        witFree(peggedSubVolList);
+
+        for ( op=0; op<lenOpList; op++ ){
+          witFree(opNameList[op]);
+        }
+        witFree(opNameList);
+        witFree(execPeriodList);
+
+d411 2
+a412 2
+   bool sceConsVol,
+   bool ignoreSubstituteUsage
+d421 4
+a424 3
+  *partNameList = 0;
+  *consPeriodList = 0;
+  *peggedConsVolList = 0;
+d427 1
+a427 1
+  PartNamePeriodConsVolDictionary consDict;
+d436 1
+a436 2
+#if 1
+  *lenLists = consDict.size();
+a441 27
+#else
+  int np;
+  witGetNPeriods(wr,&np);
+  int maxLenList = ps.size()*np;
+  if ( maxLenList>0 ) {
+    *partNameList = (char **)malloc((maxLenList)*sizeof(char *));
+    *consPeriodList = (int *)malloc((maxLenList)*sizeof(int));
+    *peggedConsVolList = (float *)malloc((maxLenList)*sizeof(float));
+  }
+#endif
+
+#if 1
+  int i=0;
+  for( PartNamePeriodConsVolDictionary::iterator it = consDict.begin();
+        it != consDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+    {
+      (*lenLists)--;
+      continue;
+    }
+d443 1
+a443 6
+    (*partNameList)[i] = strdup(key.getCharStar());
+    (*consPeriodList)[i] = key.getInt();
+    (*peggedConsVolList)[i] = (float)v.dbl();
+    i++;
+  }
+/*RWHashDictionaryIterator  iter(consDict);
+a466 17
+  }*/
+#else
+  int e; 
+  int ne=ps.size();
+  const LgFrSortingPartScheduleFloat & psc = ps;
+  for ( e=0; e<ne; ++e ) {
+     const LgFrItemTimeVecPairFloat & itv = psc[e];
+     const LgFrPart & pn = itv.part();
+     const LgFrTimeVecFloat & tv = itv.timeVecFloat();
+     int t;
+     for ( t=0; t<np; ++t ) {
+       if ( tv[t]<=0.0 ) continue; 
+       (*consPeriodList)[*lenLists] = t;
+       (*peggedConsVolList)[*lenLists] = tv[t];
+       (*partNameList)[*lenLists] = strdup(pn.name()); 
+       (*lenLists)++;
+     }
+a467 1
+#endif
+d483 2
+a484 2
+   bool sceConsVol,
+   bool ignoreSubstituteUsage
+d490 1
+a490 1
+  //  int nE = ps.size();
+d499 1
+a499 1
+  PartNamePeriodConsVolDictionary consDict;
+a504 26
+  for( PartNamePeriodConsVolDictionary::iterator it = consDict.begin();
+        it != consDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+
+    LgFrPart p(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (ps.findValue(p,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    ps.insertKeyAndValue(p,tv);
+  }
+d506 1
+a506 1
+  /*RWHashDictionaryIterator  iter(consDict);
+d512 1
+d537 1
+a537 1
+    ps.insert(p,tv);
+d541 1
+a541 1
+  }*/
+d556 1
+a556 1
+                                                   PartNamePeriodConsVolDictionary & execDict
+d581 1
+a581 2
+    // can't resize std::map
+    // if ( sp==firstShipPeriod )execDict.resize(lenOpList*20*(lastShipPeriod-firstShipPeriod));
+d616 1
+a616 1
+  PartNamePeriodConsVolDictionary execDict;
+a621 11
+  for( PartNamePeriodConsVolDictionary::iterator it = execDict.begin();
+        it != execDict.end();
+        it++ )
+  {
+    //LgFrModelClient* mc = *it;
+    SceConstCharStar_Int key = (*it).first;
+    SceCollectableDouble v = (*it).second;
+    // don't add zero consVols to returned list
+    // TOM_WAS_HERE_
+    if ( (v.dbl() > -0.0001) && (v.dbl() < 0.0001) ) 
+      continue;
+d623 1
+a623 17
+    LgFrPart o(key.getCharStar());
+    LgFrTimeVecFloat tv(nPeriods);
+    int t=key.getInt();
+    // Is part already in schedule
+    if (os.findValue(o,tv)) {
+      // part is in schedule, update timeVec
+      tv[t] = tv[t] + (float)v.dbl();
+    }
+    else {
+      // part is not in schedule, so insert it
+      tv[t] = (float)v.dbl();
+    }
+    os.insertKeyAndValue(o,tv);
+  }
+
+
+/*  RWHashDictionaryIterator  iter(execDict);
+d653 1
+a653 1
+    os.insert(o,tv);
+d657 1
+a657 1
+  }*/
+d795 1
+a795 1
+  std::string filenames[46];  
+d817 1
+a817 1
+  std::string & diner = filenames[18];
+d859 1
+a859 1
+    fprintf(stderr, "  %d: using file: %s \n",f,filenames[f].c_str());
+d864 2
+a865 2
+       bool sceConsVol=false;
+       if (consVolType==1) sceConsVol = true;
+d872 2
+a873 2
+      witSetPerfPegging(wr,true);
+      witReadData(wr, filenames[f].c_str());
+d896 1
+a949 3
+          
+        if( p == 225 )
+            p = 225;
+d1038 2
+a1039 1
+    
+d1049 1
+a1049 1
+        for ( e=0; e<temp.size() ; e++ ) {
+d1060 3
+a1062 2
+    } // for each consVolType
+  } // for each file
+d1081 1
+a1081 1
+          ps,true,false);
+d1153 1
+a1153 1
+    for ( e=0; e<temp.size() ; e++ ) {
+d1161 1
+d1181 2
+a1182 2
+    witSetPerfPegging(wr,true);
+    witReadData(wr, diner.c_str());
+d1210 1
+a1210 1
+          dad->ps1, true);
+d1238 1
+a1238 1
+          dad->ps2, true);
+d1274 2
+a1275 3
+        int ncp = total.size();
+        int cp = 0; // Pulled out of the for below by RW2STL
+        for ( cp=0; cp<ncp; cp++ ) {
+@
+
+
+1.9.2.2
+log
+@Went all the way to std::cout
+@
+text
+@d5 1
+a5 1
+#include <iostream>
+d1031 4
+a1034 4
+        //std::cout 
+        //  <<"============================" << std::endl
+        //  <<"S=" <<s << std::endl
+        //  <<temp.format() << std::endl;
+d1134 3
+a1136 3
+    //std::cout 
+    //  <<"============================" << std::endl
+    //  <<temp.format() << std::endl;
+d1241 3
+a1243 3
+        std::cout 
+          <<"--------------------" << std::endl
+          <<"Demand: " <<demList[d]  <<" Part: " <<partList[p] << std::endl;
+d1264 1
+a1264 1
+          std::cout <<"  Consumed part: " <<part.name() << std::endl;
+d1273 3
+a1275 3
+          std::cout <<"    implosion 1: ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tv1[t];
+          std::cout << std::endl;
+d1277 7
+a1283 7
+          std::cout <<"    implosion 2: ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tv2[t];
+          std::cout << std::endl;
+
+          std::cout <<"    total:       ";
+          for ( t=0; t<nPeriods; ++t ) std::cout <<" " <<tvT[t];
+          std::cout << std::endl;
+d1287 1
+a1287 1
+        std::cout 
+d1289 1
+a1289 1
+          <<demList[d] << std::endl <<ev1Const.format() << std::endl;
+@
+
+
+1.9.2.3
+log
+@Removed STD_CPP_LIB #ifdefs
+@
+text
+@d19 7
+a25 3
+
+#include <iostream>
+#include <fstream>
+@
+
+
+1.8
+log
+@Added ability to exclude substitute parts in pegging
+@
+text
+@d268 1
+a268 1
+                                                   RWBoolean considerSubstituteUsage,
+d319 1
+a319 13
+    
+    //----------------------------------------------------
+    // Get SubVol. Update existing consVol and compute new consVols
+    //----------------------------------------------------
+    float * peggedSubVolList;
+    int * bomEntryIndexList;
+    int * subsBomEntryIndexList;
+    witGetDemandSubVolPegging (wr,partName,demandName,sp,
+      &lenOpList,&opNameList,&bomEntryIndexList,&subsBomEntryIndexList,
+      &execPeriodList,&peggedSubVolList);
+    
+    // Loop once per operation with an SubVol
+    for ( op=0; op<lenOpList; op++ ){
+d321 9
+a329 4
+      // The consVol of the part connected to the bom is now decremented
+      updateConsDictFromExecOrSubVolAndBom( wr, 
+        opNameList[op],bomEntryIndexList[op],execPeriodList[op],peggedSubVolList[op],FALSE,
+        consDict);
+d331 8
+a338 1
+      if ( considerSubstituteUsage ) {
+d370 12
+a382 12
+    
+    
+    // Free storage allocated by witGetDemandExecVolPegging
+    for ( op=0; op<lenOpList; op++ ){
+      witFree(opNameList[op]);
+    }
+    witFree(opNameList);
+    witFree(execPeriodList);
+    witFree(bomEntryIndexList);
+    witFree(subsBomEntryIndexList);
+    witFree(peggedSubVolList);
+    
+d412 1
+a412 1
+   RWBoolean considerSubstituteUsage
+d430 1
+a430 1
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,considerSubstituteUsage,
+d484 1
+a484 1
+   RWBoolean considerSubstituteUsage
+d502 1
+a502 1
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,considerSubstituteUsage,
+@
+
+
+1.7
+log
+@
+
+NOTE CONCERNING FOR-SEMANTICS.
+
+In old C++ semantics, this was illegal:
+	for (int i=...) { ...}
+	for (int i=...) { ...}
+
+because the scope of i extended beyond the first for-loop, making
+the second declaration a conflict.
+
+In new C++ semantics, this is illegal:
+	for (int i=...) { ...}
+	for (i=...) { ...}
+
+because the scope of i extends in the first for-loop, making
+the use of "i" in the second loop unbound.
+
+We can't have it both ways.  We could convert the source to be this:
+	inti;
+	for (i=...) { ...}
+	for (i=...) { ...}
+
+but rather than do that, I have opted to just use a special flag
+("-qlanglvl=noansifor") to tell vacpp to use the old semantics.
+This flag is in config/p_powerVac.mk.
+We can always convert these for loops later if we like, and take
+out the flag.
+
+
+Now some notes concerning what I did in the various components.
+Hopefully no one will ever have to read this.
+
+CONFIG:
+changed config/p_powerVac.mk by copying setting for ds_comp_std_flags
+from config/p_power64v5.mk, to suppress error messages concerning
+the technique to avoid accidental use of compiler-generated constructors.
+
+WITUTIL:
+changed return type of "main" to int in several files.
+
+SCENARIO and SCE:
+In many files, some member declarations had (unnecessary) qualifiers:
+
+	class S {
+	S::f();
+	};
+
+The obvious solution was to just remove the "S::" qualifier.
+
+
+
+In some files (such as ipDifT.h), a member declaration using a class
+name in a return type caused a syntax error; the compiler complained
+about ambiguity.
+
+	class X {
+	C f();
+	};
+
+Solution:  add "class C" in front.  Should really have no possible problems.
+
+	class C;
+	class X {
+	C f();
+	};
+
+
+
+Some classes declared protected members of other classes to be friends:
+
+	class A {
+	protected:
+	  int mem();
+	};
+
+	class B {
+	friend int A::mem();
+	};
+
+This is evidentally now illegal.  I suppose it makes sense that one
+should already have access to the thing that one wants to be a friend of.
+
+My solution was to just drop the "protected" keyword.
+This allows everyone access to these members (which is presumably
+undesirable), but at least doesn't allow the friend classes access
+to the private data of this class (which presumably is desired).
+
+Another alternative would be to keep the "protected" keyword and
+add "friend class A" to the friend class.
+The situation is now reversed; it would have the drawback of allowing
+the friend class access to private data (which presumably isn't desired),
+but would disallow non-friends access to these protected members.
+
+
+
+
+attrInfo.h:  typedef declarations for functions types cannot have
+default arguments, i.e. this is illegal:
+
+	typedef int (*f)(int x = 1);
+
+Solution:  drop the default argument:
+
+	typedef int (*f)(int x);
+
+(I suppose this makes sense, given that the treatment of default arguments
+seems to have gotten a bit complicated - you can add and remove them
+using new declarations.)
+
+
+
+(THIS NOTE IS OBSOLETE since I ended up leaving these for-loops alone.
+However, it may be useful if we ever do convert the source to the
+new syntax.
+calendar.C, consSS.C, difCmrpF.C, difWit[DR].C:
+  added "int" (or size_t, as appropriate) to "for" loops:
+
+was:
+	for (int t=...) { ..}
+	for (t=...) { ..}
+
+now:
+	for (int t=...) { ..}
+	for (int t=...) { ..}
+
+This is ok since t is initialized in each loop.
+
+This wasn't possible in one spot in sched.C, in LgFrScheduleFloat::reduceItems.
+It also wasn't possible in a spot in sce/ipSce.C.
+It had code like this:
+	int t;
+	... code setting t
+	for (...) {
+	  for (int t = ...)
+		...
+	  somevar = t;
+	}
+
+According to the old rules, the assignment "somevar = t" refers to the
+t in the nested for-loop.  I've changed it to this:
+
+	for (...) {
+	  int t;
+	  for (t = ...)
+		...
+	  somevar = t;
+	}
+
+Fortunately, in most places the loop was not nested inside some other
+construct, which makes it likely that I didn't make any mistakes.
+
+END OBSOLETE NOTE)
+
+
+
+demdSchd.C, partSchd.C, scenATP.C, ...:
+  apparently, expressions that refer to a pointer-to-member must use "&":
+	class C {
+	int f();
+	};
+
+	g(C::f);	// ILLEGAL
+	g(&C::f);	// GOOD BOY!
+
+(maybe this makes parsing easier?)
+
+
+
+dfa.C:  changed
+	#include "dfa.h"
+to
+	#include <scenario/src/dfa.h>
+
+so that the depedency generated by makedepend (and that ends up in Makefile)
+doesn't cause problems.
+
+
+
+
+lastPrbS.C:  "bool" is now a keyword.  Changed variable "bool" to "Bool".
+
+
+
+
+
+multDSch.C:
+
+start with this decl:
+
+    LgFrMultiDemandScheduleFloat& msdClone = *msdClonePtr;
+
+and this call:
+
+    const LgFrSortingDemandScheduleFloat& demandSchdClone
+      = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+
+
+LgFrMultiDemandScheduleFloat (in multDSch.h) apparently inherits the
+declaration of method "schedule" from its baseclass, LgFrMultiScheduleFloat
+(in multiSch.h).
+
+  // Return a non-const schedule
+  virtual
+    LgFrSortingScheduleFloatSmartPointer
+     schedule(const LgFrScheduleDescriptor& sd) const;
+
+
+class LgFrSortingScheduleFloatSmartPointer is defined in sortSchP.h.
+Its baseclass is LgFrSortingScheduleFloatSmartPointerToConst,
+defined in the same file, and that has no baseclass.
+
+class LgFrSortingDemandScheduleFloatSmartPointer is defined in demdSchP.h,
+and looks similar to LgFrSortingScheduleFloatSmartPointer,
+probably one was copied from the other and the names were changed.
+
+So, the problematic statement is probably the equivalent of casting a pointer.
+
+This was the code I used instead.
+It may just be that one can't cast using "&" anymore.
+
+    LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+    LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+    const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+
+
+This is *probably* ok, since both smartpointers have the same private
+data fields (in their basetypes).  The code snippets below give the
+general idea.  I imagine that this would all be done with templates
+these days (if there isn't already a smartpointer library somewhere).
+
+
+
+protected:
+    LgFrSortingDemandScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingDemandScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+
+
+protected:
+    LgFrSortingScheduleFloat* pointer_; // should make this const but I want to use
+                            //  it for the LgFrSortingScheduleFloatSmartPointer class
+			    //  (the non-const class) to inherit this member.
+			    //  The way it's been set up only const stuff
+                            //  is being returned so we're OK.
+    LgFrReferenceCount count_;
+
+
+Dereference is just what it should be:
+
+
+const LgFrSortingDemandScheduleFloat &
+LgFrSortingDemandScheduleFloatSmartPointer::operator*() const
+{
+    return *pointer_;
+}
+
+LgFrSortingScheduleFloat &
+LgFrSortingScheduleFloatSmartPointer::operator*()
+{
+    return *pointer_;
+}
+
+
+
+SCE:
+Created powerVac/Makefile
+by copying power64/Makefile and just changine "power64" to "powerVac".
+
+
+
+
+
+For convenience, here is the output of these commands:
+
+	cvs diff scenario/src
+	cvs diff sce/src
+
+
+Index: scenario/src/attrInfo.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/attrInfo.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 attrInfo.h
+17c17,20
+< 	       const LgFrDataInterfaceEssentials* difEssenPtr = NULL);
+---
+>
+> 	       // syntax error - typedefs can (no longer) have default args
+> 	       const LgFrDataInterfaceEssentials* difEssenPtr /////= NULL
+> 	       );
+47c50
+< LgFrAttributeInformation::LgFrAttributeInformation(const LgFrAttributeInformation& );
+---
+> LgFrAttributeInformation(const LgFrAttributeInformation& );
+Index: scenario/src/backlgSS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/backlgSS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 backlgSS.h
+83c83
+<   LgFrBacklogScheduleStrategy::contextTest
+---
+>   contextTest
+Index: scenario/src/calendar.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/calendar.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 calendar.h
+252c252
+<   LgFrCalendar::addMonths(const RWTime& aTime, unsigned numMonthsOut,
+---
+>   addMonths(const RWTime& aTime, unsigned numMonthsOut,
+281c281
+<   LgFrCalendar::display()
+---
+>   display()
+Index: scenario/src/demdSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/demdSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 demdSchd.C
+273c273
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+288c288
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+452c452
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+475c475
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+496c496
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+514c514
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/dfa.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/dfa.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 dfa.C
+14c14,16
+< #include "dfa.h"
+---
+>
+> //#include "dfa.h"
+> #include <scenario/src/dfa.h>
+Index: scenario/src/filtStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/filtStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 filtStrt.h
+89c89,90
+< protected:
+---
+>   // see the comment in schdStrt.h.
+>   /////protected:
+Index: scenario/src/fssCtrl.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/fssCtrl.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 fssCtrl.h
+109c109
+<         LgFrFocussedShortageScheduleControl::isValid()
+---
+>         isValid()
+117c117
+<         LgFrFocussedShortageScheduleControl::focusChanged()
+---
+>         focusChanged()
+151c151
+<    LgFrFocussedShortageScheduleControl::LgFrFocussedShortageScheduleControl(
+---
+>    LgFrFocussedShortageScheduleControl(
+Index: scenario/src/ipDifT.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/ipDifT.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 ipDifT.h
+10a11,15
+>
+> // added to avoid syntax error in declaration of difTestingScenario below - vra
+> class LgFrScenarioForDifTestingSmartPointer;
+>
+>
+Index: scenario/src/lastPrbS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 lastPrbS.C
+98c98
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+100,101c100,101
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+248c248
+<    witBoolean bool;
+---
+>    witBoolean Bool;
+250,251c250,251
+<       witRunVeneer().constWitRun(), &bool );
+<    if ( bool ) return TRUE;
+---
+>       witRunVeneer().constWitRun(), &Bool );
+>    if ( Bool ) return TRUE;
+Index: scenario/src/lastPrbS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/lastPrbS.h,v
+retrieving revision 1.2
+diff -r1.2 lastPrbS.h
+182c182
+<         LgFrLastProblemSolved::focusHorizon(
+---
+>         focusHorizon(
+686c686
+<         LgFrLastProblemSolved::cumShipBounds(
+---
+>         cumShipBounds(
+760c760
+<         LgFrLastProblemSolved::cumShipSoftLowerBound(
+---
+>         cumShipSoftLowerBound(
+910c910
+<       LgFrLastProblemSolved::getPartFloatVecAttribute(
+---
+>       getPartFloatVecAttribute(
+917c917
+<        LgFrLastProblemSolved::setPartFloatVecAttribute(
+---
+>        setPartFloatVecAttribute(
+924c924
+<       LgFrLastProblemSolved::setPartBoundsAttribute(
+---
+>       setPartBoundsAttribute(
+933c933
+<       LgFrLastProblemSolved::getDemandFloatVecAttribute(
+---
+>       getDemandFloatVecAttribute(
+940c940
+<       LgFrLastProblemSolved::getDemandSoftLowerBoundAttribute(
+---
+>       getDemandSoftLowerBoundAttribute(
+947c947
+<       LgFrLastProblemSolved::setDemandBoundsAttribute(
+---
+>       setDemandBoundsAttribute(
+956c956
+<    LgFrLastProblemSolved::writeSchedule(
+---
+>    writeSchedule(
+Index: scenario/src/multDSch.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/multDSch.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 multDSch.C
+436,438c436,446
+<
+<     const LgFrSortingDemandScheduleFloat& demandSchdClone
+<       = *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+---
+>
+>     //// LET'S TRY THIS AGAIN...
+>     /////const LgFrSortingDemandScheduleFloat& demandSchdClone
+>     /////= *( (LgFrSortingDemandScheduleFloatSmartPointer&)(msdClone.schedule(LGFRDemandVolume)) );
+>
+>     LgFrSortingScheduleFloatSmartPointer XtmpschX = msdClone.schedule(LGFRDemandVolume);
+>     LgFrSortingDemandScheduleFloatSmartPointer &XtmpschX2 = *(LgFrSortingDemandScheduleFloatSmartPointer*)&XtmpschX;
+>     const LgFrSortingDemandScheduleFloat& demandSchdClone = *(XtmpschX2);
+>
+>     ///// DONE
+>
+Index: scenario/src/outInter.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/outInter.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 outInter.h
+43c43
+<   static const LgFrSchedulePrintStyle LgFrSolutionOutputInterface::pmTEXT;
+---
+>   static const LgFrSchedulePrintStyle pmTEXT;
+Index: scenario/src/pairComp.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/pairComp.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 pairComp.h
+84c84,86
+< protected:
+---
+>   // in scenario.h, class LgFrScenario declares these methods to be "friend".
+>   // see the comment in schdStrt.h.
+>   //// protected:
+Index: scenario/src/partSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/partSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 partSchd.C
+261c261
+<   LgFrTimeVecFloat::add,rhs);
+---
+>   &LgFrTimeVecFloat::add,rhs);
+276c276
+<   LgFrTimeVecFloat::subtract,rhs);
+---
+>   &LgFrTimeVecFloat::subtract,rhs);
+443c443
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+466c466
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+487c487
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+503c503
+<   LgFrTimeVecFloat::subtract, rhs );
+---
+>   &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/scenATP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenATP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenATP.C
+484c484
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+513c513
+<           LgFrTimeVecFloat::returnRHS, newVol ) );
+---
+>           &LgFrTimeVecFloat::returnRHS, newVol ) );
+Index: scenario/src/scenSnFS.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenSnFS.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenSnFS.h
+16c16
+<   LgFrScenarioSensitiveFilterStrategy::scenario(
+---
+>   scenario(
+21c21
+<   LgFrScenarioSensitiveFilterStrategy::scenarioPtr()
+---
+>   scenarioPtr()
+Index: scenario/src/scenario.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/scenario.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 scenario.h
+46a47,54
+> // had to add this line in order to avoid syntax error concerning
+> // the uses of this class in members below.
+> // vacpp complained that is was ambiguous.
+> // I don't know why.
+> // Perhaps in older versions of the compiler the friend declarations
+> // below also implicitly declared the class as well?
+> class LgFrScheduleFactory;
+>
+231c239
+<   const LgFrScheduleFactory*
+---
+>     const LgFrScheduleFactory*
+Index: scenario/src/schFCMRP.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFCMRP.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFCMRP.C
+82c82
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+184c184
+<       sumSS->combiningFunction (LgFrTimeVecFloat::add);
+---
+>       sumSS->combiningFunction (&LgFrTimeVecFloat::add);
+370c370
+<       usagePctSS->combiningFunction (LgFrTimeVecFloat::percentageOf);
+---
+>       usagePctSS->combiningFunction (&LgFrTimeVecFloat::percentageOf);
+416c416
+<       deltaSS->combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       deltaSS->combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schFctry.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schFctry.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schFctry.h
+96c96
+< friend LgFrScenarioBuilder;
+---
+> friend class LgFrScenarioBuilder;
+Index: scenario/src/schdSnSS.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdSnSS.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdSnSS.C
+242c242
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+260c260
+<    combiningFunction_(LgFrTimeVecFloat::add),
+---
+>    combiningFunction_(&LgFrTimeVecFloat::add),
+613c613
+<       cs1.combiningFunction (LgFrTimeVecFloat::subtract);
+---
+>       cs1.combiningFunction (&LgFrTimeVecFloat::subtract);
+Index: scenario/src/schdStrt.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/schdStrt.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 schdStrt.h
+141c141,168
+< protected:
+---
+>   ////??????
+>   // in scenario.h, class LgFrScenario declares (most of) the
+>   // following methods to be "friend"s.
+>   // I (vra) can't see how that would have ever been possible,
+>   // given that these are protected methods.
+>   // Perhaps the compilers are just more finicky now.
+>   // As a hack to get this working right away, I will remove the
+>   // protected keyword.
+>   //
+>   // An an alternative, one could add
+>   //    friend class LgFrAttributeScheduleStrategy;
+>   // to the classes that need access (such as LgFrScenario)
+>   // and make these methods protected again.
+>   //
+>   // The differences between these two styles is:
+>   //	dropping "protected" here allows everyone access,
+>   //	(which presumably isn't intended),
+>   //	but denies friends (such as LgFrScenario) access to private members
+>   //	(which presumably is intended).
+>   //
+>   //	in contrast, using friend class LgFrAttributeScheduleStrategy
+>   //	(and putting back the "protected" keyword here)
+>   //	allows the friend classes access to private members
+>   //	(presumably not intended),
+>   //	but denies everyone else access to protected members
+>   //	(presumably intended).
+>   //
+>   ////// protected:
+Index: scenario/src/sched.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.C
+578c578
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+585c585
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+594c594
+<   return op(LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+---
+>   return op(&LgFrTimeVecFloat::maximum,rhs,-FLT_MAX);
+716c716
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+734c734
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+750c750
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+761c761
+<   diff = lhs.op( LgFrTimeVecFloat::subtract, rhs );
+---
+>   diff = lhs.op( &LgFrTimeVecFloat::subtract, rhs );
+Index: scenario/src/sched.h
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sched.h,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sched.h
+81c81
+<       LgFrScheduleFloat::capacity()
+---
+>       capacity()
+Index: scenario/src/sortSchd.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/sortSchd.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 sortSchd.C
+679c679
+<   return lhs.op(LgFrTimeVecFloat::add,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::add,rhs);
+688c688
+<   return lhs.op(LgFrTimeVecFloat::subtract,rhs);
+---
+>   return lhs.op(&LgFrTimeVecFloat::subtract,rhs);
+Index: scenario/src/wrkgProb.C
+===================================================================
+RCS file: /u/wit/devbase/scenario/src/wrkgProb.C,v
+retrieving revision 1.1.1.1
+diff -r1.1.1.1 wrkgProb.C
+641c641
+<                LgFrLastProblemSolved::capitalCost);
+---
+>                &LgFrLastProblemSolved::capitalCost);
+650c650
+<                       LgFrLastProblemSolved::capitalCost );
+---
+>                       &LgFrLastProblemSolved::capitalCost );
+660c660
+<                LgFrLastProblemSolved::equitability);
+---
+> 	     &LgFrLastProblemSolved::equitability);
+669c669
+<                       LgFrLastProblemSolved::equitability );
+---
+> 		    &LgFrLastProblemSolved::equitability );
+679c679
+<                LgFrLastProblemSolved::buildAhead);
+---
+> 		   &LgFrLastProblemSolved::buildAhead);
+688c688
+<                       LgFrLastProblemSolved::buildAhead );
+---
+> 			  &LgFrLastProblemSolved::buildAhead );
+698c698
+<                LgFrLastProblemSolved::computeCriticalList);
+---
+> 		   &LgFrLastProblemSolved::computeCriticalList);
+707c707
+<                       LgFrLastProblemSolved::computeCriticalList );
+---
+> 			  &LgFrLastProblemSolved::computeCriticalList );
+717c717
+<                LgFrLastProblemSolved::inventoryCost);
+---
+>                &LgFrLastProblemSolved::inventoryCost);
+726c726
+<                       LgFrLastProblemSolved::inventoryCost );
+---
+>                       &LgFrLastProblemSolved::inventoryCost );
+736c736
+<                LgFrLastProblemSolved::obj2WeightInventory);
+---
+>                &LgFrLastProblemSolved::obj2WeightInventory);
+745c745
+<                       LgFrLastProblemSolved::obj2WeightInventory );
+---
+>                       &LgFrLastProblemSolved::obj2WeightInventory );
+755c755
+<                LgFrLastProblemSolved::obj2WeightRevenue);
+---
+>                &LgFrLastProblemSolved::obj2WeightRevenue);
+764c764
+<                       LgFrLastProblemSolved::obj2WeightRevenue );
+---
+>                       &LgFrLastProblemSolved::obj2WeightRevenue );
+774c774
+<                LgFrLastProblemSolved::obj2WeightService);
+---
+>                &LgFrLastProblemSolved::obj2WeightService);
+783c783
+<                       LgFrLastProblemSolved::obj2WeightService );
+---
+>                       &LgFrLastProblemSolved::obj2WeightService );
+793c793
+<                LgFrLastProblemSolved::obj2WeightSubstitutes);
+---
+>                &LgFrLastProblemSolved::obj2WeightSubstitutes);
+802c802
+<                       LgFrLastProblemSolved::obj2WeightSubstitutes );
+---
+>                       &LgFrLastProblemSolved::obj2WeightSubstitutes );
+812c812
+<                LgFrLastProblemSolved::weightBounds);
+---
+>                &LgFrLastProblemSolved::weightBounds);
+821c821
+<                       LgFrLastProblemSolved::weightBounds );
+---
+>                       &LgFrLastProblemSolved::weightBounds );
+
+
+
+
+Index: sce/src/aEngMgr.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/aEngMgr.h,v
+retrieving revision 1.5
+diff -r1.5 aEngMgr.h
+77c77
+< LgFrSceAllocationEngineMgr::sortID();
+---
+> sortID();
+Index: sce/src/scePegging.C
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.C,v
+retrieving revision 1.6
+diff -r1.6 scePegging.C
+121c121
+<   virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+---
+>   virtual RWBoolean operator==(const SceCollectableDouble& c) const
+124c124
+<   virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+---
+>   virtual RWBoolean isEqual(const RWCollectable* c) const
+Index: sce/src/scePegging.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scePegging.h,v
+retrieving revision 1.4
+diff -r1.4 scePegging.h
+120c120
+<   void ScePegging::computeConsVolAndUpdateConsDict(
+---
+>   void computeConsVolAndUpdateConsDict(
+Index: sce/src/scenSce.h
+===================================================================
+RCS file: /u/wit/devbase/sce/src/scenSce.h,v
+retrieving revision 1.6
+diff -r1.6 scenSce.h
+35a36,38
+> // added to avoid syntax error - vra
+> class LgFrScenarioForSceSmartPointer;
+>
+@
+text
+@d268 1
+d338 32
+a369 30
+      // Now increment consVol due to subVol 
+      // get name of consumed part
+      char * consumedPartName;
+      witGetSubsBomEntryConsumedPart ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &consumedPartName );    
+      
+      // get consumption rate
+      float * consRate;
+      witGetSubsBomEntryConsRate ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &consRate );
+      
+      // get fallout rate
+      float falloutRate;
+      witGetSubsBomEntryFalloutRate ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &falloutRate );
+      
+      // get impact periods
+      int * impactPeriod;
+      witGetSubsBomEntryImpactPeriod ( wr, opNameList[op], 
+        bomEntryIndexList[op], subsBomEntryIndexList[op], 
+        &impactPeriod );
+      
+      computeConsVolAndUpdateConsDict( wr, consumedPartName, consRate, falloutRate, impactPeriod,
+        peggedSubVolList[op], execPeriodList[op], TRUE, consDict );
+      
+      witFree(impactPeriod);
+      witFree(consRate);
+d411 2
+a412 1
+   RWBoolean sceConsVol
+d425 1
+a425 1
+#if 1
+d430 1
+a430 1
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,
+a431 6
+#else
+  LgFrSortingPartScheduleFloat ps;
+  retVal = getDemandConsVolPegging (
+   wr, partName, demandName,firstShipPeriod, lastShipPeriod,
+    ps, sceConsVol );
+#endif
+a435 1
+#if 1
+a441 10
+#else
+  int np;
+  witGetNPeriods(wr,&np);
+  int maxLenList = ps.entries()*np;
+  if ( maxLenList>0 ) {
+    *partNameList = (char **)malloc((maxLenList)*sizeof(char *));
+    *consPeriodList = (int *)malloc((maxLenList)*sizeof(int));
+    *peggedConsVolList = (float *)malloc((maxLenList)*sizeof(float));
+  }
+#endif
+a442 1
+#if 1
+a467 18
+#else
+  int e; 
+  int ne=ps.entries();
+  const LgFrSortingPartScheduleFloat & psc = ps;
+  for ( e=0; e<ne; ++e ) {
+     const LgFrItemTimeVecPairFloat & itv = psc[e];
+     const LgFrPart & pn = itv.part();
+     const LgFrTimeVecFloat & tv = itv.timeVecFloat();
+     int t;
+     for ( t=0; t<np; ++t ) {
+       if ( tv[t]<=0.0 ) continue; 
+       (*consPeriodList)[*lenLists] = t;
+       (*peggedConsVolList)[*lenLists] = tv[t];
+       (*partNameList)[*lenLists] = strdup(pn.name()); 
+       (*lenLists)++;
+     }
+  }
+#endif
+d483 2
+a484 1
+   RWBoolean sceConsVol
+d502 1
+a502 1
+   wr,partName,demandName,firstShipPeriod,lastShipPeriod,sceConsVol,
+d663 91
+d857 1
+a857 1
+  for (f=0; f<2/*nFiles*/; ++f )  {
+d1061 28
+d1091 1
+d1161 1
+@
+
+
+1.6
+log
+@pegging now picks up negative usage rates and minor message
+@
+text
+@d121 1
+a121 1
+  virtual RWBoolean SceCollectableDouble::operator==(const SceCollectableDouble& c) const
+d124 1
+a124 1
+  virtual RWBoolean SceCollectableDouble::isEqual(const RWCollectable* c) const
+@
+
+
+1.5
+log
+@Added execVol pegging similar to consVol pegging
+@
+text
+@d464 3
+a466 1
+    if ( v->dbl()<=0.0 ) {
+d543 1
+d545 3
+a547 1
+    if ( v->dbl()<=0.0 ) {
+d661 3
+a663 1
+    if ( v->dbl()<=0.0 ) {
+@
+
+
+1.4
+log
+@Fixed up example code not to use reference when inappropriate
+@
+text
+@d259 1
+a259 1
+// Populate HashDictionary with Consumption Voluem
+d568 3
+d572 50
+d623 63
+a685 1
+};
+d690 1
+a690 1
+// notthing to do here
+d693 1
+a693 1
+  // copy constructor
+d698 2
+a699 2
+  
+  // assignment operator
+d706 2
+a707 2
+  
+  // destructor
+d788 3
+a790 1
+  for (f=0; f</*2*/nFiles; ++f )  {
+d794 1
+a794 1
+    // Do to loops, one for sceConsVol and the other wit consVol
+a799 3
+
+      WitRun * wr;
+      
+a807 1
+      int nPeriods;
+d970 1
+a970 1
+      }
+a971 1
+      witDeleteRun(wr);
+d996 70
+d1073 2
+d1114 4
+d1142 4
+d1152 1
+a1152 1
+    // loop over all demands and access consVols
+d1170 2
+d1202 5
+@
+
+
+1.3
+log
+@Added ability to get an LgFrSchedule of pegged consVols
+@
+text
+@d986 1
+a986 1
+          const LgFrPart & part = total.part(cp);
+d992 1
+a992 1
+          const LgFrTimeVecFloat & tvT = total[cp].timeVecFloat();
+@
+
+
+1.2
+log
+@added ability to optionally peg sce's notion of consVol to a demand
+@
+text
+@d9 4
+d256 1
+a256 2
+                                           
+
+d259 2
+a260 2
+// consumption volume pegging code
+//---------------------------------------------------------------------------
+d262 8
+a269 11
+   WitRun * const wr,
+   const char * const partName,
+   const char * const demandName,
+   const int firstShipPeriod,
+   const int lastShipPeriod,
+   int * lenLists,
+   char * * * partNameList,
+   int * * consPeriodList,
+   float * * peggedConsVolList,
+   RWBoolean sceConsVol
+   )
+d272 1
+a272 12
+
+  //----------------------------------------------------
+  // Give return parms an initial value
+  //----------------------------------------------------
+  *lenLists =0;
+  *partNameList = NULL;
+  *consPeriodList = NULL;
+  *peggedConsVolList = NULL;
+
+  // Create dictionary which will contain partName and period as key and consVol as value
+  RWHashDictionary consDict;
+
+d280 1
+a280 1
+
+d283 1
+a283 1
+
+d349 1
+a349 1
+
+d379 1
+a379 1
+
+d392 42
+d438 1
+d445 10
+d456 1
+d480 88
+d615 2
+a616 2
+  filenames[0]="/u/wit/wit-data/examples/wutltest/wit.data";
+  filenames[1]="/u/wit/wit-data/anet/anet/wit.data";
+d680 2
+a681 2
+       RWBoolean sceConsVol=TRUE;
+       if (consVolType==1) sceConsVol = FALSE;
+d688 2
+d698 1
+a698 1
+      
+d704 9
+a712 2
+      RWHashDictionary witConsVolDict(nParts*nPeriods);
+      RWHashDictionary witConsVolDictAllPer(nParts*nPeriods);
+d721 6
+a726 17
+          int t;
+          for (t=0; t<nPeriods; t++ ) {
+            
+            if ( consVol[t] == 0 ) continue;
+            if (consVol[t]>maxConsVol) maxConsVol=consVol[t];
+            
+            SceConstCharStar_Int * key = new SceConstCharStar_Int(partList[p],t);
+            SceCollectableDouble * colConsVol = new SceCollectableDouble(consVol[t]);
+            
+            // insert key and consVol into dicionary
+            RWCollectable* insertRc=witConsVolDict.insertKeyAndValue(key,colConsVol);          
+            assert( insertRc != NULL );
+            
+            key = new SceConstCharStar_Int(partList[p],t);
+            colConsVol = new SceCollectableDouble(consVol[t]);
+            insertRc=witConsVolDictAllPer.insertKeyAndValue(key,colConsVol);          
+            assert( insertRc != NULL );
+d728 1
+d741 16
+a756 20
+              for ( t=0; t<nPeriods; t++ ) {
+                
+                if ( shipVol[t] == 0 ) continue;
+                if (shipVol[t]>maxConsVol) maxConsVol=consVol[t];
+                
+                SceConstCharStar_Int * key = new SceConstCharStar_Int(partList[p],t);
+                SceCollectableDouble * colShipVol = new SceCollectableDouble(shipVol[t]);
+                
+                // insert key and consVol into dicionary
+                RWCollectable* insertRc=witConsVolDict.insertKeyAndValue(key,colShipVol);
+                // Did the insert fail because the key already exists?          
+                if ( insertRc==NULL ) {
+                  RWCollectable * existingConsVolCol;
+                  witConsVolDict.findKeyAndValue(key, existingConsVolCol);
+                  SceCollectableDouble * existingConsVol = 
+                    (SceCollectableDouble *) existingConsVolCol;
+                  double updatedConsVol = existingConsVol->dbl() + shipVol[t];
+                  existingConsVol->dbl(updatedConsVol);
+                  delete key;
+                  delete colShipVol;
+a757 15
+    
+                key = new SceConstCharStar_Int(partList[p],t);
+                colShipVol = new SceCollectableDouble(shipVol[t]);
+                insertRc=witConsVolDictAllPer.insertKeyAndValue(key,colShipVol); 
+                // Did the insert fail because the key already exists?          
+                if ( insertRc==NULL ) {
+                  RWCollectable * existingConsVolCol;
+                  witConsVolDictAllPer.findKeyAndValue(key, existingConsVolCol);
+                  SceCollectableDouble * existingConsVol = 
+                    (SceCollectableDouble *) existingConsVolCol;
+                  double updatedConsVol = existingConsVol->dbl() + shipVol[t];
+                  existingConsVol->dbl(updatedConsVol);
+                  delete key;
+                  delete colShipVol;
+                }         
+d766 1
+a766 1
+      double consVolEps = maxConsVol * 0.000001;
+a783 2
+            
+            ScePegging pegger;
+d789 1
+a789 1
+            pegger.getDemandConsVolPegging(wr,partList[p],demList[d],t,t,
+d792 8
+d802 7
+a808 12
+            for( cp=0; cp<nConsParts; cp++ ) {      
+              // Find the wit computed consVol in the dictionary and decrement it
+              // by the pegged consVol.
+              SceConstCharStar_Int * key = new SceConstCharStar_Int(consPartList[cp],consPerList[cp]);
+              RWCollectable * existingConsVolCol;
+              assert(witConsVolDict.contains(key));
+              witConsVolDict.findKeyAndValue(key, existingConsVolCol);
+              SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+              double updatedConsVol = existingConsVol->dbl() - consVolList[cp];
+              assert( updatedConsVol>= -consVolEps );
+              existingConsVol->dbl(updatedConsVol);
+              delete key;
+d820 1
+a820 2
+          {          
+            ScePegging pegger;
+d826 1
+a826 1
+            pegger.getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+d830 8
+d839 8
+a846 12
+            for( cp=0; cp<nConsParts; cp++ ) {      
+              // Find the wit computed consVol in the dictionary and decrement it
+              // by the pegged consVol.
+              SceConstCharStar_Int * key = new SceConstCharStar_Int(consPartList[cp],consPerList[cp]);
+              RWCollectable * existingConsVolCol;
+              assert(witConsVolDict.contains(key));
+              witConsVolDictAllPer.findKeyAndValue(key, existingConsVolCol);
+              SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+              double updatedConsVol = existingConsVol->dbl() - consVolList[cp];
+              assert( updatedConsVol>= -consVolEps );
+              existingConsVol->dbl(updatedConsVol);
+              delete key;
+d861 13
+a873 28
+      
+      // Check that the sum of the wit computed consVol is equal
+      // to the sum of the demand pegged consvols.
+      {
+        RWHashDictionaryIterator  iter(witConsVolDict);
+        while ( iter() ) {
+          SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+          SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+          double shouldBeZero = v->dbl();
+          assert(fabs(shouldBeZero) <= consVolEps );
+          //assert((v->compareTo(&SceCollectableDouble(0.0)))==0.0);
+          delete key;
+          delete v;
+        }
+      }  
+      
+      // Check that the sum of the wit computed consVol is equal
+      // to the sum of the demand pegged consvols.
+      {
+        RWHashDictionaryIterator  iter(witConsVolDictAllPer);
+        while ( iter() ) {
+          SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+          SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+          double shouldBeZero = v->dbl();
+          assert(fabs(shouldBeZero) <= consVolEps );
+          //assert((v->compareTo(&SceCollectableDouble(0.0)))==0.0);
+          delete key;
+          delete v;
+d882 139
+@
+
+
+1.1
+log
+@Added consVol pegging
+@
+text
+@a154 1
+  RWBoolean retVal=TRUE;
+d157 2
+a158 1
+  SceConstCharStar_Int * key = new SceConstCharStar_Int(consumedPartName,consPeriod);
+d168 2
+a169 1
+    SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+d172 1
+a172 1
+    retVal = FALSE; /*witFree(consumedPartName);*/
+a208 22
+  
+#if 0
+  // Create Dictionary Key from partName and period
+  SceConstCharStar_Int * key = new SceConstCharStar_Int(consumedPartName,consPeriod);
+  SceCollectableDouble * newConsVol = new SceCollectableDouble(incrConsVol);
+  
+  // insert key and consVol into dicionary
+  RWCollectable* insertRc=consDict.insertKeyAndValue(key,newConsVol);
+  
+  // Did the insert fail because the key already exists?
+  if ( insertRc==NULL ){        
+    RWCollectable * existingConsVolCol;
+    consDict.findKeyAndValue(key, existingConsVolCol);
+    SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+    double updatedConsVol = existingConsVol->dbl() + incrConsVol;
+    assert( updatedConsVol>= 0.0 );
+    existingConsVol->dbl(updatedConsVol);
+    witFree(consumedPartName);
+    delete key;
+    delete newConsVol;
+  }
+#endif
+d267 2
+a268 1
+   float * * peggedConsVolList
+a390 1
+#if 0
+a394 1
+    RWBoolean sceConsVol = TRUE;
+d396 4
+a399 1
+      updateConsDict(consDict,partName,sp,shipVol[sp]);
+a400 1
+#endif
+d504 1
+d533 2
+a534 10
+  
+  // loop once for each wit.data file
+  for (int f=0; f<nFiles; ++f )  {
+    WitRun * wr;
+    
+    witNewRun(&wr);
+    witSetMesgTimesPrint(wr, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+    witInitialize(wr);
+    witSetPerfPegging(wr,TRUE);
+   
+d536 1
+d538 1
+d540 3
+d544 32
+a575 25
+    fprintf(stderr, "%d: Entering witReadData() to read file: %s \n",f,filenames[f].data());
+    witReadData(wr, filenames[f].data());
+    
+    int nPeriods;
+    witGetNPeriods(wr,&nPeriods);
+    
+    witHeurImplode(wr);
+    
+    // Create a dictionary containing wit computed consVols.
+    // The key is the part name and consumption period, the value is the consVols
+    char  ** partList;
+    int      nParts,p;
+    witGetParts(wr,&nParts,&partList);
+    RWHashDictionary witConsVolDict(nParts*nPeriods);
+    RWHashDictionary witConsVolDictAllPer(nParts*nPeriods);
+    double maxConsVol=0;
+    {
+      for ( p=0; p<nParts; p++ ){
+        
+        // Get ConsVol of part
+        float * consVol;
+        witGetPartConsVol(wr,partList[p],&consVol);
+        
+        int t;
+        for (t=0; t<nPeriods; t++ ) {
+d577 3
+a579 2
+          if ( consVol[t] == 0 ) continue;
+          if (consVol[t]>maxConsVol) maxConsVol=consVol[t];
+d581 19
+a599 2
+          SceConstCharStar_Int * key = new SceConstCharStar_Int(partList[p],t);
+          SceCollectableDouble * colConsVol = new SceCollectableDouble(consVol[t]);
+d601 52
+a652 8
+          // insert key and consVol into dicionary
+          RWCollectable* insertRc=witConsVolDict.insertKeyAndValue(key,colConsVol);          
+          assert( insertRc != NULL );
+
+          key = new SceConstCharStar_Int(partList[p],t);
+          colConsVol = new SceCollectableDouble(consVol[t]);
+          insertRc=witConsVolDictAllPer.insertKeyAndValue(key,colConsVol);          
+          assert( insertRc != NULL );
+a653 1
+        witFree(consVol);
+d655 1
+a655 2
+    }
+    double consVolEps = maxConsVol * 0.000001;
+d657 9
+a665 22
+    // Loop over all demands
+    for ( p=0; p<nParts; p++ ){
+      char ** demList;
+      int nDems,d;
+      witGetPartDemands(wr,partList[p],&nDems,&demList);
+      for ( d=0; d<nDems; d++ ) {
+
+        float * shipVol;
+        witGetDemandShipVol(wr,partList[p],demList[d],&shipVol);
+        
+        // loop once for each period
+        int t;
+        for ( t=0; t<nPeriods; t++ ) {
+
+          if (shipVol[t] == 0.0 ) continue;
+
+
+          ScePegging pegger;
+          char ** consPartList;
+          float * consVolList;
+          int * consPerList;
+          int nConsParts;
+d667 35
+a701 17
+          pegger.getDemandConsVolPegging(wr,partList[p],demList[d],t,t,
+            &nConsParts,&consPartList,&consPerList,&consVolList);
+
+          int cp;
+          for( cp=0; cp<nConsParts; cp++ ) {      
+            // Find the wit computed consVol in the dictionary and decrement it
+            // by the pegged consVol.
+            SceConstCharStar_Int * key = new SceConstCharStar_Int(consPartList[cp],consPerList[cp]);
+            RWCollectable * existingConsVolCol;
+            assert(witConsVolDict.contains(key));
+            witConsVolDict.findKeyAndValue(key, existingConsVolCol);
+            SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+            double updatedConsVol = existingConsVol->dbl() - consVolList[cp];
+            assert( updatedConsVol>= -consVolEps );
+            existingConsVol->dbl(updatedConsVol);
+            delete key;
+            free(consPartList[cp]);
+a702 15
+          free(consPartList);
+          free(consPerList);
+          free(consVolList);
+        }
+        
+        witFree(shipVol);
+
+        //-----------------
+        // Do consVol pegging over all periods
+        {          
+          ScePegging pegger;
+          char ** consPartList;
+          float * consVolList;
+          int * consPerList;
+          int nConsParts;
+d704 1
+a704 2
+          pegger.getDemandConsVolPegging(wr,partList[p],demList[d],0,nPeriods-1,
+            &nConsParts,&consPartList,&consPerList,&consVolList);
+d706 31
+a736 14
+          int cp;
+          for( cp=0; cp<nConsParts; cp++ ) {      
+            // Find the wit computed consVol in the dictionary and decrement it
+            // by the pegged consVol.
+            SceConstCharStar_Int * key = new SceConstCharStar_Int(consPartList[cp],consPerList[cp]);
+            RWCollectable * existingConsVolCol;
+            assert(witConsVolDict.contains(key));
+            witConsVolDictAllPer.findKeyAndValue(key, existingConsVolCol);
+            SceCollectableDouble * existingConsVol = (SceCollectableDouble *) existingConsVolCol;
+            double updatedConsVol = existingConsVol->dbl() - consVolList[cp];
+            assert( updatedConsVol>= -consVolEps );
+            existingConsVol->dbl(updatedConsVol);
+            delete key;
+            free(consPartList[cp]);
+d738 2
+a739 3
+          free(consPartList);
+          free(consPerList);
+          free(consVolList);
+d741 1
+a741 2
+        //-----------------
+        witFree(demList[d]);
+d743 32
+a774 18
+      witFree(demList);
+    }
+    
+    witDeleteRun(wr);
+
+    
+    // Check that the sum of the wit computed consVol is equal
+    // to the sum of the demand pegged consvols.
+    {
+      RWHashDictionaryIterator  iter(witConsVolDict);
+      while ( iter() ) {
+        SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+        SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+        double shouldBeZero = v->dbl();
+        assert(fabs(shouldBeZero) <= consVolEps );
+        //assert((v->compareTo(&SceCollectableDouble(0.0)))==0.0);
+        delete key;
+        delete v;
+d776 3
+a778 14
+    }  
+    
+    // Check that the sum of the wit computed consVol is equal
+    // to the sum of the demand pegged consvols.
+    {
+      RWHashDictionaryIterator  iter(witConsVolDictAllPer);
+      while ( iter() ) {
+        SceConstCharStar_Int * key= (SceConstCharStar_Int *)iter.key();
+        SceCollectableDouble * v= (SceCollectableDouble *)iter.value();
+        double shouldBeZero = v->dbl();
+        assert(fabs(shouldBeZero) <= consVolEps );
+        //assert((v->compareTo(&SceCollectableDouble(0.0)))==0.0);
+        delete key;
+        delete v;
+d780 1
+a781 5
+
+    for ( p=0; p<nParts; p++ ){
+      witFree(partList[p]);
+    }
+    witFree(partList);
+a782 1
+  
+@
+

@@ -1,0 +1,1758 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.4
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.2
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.2.0.2
+	nextGenRoot:1.2
+	sce_3_30_20030627:1.2
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.08.04.20.57.13;	author dpc;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.22;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.35.14;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.35.14;	author wit;	state Exp;
+branches
+	1.1.1.1.10.1
+	1.1.1.1.12.1;
+next	;
+
+1.1.1.1.10.1
+date	2002.11.12.15.39.15;	author rwToStl;	state Exp;
+branches;
+next	;
+
+1.1.1.1.12.1
+date	2003.01.09.13.11.50;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Changed some printf's to handle printing stl strings.
+@
+text
+@// file: sceAlMrp.C
+// author:  dan/tom
+
+#include <stdio.h>
+//#include <string>
+//#include <rw/ctoken.h>
+#include <stdlib.h>
+//#include <fstream.h>
+#include <assert.h>
+#include <wit/src/wit.h>
+#include <witutil/src/machdep.h> 
+#include <witutil/src/allocMrp.h>
+
+#include <string>
+
+void doAllocatedMRP(WitRun *, char, char, char *);
+void addStructureBelowPart(WitRun *, WitRun *, std::string, std::string, 
+   std::string, int);
+void setupOperation(WitRun *, WitRun *, std::string, std::string);
+void setTheBopData(WitRun *, WitRun *, std::string, std::string, std::string, 
+   std::string, int, int);
+void addStructureBelowOperation(WitRun *, WitRun*, std::string, std::string, 
+   std::string, int);
+void setupPart(WitRun *, WitRun *, std::string, std::string);
+void setTheBomData(WitRun *, WitRun*, std::string, std::string, std::string, 
+   std::string, int, int, int);
+void setTheDemand(WitRun *, WitRun *, std::string, std::string, std::string);
+void performMRP(WitRun *);
+
+
+// default constructor
+WUtlAllocatedMrp::WUtlAllocatedMrp()
+  :   theWitRun_ (NULL),
+      localWitRun_(NULL),
+      separatorChar_(NULL),
+      state_(0),
+      version_(0),
+      nPeriods_(0)
+{
+  assert("Can't do this:" ==  "INVOKE the default constructor");
+}
+
+
+// fairly general constructor:
+WUtlAllocatedMrp::WUtlAllocatedMrp(WitRun * const theWitRun, const char separatorChar)
+  :   theWitRun_ (theWitRun),
+      localWitRun_(NULL),
+      separatorChar_(separatorChar),
+      state_(0),
+      version_(0),
+      nPeriods_(0)
+{
+}
+
+
+// compute the allocated MRP, but don't print yet
+int
+WUtlAllocatedMrp::computeAndPopulate(const int version)
+{
+   int equitability;
+   char **partList, **demandList;
+   int partListLen, demandListLen;
+   witAttr partCategory;
+   float *supplyVol, *demandVol, *hardLower, *hardUpper, *softLower;
+   int *priority, shipLateLimit, buildAheadLimit;
+   int i,j; 
+   witBoolean exists;
+
+   version_ = version;
+   if (version_ != 1 && version_ != 2){
+      printf("Allocated MRP only supports two versions: 1 and 2.\n");
+      printf("You entered version %d, which is not supported.\n", version_);
+      return(8);
+   }
+
+   witNewRun (& localWitRun_);
+   witSetMesgFileAccessMode (localWitRun_, WitTRUE, "w");
+   witSetMesgFileName (localWitRun_, WitTRUE, "sceAMRP.msg");
+
+   // shut off ALL info messages
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, WitINFORMATIONAL_MESSAGES, 0);
+   // Let ANY warning message come out once
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, WitWARNING_MESSAGES, 1);    
+   // Suppress a few WARNING messages that we already know about
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, 338, 0);
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, 446, 0);
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, 538, 0);        
+   witSetMesgTimesPrint(localWitRun_, WitTRUE, 505, 0);        
+   
+   witInitialize (localWitRun_);
+   
+   witSetIndependentOffsets(localWitRun_, WitTRUE);
+
+   witGetNPeriods(theWitRun_, &nPeriods_);
+   witSetNPeriods(localWitRun_, nPeriods_);
+ 
+   witGetEquitability(theWitRun_, &equitability);
+   witSetEquitability(localWitRun_, equitability);
+
+   witSetTruncOffsets(localWitRun_, WitTRUE);
+
+   // get all the parts from theWitRun 
+   // and create equivalent parts in localWitRun;
+   // copy over the supply volume for the parts in theWitRun
+   witGetParts(theWitRun_, &partListLen, &partList);
+   for (i=0; i<partListLen; i++){
+      witGetPartCategory(theWitRun_, partList[i], &partCategory);
+      // For Wit3.4 compatibility, must check part type
+      if (partCategory == WitPRODUCT || partCategory == WitRAW) 
+          witAddPart(localWitRun_, partList[i], WitMATERIAL);
+      else
+          witAddPart(localWitRun_, partList[i], partCategory);
+      witGetPartSupplyVol(theWitRun_, partList[i], &supplyVol);
+      witSetPartSupplyVol(localWitRun_, partList[i], supplyVol);
+      portableFree(supplyVol);
+   }
+
+   // For each demand, create a demand specific copy of the demanded part
+   for (i=0; i<partListLen; i++){
+      witGetPartDemands (theWitRun_, partList[i], &demandListLen, &demandList);
+      for (j=0; j<demandListLen; j++){
+	std::string prefix(demandList[j]); 
+	prefix += separatorChar_; 
+	prefix += partList[i];
+	prefix += separatorChar_; 
+	std::string workingPart(prefix);
+	workingPart += partList[i];
+	
+	std::string MRPDemandName("MRP"); 
+	MRPDemandName += separatorChar_; 
+	MRPDemandName += prefix;
+	witGetPartExists(localWitRun_, prefix.c_str(), &exists);
+	if (exists){
+	  printf("Replicated part name:  %s\n", prefix.c_str());
+	  return (8);
+	}
+	witGetPartExists(localWitRun_, MRPDemandName.c_str(), &exists);
+	if (exists){
+	  printf("Replicated demand name:  %s\n", MRPDemandName.c_str());
+	  return (8);
+	}
+	
+	
+	witAddPart(localWitRun_, workingPart.c_str(), WitMATERIAL);            
+	witAddPartWithOperation(localWitRun_, MRPDemandName.c_str());
+	witAddDemand(localWitRun_, MRPDemandName.c_str(), MRPDemandName.c_str());
+	witAddBomEntry(localWitRun_, MRPDemandName.c_str(), workingPart.c_str());
+	witAddSubsBomEntry(localWitRun_, MRPDemandName.c_str(), 0, partList[i]);
+	setTheDemand(theWitRun_, localWitRun_, partList[i], demandList[j], 
+		     MRPDemandName); 
+	// Now create the BOM below the newly created demand
+	addStructureBelowPart(theWitRun_, localWitRun_, prefix, partList[i], 
+			      workingPart, version_);
+	portableFree(demandList[j]);
+      }
+      portableFree(demandList);
+   }
+   witHeurImplode(localWitRun_);
+//   witWriteData(localWitRun_, "witWrite.dat");
+//   witWriteExecSched(localWitRun_, "witExec.out", WitBSV);
+   if (version_ == 1)
+      performMRP(localWitRun_);
+
+   for (i=0; i<partListLen; i++)
+     portableFree(partList[i]);
+   portableFree(partList);
+
+
+  // set the state so that the print() method can be assured that its 
+  // all populated and ready to go
+  state_ = 1;
+
+  // if successful, return 0
+  // if warnings,   return 4
+  // if error,      return 8
+  return 0;
+}
+
+
+  char separatorChar_;
+  int state_;
+  int version_;
+  int nPeriods_;  
+
+int 
+WUtlAllocatedMrp::state() 
+{
+  return state_;
+}
+
+int 
+WUtlAllocatedMrp::version() 
+{
+  return version_;
+}
+
+int 
+WUtlAllocatedMrp::nPeriods() 
+{
+  return nPeriods_;
+}
+
+char
+WUtlAllocatedMrp::separatorChar() 
+{
+  return separatorChar_;
+}
+
+WitRun * 
+WUtlAllocatedMrp::witRun()
+{
+  return theWitRun_;
+}
+
+WitRun * 
+WUtlAllocatedMrp::localWitRun()
+{
+  return localWitRun_;
+}
+
+// print the allocated demand output file
+int
+WUtlAllocatedMrp::print(const char * fileName)
+{
+   assert(state_ == 1);
+
+   // put the generic print  here
+   char **operationList;
+   char *producedPartName, *consumingOperationName;
+   int listLen, i, j, k, l, n, t;
+   int nBomEntries, nBopEntries, nConsumingBomEntries, nSubsBomEntries;
+   int bomEntryIndex;
+   float *execVol, *MRPCoverage, *subVol, *MRPAllocReq, *MRPDelta;
+   FILE *fpout;
+
+   if ((fpout = fopen(fileName, "w")) == NULL){
+      printf("Can't open output file %s for the allocated MRP report.\n", 
+         fileName);
+      return(8);
+   }
+
+   std::string separatorString(1,separatorChar_);
+
+   MRPCoverage = (float *) calloc(nPeriods_, sizeof(float));
+   MRPAllocReq = (float *) calloc(nPeriods_, sizeof(float));
+   MRPDelta = (float *) calloc(nPeriods_, sizeof(float));
+
+   witGetOperations(localWitRun_, &listLen, &operationList);
+   for(i=0; i<listLen; i++){
+      witGetOperationNBomEntries(localWitRun_, operationList[i], &nBomEntries);
+      if (nBomEntries == 0){
+         if (version_ == 1){
+            witGetOperationExecVol(localWitRun_, operationList[i], &execVol);
+            witGetOperationMrpExecVol(localWitRun_, operationList[i], 
+               &MRPAllocReq);
+            for(t=0; t<nPeriods_; t++){
+               MRPCoverage[t] = MRPAllocReq[t] - execVol[t];
+               MRPDelta[t] = execVol[t];
+            }
+         }
+         
+         if (version_ == 2){
+            for(t=0; t<nPeriods_; t++){
+               MRPCoverage[t] = 0;
+               MRPAllocReq[t] = 0;
+            }
+            witGetOperationNBopEntries(localWitRun_, operationList[i], 
+               &nBopEntries);         
+            assert(nBopEntries == 1);
+            witGetBopEntryProducedPart(localWitRun_, operationList[i], 0, 
+               &producedPartName);
+            witGetPartNConsumingBomEntries(localWitRun_, producedPartName, 
+               &nConsumingBomEntries);
+            for(k=0; k<nConsumingBomEntries; k++){
+               witGetPartConsumingBomEntry(localWitRun_, producedPartName, k,
+                  &consumingOperationName, &bomEntryIndex);
+               witGetBomEntryNSubsBomEntries(localWitRun_, 
+                  consumingOperationName, bomEntryIndex, &nSubsBomEntries);
+               assert(nSubsBomEntries == nPeriods_);
+               for(l=0; l<nSubsBomEntries; l++){
+                  witGetSubsBomEntrySubVol(localWitRun_, consumingOperationName,
+                     bomEntryIndex, l, &subVol); 
+                  for(n=0; n<nPeriods_; n++){
+                     MRPAllocReq[n] += subVol[n];
+                     if(n >= l)
+                        MRPCoverage[n] += subVol[n-l];
+                  }
+                  portableFree(subVol);
+               }
+               portableFree(consumingOperationName);
+            }
+            portableFree(producedPartName);
+            witGetOperationExecVol(localWitRun_, operationList[i], &execVol);
+            for(t=0; t<nPeriods_; t++)
+               MRPAllocReq[t] += execVol[t];
+            for(t=0; t<nPeriods_; t++)
+               MRPDelta[t] = MRPAllocReq[t] - MRPCoverage[t];
+        }
+       
+
+         size_t position1, position2, length;
+         std::string witName(operationList[i]);
+
+		 int firstSpaceOffset = witName.find_first_of(' ');
+		 int secondSpaceOffset = witName.find_first_of(' ',firstSpaceOffset+1);
+		 int thirdSpaceOffset = witName.find_first_of(' ',secondSpaceOffset+1);
+
+		 std::string demandName = witName.substr(0, firstSpaceOffset );
+		 std::string demandedPart = witName.substr(firstSpaceOffset+1, secondSpaceOffset - firstSpaceOffset - 1 );
+		 std::string partName = witName.substr(secondSpaceOffset+1, thirdSpaceOffset - secondSpaceOffset - 1 );
+
+         fprintf(fpout, "%s, %s, %s, AMRPReq", 
+            demandName.c_str(), demandedPart.c_str(), partName.c_str());
+         for(t=0; t<nPeriods_; t++)
+            fprintf(fpout, ", %f", MRPAllocReq[t]);
+         fprintf(fpout, "\n");
+         fprintf(fpout, "%s, %s, %s, AMRPCov", 
+            demandName.c_str(), demandedPart.c_str(), partName.c_str());
+         for(t=0; t<nPeriods_; t++)
+            fprintf(fpout, ", %f", MRPCoverage[t]); 
+         fprintf(fpout, "\n");
+         fprintf(fpout, "%s, %s, %s, AMRDelta", 
+            demandName.c_str(), demandedPart.c_str(), partName.c_str());
+         for(t=0; t<nPeriods_; t++)
+            fprintf(fpout, ", %f", MRPDelta[t]);
+         fprintf(fpout, "\n");
+      }
+   }
+   fclose(fpout);
+   portableFree(execVol);
+   portableFree(MRPCoverage);
+   portableFree(MRPDelta);
+   portableFree(MRPAllocReq);
+   for(i=0; i<listLen; i++) 
+      portableFree(operationList[i]);
+   portableFree(operationList);
+
+   return 0;
+}
+ 
+  
+
+// copy constructor 
+WUtlAllocatedMrp::WUtlAllocatedMrp(const WUtlAllocatedMrp& source)
+  :   
+      theWitRun_ (source.theWitRun_),
+      localWitRun_(source.localWitRun_),
+      separatorChar_(source.separatorChar_),
+      state_(source.state_)
+{
+  assert("Cant call this" == "the copy constructor for WUtlAllocatedMrp");
+}
+
+// assignment operator
+WUtlAllocatedMrp&
+WUtlAllocatedMrp::operator=(const WUtlAllocatedMrp& rhs)
+{
+
+  assert("Cant call this" == " the assignment operator for WUtlAllocatedMrp");
+  if (this != &rhs) {		// Check for assignment to self
+    theWitRun_ = rhs.theWitRun_;
+    localWitRun_ = rhs.localWitRun_;
+    separatorChar_ = rhs.separatorChar_;
+    state_ = rhs.state_;
+  }
+  return *this;
+}
+
+// destructor
+WUtlAllocatedMrp::~WUtlAllocatedMrp()
+{
+   witDeleteRun(localWitRun_);
+}
+
+
+// This function sets the demands in the local wit run.
+void setTheDemand(WitRun *theWitRun, WitRun *localWitRun, std::string partName, 
+        std::string demandName, std::string  MRPDemandName){
+
+   float *demandVol, *hardLower, *hardUpper, *softLower;
+   int *priority, shipLateLimit, buildAheadLimit;
+
+   witGetDemandDemandVol(theWitRun, partName.c_str(), demandName.c_str(), &demandVol);
+   witSetDemandDemandVol(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), demandVol); 
+   witGetDemandBuildAheadLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+      &buildAheadLimit);
+   witSetDemandBuildAheadLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+      buildAheadLimit); 
+   witGetDemandCumShipBounds(theWitRun, partName.c_str(), demandName.c_str(), 
+      &hardLower, &softLower, &hardUpper);
+   witSetDemandCumShipBounds(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+      hardLower, softLower, hardUpper);
+   witGetDemandPriority(theWitRun, partName.c_str(), demandName.c_str(), 
+      &priority);
+   witSetDemandPriority(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+      priority);
+   witGetDemandShipLateLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+      &shipLateLimit);
+   witSetDemandShipLateLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+   shipLateLimit);
+
+   portableFree(demandVol);
+   portableFree(hardLower);
+   portableFree(hardUpper);
+   portableFree(softLower);
+   portableFree(priority);
+}
+
+// This function builds the structure below parts in the local wit run.
+void addStructureBelowPart(WitRun *theWitRun, WitRun *localWitRun, std::string prefix,
+               std::string partName, std::string workingPart, int version){
+
+   int nProducingBopEntries, nBomEntries;
+   float  *yieldRate;
+   int k, t, nPeriods;
+   int bopEntryIndex, localBopEntryIndex;
+   char *producingOperationName;
+   witBoolean exists;
+
+   witGetNPeriods(theWitRun, &nPeriods);
+   witGetPartNProducingBopEntries(theWitRun, partName.c_str(), &nProducingBopEntries);
+   if (nProducingBopEntries == 0){
+   // This is a lowest level part so create an operation under it
+      witGetOperationExists(localWitRun, workingPart.c_str(), &exists);
+      if (!exists){
+         witAddOperation(localWitRun, workingPart.c_str());
+         witAddBopEntry(localWitRun, workingPart.c_str(), workingPart.c_str());
+         witGetOperationYieldRate(localWitRun, workingPart.c_str(), &yieldRate);
+         for(t=0; t<nPeriods; t++)
+            yieldRate[t] = 1;
+         witSetOperationYieldRate(localWitRun, workingPart.c_str(), yieldRate);
+         portableFree(yieldRate);
+      }
+   }
+   else 
+   for (k=0; k<nProducingBopEntries; k++){
+      witGetPartProducingBopEntry(theWitRun, partName.c_str(), k, 
+         &producingOperationName, &bopEntryIndex);
+      std::string localOperationName(prefix);
+      localOperationName += producingOperationName;
+      witGetOperationExists(localWitRun, localOperationName.c_str(), &exists);
+      if (!exists)
+         setupOperation(theWitRun, localWitRun, producingOperationName, 
+            localOperationName);
+      // If the producing operation doesn't have any bom records, 
+      // set its yield to 1
+      witGetOperationNBomEntries(theWitRun, producingOperationName, 
+         &nBomEntries);
+      if (nBomEntries == 0){
+         witGetOperationYieldRate(localWitRun, localOperationName.c_str(), &yieldRate);
+         for(t=0; t<nPeriods; t++)
+            yieldRate[t] = 1;
+         witSetOperationYieldRate(localWitRun, localOperationName.c_str(), yieldRate);
+         portableFree(yieldRate);
+      }
+      // Add the BOP entry and set the BOP entry
+      // Can't match bop indices so first get the current index for 
+      // the operation
+      witGetOperationNBopEntries(localWitRun, localOperationName.c_str(), 
+         &localBopEntryIndex);
+      witAddBopEntry(localWitRun, localOperationName.c_str(), workingPart.c_str());
+      setTheBopData(theWitRun, localWitRun, producingOperationName,
+         localOperationName, partName, workingPart, bopEntryIndex, 
+         localBopEntryIndex);  
+      if (!exists)
+         addStructureBelowOperation(theWitRun, localWitRun, prefix, 
+            producingOperationName, localOperationName, version);              
+      portableFree(producingOperationName);
+   }
+}
+
+void setupPart(WitRun *theWitRun, WitRun *localWitRun, std::string consumedPartName, 
+        std::string localPartName){
+    
+   witAttr partCategory;
+   float *hardLower, *softLower, *hardUpper;
+
+   witGetPartCategory(theWitRun, consumedPartName.c_str(), &partCategory);
+   if (partCategory == WitPRODUCT || partCategory == WitRAW) 
+      witAddPart(localWitRun, localPartName.c_str(), WitMATERIAL);
+   else
+      witAddPart(localWitRun, localPartName.c_str(), partCategory);
+   if (partCategory != WitCAPACITY){
+      witGetPartStockBounds(theWitRun, consumedPartName.c_str(), &hardLower, &softLower, &hardUpper);
+      witSetPartStockBounds(localWitRun, localPartName.c_str(), hardLower, softLower, hardUpper);
+   portableFree(hardLower);
+   portableFree(softLower);
+   portableFree(hardUpper);
+   }
+}
+
+// This function sets the BOP data in the local wit run.
+void setTheBopData(WitRun *theWitRun, WitRun *localWitRun, 
+        std::string producingOperationName, std::string localOperationName, 
+        std::string partName, std::string workingPart, int bopEntryIndex, int localBopEntryIndex){
+
+   int earliestPeriod, latestPeriod;
+   witBoolean expAllowed;
+   float expAversion, *offset, prodRate;
+
+   witGetBopEntryEarliestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &earliestPeriod);
+   witSetBopEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      earliestPeriod);
+   witGetBopEntryLatestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &latestPeriod);
+   witSetBopEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      latestPeriod);
+   witGetBopEntryExpAllowed(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &expAllowed);
+   witSetBopEntryExpAllowed(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      expAllowed);
+   witGetBopEntryExpAversion(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &expAversion);
+   witSetBopEntryExpAversion(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      expAversion);
+   witGetBopEntryOffset(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &offset);
+   witSetBopEntryOffset(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      offset);
+   witGetBopEntryProdRate(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+      &prodRate);
+   witSetBopEntryProdRate(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+      prodRate);
+   portableFree(offset);
+}   
+
+// This function sets up the operations.
+void setupOperation(WitRun *theWitRun, WitRun *localWitRun, 
+        std::string producingOperationName, std::string localOperationName){
+
+   float *hardLower, *softLower, *hardUpper;
+   float *incLotSize, *minLotSize, *yieldRate;
+
+   witAddOperation(localWitRun, localOperationName.c_str());
+   witGetOperationExecBounds(theWitRun, producingOperationName.c_str(),
+      &hardLower, &softLower, &hardUpper);
+   witSetOperationExecBounds(localWitRun, localOperationName.c_str(),
+      hardLower, softLower, hardUpper);
+   witGetOperationIncLotSize(theWitRun, producingOperationName.c_str(),
+      &incLotSize);
+   witSetOperationIncLotSize(localWitRun, localOperationName.c_str(),
+      incLotSize);
+   witGetOperationMinLotSize(theWitRun, producingOperationName.c_str(),
+      &minLotSize);
+   witSetOperationMinLotSize(localWitRun, localOperationName.c_str(),
+      minLotSize);
+   witGetOperationYieldRate(theWitRun, producingOperationName.c_str(),
+      &yieldRate);
+   witSetOperationYieldRate(localWitRun, localOperationName.c_str(),
+      yieldRate);
+   portableFree(hardLower);
+   portableFree(softLower);
+   portableFree(hardUpper);
+   portableFree(incLotSize);
+   portableFree(minLotSize);
+   portableFree(yieldRate);
+}
+
+void addStructureBelowOperation(WitRun *theWitRun, WitRun *localWitRun, 
+   std::string prefix, std::string consumingOperationName, 
+   std::string localOperationName, int version){
+   int nBomEntries;
+   int t, k, nPeriods;
+   int bomEntryIndex, localBomEntryIndex;
+   char *consumedPartName;
+   witBoolean exists;
+   
+   witGetNPeriods(theWitRun, &nPeriods);    
+   witGetOperationNBomEntries(theWitRun, consumingOperationName.c_str(), &nBomEntries);
+   for (k=0; k<nBomEntries; k++){
+      witGetBomEntryConsumedPart(theWitRun, consumingOperationName.c_str(), 
+         k, &consumedPartName);
+      std::string localPartName(prefix);
+      localPartName += consumedPartName;
+      witGetPartExists(localWitRun, localPartName.c_str(), &exists);
+      if (!exists)
+         setupPart(theWitRun, localWitRun, consumedPartName, localPartName);
+
+      // Add the BOM entry and set the BOM entry
+      witGetOperationNBomEntries(localWitRun, localOperationName.c_str(), 
+         &localBomEntryIndex);
+      witAddBomEntry(localWitRun, localOperationName.c_str(), localPartName.c_str());
+      if (version == 1)
+         witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+            consumedPartName);
+      if (version == 2){
+         for(t=0; t<nPeriods; t++)
+            witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+               consumedPartName);
+         }
+      setTheBomData(theWitRun, localWitRun, consumingOperationName,
+         localOperationName, consumedPartName, localPartName, k, 
+         localBomEntryIndex, version);  
+      if (!exists)
+         addStructureBelowPart(theWitRun, localWitRun, prefix, 
+            consumedPartName, localPartName, version);                
+      portableFree(consumedPartName);
+   }
+}
+
+// This function sets up the BOM data in the local wit run.
+void setTheBomData(WitRun *theWitRun, WitRun *localWitRun, 
+        std::string consumingOperationName, std::string localOperationName, 
+        std::string consumedPartName, std::string localPartName, 
+        int bomEntryIndex, int localBomEntryIndex, int version){
+
+   int earliestPeriod, latestPeriod, t, k, nPeriods;   
+   float falloutRate, usageRate, *offset, *subOffset;
+   witBoolean mandEC;
+
+   witGetNPeriods(localWitRun, &nPeriods);
+   witGetBomEntryEarliestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &earliestPeriod);
+   witSetBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      earliestPeriod);
+   witGetBomEntryLatestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &latestPeriod);
+   witSetBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      latestPeriod);
+   witGetBomEntryFalloutRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &falloutRate);
+   witSetBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      falloutRate);
+   witGetBomEntryMandEC(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &mandEC);
+   witSetBomEntryMandEC(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      mandEC);
+   witGetBomEntryUsageRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &usageRate);
+   witSetBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      usageRate);
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &offset);
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+      &subOffset);
+   witSetBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+      offset);
+
+   if (version == 1){
+      witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+         0, earliestPeriod);
+      witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+         0, latestPeriod);
+      witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+         0, falloutRate);
+      witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+         0, usageRate);
+      witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+         0, offset);
+   }
+   if (version == 2){
+      for(t=0; t<nPeriods; t++){
+         witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), 
+            localBomEntryIndex, t, earliestPeriod);
+         witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), 
+            localBomEntryIndex, t, latestPeriod);
+         witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), 
+            localBomEntryIndex, t, falloutRate);
+         witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), 
+            localBomEntryIndex, t, usageRate);
+         for(k=0; k<nPeriods; k++)
+            subOffset[k] = offset[k] - t;
+         witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), 
+            localBomEntryIndex, t, subOffset);
+      }
+   }
+   portableFree(subOffset);
+   portableFree(offset);
+}
+
+// This function performs an MRP on the local wit run.
+void performMRP(WitRun *localWitRun){
+   
+   int i, t, listLen, nPeriods;
+   char **partList;
+   float *supplyVol;
+ 
+   witGetNPeriods(localWitRun, &nPeriods);
+   supplyVol = (float *) calloc(nPeriods, sizeof(float));
+   for(t=0; t<nPeriods; t++)
+      supplyVol[t] = 0;
+ 
+   witGetParts(localWitRun, &listLen, &partList);
+   for(i=0; i<listLen; i++) {
+      witSetPartSupplyVol(localWitRun, partList[i], supplyVol);
+      portableFree(partList[i]);
+   }
+   portableFree(partList);
+   portableFree(supplyVol);
+   witMrp(localWitRun);
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d134 1
+a134 1
+	  printf("Replicated part name:  %s\n", prefix);
+d139 1
+a139 1
+	  printf("Replicated demand name:  %s\n", MRPDemandName);
+d313 1
+a313 1
+            demandName, demandedPart, partName);
+d318 1
+a318 1
+            demandName, demandedPart, partName);
+d323 1
+a323 1
+            demandName, demandedPart, partName);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d5 2
+a6 2
+#include <rw/cstring.h>
+#include <rw/ctoken.h>
+d8 1
+a8 1
+#include <fstream.h>
+d14 1
+d17 11
+a27 11
+void addStructureBelowPart(WitRun *, WitRun *, RWCString, RWCString, 
+   RWCString, int);
+void setupOperation(WitRun *, WitRun *, RWCString, RWCString);
+void setTheBopData(WitRun *, WitRun *, RWCString, RWCString, RWCString, 
+   RWCString, int, int);
+void addStructureBelowOperation(WitRun *, WitRun*, RWCString, RWCString, 
+   RWCString, int);
+void setupPart(WitRun *, WitRun *, RWCString, RWCString);
+void setTheBomData(WitRun *, WitRun*, RWCString, RWCString, RWCString, 
+   RWCString, int, int, int);
+void setTheDemand(WitRun *, WitRun *, RWCString, RWCString, RWCString);
+d122 1
+a122 1
+	RWCString prefix(demandList[j]); 
+d126 1
+a126 1
+	RWCString workingPart(prefix);
+d129 1
+a129 1
+	RWCString MRPDemandName("MRP"); 
+d132 1
+a132 1
+	witGetPartExists(localWitRun_, prefix, &exists);
+d137 1
+a137 1
+	witGetPartExists(localWitRun_, MRPDemandName, &exists);
+d144 5
+a148 5
+	witAddPart(localWitRun_, workingPart, WitMATERIAL);            
+	witAddPartWithOperation(localWitRun_, MRPDemandName);
+	witAddDemand(localWitRun_, MRPDemandName, MRPDemandName);
+	witAddBomEntry(localWitRun_, MRPDemandName, workingPart);
+	witAddSubsBomEntry(localWitRun_, MRPDemandName, 0, partList[i]);
+d242 1
+a242 1
+   RWCString separatorString(separatorChar_);
+d302 1
+a302 2
+         RWCString witName(operationList[i]);
+         RWCTokenizer next(witName);
+d304 7
+a310 3
+         RWCString demandName = next(separatorString.data());
+         RWCString demandedPart = next(separatorString.data());
+         RWCString partName = next(separatorString.data());
+d377 2
+a378 2
+void setTheDemand(WitRun *theWitRun, WitRun *localWitRun, RWCString partName, 
+        RWCString demandName, RWCString  MRPDemandName){
+d383 3
+a385 3
+   witGetDemandDemandVol(theWitRun, partName, demandName, &demandVol);
+   witSetDemandDemandVol(localWitRun, MRPDemandName, MRPDemandName, demandVol); 
+   witGetDemandBuildAheadLimit(theWitRun, partName, demandName, 
+d387 1
+a387 1
+   witSetDemandBuildAheadLimit(localWitRun, MRPDemandName, MRPDemandName, 
+d389 1
+a389 1
+   witGetDemandCumShipBounds(theWitRun, partName, demandName, 
+d391 1
+a391 1
+   witSetDemandCumShipBounds(localWitRun, MRPDemandName, MRPDemandName, 
+d393 1
+a393 1
+   witGetDemandPriority(theWitRun, partName, demandName, 
+d395 1
+a395 1
+   witSetDemandPriority(localWitRun, MRPDemandName, MRPDemandName, 
+d397 1
+a397 1
+   witGetDemandShipLateLimit(theWitRun, partName, demandName, 
+d399 1
+a399 1
+   witSetDemandShipLateLimit(localWitRun, MRPDemandName, MRPDemandName, 
+d410 2
+a411 2
+void addStructureBelowPart(WitRun *theWitRun, WitRun *localWitRun, RWCString prefix,
+               RWCString partName, RWCString workingPart, int version){
+d421 1
+a421 1
+   witGetPartNProducingBopEntries(theWitRun, partName, &nProducingBopEntries);
+d424 1
+a424 1
+      witGetOperationExists(localWitRun, workingPart, &exists);
+d426 3
+a428 3
+         witAddOperation(localWitRun, workingPart);
+         witAddBopEntry(localWitRun, workingPart, workingPart);
+         witGetOperationYieldRate(localWitRun, workingPart, &yieldRate);
+d431 1
+a431 1
+         witSetOperationYieldRate(localWitRun, workingPart, yieldRate);
+d437 1
+a437 1
+      witGetPartProducingBopEntry(theWitRun, partName, k, 
+d439 1
+a439 1
+      RWCString localOperationName(prefix);
+d441 1
+a441 1
+      witGetOperationExists(localWitRun, localOperationName, &exists);
+d450 1
+a450 1
+         witGetOperationYieldRate(localWitRun, localOperationName, &yieldRate);
+d453 1
+a453 1
+         witSetOperationYieldRate(localWitRun, localOperationName, yieldRate);
+d459 1
+a459 1
+      witGetOperationNBopEntries(localWitRun, localOperationName, 
+d461 1
+a461 1
+      witAddBopEntry(localWitRun, localOperationName, workingPart);
+d472 2
+a473 2
+void setupPart(WitRun *theWitRun, WitRun *localWitRun, RWCString consumedPartName, 
+        RWCString localPartName){
+d478 1
+a478 1
+   witGetPartCategory(theWitRun, consumedPartName, &partCategory);
+d480 1
+a480 1
+      witAddPart(localWitRun, localPartName, WitMATERIAL);
+d482 1
+a482 1
+      witAddPart(localWitRun, localPartName, partCategory);
+d484 2
+a485 2
+      witGetPartStockBounds(theWitRun, consumedPartName, &hardLower, &softLower, &hardUpper);
+      witSetPartStockBounds(localWitRun, localPartName, hardLower, softLower, hardUpper);
+d494 2
+a495 2
+        RWCString producingOperationName, RWCString localOperationName, 
+        RWCString partName, RWCString workingPart, int bopEntryIndex, int localBopEntryIndex){
+d501 1
+a501 1
+   witGetBopEntryEarliestPeriod(theWitRun, producingOperationName, bopEntryIndex, 
+d503 1
+a503 1
+   witSetBopEntryEarliestPeriod(localWitRun, localOperationName, localBopEntryIndex, 
+d505 1
+a505 1
+   witGetBopEntryLatestPeriod(theWitRun, producingOperationName, bopEntryIndex, 
+d507 1
+a507 1
+   witSetBopEntryLatestPeriod(localWitRun, localOperationName, localBopEntryIndex, 
+d509 1
+a509 1
+   witGetBopEntryExpAllowed(theWitRun, producingOperationName, bopEntryIndex, 
+d511 1
+a511 1
+   witSetBopEntryExpAllowed(localWitRun, localOperationName, localBopEntryIndex, 
+d513 1
+a513 1
+   witGetBopEntryExpAversion(theWitRun, producingOperationName, bopEntryIndex, 
+d515 1
+a515 1
+   witSetBopEntryExpAversion(localWitRun, localOperationName, localBopEntryIndex, 
+d517 1
+a517 1
+   witGetBopEntryOffset(theWitRun, producingOperationName, bopEntryIndex, 
+d519 1
+a519 1
+   witSetBopEntryOffset(localWitRun, localOperationName, localBopEntryIndex, 
+d521 1
+a521 1
+   witGetBopEntryProdRate(theWitRun, producingOperationName, bopEntryIndex, 
+d523 1
+a523 1
+   witSetBopEntryProdRate(localWitRun, localOperationName, localBopEntryIndex, 
+d530 1
+a530 1
+        RWCString producingOperationName, RWCString localOperationName){
+d535 2
+a536 2
+   witAddOperation(localWitRun, localOperationName);
+   witGetOperationExecBounds(theWitRun, producingOperationName,
+d538 1
+a538 1
+   witSetOperationExecBounds(localWitRun, localOperationName,
+d540 1
+a540 1
+   witGetOperationIncLotSize(theWitRun, producingOperationName,
+d542 1
+a542 1
+   witSetOperationIncLotSize(localWitRun, localOperationName,
+d544 1
+a544 1
+   witGetOperationMinLotSize(theWitRun, producingOperationName,
+d546 1
+a546 1
+   witSetOperationMinLotSize(localWitRun, localOperationName,
+d548 1
+a548 1
+   witGetOperationYieldRate(theWitRun, producingOperationName,
+d550 1
+a550 1
+   witSetOperationYieldRate(localWitRun, localOperationName,
+d561 2
+a562 2
+   RWCString prefix, RWCString consumingOperationName, 
+   RWCString localOperationName, int version){
+d570 1
+a570 1
+   witGetOperationNBomEntries(theWitRun, consumingOperationName, &nBomEntries);
+d572 1
+a572 1
+      witGetBomEntryConsumedPart(theWitRun, consumingOperationName, 
+d574 1
+a574 1
+      RWCString localPartName(prefix);
+d576 1
+a576 1
+      witGetPartExists(localWitRun, localPartName, &exists);
+d581 1
+a581 1
+      witGetOperationNBomEntries(localWitRun, localOperationName, 
+d583 1
+a583 1
+      witAddBomEntry(localWitRun, localOperationName, localPartName);
+d585 1
+a585 1
+         witAddSubsBomEntry(localWitRun, localOperationName, k,
+d589 1
+a589 1
+            witAddSubsBomEntry(localWitRun, localOperationName, k,
+d604 2
+a605 2
+        RWCString consumingOperationName, RWCString localOperationName, 
+        RWCString consumedPartName, RWCString localPartName, 
+d613 1
+a613 1
+   witGetBomEntryEarliestPeriod(theWitRun, consumingOperationName, bomEntryIndex,
+d615 1
+a615 1
+   witSetBomEntryEarliestPeriod(localWitRun, localOperationName, localBomEntryIndex,
+d617 1
+a617 1
+   witGetBomEntryLatestPeriod(theWitRun, consumingOperationName, bomEntryIndex,
+d619 1
+a619 1
+   witSetBomEntryLatestPeriod(localWitRun, localOperationName, localBomEntryIndex,
+d621 1
+a621 1
+   witGetBomEntryFalloutRate(theWitRun, consumingOperationName, bomEntryIndex,
+d623 1
+a623 1
+   witSetBomEntryFalloutRate(localWitRun, localOperationName, localBomEntryIndex,
+d625 1
+a625 1
+   witGetBomEntryMandEC(theWitRun, consumingOperationName, bomEntryIndex,
+d627 1
+a627 1
+   witSetBomEntryMandEC(localWitRun, localOperationName, localBomEntryIndex,
+d629 1
+a629 1
+   witGetBomEntryUsageRate(theWitRun, consumingOperationName, bomEntryIndex,
+d631 1
+a631 1
+   witSetBomEntryUsageRate(localWitRun, localOperationName, localBomEntryIndex,
+d633 1
+a633 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName, bomEntryIndex,
+d635 1
+a635 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName, bomEntryIndex,
+d637 1
+a637 1
+   witSetBomEntryOffset(localWitRun, localOperationName, localBomEntryIndex,
+d641 1
+a641 1
+      witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName, localBomEntryIndex,
+d643 1
+a643 1
+      witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName, localBomEntryIndex,
+d645 1
+a645 1
+      witSetSubsBomEntryFalloutRate(localWitRun, localOperationName, localBomEntryIndex,
+d647 1
+a647 1
+      witSetSubsBomEntryUsageRate(localWitRun, localOperationName, localBomEntryIndex,
+d649 1
+a649 1
+      witSetSubsBomEntryOffset(localWitRun, localOperationName, localBomEntryIndex,
+d654 1
+a654 1
+         witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName, 
+d656 1
+a656 1
+         witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName, 
+d658 1
+a658 1
+         witSetSubsBomEntryFalloutRate(localWitRun, localOperationName, 
+d660 1
+a660 1
+         witSetSubsBomEntryUsageRate(localWitRun, localOperationName, 
+d664 1
+a664 1
+         witSetSubsBomEntryOffset(localWitRun, localOperationName, 
+@
+
+
+1.1.1.1
+log
+@Import witutil
+@
+text
+@@
+
+
+1.1.1.1.12.1
+log
+@Final commit for removing Roguewave stuff
+@
+text
+@d5 2
+a6 2
+//#include <string>
+//#include <rw/ctoken.h>
+d8 1
+a8 1
+//#include <fstream.h>
+a13 1
+#include <string>
+d16 11
+a26 11
+void addStructureBelowPart(WitRun *, WitRun *, std::string, std::string, 
+   std::string, int);
+void setupOperation(WitRun *, WitRun *, std::string, std::string);
+void setTheBopData(WitRun *, WitRun *, std::string, std::string, std::string, 
+   std::string, int, int);
+void addStructureBelowOperation(WitRun *, WitRun*, std::string, std::string, 
+   std::string, int);
+void setupPart(WitRun *, WitRun *, std::string, std::string);
+void setTheBomData(WitRun *, WitRun*, std::string, std::string, std::string, 
+   std::string, int, int, int);
+void setTheDemand(WitRun *, WitRun *, std::string, std::string, std::string);
+d121 1
+a121 1
+	std::string prefix(demandList[j]); 
+d125 1
+a125 1
+	std::string workingPart(prefix);
+d128 1
+a128 1
+	std::string MRPDemandName("MRP"); 
+d131 1
+a131 1
+	witGetPartExists(localWitRun_, prefix.c_str(), &exists);
+d136 1
+a136 1
+	witGetPartExists(localWitRun_, MRPDemandName.c_str(), &exists);
+d143 5
+a147 5
+	witAddPart(localWitRun_, workingPart.c_str(), WitMATERIAL);            
+	witAddPartWithOperation(localWitRun_, MRPDemandName.c_str());
+	witAddDemand(localWitRun_, MRPDemandName.c_str(), MRPDemandName.c_str());
+	witAddBomEntry(localWitRun_, MRPDemandName.c_str(), workingPart.c_str());
+	witAddSubsBomEntry(localWitRun_, MRPDemandName.c_str(), 0, partList[i]);
+d241 1
+a241 1
+   std::string separatorString(1,separatorChar_);
+d301 2
+a302 1
+         std::string witName(operationList[i]);
+d304 3
+a306 7
+		 int firstSpaceOffset = witName.find_first_of(' ');
+		 int secondSpaceOffset = witName.find_first_of(' ',firstSpaceOffset+1);
+		 int thirdSpaceOffset = witName.find_first_of(' ',secondSpaceOffset+1);
+
+		 std::string demandName = witName.substr(0, firstSpaceOffset );
+		 std::string demandedPart = witName.substr(firstSpaceOffset+1, secondSpaceOffset - firstSpaceOffset - 1 );
+		 std::string partName = witName.substr(secondSpaceOffset+1, thirdSpaceOffset - secondSpaceOffset - 1 );
+d373 2
+a374 2
+void setTheDemand(WitRun *theWitRun, WitRun *localWitRun, std::string partName, 
+        std::string demandName, std::string  MRPDemandName){
+d379 3
+a381 3
+   witGetDemandDemandVol(theWitRun, partName.c_str(), demandName.c_str(), &demandVol);
+   witSetDemandDemandVol(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), demandVol); 
+   witGetDemandBuildAheadLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+d383 1
+a383 1
+   witSetDemandBuildAheadLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d385 1
+a385 1
+   witGetDemandCumShipBounds(theWitRun, partName.c_str(), demandName.c_str(), 
+d387 1
+a387 1
+   witSetDemandCumShipBounds(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d389 1
+a389 1
+   witGetDemandPriority(theWitRun, partName.c_str(), demandName.c_str(), 
+d391 1
+a391 1
+   witSetDemandPriority(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d393 1
+a393 1
+   witGetDemandShipLateLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+d395 1
+a395 1
+   witSetDemandShipLateLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d406 2
+a407 2
+void addStructureBelowPart(WitRun *theWitRun, WitRun *localWitRun, std::string prefix,
+               std::string partName, std::string workingPart, int version){
+d417 1
+a417 1
+   witGetPartNProducingBopEntries(theWitRun, partName.c_str(), &nProducingBopEntries);
+d420 1
+a420 1
+      witGetOperationExists(localWitRun, workingPart.c_str(), &exists);
+d422 3
+a424 3
+         witAddOperation(localWitRun, workingPart.c_str());
+         witAddBopEntry(localWitRun, workingPart.c_str(), workingPart.c_str());
+         witGetOperationYieldRate(localWitRun, workingPart.c_str(), &yieldRate);
+d427 1
+a427 1
+         witSetOperationYieldRate(localWitRun, workingPart.c_str(), yieldRate);
+d433 1
+a433 1
+      witGetPartProducingBopEntry(theWitRun, partName.c_str(), k, 
+d435 1
+a435 1
+      std::string localOperationName(prefix);
+d437 1
+a437 1
+      witGetOperationExists(localWitRun, localOperationName.c_str(), &exists);
+d446 1
+a446 1
+         witGetOperationYieldRate(localWitRun, localOperationName.c_str(), &yieldRate);
+d449 1
+a449 1
+         witSetOperationYieldRate(localWitRun, localOperationName.c_str(), yieldRate);
+d455 1
+a455 1
+      witGetOperationNBopEntries(localWitRun, localOperationName.c_str(), 
+d457 1
+a457 1
+      witAddBopEntry(localWitRun, localOperationName.c_str(), workingPart.c_str());
+d468 2
+a469 2
+void setupPart(WitRun *theWitRun, WitRun *localWitRun, std::string consumedPartName, 
+        std::string localPartName){
+d474 1
+a474 1
+   witGetPartCategory(theWitRun, consumedPartName.c_str(), &partCategory);
+d476 1
+a476 1
+      witAddPart(localWitRun, localPartName.c_str(), WitMATERIAL);
+d478 1
+a478 1
+      witAddPart(localWitRun, localPartName.c_str(), partCategory);
+d480 2
+a481 2
+      witGetPartStockBounds(theWitRun, consumedPartName.c_str(), &hardLower, &softLower, &hardUpper);
+      witSetPartStockBounds(localWitRun, localPartName.c_str(), hardLower, softLower, hardUpper);
+d490 2
+a491 2
+        std::string producingOperationName, std::string localOperationName, 
+        std::string partName, std::string workingPart, int bopEntryIndex, int localBopEntryIndex){
+d497 1
+a497 1
+   witGetBopEntryEarliestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d499 1
+a499 1
+   witSetBopEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d501 1
+a501 1
+   witGetBopEntryLatestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d503 1
+a503 1
+   witSetBopEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d505 1
+a505 1
+   witGetBopEntryExpAllowed(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d507 1
+a507 1
+   witSetBopEntryExpAllowed(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d509 1
+a509 1
+   witGetBopEntryExpAversion(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d511 1
+a511 1
+   witSetBopEntryExpAversion(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d513 1
+a513 1
+   witGetBopEntryOffset(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d515 1
+a515 1
+   witSetBopEntryOffset(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d517 1
+a517 1
+   witGetBopEntryProdRate(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d519 1
+a519 1
+   witSetBopEntryProdRate(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d526 1
+a526 1
+        std::string producingOperationName, std::string localOperationName){
+d531 2
+a532 2
+   witAddOperation(localWitRun, localOperationName.c_str());
+   witGetOperationExecBounds(theWitRun, producingOperationName.c_str(),
+d534 1
+a534 1
+   witSetOperationExecBounds(localWitRun, localOperationName.c_str(),
+d536 1
+a536 1
+   witGetOperationIncLotSize(theWitRun, producingOperationName.c_str(),
+d538 1
+a538 1
+   witSetOperationIncLotSize(localWitRun, localOperationName.c_str(),
+d540 1
+a540 1
+   witGetOperationMinLotSize(theWitRun, producingOperationName.c_str(),
+d542 1
+a542 1
+   witSetOperationMinLotSize(localWitRun, localOperationName.c_str(),
+d544 1
+a544 1
+   witGetOperationYieldRate(theWitRun, producingOperationName.c_str(),
+d546 1
+a546 1
+   witSetOperationYieldRate(localWitRun, localOperationName.c_str(),
+d557 2
+a558 2
+   std::string prefix, std::string consumingOperationName, 
+   std::string localOperationName, int version){
+d566 1
+a566 1
+   witGetOperationNBomEntries(theWitRun, consumingOperationName.c_str(), &nBomEntries);
+d568 1
+a568 1
+      witGetBomEntryConsumedPart(theWitRun, consumingOperationName.c_str(), 
+d570 1
+a570 1
+      std::string localPartName(prefix);
+d572 1
+a572 1
+      witGetPartExists(localWitRun, localPartName.c_str(), &exists);
+d577 1
+a577 1
+      witGetOperationNBomEntries(localWitRun, localOperationName.c_str(), 
+d579 1
+a579 1
+      witAddBomEntry(localWitRun, localOperationName.c_str(), localPartName.c_str());
+d581 1
+a581 1
+         witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+d585 1
+a585 1
+            witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+d600 2
+a601 2
+        std::string consumingOperationName, std::string localOperationName, 
+        std::string consumedPartName, std::string localPartName, 
+d609 1
+a609 1
+   witGetBomEntryEarliestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d611 1
+a611 1
+   witSetBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d613 1
+a613 1
+   witGetBomEntryLatestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d615 1
+a615 1
+   witSetBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d617 1
+a617 1
+   witGetBomEntryFalloutRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d619 1
+a619 1
+   witSetBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d621 1
+a621 1
+   witGetBomEntryMandEC(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d623 1
+a623 1
+   witSetBomEntryMandEC(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d625 1
+a625 1
+   witGetBomEntryUsageRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d627 1
+a627 1
+   witSetBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d629 1
+a629 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d631 1
+a631 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d633 1
+a633 1
+   witSetBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d637 1
+a637 1
+      witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d639 1
+a639 1
+      witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d641 1
+a641 1
+      witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d643 1
+a643 1
+      witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d645 1
+a645 1
+      witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d650 1
+a650 1
+         witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), 
+d652 1
+a652 1
+         witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), 
+d654 1
+a654 1
+         witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), 
+d656 1
+a656 1
+         witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), 
+d660 1
+a660 1
+         witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), 
+@
+
+
+1.1.1.1.10.1
+log
+@Removed references to RogueWave tools.h++
+@
+text
+@d5 2
+a6 2
+//#include <rw/cstring.h>
+//#include <rw/ctoken.h>
+a13 1
+#include <string>
+d16 11
+a26 11
+void addStructureBelowPart(WitRun *, WitRun *, std::string, std::string, 
+   std::string, int);
+void setupOperation(WitRun *, WitRun *, std::string, std::string);
+void setTheBopData(WitRun *, WitRun *, std::string, std::string, std::string, 
+   std::string, int, int);
+void addStructureBelowOperation(WitRun *, WitRun*, std::string, std::string, 
+   std::string, int);
+void setupPart(WitRun *, WitRun *, std::string, std::string);
+void setTheBomData(WitRun *, WitRun*, std::string, std::string, std::string, 
+   std::string, int, int, int);
+void setTheDemand(WitRun *, WitRun *, std::string, std::string, std::string);
+d121 1
+a121 1
+	std::string prefix(demandList[j]); 
+d125 1
+a125 1
+	std::string workingPart(prefix);
+d128 1
+a128 1
+	std::string MRPDemandName("MRP"); 
+d131 1
+a131 1
+	witGetPartExists(localWitRun_, prefix.c_str(), &exists);
+d136 1
+a136 1
+	witGetPartExists(localWitRun_, MRPDemandName.c_str(), &exists);
+d143 5
+a147 5
+	witAddPart(localWitRun_, workingPart.c_str(), WitMATERIAL);            
+	witAddPartWithOperation(localWitRun_, MRPDemandName.c_str());
+	witAddDemand(localWitRun_, MRPDemandName.c_str(), MRPDemandName.c_str());
+	witAddBomEntry(localWitRun_, MRPDemandName.c_str(), workingPart.c_str());
+	witAddSubsBomEntry(localWitRun_, MRPDemandName.c_str(), 0, partList[i]);
+d241 1
+a241 1
+   std::string separatorString(1,separatorChar_);
+d301 2
+a302 1
+         std::string witName(operationList[i]);
+d304 3
+a306 7
+		 int firstSpaceOffset = witName.find_first_of(' ');
+		 int secondSpaceOffset = witName.find_first_of(' ',firstSpaceOffset+1);
+		 int thirdSpaceOffset = witName.find_first_of(' ',secondSpaceOffset+1);
+
+		 std::string demandName = witName.substr(0, firstSpaceOffset );
+		 std::string demandedPart = witName.substr(firstSpaceOffset+1, secondSpaceOffset - firstSpaceOffset - 1 );
+		 std::string partName = witName.substr(secondSpaceOffset+1, thirdSpaceOffset - secondSpaceOffset - 1 );
+d373 2
+a374 2
+void setTheDemand(WitRun *theWitRun, WitRun *localWitRun, std::string partName, 
+        std::string demandName, std::string  MRPDemandName){
+d379 3
+a381 3
+   witGetDemandDemandVol(theWitRun, partName.c_str(), demandName.c_str(), &demandVol);
+   witSetDemandDemandVol(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), demandVol); 
+   witGetDemandBuildAheadLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+d383 1
+a383 1
+   witSetDemandBuildAheadLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d385 1
+a385 1
+   witGetDemandCumShipBounds(theWitRun, partName.c_str(), demandName.c_str(), 
+d387 1
+a387 1
+   witSetDemandCumShipBounds(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d389 1
+a389 1
+   witGetDemandPriority(theWitRun, partName.c_str(), demandName.c_str(), 
+d391 1
+a391 1
+   witSetDemandPriority(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d393 1
+a393 1
+   witGetDemandShipLateLimit(theWitRun, partName.c_str(), demandName.c_str(), 
+d395 1
+a395 1
+   witSetDemandShipLateLimit(localWitRun, MRPDemandName.c_str(), MRPDemandName.c_str(), 
+d406 2
+a407 2
+void addStructureBelowPart(WitRun *theWitRun, WitRun *localWitRun, std::string prefix,
+               std::string partName, std::string workingPart, int version){
+d417 1
+a417 1
+   witGetPartNProducingBopEntries(theWitRun, partName.c_str(), &nProducingBopEntries);
+d420 1
+a420 1
+      witGetOperationExists(localWitRun, workingPart.c_str(), &exists);
+d422 3
+a424 3
+         witAddOperation(localWitRun, workingPart.c_str());
+         witAddBopEntry(localWitRun, workingPart.c_str(), workingPart.c_str());
+         witGetOperationYieldRate(localWitRun, workingPart.c_str(), &yieldRate);
+d427 1
+a427 1
+         witSetOperationYieldRate(localWitRun, workingPart.c_str(), yieldRate);
+d433 1
+a433 1
+      witGetPartProducingBopEntry(theWitRun, partName.c_str(), k, 
+d435 1
+a435 1
+      std::string localOperationName(prefix);
+d437 1
+a437 1
+      witGetOperationExists(localWitRun, localOperationName.c_str(), &exists);
+d446 1
+a446 1
+         witGetOperationYieldRate(localWitRun, localOperationName.c_str(), &yieldRate);
+d449 1
+a449 1
+         witSetOperationYieldRate(localWitRun, localOperationName.c_str(), yieldRate);
+d455 1
+a455 1
+      witGetOperationNBopEntries(localWitRun, localOperationName.c_str(), 
+d457 1
+a457 1
+      witAddBopEntry(localWitRun, localOperationName.c_str(), workingPart.c_str());
+d468 2
+a469 2
+void setupPart(WitRun *theWitRun, WitRun *localWitRun, std::string consumedPartName, 
+        std::string localPartName){
+d474 1
+a474 1
+   witGetPartCategory(theWitRun, consumedPartName.c_str(), &partCategory);
+d476 1
+a476 1
+      witAddPart(localWitRun, localPartName.c_str(), WitMATERIAL);
+d478 1
+a478 1
+      witAddPart(localWitRun, localPartName.c_str(), partCategory);
+d480 2
+a481 2
+      witGetPartStockBounds(theWitRun, consumedPartName.c_str(), &hardLower, &softLower, &hardUpper);
+      witSetPartStockBounds(localWitRun, localPartName.c_str(), hardLower, softLower, hardUpper);
+d490 2
+a491 2
+        std::string producingOperationName, std::string localOperationName, 
+        std::string partName, std::string workingPart, int bopEntryIndex, int localBopEntryIndex){
+d497 1
+a497 1
+   witGetBopEntryEarliestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d499 1
+a499 1
+   witSetBopEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d501 1
+a501 1
+   witGetBopEntryLatestPeriod(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d503 1
+a503 1
+   witSetBopEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d505 1
+a505 1
+   witGetBopEntryExpAllowed(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d507 1
+a507 1
+   witSetBopEntryExpAllowed(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d509 1
+a509 1
+   witGetBopEntryExpAversion(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d511 1
+a511 1
+   witSetBopEntryExpAversion(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d513 1
+a513 1
+   witGetBopEntryOffset(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d515 1
+a515 1
+   witSetBopEntryOffset(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d517 1
+a517 1
+   witGetBopEntryProdRate(theWitRun, producingOperationName.c_str(), bopEntryIndex, 
+d519 1
+a519 1
+   witSetBopEntryProdRate(localWitRun, localOperationName.c_str(), localBopEntryIndex, 
+d526 1
+a526 1
+        std::string producingOperationName, std::string localOperationName){
+d531 2
+a532 2
+   witAddOperation(localWitRun, localOperationName.c_str());
+   witGetOperationExecBounds(theWitRun, producingOperationName.c_str(),
+d534 1
+a534 1
+   witSetOperationExecBounds(localWitRun, localOperationName.c_str(),
+d536 1
+a536 1
+   witGetOperationIncLotSize(theWitRun, producingOperationName.c_str(),
+d538 1
+a538 1
+   witSetOperationIncLotSize(localWitRun, localOperationName.c_str(),
+d540 1
+a540 1
+   witGetOperationMinLotSize(theWitRun, producingOperationName.c_str(),
+d542 1
+a542 1
+   witSetOperationMinLotSize(localWitRun, localOperationName.c_str(),
+d544 1
+a544 1
+   witGetOperationYieldRate(theWitRun, producingOperationName.c_str(),
+d546 1
+a546 1
+   witSetOperationYieldRate(localWitRun, localOperationName.c_str(),
+d557 2
+a558 2
+   std::string prefix, std::string consumingOperationName, 
+   std::string localOperationName, int version){
+d566 1
+a566 1
+   witGetOperationNBomEntries(theWitRun, consumingOperationName.c_str(), &nBomEntries);
+d568 1
+a568 1
+      witGetBomEntryConsumedPart(theWitRun, consumingOperationName.c_str(), 
+d570 1
+a570 1
+      std::string localPartName(prefix);
+d572 1
+a572 1
+      witGetPartExists(localWitRun, localPartName.c_str(), &exists);
+d577 1
+a577 1
+      witGetOperationNBomEntries(localWitRun, localOperationName.c_str(), 
+d579 1
+a579 1
+      witAddBomEntry(localWitRun, localOperationName.c_str(), localPartName.c_str());
+d581 1
+a581 1
+         witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+d585 1
+a585 1
+            witAddSubsBomEntry(localWitRun, localOperationName.c_str(), k,
+d600 2
+a601 2
+        std::string consumingOperationName, std::string localOperationName, 
+        std::string consumedPartName, std::string localPartName, 
+d609 1
+a609 1
+   witGetBomEntryEarliestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d611 1
+a611 1
+   witSetBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d613 1
+a613 1
+   witGetBomEntryLatestPeriod(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d615 1
+a615 1
+   witSetBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d617 1
+a617 1
+   witGetBomEntryFalloutRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d619 1
+a619 1
+   witSetBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d621 1
+a621 1
+   witGetBomEntryMandEC(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d623 1
+a623 1
+   witSetBomEntryMandEC(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d625 1
+a625 1
+   witGetBomEntryUsageRate(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d627 1
+a627 1
+   witSetBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d629 1
+a629 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d631 1
+a631 1
+   witGetBomEntryOffset(theWitRun, consumingOperationName.c_str(), bomEntryIndex,
+d633 1
+a633 1
+   witSetBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d637 1
+a637 1
+      witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d639 1
+a639 1
+      witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d641 1
+a641 1
+      witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d643 1
+a643 1
+      witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d645 1
+a645 1
+      witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), localBomEntryIndex,
+d650 1
+a650 1
+         witSetSubsBomEntryEarliestPeriod(localWitRun, localOperationName.c_str(), 
+d652 1
+a652 1
+         witSetSubsBomEntryLatestPeriod(localWitRun, localOperationName.c_str(), 
+d654 1
+a654 1
+         witSetSubsBomEntryFalloutRate(localWitRun, localOperationName.c_str(), 
+d656 1
+a656 1
+         witSetSubsBomEntryUsageRate(localWitRun, localOperationName.c_str(), 
+d660 1
+a660 1
+         witSetSubsBomEntryOffset(localWitRun, localOperationName.c_str(), 
+@
+

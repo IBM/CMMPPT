@@ -1,0 +1,163 @@
+head	1.2;
+access;
+symbols
+	beforeInforms:1.1.1.1
+	Start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.2
+date	2005.04.12.18.44.43;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2004.12.22.18.52.42;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Removing Sbb
+@
+text
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a0 109
+// Copyright (C) 2002, International Business Machines
+// Corporation and others.  All Rights Reserved.
+#ifndef SbbCountRowCut_H
+#define SbbCountRowCut_H
+
+
+class OsiCuts;
+class OsiRowCut;
+class SbbNodeInfo;
+
+//#############################################################################
+/** \brief OsiRowCut augmented with bookkeeping
+
+  SbbCountRowCut is an OsiRowCut object augmented with bookkeeping
+  information: a reference count and information that specifies the
+  the generator that created the cut and the node to which it's associated.
+
+  The general principles for handling the reference count are as follows:
+  <ul>
+    <li> Once it's determined how the node will branch, increment the
+	 reference count under the assumption that all children will use
+         all cuts currently tight at the node and will survive to be placed
+	 in the search tree.
+    <li> As this assumption is proven incorrect (a cut becomes loose, or a
+	 child is fathomed), decrement the reference count accordingly.
+  </ul>
+  When all possible uses of a cut have been demonstrated to be unnecessary,
+  the reference count (#numberPointingToThis_) will fall to zero. The
+  SbbCountRowCut object (and its included OsiRowCut object) are then deleted.
+*/
+
+class SbbCountRowCut : public OsiRowCut {
+
+public:
+  
+  /** @@name Constructors & destructors */
+  //@@{
+
+    /// Default Constructor 
+    SbbCountRowCut ();
+
+    /// `Copy' constructor using an OsiRowCut
+    SbbCountRowCut ( const OsiRowCut &);  
+
+    /// `Copy' constructor using an OsiRowCut and an SbbNodeInfo
+    SbbCountRowCut(const OsiRowCut &, SbbNodeInfo *, int whichOne,
+		   int whichGenerator=-1);  
+
+    /** Destructor
+
+      \note The destructor will reach out (via #owner_) and NULL the
+      reference to the cut in the owner's
+      \link SbbNodeInfo::cuts_ cuts_ \endlink list.
+    */
+    virtual ~SbbCountRowCut ();
+  //@@}
+
+  /// Increment the number of references
+  void increment(int change=1);
+
+  /// Decrement the number of references and return the number left.
+  int decrement(int change=1);
+
+  /** \brief Set the information associating this cut with a node
+
+    An SbbNodeInfo object and an index in the cut set of the node.
+    For locally valid cuts, the node will be the  search tree node where the
+    cut was generated. For globally valid cuts, it's the node where the cut
+    was activated.
+  */
+  void setInfo(SbbNodeInfo *, int whichOne);
+
+  /// Number of other SbbNodeInfo objects pointing to this row cut
+  inline int numberPointingToThis()
+  { return numberPointingToThis_;};
+
+  /// Which generator for cuts - as user order
+   int whichCutGenerator() const
+  { return whichCutGenerator_;};
+
+#ifdef CHECK_CUT_COUNTS
+  // Just for printing sanity checks
+  int tempNumber_;
+#endif
+
+private:
+
+  /// Standard copy is illegal (reference counts would be incorrect)
+  SbbCountRowCut(const SbbCountRowCut &);
+  
+  /// Standard assignment is illegal (reference counts would be incorrect)
+  SbbCountRowCut & operator=(const SbbCountRowCut& rhs);
+
+  /// Backward pointer to owning SbbNodeInfo
+  SbbNodeInfo * owner_;
+  
+  /// Index of cut in owner's cut set
+  /// (\link SbbNodeInfo::cuts_ cuts_ \endlink).
+  int ownerCut_;
+  
+  /// Number of other SbbNodeInfo objects pointing to this cut
+  int numberPointingToThis_;
+
+  /// Which generator created this cut
+  int whichCutGenerator_;
+
+};
+
+#endif
+@
+
+
+1.1.1.1
+log
+@COIN code from IBM hosted repository (before move to informs)
+@
+text
+@@

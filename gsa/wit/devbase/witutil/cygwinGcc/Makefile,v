@@ -1,0 +1,117 @@
+head	1.1;
+access;
+symbols
+	latest_sce_4_20_20060523:1.1.0.4
+	sce_4_20_20060523:1.1
+	latest_sce4_20_OSL:1.1.0.2
+	sce_4_20_OSL:1.1;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2004.12.17.18.59.33;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@added to build with cygwin using gcc compiler
+@
+text
+@# Makefile for the program for this architecture
+
+# $Header: /u/wit/devbase/witutil/linux/Makefile,v 1.1 2003/08/05 13:14:58 dpc Exp $
+
+platform = cygwinGcc
+
+sep = /
+config_dir	= ..$(sep)..$(sep)config$(sep)
+
+include $(config_dir)p_$(platform).mk
+
+# exe_type should be debug, profile, slow, fast, beta, or released.  
+# To override it without
+# changing this makefile, use "exe_type=debug" (for example) as an 
+# argument to make on the command line.  This default was chosen so that
+# we don't accidentally ship product code with symbol tables and other
+# info for reverse-engineering enclosed.
+exe_type = debug
+
+include ..$(sep)src$(sep)appl.mk
+
+
+all:	unitTest $(objects) libwutl.a shrtFall
+
+# Following is for doing compiles locally.  To use it, execute "make dotohs".
+# The is useful because doing manipulating libraries and linking
+# runs much faster when it is run on the machine that has the files, but
+# it does not make much difference when compiling
+dotohs:	$(objects)
+
+# Following is for doing compiles locally and link on mfglog2.  It assumes
+# you have an alias for setvars.[ck]sh and that your working directory is named
+# after your userid or that there is a soft link to do the same thing.
+remlink:	dotohs
+	sleep 2		# Give NFS time to catch up
+	rsh mfglog2 "setvars; cd /u/implode/$(USER)/witutil/$(platform); pwd; nice $(MAKE) -k shrtFall "
+
+remlink1:	dotohs
+	sleep 2		# Give NFS time to catch up
+	rsh $(XLC_SERVER) "setvars; cd /u/implode/$(USER)/witutil/$(platform); pwd; nice $(MAKE) -k shrtFall"
+
+
+remlinkKsh:	dotohs
+	sleep 2		# Give NFS time to catch up
+	rsh $(XLC_SERVER) "export PATH=/usr/gnu/bin/:$(PATH); . /u/implode/bin/setvars.ksh; cd /u/implode/$(USER)/witutil/$(platform); pwd; nice $(MAKE) -k shrtFall "
+
+# Following is for doing compiles on woodenshoe and links locally.  They assume
+# that your working directory is named after your userid or that there is a soft 
+# link to do the same thing.
+#
+# remcomp further assumes :
+#    - Your default shell is csh.
+#    - You have an alias for setvars.csh named setvars.
+#    - /usr/gnu/bin is in your PATH
+#
+# remcompKsh further assumes:
+#    - Your default shell is ksh.
+# 
+remcomp:
+	rsh $(XLC_SERVER) "setvars; cd /u/implode/$(USER)/witutil/$(platform); pwd; nice /usr/gnu/bin/make dotohs exe_type=$(exe_type); hostname"
+	sleep 2         # Give NFS time to catch up
+	$(MAKE)  shrtFall; hostname
+
+
+remcompKsh:
+	rsh $(XLC_SERVER) "export PATH=/usr/gnu/bin/:$(PATH); . /u/implode/bin/setvars.ksh; cd /u/implode/$(USER)/scenario/$(platform); pwd; nice $(MAKE) dotohs exe_type=$(exe_type); hostname"
+	sleep 2         # Give NFS time to catch up
+	$(MAKE)  shrtFall
+
+../src/TAGS:	$(sources)
+		cd ..$(sep)src; etags -C $(sources)
+
+parTestRun:	
+	$(MAKE) parComp
+	$(MAKE) shrtFall
+
+shrtFallRun:	shrtFall
+	$<
+
+sentinelShortFall:	shrtFall.o $(lib_objects) \
+			../../wit/$(platform)/libwit.a \
+			/lib/libm.a /lib/libxlf.a
+	SE_HOME=/u/dcwong/SE_HOME; export SE_HOME; \
+		/u/dcwong/SE_HOME/sentinel $(CC)  $(CPPFLAGS) $(CXXFLAGS) \
+		$(LDFLAGS) $^ $(LOADLIBES) \
+		-o $@@
+
+
+# DO NOT DELETE THIS LINE -- make depend depends on it.
+
+@

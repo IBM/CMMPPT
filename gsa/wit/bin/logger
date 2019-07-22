@@ -1,0 +1,48 @@
+#!/bin/csh
+
+# A filter to do things to log changes.  This file is used by the
+# Concurrent Version Control (CVS) system used for maintaining the
+# logistics software.
+
+# Arguments: A brief title (from CVS) showing the modified file names
+# Stadard input: Log information from the "cvs commit" command. 
+
+# $Id: logger.sh,v 1.1.1.1 2000/02/23 17:02:56 wit Exp $
+
+if ($USER == nobody) then
+    # print debugging information when "cvs commit" is executed
+    set echo verbose
+endif
+
+# Where the log information from cvs commit is to be put.
+set logFile = /tmp/logger.$$
+
+# People and mailing lists that should receive log info
+set mailees = 'logistics-dev-list'
+
+# Save input stream
+unset noclobber
+/usr/bin/cat - > $logFile
+if ($status != 0) then
+  echo Unable to make $logFile
+  /usr/bin/mail -s "Warning: semisuccessfull update by $USER" $mailees < /dev/null
+  echo The commit was done, but it will not be saved in commitlog and
+  echo the other users will not get mail describing the changes.
+  exit 1
+endif
+set noclobber
+
+# Record info in history file
+$CVSROOT/CVSROOT/log.pl $* $CVSROOT/CVSROOT/commitlog < $logFile
+
+# Send mail to appropriate people, do this last as the previos lines
+# are simpler, hence less likely to be buggy.
+set noglob		# Avoid globbing
+set argList = (`echo $argv`)	# Convert argv to list of words instead of 
+				# one word
+set nArgs = $#argList
+set fileArgs = ($argList[2-$nArgs])	# Handle multiple files
+set subject = ("CVS (${argList[1]}" 'directory):' updating "$fileArgs")
+/usr/bin/mail -s "$subject" $mailees <  $logFile
+
+/bin/rm $logFile

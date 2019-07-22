@@ -1,0 +1,2340 @@
+head	1.24;
+access;
+symbols
+	sce_5_01_20080919:1.12;
+locks; strict;
+comment	@ * @;
+
+
+1.24
+date	2011.09.28.23.49.16;	author rjw;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2011.09.24.00.27.32;	author rjw;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2011.08.30.20.17.25;	author rjw;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2010.09.10.22.10.37;	author rjw;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2010.08.19.18.00.11;	author rjw;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2010.03.24.21.31.01;	author rjw;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2010.03.18.23.28.01;	author rjw;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2010.03.16.20.39.21;	author rjw;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2010.03.13.00.35.49;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2010.01.08.22.51.54;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2010.01.06.21.13.11;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2010.01.06.00.27.30;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2008.02.27.23.43.41;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2008.02.27.23.19.09;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.12.06.22.53.01;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.08.15.22.02.08;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.08.15.19.15.32;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.08.09.20.17.41;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.08.09.19.30.35;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.08.01.22.41.56;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.07.31.22.22.33;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.07.31.20.39.45;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.06.26.20.01.29;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.06.26.19.06.20;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.24
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Source file: "DetCons.C"
+//
+// Implementation the following hierarchy of classes:
+//
+//    DetCon
+//       ResourceCon
+//       SubCon
+//       ShipCon
+//       SlbCon
+//       MultiObjCon
+//       TbvCon
+//------------------------------------------------------------------------------
+
+#include <DetCons.h>
+#include <DetImpOP.h>
+#include <DetOptImpMgr.h>
+#include <DetVars.h>
+#include <OptComp.h>
+#include <Material.h>
+#include <Operation.h>
+#include <BomEntry.h>
+#include <SubEntry.h>
+#include <BopEntry.h>
+#include <ExecPerSch.h>
+#include <MultiObjMgr.h>
+
+#include <float.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class DetCon.
+//------------------------------------------------------------------------------
+
+WitDetCon::WitDetCon (WitDetImpOP * theDetImpOP, WitPeriod thePer):
+
+      WitOptCon   (theDetImpOP),
+      myDetImpOP_ (theDetImpOP),
+      myPeriod_   (thePer)
+   {
+   witAssert (thePer >= 0);
+   }
+
+//------------------------------------------------------------------------------
+
+WitDetCon::WitDetCon (WitDetImpOP * theDetImpOP):
+
+      WitOptCon   (theDetImpOP),
+      myDetImpOP_ (theDetImpOP),
+      myPeriod_   (-1)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitDetCon::~WitDetCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptProblem * WitDetCon::myOptProblem ()
+   {
+   return myDetImpOP_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDetCon::printSource ()
+   {
+   printItem ();
+
+   if (hasPeriod ())
+      {
+      myDetImpOP_->printPeriod (myPeriod ());
+      }
+   else
+      {
+      myDetImpOP_->printNonPeriod ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ResourceCon.
+//------------------------------------------------------------------------------
+
+WitResourceCon::WitResourceCon (
+         WitPart *     thePart,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myPart_   (thePart)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitResourceCon::~WitResourceCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+double WitResourceCon::upperBoundVal ()
+   {
+   return myPart_->supplyVol ()[myPeriod ()];
+   }
+
+//------------------------------------------------------------------------------
+
+double WitResourceCon::lowerBoundVal ()
+   {
+   return myPart_->supplyVol ()[myPeriod ()];
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitResourceCon::classText ()
+   {
+   return "Resource";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitResourceCon::printItem ()
+   {
+   myDetImpOP ()->printItem (myPart ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitResourceCon::generateCoeffs ()
+   {
+   WitPeriod     thePer;
+   WitMaterial * theMat;
+   WitDemand *   theDemand;
+   WitScrapVar * theScrapVar;
+
+   thePer = myPeriod ();
+
+   theMat = myPart ()->thisMat ();
+
+   if (theMat != NULL)
+      {
+      if (theMat->canStock (thePer))
+         myDetImpOP ()->myStockVar (theMat, thePer)->incCoeff (1.0);
+
+      if (thePer > 0)
+         if (theMat->canStock (thePer - 1))
+            myDetImpOP ()->myStockVar (theMat, thePer - 1)->incCoeff (-1.0);
+      }
+
+   forEachEl (theDemand, myPart ()->myDemands ())
+      myDetImpOP ()->myShipVar (theDemand, thePer)->incCoeff (1.0);
+
+   theScrapVar = myDetImpOP ()->myScrapVar (myPart (), thePer);
+
+   if (theScrapVar != NULL)
+      theScrapVar->incCoeff (1.0);
+
+   genBillEntCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitResourceCon::genBillEntCoeffs ()
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPerF;
+   WitPeriod     execPerL;
+   WitPeriod     execPer;
+   WitOptVar *   theOptVar;
+
+   forEachEl (theBomEnt, myPart ()->consumingBomEntries ())
+      {
+      getExecPerRange (theBomEnt, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theBomEnt->impactPeriod ()[execPer] == myPeriod ())
+            {
+            if (theBomEnt->hasSubsInEffect ()[execPer])
+               theOptVar = myDetImpOP ()->myNonSubVar (theBomEnt, execPer);
+            else
+               theOptVar =
+                  myDetImpOP ()->myExecVar (theBomEnt->myOperation (), execPer);
+
+            theOptVar->incCoeff (theBomEnt->effConsRate ()[execPer]);
+            }
+      }
+
+   forEachEl (theSub, myPart ()->consumingSubEntries ())
+      {
+      getExecPerRange (theSub, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theSub->impactPeriod ()[execPer] == myPeriod ())
+            myDetImpOP ()->mySubVar (theSub, execPer)->
+               incCoeff (theSub->effConsRate ()[execPer]);
+      }
+
+   forEachEl (theBopEnt, myPart ()->producingBopEntries ())
+      {
+      getExecPerRange (theBopEnt, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theBopEnt->impactPeriod ()[execPer] == myPeriod ())
+            myDetImpOP ()->
+               myExecVar (theBopEnt->myOperation (), execPer)->
+                  incCoeff (- theBopEnt->effProdRate ()[execPer]);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitResourceCon::getExecPerRange (
+      WitBillEntry * theBillEnt,
+      WitPeriod &    execPerF,
+      WitPeriod &    execPerL)
+   {
+   myDetImpOP ()->
+      myExecPerSched ()->
+         getExecPerRange (theBillEnt, myPeriod (), execPerF, execPerL);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SubCon.
+//------------------------------------------------------------------------------
+
+WitSubCon::WitSubCon (
+         WitBomEntry * theBomEnt,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myBomEnt_ (theBomEnt)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSubCon::~WitSubCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSubCon::upperBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSubCon::lowerBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitSubCon::classText ()
+   {
+   return "Substitution";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSubCon::printItem ()
+   {
+   myDetImpOP ()->printItem (myBomEnt ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSubCon::generateCoeffs ()
+   {
+   WitPeriod     thePer;
+   WitSubEntry * theSub;
+
+   thePer = myPeriod ();
+
+   forEachEl (theSub, myBomEnt ()->mySubEntries ())
+      if (theSub->inEffect (thePer))
+         myDetImpOP ()->mySubVar (theSub, thePer)->incCoeff (1.0);
+
+   myDetImpOP ()->myNonSubVar (myBomEnt (), thePer)->incCoeff (1.0);
+
+   myDetImpOP ()->
+      myExecVar (myBomEnt ()->myOperation (), thePer)->
+         incCoeff (-1.0);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ShipCon.
+//------------------------------------------------------------------------------
+
+WitShipCon::WitShipCon (
+         WitDemand *   theDemand,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myDemand_ (theDemand)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitShipCon::~WitShipCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+double WitShipCon::upperBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitShipCon::lowerBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitShipCon::classText ()
+   {
+   return "Shipment";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitShipCon::printItem ()
+   {
+   myDetImpOP ()->printItem (myDemand ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitShipCon::generateCoeffs ()
+   {
+   WitPeriod thePer;
+
+   thePer = myPeriod ();
+
+   if (thePer > 0)
+      myDetImpOP ()->myCumShipVar (myDemand (), thePer - 1)->incCoeff  (1.0);
+
+   myDetImpOP ()   ->myShipVar    (myDemand (), thePer)    ->incCoeff  (1.0);
+
+   myDetImpOP ()   ->myCumShipVar (myDemand (), thePer)    ->incCoeff (-1.0);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class SlbCon.
+//------------------------------------------------------------------------------
+
+WitSlbCon::WitSlbCon (
+         WitBoundedVar * theBoundedVar,
+         WitDetImpOP *   theDetImpOP):
+
+      WitDetCon     (theDetImpOP, theBoundedVar->myPeriod ()),
+
+      myBoundedVar_ (theBoundedVar)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSlbCon::~WitSlbCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoundSet * WitSlbCon::myBoundSet ()
+   {
+   return myBoundedVar_->myBoundSet ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSlbCon::upperBoundVal ()
+   {
+   return DBL_MAX;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSlbCon::lowerBoundVal ()
+   {
+   return myBoundedVar_->softLB ();
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitSlbCon::classText ()
+   {
+   return "S. L. B.";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSlbCon::printItem ()
+   {
+   myDetImpOP ()->printItem (myBoundedVar_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSlbCon::generateCoeffs ()
+   {
+   myBoundedVar_->incCoeff (1.0);
+
+   myDetImpOP ()->mySlbvVar (myBoundedVar_)->incCoeff (1.0);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class MultiObjCon.
+//------------------------------------------------------------------------------
+
+WitMultiObjCon::WitMultiObjCon (
+         WitObjective * theObj,
+         WitDetImpOP *  theDetImpOP):
+
+      WitDetCon (theDetImpOP),
+      myObj_    (theObj)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitMultiObjCon::~WitMultiObjCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+double WitMultiObjCon::upperBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitMultiObjCon::lowerBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitMultiObjCon::classText ()
+   {
+   return "Multi-Obj";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjCon::printItem ()
+   {
+   myDetImpOP ()->printItem (myObj_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMultiObjCon::generateCoeffs ()
+   {
+   WitMultiObjMgr * theMultiObjMgr;
+   WitObjective *   savedObj;
+   WitOptVar *      theOptVar;
+   double           theObjCoeff;
+
+   theMultiObjMgr = myDetImpOP ()->myOptComp ()->myMultiObjMgr ();
+
+   myDetImpOP ()->myMultiObjVar (myObj_)->incCoeff (-1.0);
+
+   savedObj       = theMultiObjMgr->currentObjective ();
+
+   theMultiObjMgr->setCurrentObjective (myObj_);
+
+   forEachEl (theOptVar, myDetImpOP ()->myOptVars ())
+      {
+      if (theOptVar->mandDetVar ()->isSlbvVar ())
+         continue;
+
+      theObjCoeff = theOptVar->compObjCoeff ();
+
+      theOptVar->incCoeff (theObjCoeff);
+      }
+
+   theMultiObjMgr->setCurrentObjective (savedObj);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class MultiObjCon.
+//------------------------------------------------------------------------------
+
+WitTbvCon::WitTbvCon (WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitTbvCon::~WitTbvCon ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+double WitTbvCon::upperBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitTbvCon::lowerBoundVal ()
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitTbvCon::classText ()
+   {
+   return "T. B. V.";
+   }
+
+//------------------------------------------------------------------------------
+
+void WitTbvCon::printItem ()
+   {
+   myDetImpOP ()->printItem ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitTbvCon::generateCoeffs ()
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+
+   myDetImpOP ()->myNtbvVar ()->incCoeff (+1.0);
+
+   forEachEl (theBoundedVar, myDetImpOP ()->myBoundedVars ())
+      {
+      theSlbvVar = myDetImpOP ()->mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         theSlbvVar->incCoeff (+1.0);
+         }
+      }
+   }
+@
+
+
+1.23
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 6
+a6 1
+//------------------------------------------------------------------------------
+d8 1
+a8 4
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+d10 4
+a13 1
+//------------------------------------------------------------------------------
+@
+
+
+1.22
+log
+@Revised the copyright date.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2011.
+d45 6
+a50 6
+WitOptCon   (theDetImpOP),
+myDetImpOP_ (theDetImpOP),
+myPeriod_   (thePer)
+{
+witAssert (thePer >= 0);
+}
+d56 5
+a60 5
+WitOptCon   (theDetImpOP),
+myDetImpOP_ (theDetImpOP),
+myPeriod_   (-1)
+{
+}
+d65 2
+a66 2
+{
+}
+d71 3
+a73 3
+{
+return myDetImpOP_;
+}
+d78 2
+a79 2
+{
+printItem ();
+d81 9
+a89 9
+if (hasPeriod ())
+{
+myDetImpOP_->printPeriod (myPeriod ());
+}
+else
+{
+myDetImpOP_->printNonPeriod ();
+}
+}
+d96 10
+a105 10
+WitPart *     thePart,
+WitPeriod     t,
+WitDetImpOP * theDetImpOP):
+
+WitDetCon (theDetImpOP, t),
+
+myPart_   (thePart)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d110 2
+a111 2
+{
+}
+d116 3
+a118 3
+{
+return myPart_->supplyVol ()[myPeriod ()];
+}
+d123 3
+a125 3
+{
+return myPart_->supplyVol ()[myPeriod ()];
+}
+d130 3
+a132 3
+{
+return "Resource";
+}
+d137 3
+a139 3
+{
+myDetImpOP ()->printItem (myPart ());
+}
+d144 5
+a148 5
+{
+WitPeriod     thePer;
+WitMaterial * theMat;
+WitDemand *   theDemand;
+WitScrapVar * theScrapVar;
+d150 1
+a150 1
+thePer = myPeriod ();
+d152 1
+a152 1
+theMat = myPart ()->thisMat ();
+d154 4
+a157 4
+if (theMat != NULL)
+{
+if (theMat->canStock (thePer))
+myDetImpOP ()->myStockVar (theMat, thePer)->incCoeff (1.0);
+d159 4
+a162 4
+if (thePer > 0)
+if (theMat->canStock (thePer - 1))
+myDetImpOP ()->myStockVar (theMat, thePer - 1)->incCoeff (-1.0);
+}
+d164 2
+a165 2
+forEachEl (theDemand, myPart ()->myDemands ())
+myDetImpOP ()->myShipVar (theDemand, thePer)->incCoeff (1.0);
+d167 1
+a167 1
+theScrapVar = myDetImpOP ()->myScrapVar (myPart (), thePer);
+d169 2
+a170 2
+if (theScrapVar != NULL)
+theScrapVar->incCoeff (1.0);
+d172 2
+a173 2
+genBillEntCoeffs ();
+}
+d178 47
+a224 47
+{
+WitBomEntry * theBomEnt;
+WitSubEntry * theSub;
+WitBopEntry * theBopEnt;
+WitPeriod     execPerF;
+WitPeriod     execPerL;
+WitPeriod     execPer;
+WitOptVar *   theOptVar;
+
+forEachEl (theBomEnt, myPart ()->consumingBomEntries ())
+{
+getExecPerRange (theBomEnt, execPerF, execPerL);
+
+for (execPer = execPerL; execPer >= execPerF; execPer --)
+if (theBomEnt->impactPeriod ()[execPer] == myPeriod ())
+{
+if (theBomEnt->hasSubsInEffect ()[execPer])
+theOptVar = myDetImpOP ()->myNonSubVar (theBomEnt, execPer);
+else
+theOptVar =
+myDetImpOP ()->myExecVar (theBomEnt->myOperation (), execPer);
+
+theOptVar->incCoeff (theBomEnt->effConsRate ()[execPer]);
+}
+}
+
+forEachEl (theSub, myPart ()->consumingSubEntries ())
+{
+getExecPerRange (theSub, execPerF, execPerL);
+
+for (execPer = execPerL; execPer >= execPerF; execPer --)
+if (theSub->impactPeriod ()[execPer] == myPeriod ())
+myDetImpOP ()->mySubVar (theSub, execPer)->
+incCoeff (theSub->effConsRate ()[execPer]);
+}
+
+forEachEl (theBopEnt, myPart ()->producingBopEntries ())
+{
+getExecPerRange (theBopEnt, execPerF, execPerL);
+
+for (execPer = execPerL; execPer >= execPerF; execPer --)
+if (theBopEnt->impactPeriod ()[execPer] == myPeriod ())
+myDetImpOP ()->
+myExecVar (theBopEnt->myOperation (), execPer)->
+incCoeff (- theBopEnt->effProdRate ()[execPer]);
+}
+}
+d229 8
+a236 8
+WitBillEntry * theBillEnt,
+WitPeriod &    execPerF,
+WitPeriod &    execPerL)
+{
+myDetImpOP ()->
+myExecPerSched ()->
+getExecPerRange (theBillEnt, myPeriod (), execPerF, execPerL);
+}
+d243 10
+a252 10
+WitBomEntry * theBomEnt,
+WitPeriod     t,
+WitDetImpOP * theDetImpOP):
+
+WitDetCon (theDetImpOP, t),
+
+myBomEnt_ (theBomEnt)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d257 2
+a258 2
+{
+}
+d263 3
+a265 3
+{
+return 0.0;
+}
+d270 3
+a272 3
+{
+return 0.0;
+}
+d277 3
+a279 3
+{
+return "Substitution";
+}
+d284 3
+a286 3
+{
+myDetImpOP ()->printItem (myBomEnt ());
+}
+d291 16
+a306 16
+{
+WitPeriod     thePer;
+WitSubEntry * theSub;
+
+thePer = myPeriod ();
+
+forEachEl (theSub, myBomEnt ()->mySubEntries ())
+if (theSub->inEffect (thePer))
+myDetImpOP ()->mySubVar (theSub, thePer)->incCoeff (1.0);
+
+myDetImpOP ()->myNonSubVar (myBomEnt (), thePer)->incCoeff (1.0);
+
+myDetImpOP ()->
+myExecVar (myBomEnt ()->myOperation (), thePer)->
+incCoeff (-1.0);
+}
+d313 10
+a322 10
+WitDemand *   theDemand,
+WitPeriod     t,
+WitDetImpOP * theDetImpOP):
+
+WitDetCon (theDetImpOP, t),
+
+myDemand_ (theDemand)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d327 2
+a328 2
+{
+}
+d333 3
+a335 3
+{
+return 0.0;
+}
+d340 3
+a342 3
+{
+return 0.0;
+}
+d347 3
+a349 3
+{
+return "Shipment";
+}
+d354 3
+a356 3
+{
+myDetImpOP ()->printItem (myDemand ());
+}
+d361 2
+a362 2
+{
+WitPeriod thePer;
+d364 1
+a364 1
+thePer = myPeriod ();
+d366 2
+a367 2
+if (thePer > 0)
+myDetImpOP ()->myCumShipVar (myDemand (), thePer - 1)->incCoeff  (1.0);
+d369 1
+a369 1
+myDetImpOP ()   ->myShipVar    (myDemand (), thePer)    ->incCoeff  (1.0);
+d371 2
+a372 2
+myDetImpOP ()   ->myCumShipVar (myDemand (), thePer)    ->incCoeff (-1.0);
+}
+d379 2
+a380 2
+WitBoundedVar * theBoundedVar,
+WitDetImpOP *   theDetImpOP):
+d382 1
+a382 1
+WitDetCon     (theDetImpOP, theBoundedVar->myPeriod ()),
+d384 4
+a387 4
+myBoundedVar_ (theBoundedVar)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d392 2
+a393 2
+{
+}
+d398 3
+a400 3
+{
+return myBoundedVar_->myBoundSet ();
+}
+d405 3
+a407 3
+{
+return DBL_MAX;
+}
+d412 3
+a414 3
+{
+return myBoundedVar_->softLB ();
+}
+d419 3
+a421 3
+{
+return "S. L. B.";
+}
+d426 3
+a428 3
+{
+myDetImpOP ()->printItem (myBoundedVar_);
+}
+d433 2
+a434 2
+{
+myBoundedVar_->incCoeff (1.0);
+d436 2
+a437 2
+myDetImpOP ()->mySlbvVar (myBoundedVar_)->incCoeff (1.0);
+}
+d444 2
+a445 2
+WitObjective * theObj,
+WitDetImpOP *  theDetImpOP):
+d447 5
+a451 5
+WitDetCon (theDetImpOP),
+myObj_    (theObj)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d456 2
+a457 2
+{
+}
+d462 3
+a464 3
+{
+return 0.0;
+}
+d469 3
+a471 3
+{
+return 0.0;
+}
+d476 3
+a478 3
+{
+return "Multi-Obj";
+}
+d483 3
+a485 3
+{
+myDetImpOP ()->printItem (myObj_);
+}
+d490 5
+a494 5
+{
+WitMultiObjMgr * theMultiObjMgr;
+WitObjective *   savedObj;
+WitOptVar *      theOptVar;
+double           theObjCoeff;
+d496 1
+a496 1
+theMultiObjMgr = myDetImpOP ()->myOptComp ()->myMultiObjMgr ();
+d498 1
+a498 1
+myDetImpOP ()->myMultiObjVar (myObj_)->incCoeff (-1.0);
+d500 1
+a500 1
+savedObj       = theMultiObjMgr->currentObjective ();
+d502 1
+a502 1
+theMultiObjMgr->setCurrentObjective (myObj_);
+d504 4
+a507 4
+forEachEl (theOptVar, myDetImpOP ()->myOptVars ())
+{
+if (theOptVar->mandDetVar ()->isSlbvVar ())
+continue;
+d509 1
+a509 1
+theObjCoeff = theOptVar->compObjCoeff ();
+d511 2
+a512 2
+theOptVar->incCoeff (theObjCoeff);
+}
+d514 2
+a515 2
+theMultiObjMgr->setCurrentObjective (savedObj);
+}
+d523 4
+a526 4
+WitDetCon (theDetImpOP)
+{
+myDetImpOP ()->storeDerived (this);
+}
+d531 2
+a532 2
+{
+}
+d537 3
+a539 3
+{
+return 0.0;
+}
+d544 3
+a546 3
+{
+return 0.0;
+}
+d551 3
+a553 3
+{
+return "T. B. V.";
+}
+d558 3
+a560 3
+{
+myDetImpOP ()->printItem ();
+}
+d565 16
+a580 16
+{
+WitSlbvVar *    theSlbvVar;
+WitBoundedVar * theBoundedVar;
+
+myDetImpOP ()->myNtbvVar ()->incCoeff (+1.0);
+
+forEachEl (theBoundedVar, myDetImpOP ()->myBoundedVars ())
+{
+theSlbvVar = myDetImpOP ()->mySlbvVar (theBoundedVar);
+
+if (theSlbvVar != NULL)
+{
+theSlbvVar->incCoeff (+1.0);
+}
+}
+}
+@
+
+
+1.21
+log
+@Heuristic Adjustment
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 2006.
+d45 6
+a50 6
+      WitOptCon   (theDetImpOP),
+      myDetImpOP_ (theDetImpOP),
+      myPeriod_   (thePer)
+   {
+   witAssert (thePer >= 0);
+   }
+d56 5
+a60 5
+      WitOptCon   (theDetImpOP),
+      myDetImpOP_ (theDetImpOP),
+      myPeriod_   (-1)
+   {
+   }
+d65 2
+a66 2
+   {
+   }
+d71 3
+a73 3
+   {
+   return myDetImpOP_;
+   }
+d78 2
+a79 2
+   {
+   printItem ();
+d81 9
+a89 9
+   if (hasPeriod ())
+      {
+      myDetImpOP_->printPeriod (myPeriod ());
+      }
+   else
+      {
+      myDetImpOP_->printNonPeriod ();
+      }
+   }
+d96 10
+a105 10
+         WitPart *     thePart,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myPart_   (thePart)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d110 2
+a111 2
+   {
+   }
+d116 3
+a118 3
+   {
+   return myPart_->supplyVol ()[myPeriod ()];
+   }
+d123 3
+a125 3
+   {
+   return myPart_->supplyVol ()[myPeriod ()];
+   }
+d130 3
+a132 3
+   {
+   return "Resource";
+   }
+d137 3
+a139 3
+   {
+   myDetImpOP ()->printItem (myPart ());
+   }
+d144 5
+a148 5
+   {
+   WitPeriod     thePer;
+   WitMaterial * theMat;
+   WitDemand *   theDemand;
+   WitScrapVar * theScrapVar;
+d150 1
+a150 1
+   thePer = myPeriod ();
+d152 1
+a152 1
+   theMat = myPart ()->thisMat ();
+d154 4
+a157 4
+   if (theMat != NULL)
+      {
+      if (theMat->canStock (thePer))
+         myDetImpOP ()->myStockVar (theMat, thePer)->incCoeff (1.0);
+d159 4
+a162 4
+      if (thePer > 0)
+         if (theMat->canStock (thePer - 1))
+            myDetImpOP ()->myStockVar (theMat, thePer - 1)->incCoeff (-1.0);
+      }
+d164 2
+a165 2
+   forEachEl (theDemand, myPart ()->myDemands ())
+      myDetImpOP ()->myShipVar (theDemand, thePer)->incCoeff (1.0);
+d167 1
+a167 1
+   theScrapVar = myDetImpOP ()->myScrapVar (myPart (), thePer);
+d169 2
+a170 2
+   if (theScrapVar != NULL)
+      theScrapVar->incCoeff (1.0);
+d172 2
+a173 2
+   genBillEntCoeffs ();
+   }
+d178 47
+a224 47
+   {
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitBopEntry * theBopEnt;
+   WitPeriod     execPerF;
+   WitPeriod     execPerL;
+   WitPeriod     execPer;
+   WitOptVar *   theOptVar;
+
+   forEachEl (theBomEnt, myPart ()->consumingBomEntries ())
+      {
+      getExecPerRange (theBomEnt, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theBomEnt->impactPeriod ()[execPer] == myPeriod ())
+            {
+            if (theBomEnt->hasSubsInEffect ()[execPer])
+               theOptVar = myDetImpOP ()->myNonSubVar (theBomEnt, execPer);
+            else
+               theOptVar =
+                  myDetImpOP ()->myExecVar (theBomEnt->myOperation (), execPer);
+
+            theOptVar->incCoeff (theBomEnt->effConsRate ()[execPer]);
+            }
+      }
+
+   forEachEl (theSub, myPart ()->consumingSubEntries ())
+      {
+      getExecPerRange (theSub, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theSub->impactPeriod ()[execPer] == myPeriod ())
+            myDetImpOP ()->mySubVar (theSub, execPer)->
+               incCoeff (theSub->effConsRate ()[execPer]);
+      }
+
+   forEachEl (theBopEnt, myPart ()->producingBopEntries ())
+      {
+      getExecPerRange (theBopEnt, execPerF, execPerL);
+
+      for (execPer = execPerL; execPer >= execPerF; execPer --)
+         if (theBopEnt->impactPeriod ()[execPer] == myPeriod ())
+            myDetImpOP ()->
+               myExecVar (theBopEnt->myOperation (), execPer)->
+                  incCoeff (- theBopEnt->effProdRate ()[execPer]);
+      }
+   }
+d229 8
+a236 8
+      WitBillEntry * theBillEnt,
+      WitPeriod &    execPerF,
+      WitPeriod &    execPerL)
+   {
+   myDetImpOP ()->
+      myExecPerSched ()->
+         getExecPerRange (theBillEnt, myPeriod (), execPerF, execPerL);
+   }
+d243 10
+a252 10
+         WitBomEntry * theBomEnt,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myBomEnt_ (theBomEnt)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d257 2
+a258 2
+   {
+   }
+d263 3
+a265 3
+   {
+   return 0.0;
+   }
+d270 3
+a272 3
+   {
+   return 0.0;
+   }
+d277 3
+a279 3
+   {
+   return "Substitution";
+   }
+d284 3
+a286 3
+   {
+   myDetImpOP ()->printItem (myBomEnt ());
+   }
+d291 16
+a306 16
+   {
+   WitPeriod     thePer;
+   WitSubEntry * theSub;
+
+   thePer = myPeriod ();
+
+   forEachEl (theSub, myBomEnt ()->mySubEntries ())
+      if (theSub->inEffect (thePer))
+         myDetImpOP ()->mySubVar (theSub, thePer)->incCoeff (1.0);
+
+   myDetImpOP ()->myNonSubVar (myBomEnt (), thePer)->incCoeff (1.0);
+
+   myDetImpOP ()->
+      myExecVar (myBomEnt ()->myOperation (), thePer)->
+         incCoeff (-1.0);
+   }
+d313 10
+a322 10
+         WitDemand *   theDemand,
+         WitPeriod     t,
+         WitDetImpOP * theDetImpOP):
+
+      WitDetCon (theDetImpOP, t),
+
+      myDemand_ (theDemand)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d327 2
+a328 2
+   {
+   }
+d333 3
+a335 3
+   {
+   return 0.0;
+   }
+d340 3
+a342 3
+   {
+   return 0.0;
+   }
+d347 3
+a349 3
+   {
+   return "Shipment";
+   }
+d354 3
+a356 3
+   {
+   myDetImpOP ()->printItem (myDemand ());
+   }
+d361 2
+a362 2
+   {
+   WitPeriod thePer;
+d364 1
+a364 1
+   thePer = myPeriod ();
+d366 2
+a367 2
+   if (thePer > 0)
+      myDetImpOP ()->myCumShipVar (myDemand (), thePer - 1)->incCoeff  (1.0);
+d369 1
+a369 1
+   myDetImpOP ()   ->myShipVar    (myDemand (), thePer)    ->incCoeff  (1.0);
+d371 2
+a372 2
+   myDetImpOP ()   ->myCumShipVar (myDemand (), thePer)    ->incCoeff (-1.0);
+   }
+d379 2
+a380 2
+         WitBoundedVar * theBoundedVar,
+         WitDetImpOP *   theDetImpOP):
+d382 1
+a382 1
+      WitDetCon     (theDetImpOP, theBoundedVar->myPeriod ()),
+d384 4
+a387 4
+      myBoundedVar_ (theBoundedVar)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d392 2
+a393 2
+   {
+   }
+d398 3
+a400 3
+   {
+   return myBoundedVar_->myBoundSet ();
+   }
+d405 3
+a407 3
+   {
+   return DBL_MAX;
+   }
+d412 3
+a414 3
+   {
+   return myBoundedVar_->softLB ();
+   }
+d419 3
+a421 3
+   {
+   return "S. L. B.";
+   }
+d426 3
+a428 3
+   {
+   myDetImpOP ()->printItem (myBoundedVar_);
+   }
+d433 2
+a434 2
+   {
+   myBoundedVar_->incCoeff (1.0);
+d436 2
+a437 2
+   myDetImpOP ()->mySlbvVar (myBoundedVar_)->incCoeff (1.0);
+   }
+d444 2
+a445 2
+         WitObjective * theObj,
+         WitDetImpOP *  theDetImpOP):
+d447 5
+a451 5
+      WitDetCon (theDetImpOP),
+      myObj_    (theObj)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d456 2
+a457 2
+   {
+   }
+d462 3
+a464 3
+   {
+   return 0.0;
+   }
+d469 3
+a471 3
+   {
+   return 0.0;
+   }
+d476 3
+a478 3
+   {
+   return "Multi-Obj";
+   }
+d483 3
+a485 3
+   {
+   myDetImpOP ()->printItem (myObj_);
+   }
+d490 5
+a494 5
+   {
+   WitMultiObjMgr * theMultiObjMgr;
+   WitObjective *   savedObj;
+   WitOptVar *      theOptVar;
+   double           theObjCoeff;
+d496 1
+a496 1
+   theMultiObjMgr = myDetImpOP ()->myOptComp ()->myMultiObjMgr ();
+d498 1
+a498 1
+   myDetImpOP ()->myMultiObjVar (myObj_)->incCoeff (-1.0);
+d500 1
+a500 1
+   savedObj       = theMultiObjMgr->currentObjective ();
+d502 1
+a502 1
+   theMultiObjMgr->setCurrentObjective (myObj_);
+d504 4
+a507 4
+   forEachEl (theOptVar, myDetImpOP ()->myOptVars ())
+      {
+      if (theOptVar->mandDetVar ()->isSlbvVar ())
+         continue;
+d509 1
+a509 1
+      theObjCoeff = theOptVar->compObjCoeff ();
+d511 2
+a512 2
+      theOptVar->incCoeff (theObjCoeff);
+      }
+d514 2
+a515 2
+   theMultiObjMgr->setCurrentObjective (savedObj);
+   }
+d523 4
+a526 4
+      WitDetCon (theDetImpOP)
+   {
+   myDetImpOP ()->storeDerived (this);
+   }
+d531 2
+a532 2
+   {
+   }
+d537 3
+a539 3
+   {
+   return 0.0;
+   }
+d544 3
+a546 3
+   {
+   return 0.0;
+   }
+d551 3
+a553 3
+   {
+   return "T. B. V.";
+   }
+d558 3
+a560 3
+   {
+   myDetImpOP ()->printItem ();
+   }
+d565 16
+a580 16
+   {
+   WitSlbvVar *    theSlbvVar;
+   WitBoundedVar * theBoundedVar;
+
+   myDetImpOP ()->myNtbvVar ()->incCoeff (+1.0);
+
+   forEachEl (theBoundedVar, myDetImpOP ()->myBoundedVars ())
+      {
+      theSlbvVar = myDetImpOP ()->mySlbvVar (theBoundedVar);
+
+      if (theSlbvVar != NULL)
+         {
+         theSlbvVar->incCoeff (+1.0);
+         }
+      }
+   }
+@
+
+
+1.20
+log
+@CPLEX
+@
+text
+@d30 1
+a30 1
+#include <Opn.h>
+@
+
+
+1.19
+log
+@Removed OptObj classes.
+@
+text
+@d25 1
+a25 1
+#include <DetImpOM.h>
+d43 1
+a43 1
+WitDetCon::WitDetCon (WitDetImpOM * theDetImpOM, WitPeriod thePer):
+d45 2
+a46 2
+      WitOptCon   (theDetImpOM),
+      myDetImpOM_ (theDetImpOM),
+d54 1
+a54 1
+WitDetCon::WitDetCon (WitDetImpOM * theDetImpOM):
+d56 2
+a57 2
+      WitOptCon   (theDetImpOM),
+      myDetImpOM_ (theDetImpOM),
+d70 1
+a70 1
+WitOptModel * WitDetCon::myOptModel ()
+d72 1
+a72 1
+   return myDetImpOM_;
+d83 1
+a83 1
+      myDetImpOM_->printPeriod (myPeriod ());
+d87 1
+a87 1
+      myDetImpOM_->printNonPeriod ();
+d98 1
+a98 1
+         WitDetImpOM * theDetImpOM):
+d100 1
+a100 1
+      WitDetCon (theDetImpOM, t),
+d104 1
+a104 1
+   myDetImpOM ()->storeDerived (this);
+d138 1
+a138 1
+   myDetImpOM ()->printItem (myPart ());
+d157 1
+a157 1
+         myDetImpOM ()->myStockVar (theMat, thePer)->incCoeff (1.0);
+d161 1
+a161 1
+            myDetImpOM ()->myStockVar (theMat, thePer - 1)->incCoeff (-1.0);
+d165 1
+a165 1
+      myDetImpOM ()->myShipVar (theDemand, thePer)->incCoeff (1.0);
+d167 1
+a167 1
+   theScrapVar = myDetImpOM ()->myScrapVar (myPart (), thePer);
+d195 1
+a195 1
+               theOptVar = myDetImpOM ()->myNonSubVar (theBomEnt, execPer);
+d198 1
+a198 1
+                  myDetImpOM ()->myExecVar (theBomEnt->myOperation (), execPer);
+d210 1
+a210 1
+            myDetImpOM ()->mySubVar (theSub, execPer)->
+d220 1
+a220 1
+            myDetImpOM ()->
+d233 1
+a233 1
+   myDetImpOM ()->
+d245 1
+a245 1
+         WitDetImpOM * theDetImpOM):
+d247 1
+a247 1
+      WitDetCon (theDetImpOM, t),
+d251 1
+a251 1
+   myDetImpOM ()->storeDerived (this);
+d285 1
+a285 1
+   myDetImpOM ()->printItem (myBomEnt ());
+d299 1
+a299 1
+         myDetImpOM ()->mySubVar (theSub, thePer)->incCoeff (1.0);
+d301 1
+a301 1
+   myDetImpOM ()->myNonSubVar (myBomEnt (), thePer)->incCoeff (1.0);
+d303 1
+a303 1
+   myDetImpOM ()->
+d315 1
+a315 1
+         WitDetImpOM * theDetImpOM):
+d317 1
+a317 1
+      WitDetCon (theDetImpOM, t),
+d321 1
+a321 1
+   myDetImpOM ()->storeDerived (this);
+d355 1
+a355 1
+   myDetImpOM ()->printItem (myDemand ());
+d367 1
+a367 1
+      myDetImpOM ()->myCumShipVar (myDemand (), thePer - 1)->incCoeff  (1.0);
+d369 1
+a369 1
+   myDetImpOM ()   ->myShipVar    (myDemand (), thePer)    ->incCoeff  (1.0);
+d371 1
+a371 1
+   myDetImpOM ()   ->myCumShipVar (myDemand (), thePer)    ->incCoeff (-1.0);
+d380 1
+a380 1
+         WitDetImpOM *   theDetImpOM):
+d382 1
+a382 1
+      WitDetCon     (theDetImpOM, theBoundedVar->myPeriod ()),
+d386 1
+a386 1
+   myDetImpOM ()->storeDerived (this);
+d427 1
+a427 1
+   myDetImpOM ()->printItem (myBoundedVar_);
+d436 1
+a436 1
+   myDetImpOM ()->mySlbvVar (myBoundedVar_)->incCoeff (1.0);
+d445 1
+a445 1
+         WitDetImpOM *  theDetImpOM):
+d447 1
+a447 1
+      WitDetCon (theDetImpOM),
+d450 1
+a450 1
+   myDetImpOM ()->storeDerived (this);
+d484 1
+a484 1
+   myDetImpOM ()->printItem (myObj_);
+d496 1
+a496 1
+   theMultiObjMgr = myDetImpOM ()->myOptComp ()->myMultiObjMgr ();
+d498 1
+a498 1
+   myDetImpOM ()->myMultiObjVar (myObj_)->incCoeff (-1.0);
+d504 1
+a504 1
+   forEachEl (theOptVar, myDetImpOM ()->myOptVars ())
+d521 1
+a521 1
+WitTbvCon::WitTbvCon (WitDetImpOM * theDetImpOM):
+d523 1
+a523 1
+      WitDetCon (theDetImpOM)
+d525 1
+a525 1
+   myDetImpOM ()->storeDerived (this);
+d559 1
+a559 1
+   myDetImpOM ()->printItem ();
+d569 1
+a569 1
+   myDetImpOM ()->myNtbvVar ()->incCoeff (+1.0);
+d571 1
+a571 1
+   forEachEl (theBoundedVar, myDetImpOM ()->myBoundedVars ())
+d573 1
+a573 1
+      theSlbvVar = myDetImpOM ()->mySlbvVar (theBoundedVar);
+@
+
+
+1.18
+log
+@Removed some unneeded functions.
+@
+text
+@d509 1
+a509 1
+      theObjCoeff = theOptVar->mandDetVar ()->detCoeffVal ();
+@
+
+
+1.17
+log
+@Multi-Obj Mode
+@
+text
+@d506 4
+a509 1
+      theObjCoeff = theOptVar->mandDetVar ()->primaryCoeffVal ();
+@
+
+
+1.16
+log
+@Multi-Obj Mode
+@
+text
+@d566 1
+a566 1
+   myDetImpOM ()->myTbvVar ()->incCoeff (+1.0);
+@
+
+
+1.15
+log
+@Multi-objective mode
+@
+text
+@d21 1
+d513 65
+@
+
+
+1.14
+log
+@Multi-objective mode
+@
+text
+@d449 1
+@
+
+
+1.13
+log
+@Multi-objective mode
+@
+text
+@a448 1
+   myDetImpOM ()->storeDerived (this);
+@
+
+
+1.12
+log
+@Stochastic Implosion
+@
+text
+@d20 1
+d27 1
+d34 1
+d48 11
+d80 8
+a87 1
+   myDetImpOM_->printPeriod (myPeriod ());
+d437 75
+@
+
+
+1.11
+log
+@Stochastic Implosion
+@
+text
+@d23 1
+a23 1
+#include <DetImpOP.h>
+d39 1
+a39 1
+WitDetCon::WitDetCon (WitDetImpOP * theDetImpOP, WitPeriod thePer):
+d41 2
+a42 2
+      WitOptCon   (theDetImpOP),
+      myDetImpOP_ (theDetImpOP),
+d57 1
+a57 1
+   return myDetImpOP_;
+d66 1
+a66 1
+   myDetImpOP_->printPeriod (myPeriod ());
+d76 1
+a76 1
+         WitDetImpOP * theDetImpOP):
+d78 1
+a78 1
+      WitDetCon (theDetImpOP, t),
+d82 1
+a82 1
+   myDetImpOP ()->storeDerived (this);
+d116 1
+a116 1
+   myDetImpOP ()->printItem (myPart ());
+d135 1
+a135 1
+         myDetImpOP ()->myStockVar (theMat, thePer)->incCoeff (1.0);
+d139 1
+a139 1
+            myDetImpOP ()->myStockVar (theMat, thePer - 1)->incCoeff (-1.0);
+d143 1
+a143 1
+      myDetImpOP ()->myShipVar (theDemand, thePer)->incCoeff (1.0);
+d145 1
+a145 1
+   theScrapVar = myDetImpOP ()->myScrapVar (myPart (), thePer);
+d173 1
+a173 1
+               theOptVar = myDetImpOP ()->myNonSubVar (theBomEnt, execPer);
+d176 1
+a176 1
+                  myDetImpOP ()->myExecVar (theBomEnt->myOperation (), execPer);
+d188 1
+a188 1
+            myDetImpOP ()->mySubVar (theSub, execPer)->
+d198 1
+a198 1
+            myDetImpOP ()->
+d211 1
+a211 1
+   myDetImpOP ()->
+d223 1
+a223 1
+         WitDetImpOP * theDetImpOP):
+d225 1
+a225 1
+      WitDetCon (theDetImpOP, t),
+d229 1
+a229 1
+   myDetImpOP ()->storeDerived (this);
+d263 1
+a263 1
+   myDetImpOP ()->printItem (myBomEnt ());
+d277 1
+a277 1
+         myDetImpOP ()->mySubVar (theSub, thePer)->incCoeff (1.0);
+d279 1
+a279 1
+   myDetImpOP ()->myNonSubVar (myBomEnt (), thePer)->incCoeff (1.0);
+d281 1
+a281 1
+   myDetImpOP ()->
+d293 1
+a293 1
+         WitDetImpOP * theDetImpOP):
+d295 1
+a295 1
+      WitDetCon (theDetImpOP, t),
+d299 1
+a299 1
+   myDetImpOP ()->storeDerived (this);
+d333 1
+a333 1
+   myDetImpOP ()->printItem (myDemand ());
+d345 1
+a345 1
+      myDetImpOP ()->myCumShipVar (myDemand (), thePer - 1)->incCoeff  (1.0);
+d347 1
+a347 1
+   myDetImpOP ()   ->myShipVar    (myDemand (), thePer)    ->incCoeff  (1.0);
+d349 1
+a349 1
+   myDetImpOP ()   ->myCumShipVar (myDemand (), thePer)    ->incCoeff (-1.0);
+d358 1
+a358 1
+         WitDetImpOP *   theDetImpOP):
+d360 1
+a360 1
+      WitDetCon     (theDetImpOP, theBoundedVar->myPeriod ()),
+d364 1
+a364 1
+   myDetImpOP ()->storeDerived (this);
+d405 1
+a405 1
+   myDetImpOP ()->printItem (myBoundedVar_);
+d414 1
+a414 1
+   myDetImpOP ()->mySlbvVar (myBoundedVar_)->incCoeff (1.0);
+@
+
+
+1.10
+log
+@Stochastic Implosion
+@
+text
+@d55 1
+a55 1
+WitOptProb * WitDetCon::myOptProb ()
+@
+
+
+1.9
+log
+@Stochastic Implosion
+@
+text
+@d375 1
+a375 1
+const WitBoundSet * WitSlbCon::myBoundSet ()
+@
+
+
+1.8
+log
+@Stochastic Implosion
+@
+text
+@d93 1
+a93 1
+double WitResourceCon::compUpperBound ()
+d100 1
+a100 1
+double WitResourceCon::compLowerBound ()
+d240 1
+a240 1
+double WitSubCon::compUpperBound ()
+d247 1
+a247 1
+double WitSubCon::compLowerBound ()
+d310 1
+a310 1
+double WitShipCon::compUpperBound ()
+d317 1
+a317 1
+double WitShipCon::compLowerBound ()
+d382 1
+a382 1
+double WitSlbCon::compUpperBound ()
+d389 1
+a389 1
+double WitSlbCon::compLowerBound ()
+@
+
+
+1.7
+log
+@Stochastic Implosion
+@
+text
+@d93 14
+a154 11
+void WitResourceCon::compBounds ()
+   {
+   double theSupplyVol;
+
+   theSupplyVol = myPart ()->supplyVol ()[myPeriod ()];
+
+   setBoundsTo (theSupplyVol, theSupplyVol);
+   }
+
+//------------------------------------------------------------------------------
+
+d240 14
+a286 7
+
+void WitSubCon::compBounds ()
+   {
+   setBoundsTo (0.0, 0.0);
+   }
+
+//------------------------------------------------------------------------------
+d310 14
+a352 7
+
+void WitShipCon::compBounds ()
+   {
+   setBoundsTo (0.0, 0.0);
+   }
+
+//------------------------------------------------------------------------------
+d382 14
+a415 7
+
+//------------------------------------------------------------------------------
+
+void WitSlbCon::compBounds ()
+   {
+   setBoundsTo (myBoundedVar_->softLB (), + DBL_MAX);
+   }
+@
+
+
+1.6
+log
+@Stochastic Implosion
+@
+text
+@d100 1
+a100 1
+void WitResourceCon::printItem () const
+d244 1
+a244 1
+void WitSubCon::printItem () const
+d307 1
+a307 1
+void WitShipCon::printItem () const
+d358 1
+a358 1
+const WitBoundSet * WitSlbCon::myBoundSet () const
+d372 1
+a372 1
+void WitSlbCon::printItem () const
+@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@d55 1
+a55 1
+WitOptProb * WitDetCon::myOptProb () const
+d62 1
+a62 1
+void WitDetCon::printSource () const
+d93 1
+a93 1
+const char * WitResourceCon::classText () const
+d237 1
+a237 1
+const char * WitSubCon::classText () const
+d300 1
+a300 1
+const char * WitShipCon::classText () const
+d365 1
+a365 1
+const char * WitSlbCon::classText () const
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@d24 1
+a24 1
+#include <OptImp.h>
+@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@a111 4
+   WitBomEntry * theBomEnt;
+   WitSubEntry * theSub;
+   WitBopEntry * theBopEnt;
+   WitOptVar *   theOptVar;
+a112 5
+   WitPeriod     execPerF;
+   WitPeriod     execPerL;
+   WitPeriod     execPer;
+
+   WitExecPerSched <WitBillEntry> * theExecPerSched;
+a117 2
+   theExecPerSched = myDetImpOP ()->myExecPerSched ();
+
+d136 26
+d164 1
+a164 1
+      theExecPerSched->getExecPerRange (theBomEnt, thePer, execPerF, execPerL);
+d167 1
+a167 1
+         if (theBomEnt->impactPeriod ()[execPer] == thePer)
+d181 1
+a181 1
+      theExecPerSched->getExecPerRange (theSub, thePer, execPerF, execPerL);
+d184 1
+a184 1
+         if (theSub->impactPeriod ()[execPer] == thePer)
+d191 1
+a191 1
+      theExecPerSched->getExecPerRange (theBopEnt, thePer, execPerF, execPerL);
+d194 1
+a194 1
+         if (theBopEnt->impactPeriod ()[execPer] == thePer)
+d203 4
+a206 1
+void WitResourceCon::compBounds ()
+d208 3
+a210 5
+   double theSupplyVol;
+
+   theSupplyVol = myPart ()->supplyVol ()[myPeriod ()];
+
+   setBoundsTo (theSupplyVol, theSupplyVol);
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@a23 1
+#include <ExecPerItr.h>
+d31 1
+d110 1
+a114 2
+   WitMaterial * theMat;
+   WitExecPerItr theExecPerItr (myDetImpOP ()->myExecPerMgr ());
+d117 5
+d127 2
+d148 11
+a158 10
+      for (theExecPerItr (theBomEnt, thePer); ++ theExecPerItr;)
+         {
+         if (theBomEnt->hasSubsInEffect ()[theExecPerItr ()])
+            theOptVar =
+               myDetImpOP ()->myNonSubVar (theBomEnt, theExecPerItr ());
+         else
+            theOptVar =
+               myDetImpOP ()->myExecVar (
+                  theBomEnt->myOperation (), 
+                  theExecPerItr ());
+d160 3
+a162 2
+         theOptVar->incCoeff (theBomEnt->effConsRate ()[theExecPerItr ()]);
+         }
+d165 8
+a172 4
+      for (theExecPerItr (theSub, thePer); ++ theExecPerItr;)
+         if (theSub->inEffect (theExecPerItr ()))
+            myDetImpOP ()->mySubVar (theSub, theExecPerItr ())->
+               incCoeff (theSub->effConsRate ()[theExecPerItr ()]);
+d175 9
+a183 4
+      for (theExecPerItr (theBopEnt, thePer); ++ theExecPerItr;)
+         myDetImpOP ()->
+            myExecVar (theBopEnt->myOperation (), theExecPerItr ())->
+               incCoeff (- theBopEnt->effProdRate ()[theExecPerItr ()]);
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@d39 1
+a39 1
+WitDetCon::WitDetCon (WitDetImpOP * theDetImpOP, WitPeriod t):
+d41 7
+a47 1
+      WitOptCon (theDetImpOP),
+d49 1
+a49 1
+      myPeriod_ (t)
+d55 1
+a55 1
+WitDetCon::~WitDetCon ()
+d57 1
+d66 1
+a66 1
+   myDetImpOP ()->printPeriod (myPeriod ());
+@
+

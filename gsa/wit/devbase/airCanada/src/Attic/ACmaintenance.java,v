@@ -1,0 +1,232 @@
+head	1.2;
+access;
+symbols
+	Start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.2
+date	2002.10.31.19.33.24;	author yingdong;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2002.10.31.16.59.39;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.10.31.16.59.39;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Moved Java Classes from src directory to AirCanada directory
+@
+text
+@package com.ibm.mathsci.witApplications.airCanada;
+
+import com.ibm.mathsci.witinterface.*;
+
+/**
+ * @@author JPF2
+ *
+ * Air Canada Maintenance
+ * This class allows one to:
+ *   1. Define Resources
+ *   2. Define Maintenance Events
+ *   3. Optimally plan maintenance event schdule
+ *   4. Get planned maintenance schedule
+ *   6. Get consumed resources
+ */
+public class ACmaintenance extends WitInterface {
+
+    private WitRun wr_=null;
+    
+   	private WitRun witRun() {
+		if (wr_ == null) {
+			WitRun[] wrP = new WitRun[1];
+			int rc;
+			wrP[0] = new WitRun();
+			try {
+				rc = witNewRun(wrP);
+		    	wr_ = wrP[0];
+		   	    rc = witInitialize(wr_);
+			} catch (com.ibm.mathsci.mshcalc.MshException e) {
+				e.printStackTrace();
+			}
+		}
+		return wr_;
+    }
+    
+	/**
+	 * Constructor for ACmaintenance.
+	 */
+	public ACmaintenance() {
+		super();
+	}
+	
+	public void setPlanningHorizon(int weeks) {
+	  try {
+	    witSetNPeriods(witRun(),weeks);
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+	}	
+	
+	public int getPlanningHorizon() {
+	  int nPeriods[] = new int[1];
+	  try {
+	    witGetNPeriods(witRun(),nPeriods);
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+	  return nPeriods[0];
+	}
+	
+	public boolean getResourceExists(String resourceName) {
+	  boolean retVal = false;
+	  try {
+	  	int exists[] = { 0 };
+	    witGetPartExists(witRun(),resourceName,exists);
+	    if ( exists[0]==1 ) retVal = true;
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+      return retVal;
+	}	
+	
+	public boolean getMaintenanceEventExists(String eventName) {
+	  boolean retVal = false;
+	  try {
+	  	int exists[] = { 0 };
+	    witGetPartExists(witRun(),eventName,exists);
+	    if ( exists[0]==1 ) retVal = true;
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+      return retVal;
+	}
+	
+	public void addPeriodResource(
+	  String resourceName,
+	  int period,
+	  float availableSupply )
+	throws ACexception {
+	  try {
+		
+	    // Has Resource already been defined to wit?	
+	    if ( !getResourceExists(resourceName) ) {
+	      // Resource is not defined to wit, so define it.
+	      witAddPart(witRun(),resourceName,getWitAttr("WitCAPACITY"));
+	    }
+	    
+	    // check to ensure period is within valid range
+	    int nP = getPlanningHorizon();
+	    if ( period>=nP ) {
+	    	throw new ACexception(
+	    	"Specified period "+period+" is greater than planning horizion");
+	    }
+	    
+	    // Get the current supplyVol
+	    float supplyVol[][]=new float[1][nP];;
+	    witGetPartSupplyVol(witRun(),resourceName,supplyVol);
+	    
+	    // Increment supplyVol by availability
+	    supplyVol[0][period] += availableSupply;
+	    
+	    // Set new supplyVol
+	    witSetPartSupplyVol(witRun(),resourceName,supplyVol[0]);
+	    
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+	}  
+
+	
+    public void addMaintenanceEvent(String eventName) 
+	throws ACexception {
+	  try {
+	  	if ( getMaintenanceEventExists(eventName) ) {
+	  		throw new ACexception(
+	  		  "Cannot addMaintenanceEvent. Event named " + eventName +
+	  		  " already exists.");
+	  	}
+	    witAddPart(witRun(),eventName,getWitAttr("WitMATERIAL"));
+	    witAddDemand(witRun(),eventName,eventName);
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+	}
+	
+	public void setMaintenanceEventRequiredCompletionPeriods(
+	  String eventName,
+	  int desiredPeriod,
+	  int earliestPeriod,
+	  int latestPeriod)
+	throws ACexception {
+	  try {
+	  	if ( !getMaintenanceEventExists(eventName) ) {
+	  		throw new ACexception(
+	  		  "Cannot setMaintenanceEventRequiredCompletionPeriods. Event named " + eventName +
+	  		  " does not exist.");
+	  	}
+	  	int buildAheadUB = desiredPeriod - earliestPeriod;
+	  	if ( buildAheadUB < 0 ) {
+	  		throw new ACexception(
+	  		  "Error setMaintenanceEventRequiredCompletionPeriods. Event named " + eventName +
+	  		  ". Cannot have earliestPeriod>desiredPeriod.");
+	  	}
+	  	int shipLateUB = latestPeriod-desiredPeriod;
+	  	if ( shipLateUB < 0 ) {
+	  		throw new ACexception(
+	  		  "Error setMaintenanceEventRequiredCompletionPeriods. Event named " + eventName +
+	  		  ". Cannot have latestPeriod<desiredPeriod.");
+	  	}
+	  	
+	  	int ph = getPlanningHorizon();
+	  	int baub[] = new int [ph];
+	  	for ( int t=0; t<ph; t++ ) baub[t] = 0;
+	  	baub[desiredPeriod]=buildAheadUB;
+	    witSetPartBuildAheadUB(witRun(),eventName,baub);
+	    
+	  	int lp[] = new int [ph];
+	  	for ( int t=0; t<ph; t++ ) lp[t] = 0;
+	  	lp[desiredPeriod]=shipLateUB;
+	    witSetDemandShipLateUB(witRun(),eventName,eventName,lp);
+	    
+	  	float dv[] = new float [ph];
+	  	for ( int t=0; t<ph; t++ ) lp[t] = 0;
+	  	dv[desiredPeriod]=1;
+	    witSetDemandDemandVol(witRun(),eventName,eventName,dv);
+	    
+      } catch (com.ibm.mathsci.mshcalc.MshException e) {
+	    e.printStackTrace(); System.exit(0);
+      }
+	}
+}
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@@
+
+
+1.1.1.1
+log
+@Initial Import
+@
+text
+@@

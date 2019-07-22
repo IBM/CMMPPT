@@ -1,0 +1,172 @@
+head	1.1;
+access;
+symbols
+	beforeTiersAdded:1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.04.09.15.41.54;	author barahon;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@I added code to set up a MIP model and solve it with OSL.
+@
+text
+@#include <cfloat>
+#include <algorithm>
+#include <cmath>
+#define VOL_DEBUG 0
+// When VOL_DEBUG is 1, we check vector indices
+//############################################################################
+
+#if defined(VOL_DEBUG) && (VOL_DEBUG != 0)
+#define VOL_TEST_INDEX(i, size)			\
+{						\
+   if ((i) < 0 || (i) >= (size)) {		\
+      cout << "bad VOL_?vector index"<< endl; 	\
+      abort();					\
+   }						\
+}
+#define VOL_TEST_SIZE(size)			\
+{						\
+   if (s <= 0) {				\
+      cout << "bad VOL_?vector size"<< endl;	\
+      abort();					\
+   }						\
+}
+#else
+#define VOL_TEST_INDEX(i, size)
+#define VOL_TEST_SIZE(size)
+#endif
+
+class VOL_dvector;
+class VOL_ivector;
+
+//############################################################################
+// vector of doubles. It is used for most vector operations
+class VOL_dvector {
+public:
+   double* v;
+   int sz;
+
+public:
+   VOL_dvector(const int s) {
+      VOL_TEST_SIZE(s);
+      v = new double[sz = s];
+   }
+   VOL_dvector() : v(0), sz(0) {}
+   VOL_dvector(const VOL_dvector& x) : v(0), sz(0) {
+     sz = x.sz;
+     if (sz > 0) {
+       v = new double[sz];
+       //copy(x.v, x.v + sz, v);
+       double *y=v;
+       double *end=v+sz;
+       double *zz=x.v;
+       while( y!=end ){
+	   *y++=*zz++;
+       }
+     }
+   }
+   ~VOL_dvector() { delete[] v; }
+
+   inline int size() const {return sz;}
+
+   inline double& operator[](const int i) {
+     VOL_TEST_INDEX(i, sz);
+     return v[i];
+   }
+
+   inline double operator[](const int i) const {
+     VOL_TEST_INDEX(i, sz);
+     return v[i];
+   }
+
+   inline void clear() {
+     delete[] v;
+     v = 0;
+     sz = 0;
+   }
+
+   inline void cc(const double gamma, const VOL_dvector& w) {
+     if (sz != w.sz) {
+       cout << "bad VOL_dvector sizes " << endl; abort();
+     }
+     double * p_v = v - 1;
+     const double * p_w = w.v - 1;
+     const double * const p_e = v + sz;
+     const double one_gamma = 1.0 - gamma;
+     while ( ++p_v != p_e ){
+       *p_v = one_gamma * (*p_v) + gamma * (*++p_w);
+     }
+   }
+
+   inline void allocate(const int s) {
+     VOL_TEST_SIZE(s);
+     delete[] v;
+     v = new double[sz = s];
+   }
+
+   VOL_dvector&   operator=(const VOL_dvector& w);
+   VOL_dvector&   operator=(const double w);
+};
+
+//-----------------------------------------------------------------------------
+// vector of ints. It's used to store indices
+class VOL_ivector {
+public:
+   int* v;
+   int sz;
+public:
+   VOL_ivector(const int s) {
+      VOL_TEST_SIZE(s);
+      v = new int[sz = s];
+   }
+   VOL_ivector() : v(0), sz(0) {}
+   VOL_ivector(const VOL_ivector& x) {
+     sz = x.sz;
+     if (sz > 0) {
+       v = new int[sz];
+       //copy(x.v, x.v+sz, v); 
+       int *y=v;
+       int *end=v+sz;
+       int *zz=x.v;
+       while( y!=end ){
+	   *y++=*zz++;
+       }
+     }
+   }
+   ~VOL_ivector(){
+      delete [] v;
+   }
+
+   inline int size() const { return sz; }
+   inline int& operator[](const int i) {
+     VOL_TEST_INDEX(i, sz);
+     return v[i];
+   }
+
+   inline int operator[](const int i) const {
+     VOL_TEST_INDEX(i, sz);
+     return v[i];
+   }
+
+   inline void allocate(const int s) {
+     VOL_TEST_SIZE(s);
+     delete[] v;
+     v = new int[sz = s];
+   }
+
+   VOL_ivector& operator=(const VOL_ivector& v);      
+   VOL_ivector& operator=(const int w);
+};
+@

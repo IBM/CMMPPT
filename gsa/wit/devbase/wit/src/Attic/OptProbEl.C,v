@@ -1,0 +1,740 @@
+head	1.7;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.7
+date	2007.08.01.20.38.23;	author rjw;	state dead;
+branches;
+next	1.6;
+
+1.6
+date	2007.08.01.20.12.25;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.06.26.20.01.30;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.06.22.18.03.49;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.10.03.15.08.59;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.08.18.22.29.01;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.08.18.18.43.39;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.7
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 2006.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential
+//
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "OptProbEl.C"
+//
+// Implementation of the following classes:
+//
+//    BoundPair
+//    Coeff
+//    OptObj
+//    OptProbEl
+//    OptVar
+//    OptCon
+//------------------------------------------------------------------------------
+
+#include <Coeff.h>
+#include <OptObj.h>
+#include <OptVar.h>
+#include <OptCon.h>
+#include <OptProb.h>
+
+#include <float.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class BoundPair.
+//------------------------------------------------------------------------------
+
+WitBoundPair::WitBoundPair ():
+
+      lower_ (0.0),
+      upper_ (0.0)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoundPair::WitBoundPair (double lowerInit, double upperInit):
+      lower_ (lowerInit),
+      upper_ (upperInit)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitBoundPair::operator = (const WitBoundPair & theBoundPair)
+   {
+   lower () = theBoundPair.lower ();
+   upper () = theBoundPair.upper ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoundPair::~WitBoundPair ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class Coeff.
+//------------------------------------------------------------------------------
+
+WitCoeff::WitCoeff (WitOptCon * theCon, WitOptVar * theVar, double theValue):
+
+      myCon_   (theCon),
+      myVar_   (theVar),
+      myValue_ (theValue)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoeff::~WitCoeff ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OptObj.
+//------------------------------------------------------------------------------
+
+WitOptObj::~WitOptObj ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptObj::print () const
+   {
+   WitOptVar * theVar;
+   double      varCoeffVal;
+
+   fprintf (myOptProb_->optProbFile (), "\n%s:\n", myText ());
+
+   forEachEl (theVar, myOptProb_->myOptVars ())
+      {
+      varCoeffVal = coeffVal (theVar);
+
+      if (fabs (varCoeffVal) > FLOAT_EPSILON)
+         {
+         theVar->printID ();
+
+         fprintf (myOptProb_->optProbFile (), " %7.1f\n", varCoeffVal);
+         }
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptObj::myValue () const
+   {
+   WitOptVar * theVar;
+   double      varVal;
+   double      val = 0.0;
+
+   forEachEl (theVar, myOptProb_->myOptVars ())
+      {
+      varVal = theVar->primalValue ();
+
+      if (fabs (varVal) > FLOAT_EPSILON)
+         val += coeffVal (theVar) * varVal;
+      }
+
+   return val;
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptObj::WitOptObj (const char * theText, WitOptProb * theOptProb):
+
+      WitProbAssoc (theOptProb->myProblem ()),
+      myText_      (theText),
+      myOptProb_   (theOptProb)
+   {
+   myOptProb_->store (this);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OptProbEl.
+//------------------------------------------------------------------------------
+
+WitOptProbEl::WitOptProbEl (WitOptProb * theOptProb, int theIndex):
+
+      myCoeffVec_ (),
+      nCoeffs_    (0),
+      bounds_     (0.0, 0.0),
+      index_      (theIndex)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptProbEl::~WitOptProbEl ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::writeExtReal (
+      FILE * outFile,
+      const char * fFormat,
+      const char * sFormat,
+      double val)
+   {
+   if      (val == + DBL_MAX)
+      fprintf (outFile, sFormat, "+Infty");
+
+   else if (val == - DBL_MAX)
+      fprintf (outFile, sFormat, "-Infty");
+
+   else
+      fprintf (outFile, fFormat, val);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::setBoundsTo (double theLower, double theUpper)
+   {
+   bounds_.lower () = theLower;
+   bounds_.upper () = theUpper;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::allocMyCoeffs (int nCoeffsForOptProbEl)
+   {
+   myCoeffVec_.resize (nCoeffsForOptProbEl);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::clearMyCoeffs ()
+   {
+   nCoeffs_ = 0;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::store (WitCoeff * theCoeff)
+   {
+   myCoeffVec_[nCoeffs_] = theCoeff;
+
+   nCoeffs_ ++;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::printID () const
+   {
+   fprintf (myOptProb ()->optProbFile (), "%s #%-7d %-12s",
+      kindText (), index (), classText ());
+
+   printSource ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::printBounds (const WitBoundPair & preScreenBounds) const
+   {
+   writeExtReal (myOptProb ()->optProbFile (), " %7.1f", " %7s",
+      bounds ().lower ());
+
+   writeExtReal (myOptProb ()->optProbFile (), " %7.1f", " %7s",
+      bounds ().upper ());
+
+   if (preScreenBounds.lower () == bounds ().lower ())
+      fprintf (myOptProb ()->optProbFile (), " %7s", "");
+   else
+      writeExtReal (myOptProb ()->optProbFile (), " %7.1f", " %7s",
+         preScreenBounds.lower ());
+
+   if (preScreenBounds.upper () == bounds ().upper ())
+      fprintf (myOptProb ()->optProbFile (), " %7s", "");
+   else
+      writeExtReal (myOptProb ()->optProbFile (), " %7.1f", " %7s",
+         preScreenBounds.upper ());
+
+   fprintf (myOptProb ()->optProbFile (), "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProbEl::attachCoeffItr (WitCoeffItr & theItr) const
+   {
+   myCoeffVec_.attachItr (theItr);
+   }
+
+//------------------------------------------------------------------------------
+
+WitProblem * WitOptProbEl::myProblem () const
+   {
+   return myOptProb ()->myProblem ();
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OptVar.
+//------------------------------------------------------------------------------
+
+WitOptVar::WitOptVar (WitOptProb * theOptProb):
+
+      WitOptProbEl     (theOptProb, theOptProb->nOptVars ()),
+
+      mainObjCoeffVal_ (0.0)
+   {
+   theOptProb->store (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptVar::~WitOptVar ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptVar::compBounds ()
+   {
+   setBoundsTo (0.0, + DBL_MAX);
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::solnValue () const
+   {
+   return primalValue ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::indepInitValue () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::boundsCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::primaryCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::revCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::invCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::servCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::subCoeffVal () const
+   {
+   return 0.0;
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOptVar::isAnIntVar () const
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptVar::incCoeff (double delta)
+   {
+   witAssert (this != NULL);
+
+   myOptProb ()->incCoeff (this, delta);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptVar::compMainObjCoeffVal ()
+   {
+   mainObjCoeffVal_ = myOptProb ()->mainObj ()->coeffVal (this);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptVar::print () const
+   {
+   printID ();
+
+   fprintf (myOptProb ()->optProbFile (), 
+      " %1s %7.2f",
+      isAnIntVar ()? "I": " ",
+      mainObjCoeffVal ());
+
+   printBounds (myOptProb ()->preScreenBounds (this));
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptVar::reducedReward () const
+   {
+   double      rrVal;
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   rrVal = mainObjCoeffVal ();
+
+   attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      rrVal -= theCoeff->myCon ()->dualValue () * theCoeff->myValue ();
+
+    return rrVal;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptVar::setPrimalValue (double theValue)
+   {
+   primalValue_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitOptVar::kindText () const
+   {
+   return "Var";
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class OptCon.
+//------------------------------------------------------------------------------
+
+WitOptCon::WitOptCon (WitOptProb * theOptProb):
+
+      WitOptProbEl (theOptProb, theOptProb->nOptCons ()),
+
+      dualValue_   (0.0)
+   {
+   theOptProb->store (this);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOptCon::~WitOptCon ()
+   {
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      delete theCoeff;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitOptCon::solnValue () const
+   {
+   return dualValue ();
+   }
+
+//------------------------------------------------------------------------------
+// screenable
+//
+// Returns true, iff this OptCon can be screened.
+//
+// It is assumed that all variables that intersect this OptCon are
+// constrained (implicitly or explicitly) to be nonnegative.
+// The following conditions are tested:
+//
+// A. The upper bound on this OptCon is zero.
+// B. Each variable whose Coeff in this OptCon is negative has an upper bound
+//    of zero.
+// C. Each variable whose Coeff in this OptCon is non-zero has a nonpositive
+//    lower bound and a nonnegative upper bound.
+//
+// When A and B hold, it follows that any variable with non-zero Coeff in
+// this OptCon must be zero to be feasible. If, in addition, C fails to hold,
+// then this OptCon causes an infeasibility and so it should not be screened.
+// Otherwise, if A, B, and C hold, then this OptCon should be screened.
+//------------------------------------------------------------------------------
+
+bool WitOptCon::screenable () const
+   {
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   if (fabs (bounds ().upper ()) > FLOAT_EPSILON)
+      return false;
+         //
+         // A fails.
+
+   attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      if (theCoeff->myValue () < - FLOAT_EPSILON)
+         if (fabs (theCoeff->myVar ()->bounds ().upper ()) > FLOAT_EPSILON)
+            return false;
+               //
+               // B fails.
+
+   attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      {
+      if (fabs (theCoeff->myValue ()) <= FLOAT_EPSILON)
+         continue;
+
+      if (theCoeff->myVar ()->bounds ().lower () > + FLOAT_EPSILON)
+         return false;
+            //
+            // C fails.
+
+      if (theCoeff->myVar ()->bounds ().upper () < - FLOAT_EPSILON)
+         return false;
+            //
+            // C fails.
+      }
+
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptCon::print () const
+   {
+   WitCoeffItr theItr;
+   WitCoeff *  theCoeff;
+
+   fprintf     (myOptProb ()->optProbFile (), "\n");
+   printID     ();
+   printBounds (myOptProb ()->preScreenBounds (this));
+
+   attachCoeffItr (theItr);
+
+   while (theItr.advance (theCoeff))
+      {
+      theCoeff->myVar ()->printID ();
+
+      fprintf (myOptProb ()->optProbFile (), " %7.1f\n", theCoeff->myValue ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptCon::setDualValue (double theValue)
+   {
+   dualValue_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitOptCon::kindText () const
+   {
+   return "Con";
+   }
+@
+
+
+1.6
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@a85 10
+WitOptObj::WitOptObj (const char * theText, WitOptProb * theOptProb):
+
+      myText_    (theText),
+      myOptProb_ (theOptProb)
+   {
+   myOptProb_->store (this);
+   }
+
+//------------------------------------------------------------------------------
+
+d133 5
+a137 1
+WitOptImploder * WitOptObj::myOptImploder () const
+d139 1
+a139 1
+   return myOptProb_->myOptImploder ();
+d254 1
+a254 1
+WitOptImploder * WitOptProbEl::myOptImploder () const
+d256 1
+a256 1
+   return myOptProb ()->myOptImploder ();
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@a153 1
+      myOptProb_  (theOptProb),
+d220 1
+a220 1
+   fprintf (myOptProb_->optProbFile (), "%s #%-7d %-12s",
+d230 1
+a230 1
+   writeExtReal (myOptProb_->optProbFile (), " %7.1f", " %7s",
+d233 1
+a233 1
+   writeExtReal (myOptProb_->optProbFile (), " %7.1f", " %7s",
+d237 1
+a237 1
+      fprintf (myOptProb_->optProbFile (), " %7s", "");
+d239 1
+a239 1
+      writeExtReal (myOptProb_->optProbFile (), " %7.1f", " %7s",
+d243 1
+a243 1
+      fprintf (myOptProb_->optProbFile (), " %7s", "");
+d245 1
+a245 1
+      writeExtReal (myOptProb_->optProbFile (), " %7.1f", " %7s",
+d248 1
+a248 1
+   fprintf (myOptProb_->optProbFile (), "\n");
+d275 1
+a275 1
+   myOptProb ()->store (this);
+d426 1
+a426 1
+   myOptProb ()->store (this);
+@
+
+
+1.3
+log
+@App controlled opt implosion.
+@
+text
+@d17 1
+d23 2
+a26 1
+#include <Coeff.h>
+a27 1
+#include <OptObj.h>
+d83 66
+@
+
+
+1.2
+log
+@App controlled opt implode.
+@
+text
+@d154 1
+a154 1
+   fprintf (myOptProb_->modelFile (), "%s #%-7d %-12s",
+d164 1
+a164 1
+   writeExtReal (myOptProb_->modelFile (), " %7.1f", " %7s",
+d167 1
+a167 1
+   writeExtReal (myOptProb_->modelFile (), " %7.1f", " %7s",
+d171 1
+a171 1
+      fprintf (myOptProb_->modelFile (), " %7s", "");
+d173 1
+a173 1
+      writeExtReal (myOptProb_->modelFile (), " %7.1f", " %7s",
+d177 1
+a177 1
+      fprintf (myOptProb_->modelFile (), " %7s", "");
+d179 1
+a179 1
+      writeExtReal (myOptProb_->modelFile (), " %7.1f", " %7s",
+d182 1
+a182 1
+   fprintf (myOptProb_->modelFile (), "\n");
+d310 1
+a310 1
+   fprintf (myOptProb ()->modelFile (), 
+d451 1
+a451 1
+   fprintf     (myOptProb ()->modelFile (), "\n");
+d461 1
+a461 1
+      fprintf (myOptProb ()->modelFile (), " %7.1f\n", theCoeff->myValue ());
+@
+
+
+1.1
+log
+@App controlled opt implosion.
+@
+text
+@a29 2
+#ifdef OPT_IMPLODE
+
+a477 2
+
+#endif
+@
+

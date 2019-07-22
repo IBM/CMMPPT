@@ -1,0 +1,268 @@
+IBM CONFIDENTIAL
+
+The WIT "Wish List"
+
+10-1-10
+
+Maintained by: Bob Wittrock
+
+/gsa/yktgsa/projects/w/wit/doc/wit-lists/wish-list
+
+------------------------------------------
+
+This document consists of a list of requested enhancements to WIT and some
+commentary. The items are listed in the order in which they are currently
+expected to be done. The first set of them also include work load estimates: a
+rough estimate of how much of my time I expect them to take. (To be used for 
+prioritization purposes, but not for actual scheduling.)
+
+BW
+
+------------------------------------------------------------------------------
+Primary Wish List Items
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+The following items are needed, but the ordering of them has not been 
+determined.
+------------------------------------------------------------------------------
+
+?   [write MPS file]
+
+    Create a capability to have WIT write an MPS file of the LP/MIP problem
+    without solving the problem. The capability should be accessible in both API
+    and stand-alone mode.
+
+?   [write files vs. info messages]
+
+    Have the functions the write special files do so even when informational
+    messages are turned off:
+
+       witDisplayData
+       witWriteCriticalList
+       witWriteData
+       witWriteExecSched
+       witWriteReqSched
+       witWriteShipSched
+
+------------------------------------------------------------------------------
+The remaining items are deferred for now, waiting for a more specific need.
+------------------------------------------------------------------------------
+
+?.  [LIFO undo]
+
+    Provide a capability to undo the effects of the most recent calls to
+    witIncHeurAlloc and revert to a previous state. It might work as follows:
+    At some point during heuristic allocation, the application would indicate
+    that the current state of heuristic allocation is to be saved. Later, if
+    told to do so by the application, WIT could then revert heuristic allocation
+    back to that state, undoing all allocation that had been done since.
+
+    Work load estimate: 3 weeks
+
+?   [stochastic implosion screening]
+
+    In stochastic implosion, implementing the screening out of unnecessary
+    variables and constraints in the LP model in order to make the model
+    smaller and faster to solve.
+
+?   [accelerated stochastic implosion]
+
+    Implement the equivalent of accelerated optimizing implosion for stochastic
+    implosion.
+
+?   [multi-stage]
+
+    In stochastic implosion, extend the [stage by period] case to any number of
+    stages (i.e., not just 2 stages).
+
+?   [flexible single-source]
+
+    Currently the single-source capability, when applied to a BOM entry, works
+    as follows:
+    * Initially, the heuristic proceeds in "single-source" mode, attempting to
+      ship the entire desIncVol from witIncHeurAlloc using either just the BOM
+      entry itself in all periods and just one substitute for the BOM entry in
+      all periods.
+    * If it does not succeed in shipping the entire desIncVol in this way, it
+      then proceeds in "multi-source" mode for the BOM entry, using the BOM
+      entry itself and potentially all of its substitutes together in the
+      normal build-ahead / multi-route order.
+
+    The proposal is to add an option to single-source, called "flexible
+    single-source" (probably specified as a global boolean). When flexible
+    single-source is requested, the heuristic would proceed as follows at a
+    BOM entry:
+    * Initially, the heuristic proceeds in "single-source" mode, attempting to
+      ship the entire desIncVol from witIncHeurAlloc using either just the BOM
+      entry itself in all periods and just one substitute for the BOM entry in
+      all periods. This is the same as ordinary single-source.
+    * If it does not succeed in shipping the entire desIncVol in this way, it
+      then proceeds in "weak single-source" mode for the BOM entry. In this
+      mode, the heuristic first attempts to ship as much of the desIncVol as it
+      can using just the BOM entry itself in all periods and retains the result.
+      It then attempts to ship as much of the remaining unshipped desIncVol as
+      it can using the first substitute for the BOM entry in all periods and
+      retains the result. And so on.
+
+    A similar logic would apply to the BOP entries the produce a part.
+
+    Potentially needed by Scorpio for its LCD engagement.
+
+    Work load estimate, not yet determined. This would constitute a major
+    extension of the existing single-source algorithm, but I am confident that
+    it can be done.
+
+?   [proportionate routing for MRP]
+
+    Add a new capability to WIT-MRP. To use this capability, one would set a
+    global boolean attribute, mrpPropRtg to TRUE. When it's TRUE, then whenever
+    MRP explodes a requirement though a BOM entry for which propRtg is TRUE in
+    the current period, the explosion would be in proportion to the
+    routingShares of the BOM entry and its substitutes. A similar behavior would
+    occur at parts for which propRtg is TRUE. There would be no "dropping out"
+    for constrained availability as with proportionate routing in heuristic
+    implosion, since MRP is unconstrained. The mrpPropRtg attribute would also
+    apply to FSS in a similar way.
+
+    Potentially needed by Scorpio for Renesas. The idea is to use 
+    [proportionate routing for MRP] as a step in building a WIT model that does
+    a special version of proportionate routing with the heuristic.
+
+    Work load estimate: 2 weeks.
+    
+?.  [reverse pegging]
+
+    Currently, to obtain (for example) the supplyVol pegging, one specifies a
+    shipment (i.e. a demand and a shipment period) and retrieves a list of
+    "pegging triples", each consisting of a part, a period, and a pegged
+    supplyVol, where the pegged supplyVol is the portion of the supplyVol of the
+    part in the period that is pegged to the shipment.
+
+    The new capability would allow one to specify a part and period and retrieve
+    a list of "pegging specifications", each consisting of a pegged supplyVol
+    and a corresponding list of shipments. In this case, the pegged supplyVol
+    would be the portion of the supplyVol of the part in the period that is
+    pegged jointly to all of the shipments in the corresponding list. The same
+    capability would be added to all other attributes pegged by PIP: execVol,
+    subVol, prodVol, consVol, and sideVol (Also BOP entry execVol, if
+    appropriate.)
+
+    For problems that do *not* have operations with multiple explodeable BOP
+    entries, the list of shipments to which any partial supplyVol is pegged 
+    will always be of length 1. In this case, the information provided by the
+    reverse pegging is completely equivalent to the information provided by the
+    "forward" (i.e., currently implemented) pegging; it is simply organized
+    differently.
+    
+    For problems that *do* have operations with multiple explodeable BOP
+    entries, the list of shipments to which any partial supplyVol is pegged 
+    will often be of length greater than 1, reflecting a "group" or "joint"
+    pegging. In this case, the reverse pegging is providing new information that
+    cannot be derived from the forward pegging.
+
+    May be needed for ESO2.
+
+    Work load estimate: 4 weeks.
+
+?.  [penalized netting]
+
+    Extend the heuristic's "penalized execution" capability to allow a smaller
+    penalty for netting through a BOM entry or substitute than for exploding
+    through it. Specifically, a new global boolean attribute "penNet" would be
+    added, which would activate the new capability. Also, a new float
+    attribute "netPenalty" would be added for BOM entries and substitutes,
+    where netPenalty <= execPenalty. Initially, when the algorithm
+    explodes through a BOM entry or a substitute, it would only be allowed to
+    use available supplies of the consumed part and would not be allowed to
+    build more of the part. (This is called "netting".) The penalized execution
+    algorithm would incur a penalty of netPenalty for using the BOM entry or
+    substitute in this way. After the supply of the part is considered to be
+    exhausted, the algorithm would then be allowed to build more of the part.
+    But from this point forward, the algorithm would incur a penalty of
+    execPenalty for using the BOM entry or substitute.
+
+    As it stands, this capability seems to be needed by SCE for the Server Group
+    application in order to support its "sharing" model. However, there is a
+    chance that the SCE/Server group sharing model will be discontinued in the
+    near future and so there is a possibility that this capability may not be
+    needed after all. We'll see.
+
+    Work load estimate: 6 weeks.
+
+?.  [bundled heuristic allocation]
+
+    Create a variant of the witIncHeurAlloc function that specifies an
+    "allocation set", i.e., a set of triples: (demand, shipPeriod, desIncVol).
+    The heuristic would then attempt to allocate the entire set: It would
+    either successfully do the entire allocation defined by the allocation set
+    or do no allocation at all.
+
+    This would be used by SCE to do order scheduling, where the number of
+    individual orders is too massive to store in a WitRun.
+
+    Work load estimate: moderate.
+
+?.  [pip explosion order]
+
+    Allow the application program to select the order in which the explosion in
+    PIP selects from the multiple ways to fill a requirement:
+
+    * Netting against supply
+    * Exploding to production
+    * Netting against sideVol
+
+    Work load estimate: 4 weeks
+
+?.  [pure equitable allocation]
+
+    Implement a totally new algorithm for equitable allocation, that does not
+    involve breaking the demands into small pieces. The new algorithm does not
+    require setting the equitability parameter and is likely to be faster than
+    ordinary equitable allocation.
+
+    Not needed for any specific application, since ordinary equitable allocation
+    works fine. I think that implementing [pure equitable allocation] would
+    improve heuristic implosion from the user's (app developer's) perspective,
+    by eliminating the speed vs. solution quality trade-off implied by setting
+    the equitability parameter.
+
+    Work load estimate: 7 weeks.
+
+?.  [heur opt init]
+    Speed up optimizing implosion by having it use a special customized
+    heuristic to generate its initial solution.
+
+    Certainly, no customer has asked for this: it's too internal to be 
+    visible to the customer. Rather, we (Research) consider this enhancement
+    to be strategic in making optimizing implosion more competitive.
+
+    A moderate amount of work.
+
+*.  [black box execution constraints]
+    Allow the application program to specify an oracle function, to be called by
+    heuristic implosion and allocation, that tells whether or not a proposed
+    increase in the execVol of a given operation in a given period is feasible,
+    and updates its state in the TRUE case.
+                                                                     
+    This will allow the application to implement a much more sophisticated model
+    of supply. SCE could use this for complex "feature" models, etc. The oracle
+    function might, e.g., do a (possibly optimizing) implosion in another WitRun
+    to answer the question.
+
+    Moderately easy.
+    (I've written a document on what exactly this would look like.)
+ 
+*.  [parallel opt]
+    Make opt implosion run much faster using a parallel LP solver.
+
+    A very major effort.
+    This would involve using a different LP solver from CLP.
+    Also, we can't predict how much speed-up will result.
+
+*.  [bounds]
+    Have heuristic respect all bounds (that make sense).
+
+    No known customer need.
+
+    A lot of work.

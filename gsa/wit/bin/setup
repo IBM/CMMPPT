@@ -1,0 +1,44 @@
+#!/bin/tcsh
+#
+# Get the user ready to work on Decission Support software.
+# This routine starts a new shell with wit as the primary group.
+#
+# Note: When setgroups runs, it runs your shell's profile file, so 
+# to finish getting set up to work in Decsission Support software,
+# you have to source setvars.<your_shell_name>.  
+#
+# $Id: setup.sh,v 1.1.1.1 2000/02/23 17:02:57 wit Exp $
+
+
+# Make wit the real group ID but keep the rest of the groups the user is in
+    set nums = '[0-9][ 0-9]*'
+    set dollar = '$'
+    set carret = '^'
+    set oldgroups = `groups`
+    set noglob			# Do not do filename globing
+    set oldgroups_wo_nums = \
+	`echo $oldgroups | sed -e "s/${carret}${nums} //" -e "s/ ${nums} / /" -e "s/ ${nums}${dollar}//" `
+	# the three substitution patterns handle numeric gid's at (1) the
+	# beginning of the list, (2) in the middle of the list, and (3) at
+	# the end of the list.  The will not change the name of groups that
+	# have numbers as substrings.
+    set oldgroups_wo_nums_wit = \
+	`echo $oldgroups_wo_nums | sed -e 's/^wit //' -e 's/ wit / /' -e 's/ wit$//' `
+	# the three substitution patterns handle (1) wit at the beginning
+	# of the list, (2) wit in the middle of the list, and (3) wit at
+	# the end of the list.  The will not change the name of groups that
+	# have wit as a substring.
+    set newgroups = `echo wit $oldgroups_wo_nums_wit | tr ' ' ',' `
+	# tr ' ' ',' replaces blanks in the input with commas
+    set noglob
+echo "Remember to do source setvars.csh or the version for your shell"
+if ($HOSTTYPE == sun4) then
+    newgrp wit
+else 
+    if ($HOSTTYPE == rs6000) then
+        setgroups $newgroups
+    else
+	echo "Not sure this is the right way to change groups, but here goes..."
+        setgroups $newgroups
+    endif
+endif 

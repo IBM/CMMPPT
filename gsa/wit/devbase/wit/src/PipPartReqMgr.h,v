@@ -1,0 +1,761 @@
+head	1.8;
+access;
+symbols
+	sce_5_01_20080919:1.5;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2011.09.28.23.49.54;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.09.24.00.28.16;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.08.30.20.17.55;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.07.13.21.23.19;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.07.13.19.44.40;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.07.13.18.36.27;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.07.13.18.22.53;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.07.12.21.27.48;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Revised the source code proprietary statement.
+@
+text
+@//==============================================================================
+// IBM Confidential
+//
+// OCO Source Materials
+//
+// Watson Implosion Technology
+//
+// (C) Copyright IBM Corp. 1993, 2011  All Rights Reserved
+//
+// The Source code for this program is not published or otherwise divested of
+// its trade secrets, irrespective of what has been deposited with the U. S.
+// Copyright office.
+//==============================================================================
+
+#ifndef PipPartReqMgrH
+#define PipPartReqMgrH
+
+//------------------------------------------------------------------------------
+// Header file: "PipPartReqMgr.h"
+//
+// Contains the declaration of class PipPartReqMgr.
+//------------------------------------------------------------------------------
+
+#include <Assoc.h>
+#include <PtrTVec.h>
+#include <TripStack.h>
+
+//------------------------------------------------------------------------------
+// Class PipPartReqMgr
+//
+// "PIP Part Requirement Manager"
+// Responsible for working with the requirements associated with the Part
+// currently being pegged (which is called "the current Part").
+//------------------------------------------------------------------------------
+
+class WitPipPartReqMgr: public WitProbAssoc
+   {
+   public:
+
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitPipPartReqMgr (WitPipReqMgr *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitPipPartReqMgr ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void setUpPartReqs (WitPart * thePart);
+         //
+         // Prepares the requirements on thePart for pegging.
+
+      void mergeCurPartReqsIntoWorkSeq (WitPeriod thePer);
+         //
+         // Takes the requirements for the current part in thePer and merges
+         // them in the working requirement sequence.
+
+      bool workSeqIsEmpty ();
+         //
+         // Returns true, iff the working requirement sequence is currently
+         // empty.
+
+      void getNextReq (
+            double &         netAttVol,
+            WitPipReqSrc * & theReqSrc,
+            double &         incPegVol);
+         //
+         // On return, theReqSrc and incPegVol will specify the next requirement
+         // to be pegged, which is bounded by netAttVol. This requirement is
+         // removed from the working requirement sequence and debited from
+         // netAttVol.
+
+      void rollReqsBack (WitPeriod thePer);
+         //
+         // Rolls the requirements from thePer to thePer - 1, constrained by
+         // the net stockVol in thePer - 1. Reduces the net stockVol in 
+         // thePer - 1 accordingly and stores any unrolled requirements.
+
+      void rollReqsFwd (WitPeriod thePer);
+         //
+         // Rolls the requirements from thePer - 1 to thePer. Increases
+         // the net stockVol in thePer - 1 accordingly and merges the
+         // requirements with the requirements that could not be rolled backward
+         // from thePer in the backward pass.
+
+      void restoreUnfilledCurPartReqs (WitPeriod thePer);
+         //
+         // For each requirement in the working requirement sequence whose fill
+         // period is thePer, this function removes the requirement from the
+         // working requirement sequence and places it back in the requirements
+         // for the current Part in thePer.
+
+      void prtWorkReqSeq (
+            const char * theAttname,
+            WitPart *    thePart,
+            WitPeriod    thePer);
+         //
+         // Prints the working requirement sequence, just before pegging the
+         // attribute given by theAttname for thePart in thePer.
+
+      void prtPeg (
+            double         pegVol,
+            WitPeriod      fillPer,
+            WitPipReqSrc * theReqSrc);
+         //
+         // Prints data for pegging pegVol units to theReqSrc, where the
+         // requirement is from fillPer.
+
+      void recordInfeas (WitPart * thePart);
+         //
+         // Records all unfilled requirements for thePart as infeasibility.
+
+      void prtInfeas ();
+         //
+         // Prints infeasibility data, as appropriate.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      void compNonExcStockVol (WitMaterial * theMat);
+         //
+         // Sets netStockVol_[thePer] to the portion of
+         // theMat->stockVol ()[thePer] that does not come from excess
+         // supplyVol.
+
+      void loadCurPartReqSeqs (WitPart * thePart);
+         //
+         // Transfers the requirements for thePart in each period to
+         // curPartReqSeq_, sorting and consolidating the lists, as well.
+
+      void popOrNull (
+            WitPipReqSeq &   theReqSeq,
+            WitPipReqSrc * & theReqSrc,
+            WitPeriod &      fillPer,
+            double &         incReqVol);
+         //
+         // Pops theReqSrc, fillPer, and incReqVol from theReqSeq, or sets
+         // them to NULL, -1 and 0.0, if theReqSeq is empty.
+
+      noCopyCtorAssign (WitPipPartReqMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitPipReqMgr * const myReqMgr_;
+         //
+         // The PipReqMgr for this PipPartReqMgr.
+
+      bool curPartHasStock_;
+         //
+         // True, iff the current Part is a Material with a positive stockVol in
+         // some period.
+
+      WitTVec <double> netStockVol_;
+         //
+         // netStockVol_[thePer] is the portion of the stockVol of the current
+         // Part in thePer that is available for pegging.
+
+      WitPtrTVec <WitPipReqSeq> curPartReqSeq_;
+         //
+         // The vector of requirement sequences for the current Part. For each
+         // period, fillPer, curPartReqSeq_[fillPer} is a list of triples,
+         // (theReqSrc, fillPer, incReqVol), indicating that incReqVol units of
+         // requirement for the the current Part in fillPer are pegged to
+         // theReqSrc.
+
+      WitPipReqSeq workReqSeq_;
+         //
+         // The working requirement sequence for the current Part in some
+         // Period.
+
+      WitPtrTVec <WitPipReqSeq> overStockReqSeq_;
+         //
+         // For each period, thePer > 0, overStockReqSeq_[thePer] is portion of
+         // workReqSeq_ that could not be rolled to thePer - 1, due to
+         // insufficient available stock in thePer - 1.
+
+      //------------------------------------------------------------------------
+      // Maximum infeasibility data.
+      //------------------------------------------------------------------------
+
+      double maxInfeas_;
+         //
+         // The maximum infesibility encountered.
+
+      WitPart * maxInfeasPart_;
+      WitPeriod maxInfeasPer_;
+         //
+         // The Part and period at which maxInfeas_ was encountered.
+   };
+
+#endif
+@
+
+
+1.7
+log
+@Reverted to the version of 8-30-2011, which has the following differences:
+   Release 7.0
+   Old copyright dates (2006)
+   The leading blanks in each line, which were lost with the 2011 copyright
+      update, are restored.
+Restored release # as 8.0.
+@
+text
+@d1 8
+a8 1
+//------------------------------------------------------------------------------
+d10 4
+a13 6
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+@
+
+
+1.6
+log
+@Revised the copyright date.
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential
+//
+d32 2
+a33 122
+{
+public:
+
+//------------------------------------------------------------------------
+// Constructor functions.
+//------------------------------------------------------------------------
+
+WitPipPartReqMgr (WitPipReqMgr *);
+
+//------------------------------------------------------------------------
+// Destructor function.
+//------------------------------------------------------------------------
+
+~WitPipPartReqMgr ();
+
+//------------------------------------------------------------------------
+// Other public member functions.
+//------------------------------------------------------------------------
+
+void setUpPartReqs (WitPart * thePart);
+//
+// Prepares the requirements on thePart for pegging.
+
+void mergeCurPartReqsIntoWorkSeq (WitPeriod thePer);
+//
+// Takes the requirements for the current part in thePer and merges
+// them in the working requirement sequence.
+
+bool workSeqIsEmpty ();
+//
+// Returns true, iff the working requirement sequence is currently
+// empty.
+
+void getNextReq (
+double &         netAttVol,
+WitPipReqSrc * & theReqSrc,
+double &         incPegVol);
+//
+// On return, theReqSrc and incPegVol will specify the next requirement
+// to be pegged, which is bounded by netAttVol. This requirement is
+// removed from the working requirement sequence and debited from
+// netAttVol.
+
+void rollReqsBack (WitPeriod thePer);
+//
+// Rolls the requirements from thePer to thePer - 1, constrained by
+// the net stockVol in thePer - 1. Reduces the net stockVol in
+// thePer - 1 accordingly and stores any unrolled requirements.
+
+void rollReqsFwd (WitPeriod thePer);
+//
+// Rolls the requirements from thePer - 1 to thePer. Increases
+// the net stockVol in thePer - 1 accordingly and merges the
+// requirements with the requirements that could not be rolled backward
+// from thePer in the backward pass.
+
+void restoreUnfilledCurPartReqs (WitPeriod thePer);
+//
+// For each requirement in the working requirement sequence whose fill
+// period is thePer, this function removes the requirement from the
+// working requirement sequence and places it back in the requirements
+// for the current Part in thePer.
+
+void prtWorkReqSeq (
+const char * theAttname,
+WitPart *    thePart,
+WitPeriod    thePer);
+//
+// Prints the working requirement sequence, just before pegging the
+// attribute given by theAttname for thePart in thePer.
+
+void prtPeg (
+double         pegVol,
+WitPeriod      fillPer,
+WitPipReqSrc * theReqSrc);
+//
+// Prints data for pegging pegVol units to theReqSrc, where the
+// requirement is from fillPer.
+
+void recordInfeas (WitPart * thePart);
+//
+// Records all unfilled requirements for thePart as infeasibility.
+
+void prtInfeas ();
+//
+// Prints infeasibility data, as appropriate.
+
+private:
+
+//------------------------------------------------------------------------
+// Private member functions.
+//------------------------------------------------------------------------
+
+void compNonExcStockVol (WitMaterial * theMat);
+//
+// Sets netStockVol_[thePer] to the portion of
+// theMat->stockVol ()[thePer] that does not come from excess
+// supplyVol.
+
+void loadCurPartReqSeqs (WitPart * thePart);
+//
+// Transfers the requirements for thePart in each period to
+// curPartReqSeq_, sorting and consolidating the lists, as well.
+
+void popOrNull (
+WitPipReqSeq &   theReqSeq,
+WitPipReqSrc * & theReqSrc,
+WitPeriod &      fillPer,
+double &         incReqVol);
+//
+// Pops theReqSrc, fillPer, and incReqVol from theReqSeq, or sets
+// them to NULL, -1 and 0.0, if theReqSeq is empty.
+
+noCopyCtorAssign (WitPipPartReqMgr);
+
+//------------------------------------------------------------------------
+// Private member data.
+//------------------------------------------------------------------------
+
+WitPipReqMgr * const myReqMgr_;
+//
+// The PipReqMgr for this PipPartReqMgr.
+d35 162
+a196 42
+bool curPartHasStock_;
+//
+// True, iff the current Part is a Material with a positive stockVol in
+// some period.
+
+WitTVec <double> netStockVol_;
+//
+// netStockVol_[thePer] is the portion of the stockVol of the current
+// Part in thePer that is available for pegging.
+
+WitPtrTVec <WitPipReqSeq> curPartReqSeq_;
+//
+// The vector of requirement sequences for the current Part. For each
+// period, fillPer, curPartReqSeq_[fillPer} is a list of triples,
+// (theReqSrc, fillPer, incReqVol), indicating that incReqVol units of
+// requirement for the the current Part in fillPer are pegged to
+// theReqSrc.
+
+WitPipReqSeq workReqSeq_;
+//
+// The working requirement sequence for the current Part in some
+// Period.
+
+WitPtrTVec <WitPipReqSeq> overStockReqSeq_;
+//
+// For each period, thePer > 0, overStockReqSeq_[thePer] is portion of
+// workReqSeq_ that could not be rolled to thePer - 1, due to
+// insufficient available stock in thePer - 1.
+
+//------------------------------------------------------------------------
+// Maximum infeasibility data.
+//------------------------------------------------------------------------
+
+double maxInfeas_;
+//
+// The maximum infesibility encountered.
+
+WitPart * maxInfeasPart_;
+WitPeriod maxInfeasPer_;
+//
+// The Part and period at which maxInfeas_ was encountered.
+};
+@
+
+
+1.5
+log
+@ASAP pegging order
+@
+text
+@d6 2
+a7 2
+//     IBM Confidential 
+// 
+d32 122
+a153 2
+   {
+   public:
+d155 42
+a196 162
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
+
+      WitPipPartReqMgr (WitPipReqMgr *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitPipPartReqMgr ();
+
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void setUpPartReqs (WitPart * thePart);
+         //
+         // Prepares the requirements on thePart for pegging.
+
+      void mergeCurPartReqsIntoWorkSeq (WitPeriod thePer);
+         //
+         // Takes the requirements for the current part in thePer and merges
+         // them in the working requirement sequence.
+
+      bool workSeqIsEmpty ();
+         //
+         // Returns true, iff the working requirement sequence is currently
+         // empty.
+
+      void getNextReq (
+            double &         netAttVol,
+            WitPipReqSrc * & theReqSrc,
+            double &         incPegVol);
+         //
+         // On return, theReqSrc and incPegVol will specify the next requirement
+         // to be pegged, which is bounded by netAttVol. This requirement is
+         // removed from the working requirement sequence and debited from
+         // netAttVol.
+
+      void rollReqsBack (WitPeriod thePer);
+         //
+         // Rolls the requirements from thePer to thePer - 1, constrained by
+         // the net stockVol in thePer - 1. Reduces the net stockVol in 
+         // thePer - 1 accordingly and stores any unrolled requirements.
+
+      void rollReqsFwd (WitPeriod thePer);
+         //
+         // Rolls the requirements from thePer - 1 to thePer. Increases
+         // the net stockVol in thePer - 1 accordingly and merges the
+         // requirements with the requirements that could not be rolled backward
+         // from thePer in the backward pass.
+
+      void restoreUnfilledCurPartReqs (WitPeriod thePer);
+         //
+         // For each requirement in the working requirement sequence whose fill
+         // period is thePer, this function removes the requirement from the
+         // working requirement sequence and places it back in the requirements
+         // for the current Part in thePer.
+
+      void prtWorkReqSeq (
+            const char * theAttname,
+            WitPart *    thePart,
+            WitPeriod    thePer);
+         //
+         // Prints the working requirement sequence, just before pegging the
+         // attribute given by theAttname for thePart in thePer.
+
+      void prtPeg (
+            double         pegVol,
+            WitPeriod      fillPer,
+            WitPipReqSrc * theReqSrc);
+         //
+         // Prints data for pegging pegVol units to theReqSrc, where the
+         // requirement is from fillPer.
+
+      void recordInfeas (WitPart * thePart);
+         //
+         // Records all unfilled requirements for thePart as infeasibility.
+
+      void prtInfeas ();
+         //
+         // Prints infeasibility data, as appropriate.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private member functions.
+      //------------------------------------------------------------------------
+
+      void compNonExcStockVol (WitMaterial * theMat);
+         //
+         // Sets netStockVol_[thePer] to the portion of
+         // theMat->stockVol ()[thePer] that does not come from excess
+         // supplyVol.
+
+      void loadCurPartReqSeqs (WitPart * thePart);
+         //
+         // Transfers the requirements for thePart in each period to
+         // curPartReqSeq_, sorting and consolidating the lists, as well.
+
+      void popOrNull (
+            WitPipReqSeq &   theReqSeq,
+            WitPipReqSrc * & theReqSrc,
+            WitPeriod &      fillPer,
+            double &         incReqVol);
+         //
+         // Pops theReqSrc, fillPer, and incReqVol from theReqSeq, or sets
+         // them to NULL, -1 and 0.0, if theReqSeq is empty.
+
+      noCopyCtorAssign (WitPipPartReqMgr);
+
+      //------------------------------------------------------------------------
+      // Private member data.
+      //------------------------------------------------------------------------
+
+      WitPipReqMgr * const myReqMgr_;
+         //
+         // The PipReqMgr for this PipPartReqMgr.
+
+      bool curPartHasStock_;
+         //
+         // True, iff the current Part is a Material with a positive stockVol in
+         // some period.
+
+      WitTVec <double> netStockVol_;
+         //
+         // netStockVol_[thePer] is the portion of the stockVol of the current
+         // Part in thePer that is available for pegging.
+
+      WitPtrTVec <WitPipReqSeq> curPartReqSeq_;
+         //
+         // The vector of requirement sequences for the current Part. For each
+         // period, fillPer, curPartReqSeq_[fillPer} is a list of triples,
+         // (theReqSrc, fillPer, incReqVol), indicating that incReqVol units of
+         // requirement for the the current Part in fillPer are pegged to
+         // theReqSrc.
+
+      WitPipReqSeq workReqSeq_;
+         //
+         // The working requirement sequence for the current Part in some
+         // Period.
+
+      WitPtrTVec <WitPipReqSeq> overStockReqSeq_;
+         //
+         // For each period, thePer > 0, overStockReqSeq_[thePer] is portion of
+         // workReqSeq_ that could not be rolled to thePer - 1, due to
+         // insufficient available stock in thePer - 1.
+
+      //------------------------------------------------------------------------
+      // Maximum infeasibility data.
+      //------------------------------------------------------------------------
+
+      double maxInfeas_;
+         //
+         // The maximum infesibility encountered.
+
+      WitPart * maxInfeasPart_;
+      WitPeriod maxInfeasPer_;
+         //
+         // The Part and period at which maxInfeas_ was encountered.
+   };
+@
+
+
+1.4
+log
+@ASAP Pegging Order
+@
+text
+@d57 2
+a58 2
+         // Merges the requirements in curPartReqSeq_ (thePer) into
+         // workReqSeq_, emptying curPartReqSeq_ (thePer).
+d60 1
+a60 1
+      bool hasUnfilledReqs ();
+d62 2
+a63 2
+         // Returns true, iff there are currently any unfilled requirements on
+         // the current Part in the current Period.
+d78 2
+a79 3
+         // netStockVol_[thePer - 1]. Reduces netStockVol_[thePer - 1]
+         // accordingly and leaves any unrolled requirements in
+         // overStockReqSeq_[thePer].
+d84 3
+a86 2
+         // netStockVol_[thePer - 1] accordingly and merges the requirements
+         // with overStockReqSeq_[thePer].
+d90 4
+a93 3
+         // For requirement in workReqSeq_ whose fill period is thePer, this
+         // function removes the requirement from workReqSeq_ and places it
+         // back in curPartReqSeq_ (thePer).
+d100 2
+a101 2
+         // Prints workReqSeq_, just before pegging the attribute given by
+         // theAttname for thePart in thePer.
+@
+
+
+1.3
+log
+@ASAP Pegging Order
+@
+text
+@d60 15
+a117 10
+      //------------------------------------------------------------------------
+      // Update access functions.
+      // (Temporary)
+      //------------------------------------------------------------------------
+
+      inline WitPipReqSeq & workReqSeq ()
+         {
+         return workReqSeq_;
+         }
+
+a157 2
+         // "The current Part" is the Part for which fillReqs (...) is currently
+         // executing.
+@
+
+
+1.2
+log
+@ASAP Pegging Order
+@
+text
+@d95 8
+a107 5
+      inline WitPtrTVec <WitPipReqSeq> & curPartReqSeq ()
+         {
+         return curPartReqSeq_;
+         }
+
+d179 13
+@
+
+
+1.1
+log
+@ASAP Pegging Order
+@
+text
+@a32 2
+   friend class WitPipBldr;
+
+a46 2
+   private:
+
+d48 1
+a48 1
+      // Private member functions.
+d51 1
+a51 1
+      void loadCurPartReqSeqs (WitPart * thePart);
+d53 1
+a53 2
+         // Transfers the requirements for thePart in each period to
+         // curPartReqSeq_, sorting and consolidating the lists, as well.
+a59 9
+      void popOrNull (
+            WitPipReqSeq &   theReqSeq,
+            WitPipReqSrc * & theReqSrc,
+            WitPeriod &      fillPer,
+            double &         incReqVol);
+         //
+         // Pops theReqSrc, fillPer, and incReqVol from theReqSeq, or sets
+         // them to NULL, -1 and 0.0, if theReqSeq is empty.
+
+d87 1
+a87 1
+      void prtPegMat (
+d95 41
+@
+

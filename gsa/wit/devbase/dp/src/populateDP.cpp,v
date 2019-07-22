@@ -1,0 +1,2043 @@
+head	1.23;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.23
+date	2006.10.06.17.07.35;	author gresh;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2006.08.17.18.11.16;	author gresh;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2006.08.01.14.21.12;	author gresh;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2006.05.24.16.48.25;	author gresh;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2006.05.24.16.42.20;	author gresh;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2006.05.22.15.32.05;	author gresh;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2006.05.18.17.23.19;	author gresh;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2006.05.16.16.42.29;	author gresh;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2006.05.15.14.26.29;	author gresh;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2006.05.08.16.05.34;	author gresh;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.04.18.13.27.05;	author gresh;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.03.17.17.49.17;	author gresh;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.03.15.15.43.02;	author gresh;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.03.02.18.25.38;	author gresh;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.02.28.14.37.26;	author gresh;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.02.27.19.22.37;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.02.24.19.52.59;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.02.24.19.03.56;	author gresh;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.02.23.18.56.10;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.02.23.15.10.05;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.02.23.14.54.39;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.02.23.14.39.45;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.02.23.13.50.39;	author gresh;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.23
+log
+@*** empty log message ***
+@
+text
+@#if defined(_MSC_VER)
+  #pragma warning(disable:4786)
+  #pragma warning(disable:4503)
+  #pragma warning(disable:4290)
+#endif
+
+
+#include "CoinFinite.h"
+#include "CoinFloatEqual.h"
+#include "populateDP.h"
+#include "problemBase.h"
+#include "dpException.h"
+#include "gnrlDemandFile.h"
+#include "gnrlDemandFileUncertainStart.h"
+#include "gnrlOngoingDemandFile.h"
+#include "gnrlWedgeDemandFile.h"
+#include "gnrlResourceFile.h"
+#include "gnrlSolutionFile.h"
+#include "gnrlSolutionBomFile.h"
+//#include "bomFile.h"
+#include "globalAttrFile.h"
+#include <cstdio>
+#include <iostream>
+#include <sstream>
+
+
+
+
+//this just adds the bit necessary for the extra part that we are determining
+//whether or not it is feasible
+std::string addATPelement(
+	          demandPlanningProblem * prob,
+			  const std::string &demandName,
+			  const std::string &solutionName,
+			  int duration,
+			  float quantity,
+			  int requestedPeriod,
+			  int lateAllowance){
+
+		
+		//check that the solution already exists
+        if ( !prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: atp solution does not exist"                                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+        }
+		//check that the demand for solution does not already exist
+        if (prob->demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: atp demand already exists"                                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+        }
+
+	
+		//check the quantity
+        if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: atp demand quantity less than 0"                                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+        }
+		//check the duration
+        if (duration<=0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: atp duration less than or equal to 0"                                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+        }
+		//check the requested period
+        if (requestedPeriod>prob->getUserNPeriods()) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: atp requested period is beyond the horizon"                                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+        }
+		//check the extended horizon
+		//if (requestedPeriod+duration>prob->getNPeriods()) {
+		//	prob->setNPeriods(requestedPeriod+duration);
+		//}
+		//add a "specific solution" to create the duration
+		
+		std::string specificSolutionName = demandName+":"+solutionName;
+		//add it
+		prob->addSolution(specificSolutionName);
+		//mark it for deletion
+		prob->setSolutionForDeletion(specificSolutionName);
+
+		prob->addDemand(demandName,specificSolutionName,"atp"); 
+		prob->setDemandForDeletion(demandName,specificSolutionName);
+		//connect the atomic solution to the specific solution
+		prob->addAtomicSolutionRequirements(specificSolutionName, solutionName,duration);
+
+		//this demand shows itself in period requestedPeriod
+		prob->setDemandQuantity(demandName, specificSolutionName, requestedPeriod, quantity);
+		prob->setDemandShipLateAllowance(demandName,specificSolutionName,lateAllowance);
+		prob->setSolutionIncLotSize(specificSolutionName,quantity);
+
+	    //prob->writeModel("foobar");
+		return specificSolutionName;
+	
+
+}
+
+ // This is a different problem; it creates engagements with durations so they can
+//shift in an implosion, for example
+ void populateWithDuration(
+              demandPlanningProblem * prob, 
+              const std::string & idir, 
+			  bool  simulation,
+			  bool  ATP) 
+{
+	try {
+	//figure out whether we are doing an implosion or an MRP problem
+    std::string globalAttrFileName = idir + "/globalAttr.csv";
+	DPglobalAttrFile globalAttrFile(globalAttrFileName);
+	std::string problemType;
+	bool mrpProblem;
+    if ( globalAttrFile.keyExists("problem") ) {
+		problemType =globalAttrFile.fieldAsString("problem","attrValue");
+		if ((problemType != "MRP")&&(problemType != "implosion")) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  problem type in globalAttr.csv must be MRP or implosion"                         <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+		 }
+		if (problemType=="MRP")
+			mrpProblem=true;
+		else
+			mrpProblem=false;
+	}
+	else {
+		mrpProblem=true;
+	}
+	bool hasLateAllowance;
+	if (mrpProblem)
+		hasLateAllowance=false;
+	else {
+		if ( globalAttrFile.keyExists("hasLateAllowance") ) {
+			std::string lAllowance =globalAttrFile.fieldAsString("hasLateAllowance","attrValue");
+			if ((lAllowance != "yes")&&(problemType != "no")) {
+				std::ostringstream msgStream;
+				msgStream <<"-------------------------------------------------------"         <<std::endl
+				<<"Error:  hasLateAllowance in globalAttr.csv must be yes or no"                         <<std::endl
+				<<"-------------------------------------------------------"                   <<std::endl;
+				throw ( DpException(msgStream.str()) );
+			}
+			if (lAllowance=="yes")
+				hasLateAllowance=true;
+			else
+				hasLateAllowance=false;
+		}
+		else {
+			hasLateAllowance=false;
+		}
+	}
+	prob->setIsMrpProblem(mrpProblem);
+
+	std::string divisibleDemandVal;
+	bool divisibleDemand;
+	if (!mrpProblem) {
+		if ( globalAttrFile.keyExists("divisibleDemand") ) {
+			divisibleDemandVal =globalAttrFile.fieldAsString("divisibleDemand","attrValue");
+			if ((divisibleDemandVal != "yes")&&(divisibleDemandVal != "no")) {
+				std::ostringstream msgStream;
+				msgStream <<"-------------------------------------------------------"         <<std::endl
+				<<"Error:  divisibleDemand in globalAttr.csv must be yes or no"                         <<std::endl
+				<<"-------------------------------------------------------"                   <<std::endl;
+				throw ( DpException(msgStream.str()) );
+			}
+			if (divisibleDemandVal=="yes")
+				divisibleDemand=true;
+			else
+				divisibleDemand=false;
+		}
+		else {
+			divisibleDemand=false;
+		}
+		prob->setDivisibleDemand(divisibleDemand);
+		if (divisibleDemand) prob->setEquitableAllocation(true);
+	}
+	else {
+		prob->setDivisibleDemand(false);
+	}
+
+	//first need to get longest demand duration + late allowance. Simplest to
+	//just multiply by three
+
+
+    // Get number of periods
+
+    int nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+    if (nPeriods < 1) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  nPeriods in globalAttr.csv is less than 1"                         <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+    }
+	int extendedNPeriods = 3*nPeriods;
+	prob->setNPeriods(extendedNPeriods);
+	prob->setUserNPeriods(nPeriods);
+
+
+
+    //initialize the fields
+    char name[100];
+    int numResourceIds = globalAttrFile.fieldAsInt("nResourceIds","attrValue");
+    if (numResourceIds < 1) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  nResourceIds in globalAttr.csv is less than 1"                               <<std::endl
+             <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+    }
+    
+
+      
+    for (int j=0; j<numResourceIds; j++) {
+        sprintf(name,"resourceId%d",j);
+        std::string attr = globalAttrFile.fieldAsString(name,"attrValue");
+        prob->addResourceIdentifierName(attr);
+    }
+
+
+	//read resource file; here we read in a different version of the resource file depending
+	//on whether this is an mrp problem or not. For mrp, there is no supply; for implosion, there is
+	{
+		int numAttributes = prob->getResourceIdentifierNames().size();  
+		std::string resourceFileName = idir + "/resource.csv";
+		DPgnrlResourceFile resourceFile(resourceFileName,numAttributes,mrpProblem);
+		DPgnrlResourceFileIterator resourceFileIter(resourceFile);
+	  
+		// loop once for each record in resource file
+	  
+		std::vector<std::string> resourceAttributeValues(numAttributes);
+		for ( ; resourceFileIter()!=NULL; ) {
+			for (int j=0; j<numAttributes; j++) {
+				std::string attributeName = prob->getResourceIdentifierNames()[j];
+				std::string attributeValue = resourceFileIter.fieldOnRecord(attributeName);
+				resourceAttributeValues[j]=attributeValue;
+			}
+			if (!prob->resourceExists(resourceAttributeValues) ) {
+				prob->addResource(resourceAttributeValues);
+			}
+			if (!mrpProblem) { //read the supply; here it is assumed that it is constant over the horizon
+				float supply = resourceFileIter.supplyAsFloat();
+				prob->setResourceSupplyQuantity(resourceAttributeValues, supply);
+			}
+		}
+	}
+
+
+
+	//read solution file; this adds the single period solutions
+	{
+		std::string solutionFileName = idir + "/solution.csv";
+		DPgnrlSolutionFile solutionFile(solutionFileName);
+		DPgnrlSolutionFileIterator solutionFileIter(solutionFile);
+	  
+		// loop once for each record in solution file
+	  
+		for ( ; solutionFileIter()!=NULL; ) {
+		    std::string solutionName = solutionFileIter.solution();
+
+			//check that it doesn't already exist
+            if ( prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution already exists"                                <<std::endl
+                <<"   solution filename: " <<solutionFile.filename().c_str()    <<std::endl
+                <<"   solutin file line number: " <<solutionFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+			//add it
+			prob->addSolution(solutionName);
+		}
+
+	}
+
+
+	//read bom file. Each solution only "exists" for one period. 
+	{
+	    int numAttributes = prob->getResourceIdentifierNames().size();
+
+		std::string solutionBomFileName = idir + "/solutionBom.csv";
+		DPgnrlSolutionBomFile solutionBomFile(solutionBomFileName,numAttributes);
+		DPgnrlSolutionBomFileIterator solutionBomFileIter(solutionBomFile);
+	  
+		// loop once for each record in solution bom file
+		for ( ; solutionBomFileIter()!=NULL; ) {
+		    std::string solutionName = solutionBomFileIter.solution();
+			float quantity = solutionBomFileIter.quantityAsFloat();
+			std::vector<std::string> resourceAttributeValues(numAttributes);
+			for (int j=0; j<numAttributes; j++) {
+				std::string attributeName = prob->getResourceIdentifierNames()[j];
+				std::string attributeValue = solutionBomFileIter.fieldOnRecord(attributeName);
+				resourceAttributeValues[j]=attributeValue;
+			}
+
+			//check that the solution already exists
+            if ( !prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   solutionBom filename: " <<solutionBomFile.filename().c_str()    <<std::endl
+                <<"   solutionBom file line number: " <<solutionBomFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+#if 0
+			if (!prob->resourceExists(resourceAttributeValues)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: resource does not exist"                                <<std::endl
+                <<"   solutionBom filename: " <<solutionBomFile.filename().c_str()    <<std::endl
+                <<"   solutionBom file line number: " <<solutionBomFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+#endif
+			//check whether the resource exists. Should this be an error?
+			//for now, just add it
+			if (!prob->resourceExists(resourceAttributeValues))
+				prob->addResource(resourceAttributeValues);
+
+
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution bom quantity less than 0"                                <<std::endl
+                <<"   solutionBom filename: " <<solutionBomFile.filename().c_str()    <<std::endl
+                <<"   solutionBom file line number: " <<solutionBomFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add it
+			prob->addResourceRequirement(solutionName,resourceAttributeValues,quantity);
+		}
+	}
+
+
+    CoinRelFltEq eq(1.0e-4);
+ 
+	//read probabilistic demand file, only if it's not a simulation
+	if (!simulation)
+	{
+	    int numAttributes = prob->getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/demand.csv";
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods,hasLateAllowance);
+		DPgnrlDemandFileUncertainStartIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; demandFileIter()!=NULL; ) {
+		    std::string solutionName = demandFileIter.solution();
+			std::string demandName = demandFileIter.demand();
+			float quantity = demandFileIter.quantityAsFloat();
+			float odds = demandFileIter.oddsAsFloat();
+			float duration = demandFileIter.durationAsFloat();
+			int intDuration = (int)floor(duration+0.5);
+			int lateAllowance;
+			if (hasLateAllowance) {
+				lateAllowance = demandFileIter.lateAllowanceAsInt();
+				if ( lateAllowance < -1 ) {
+					std::ostringstream msgStream;
+					msgStream <<"-------------------------------------------------------"         <<std::endl
+					<<"Error: lateAllowance must be an integer greater than or equal to -1"       <<std::endl
+					<<"-------------------------------------------------------"                   <<std::endl;
+					throw ( DpException(msgStream.str()) );
+				}
+				if (lateAllowance > prob->getNPeriods()) {
+					std::ostringstream msgStream;
+					msgStream <<"-------------------------------------------------" << std::endl
+					<<"Error: lateAllowance can not be larger than nPeriods." <<std::endl
+					<<"-------------------------------------------------------"                   <<std::endl;
+					throw ( DpException(msgStream.str()) );			
+				}
+			}
+
+			char dName[100];
+            sprintf(dName,"d%d",intDuration);
+			std::string specificSolutionName = demandName+":"+solutionName+":"+dName;
+
+			//check that the solution already exists
+            if ( !prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob->demandExists(demandName,specificSolutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check the odds; odds of less than one do NOT make sense for implosion and !simulation
+            if (odds<0 || odds>1.0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand odds must be between 0 and 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			if (!mrpProblem && !eq(odds,1.0f)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand odds must be 1 for implosion problem and !simulation"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+			}
+			//we need to add the specific solution here (solution along with its duration)
+            //first check whether it already exists
+			bool solExists = prob->solutionExists(specificSolutionName);
+			if (!solExists) {
+				prob->addSolution(specificSolutionName);
+				//connect the atomic solution to the specific solution
+				prob->addAtomicSolutionRequirements(specificSolutionName, solutionName,intDuration);
+			}
+			else {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand for solution already exists"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+			}
+			//check sum = 1.0
+			float sumProb=0;
+			prob->addDemand(demandName,specificSolutionName,"opportunity");
+			if (ATP) prob->setDemandForDeletion(demandName, specificSolutionName);
+			if (hasLateAllowance)
+				prob->setDemandShipLateAllowance(demandName,specificSolutionName,lateAllowance);
+
+			for (int j=0; j<nPeriods; j++) {
+				//get the probability for the current period
+				char pName[100];
+                sprintf(pName,"P%d",j);
+				std::string pNameStr = pName;
+				float probability =  demandFileIter.fieldOnRecordAsFloat(pNameStr);
+				sumProb+=probability;
+				if (!mrpProblem && !(eq(probability,1.0)||(eq(probability,0.0)))) {
+					std::ostringstream msgStream;
+					msgStream <<"-------------------------------------------------------"         <<std::endl
+					<<"Error: only one demand probability can be non-zero"                                <<std::endl
+					<<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+					<<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+					<<"-------------------------------------------------------"                   <<std::endl;
+					throw ( DpException(msgStream.str()) );
+				}
+
+			}
+			if (!eq(sumProb,1.0f)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: sum of demand probabilites not equal to 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+
+			}
+
+
+
+			//now add in the demands for each period in the duration
+			for (int i=0; i<nPeriods; i++) {
+				char pName[100];
+                sprintf(pName,"P%d",i);
+				float probability =  demandFileIter.fieldOnRecordAsFloat(pName);
+				prob->setDemandQuantity(demandName, specificSolutionName, i,quantity*odds*probability);
+			    if ((!mrpProblem) &&(!divisibleDemand))
+					prob->setSolutionIncLotSize(specificSolutionName,quantity);
+			}
+		}
+	}
+
+
+	//read ongoing demand file
+
+	{
+	    int numAttributes = prob->getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/ongoingDemand.csv";
+		DPgnrlOngoingDemandFile ongoingDemandFile(demandFileName);
+		DPgnrlOngoingDemandFileIterator ongoingDemandFileIter(ongoingDemandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; ongoingDemandFileIter()!=NULL; ) {
+		    std::string solutionName = ongoingDemandFileIter.solution();
+			std::string demandName = ongoingDemandFileIter.demand();
+			float quantity = ongoingDemandFileIter.quantityAsFloat();
+			int remaining = ongoingDemandFileIter.remainingAsInt();
+			//check that the solution already exists
+            if ( !prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob->demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+	
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add a "specific solution" to create the duration
+			char dName[100];
+            sprintf(dName,"d%d",remaining);
+			std::string specificSolutionName = demandName+":"+solutionName+":"+dName;
+			//add it
+			prob->addSolution(specificSolutionName);
+
+			prob->addDemand(demandName,specificSolutionName,"ongoing"); 
+			if (ATP) prob->setDemandForDeletion(demandName, specificSolutionName);
+
+			//connect the atomic solution to the specific solution
+			prob->addAtomicSolutionRequirements(specificSolutionName, solutionName,remaining);
+
+			//this demand shows itself in period 0
+			prob->setDemandQuantity(demandName, specificSolutionName, 0, quantity);
+			if (!mrpProblem) 
+					prob->setSolutionIncLotSize(specificSolutionName,quantity);
+		}
+	}
+	
+	
+	//read the wedge demand file
+	//this one is different in that we assume the requirements extend over
+	//the entire planning period (ignore duration)
+	{
+	    int numAttributes = prob->getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/wedgeDemand.csv";
+		DPgnrlWedgeDemandFile wedgeDemandFile(demandFileName);
+		DPgnrlWedgeDemandFileIterator wedgeDemandFileIter(wedgeDemandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; wedgeDemandFileIter()!=NULL; ) {
+		    std::string solutionName = wedgeDemandFileIter.solution();
+			std::string demandName = "wedge";
+			float quantity = wedgeDemandFileIter.quantityAsFloat();
+			//check that the solution already exists
+            if ( !prob->solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob->demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+	
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add it
+			prob->addDemand(demandName,solutionName,"wedge");
+			if (ATP) prob->setDemandForDeletion(demandName, solutionName);
+
+			for (int i=0; i<nPeriods; i++)
+			    prob->setDemandQuantity(demandName, solutionName, i, quantity);
+		}
+	}
+
+    
+
+
+	//prob->writeModel("foobar");
+	}
+	catch (SCOexception e) {
+       DpException dpEx(e.what());
+       throw dpEx;
+	}
+
+
+  }
+@
+
+
+1.22
+log
+@changes to support available to promise
+@
+text
+@d84 3
+a86 3
+		if (requestedPeriod+duration>prob->getNPeriods()) {
+			prob->setNPeriods(requestedPeriod+duration);
+		}
+@
+
+
+1.21
+log
+@change tolerance, and add some more models for the future
+@
+text
+@d29 10
+d40 3
+a42 135
+#if 0
+void populate(
+              demandPlanningProblem & prob, 
+              const std::string & idir, 
+              const std::string & odir,
+			  bool  simulation) 
+{
+	//first need to get longest demand duration
+	//read solution file
+	int longestDuration = 0;
+	{
+		std::string demandFileName = idir + "/demand.csv";
+		DPgnrlDemandFile demandFile(demandFileName);
+		DPgnrlDemandFileIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in solution file
+	  
+		for ( ; demandFileIter()!=NULL; ) {
+			float duration = demandFileIter.durationAsFloat();
+			int intDuration = (int)floor(duration+0.5);
+            if (intDuration>longestDuration) longestDuration=intDuration;
+		}
+	}
+
+    // Get number of periods
+    std::string globalAttrFileName = idir + "/globalAttr.csv";
+    DPglobalAttrFile globalAttrFile(globalAttrFileName);
+    int nPeriods=globalAttrFile.fieldAsInt("nPeriods","attrValue");
+    if (nPeriods < 1) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  nPeriods in globalAttr.csv is less than 1"                         <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+    }
+	int extendedNPeriods = longestDuration+nPeriods;
+	prob.setNPeriods(extendedNPeriods);
+	prob.setUserNPeriods(nPeriods);
+
+
+
+    //initialize the fields
+    char name[100];
+    int numResourceIds = globalAttrFile.fieldAsInt("nResourceIds","attrValue");
+    if (numResourceIds < 1) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  nResourceIds in globalAttr.csv is less than 1"                               <<std::endl
+             <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+    }
+    
+
+      
+    for (int j=0; j<numResourceIds; j++) {
+        sprintf(name,"resourceId%d",j);
+        std::string attr = globalAttrFile.fieldAsString(name,"attrValue");
+        prob.addResourceIdentifierName(attr);
+    }
+
+	//read resource file
+	{
+		int numAttributes = prob.getResourceIdentifierNames().size();  
+		std::string resourceFileName = idir + "/resource.csv";
+		DPgnrlResourceFile resourceFile(resourceFileName,numAttributes, true);
+		DPgnrlResourceFileIterator resourceFileIter(resourceFile);
+	  
+		// loop once for each record in resource file
+	  
+		std::vector<std::string> resourceAttributeValues(numAttributes);
+		for ( ; resourceFileIter()!=NULL; ) {
+			for (int j=0; j<numAttributes; j++) {
+				std::string attributeName = prob.getResourceIdentifierNames()[j];
+				std::string attributeValue = resourceFileIter.fieldOnRecord(attributeName);
+				resourceAttributeValues[j]=attributeValue;
+			}
+			if (!prob.resourceExists(resourceAttributeValues) ) {
+				prob.addResource(resourceAttributeValues);
+			}
+		}
+	}
+
+
+
+	//read solution file
+	{
+		std::string solutionFileName = idir + "/solution.csv";
+		DPgnrlSolutionFile solutionFile(solutionFileName);
+		DPgnrlSolutionFileIterator solutionFileIter(solutionFile);
+	  
+		// loop once for each record in solution file
+	  
+		for ( ; solutionFileIter()!=NULL; ) {
+		    std::string solutionName = solutionFileIter.solution();
+
+			//check that it doesn't already exist
+            if ( prob.solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution already exists"                                <<std::endl
+                <<"   solution filename: " <<solutionFile.filename().c_str()    <<std::endl
+                <<"   solutin file line number: " <<solutionFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+			//add it
+			prob.addSolution(solutionName);
+		}
+
+	}
+
+	//read bom file. Each solution only "exists" for one period. Demands
+	//will draw it out over the duration of the engagement.
+	{
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+
+		std::string solutionBomFileName = idir + "/solutionBom.csv";
+		DPgnrlSolutionBomFile solutionBomFile(solutionBomFileName,numAttributes);
+		DPgnrlSolutionBomFileIterator solutionBomFileIter(solutionBomFile);
+	  
+		// loop once for each record in solution bom file
+		for ( ; solutionBomFileIter()!=NULL; ) {
+		    std::string solutionName = solutionBomFileIter.solution();
+			float quantity = solutionBomFileIter.quantityAsFloat();
+			std::vector<std::string> resourceAttributeValues(numAttributes);
+			for (int j=0; j<numAttributes; j++) {
+				std::string attributeName = prob.getResourceIdentifierNames()[j];
+				std::string attributeValue = solutionBomFileIter.fieldOnRecord(attributeName);
+				resourceAttributeValues[j]=attributeValue;
+			}
+
+			//check that the solution already exists
+            if ( !prob.solutionExists(solutionName)) {
+d45 1
+a45 4
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   solutionBom filename: " <<solutionBomFile.filename().c_str()    <<std::endl
+                <<"   solutionBom file line number: " <<solutionBomFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+d48 3
+a50 9
+            }
+			//check whether the resource exists. Should this be an error?
+			//for now, just add it
+			if (!prob.resourceExists(resourceAttributeValues))
+				prob.addResource(resourceAttributeValues);
+
+
+			//check the quantity
+            if (quantity<0) {
+d53 1
+a53 3
+                <<"Error: solution bom quantity less than 0"                                <<std::endl
+                <<"   solutionBom filename: " <<solutionBomFile.filename().c_str()    <<std::endl
+                <<"   solutionBom file line number: " <<solutionBomFileIter.recNum()  <<std::endl
+d56 1
+a56 5
+            }
+			//add it
+			prob.addResourceRequirement(solutionName,resourceAttributeValues,quantity);
+		}
+	}
+d58 3
+a60 24
+
+    CoinRelFltEq eq(1.0e-5);
+ 
+	//read probabilistic demand file, only if it's not a simulation
+	if (!simulation)
+	{
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/demand.csv";
+		bool mrpProblem = true;
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods,mrpProblem);
+		DPgnrlDemandFileUncertainStartIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; demandFileIter()!=NULL; ) {
+		    std::string solutionName = demandFileIter.solution();
+			std::string demandName = demandFileIter.demand();
+			float quantity = demandFileIter.quantityAsFloat();
+			float odds = demandFileIter.oddsAsFloat();
+			float duration = demandFileIter.durationAsFloat();
+			int intDuration = (int)floor(duration+0.5);
+
+			//check that the solution already exists
+            if ( !prob.solutionExists(solutionName)) {
+d63 1
+a63 4
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+d66 3
+a68 3
+            }
+			//check that the demand for solution does not already exist
+            if (prob.demandExists(demandName,solutionName)) {
+d71 1
+a71 28
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+
+
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check the odds
+            if (odds<0 || odds>1.0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand odds must be between 0 and 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+d74 3
+a76 15
+            }
+
+			//check sum = 1.0
+			float sumProb=0;
+			prob.addDemand(demandName,solutionName);
+			for (int j=0; j<nPeriods; j++) {
+				//get the probability for the current period
+				char pName[100];
+                sprintf(pName,"P%d",j);
+				std::string pNameStr = pName;
+				float probability =  demandFileIter.fieldOnRecordAsFloat(pNameStr);
+				sumProb+=probability;
+
+			}
+			if (!eq(sumProb,1.0f)) {
+d79 1
+a79 3
+                <<"Error: sum of demand probabilites not equal to 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+d82 4
+a85 11
+
+			}
+			//now add in the demands for each period in the duration
+			for (int i=0; i<nPeriods; i++) {
+				char pName[100];
+                sprintf(pName,"P%d",i);
+				float probability =  demandFileIter.fieldOnRecordAsFloat(pName);
+				for (int j=0; j<intDuration; j++) {
+					prob.setDemandQuantity(demandName, solutionName, i+j,quantity*odds*probability);
+				}
+			}
+d87 7
+a93 1
+	}
+d95 4
+a98 5
+#if 0
+	//we are not using this one now
+	//now add deterministic demand (not uncertain)
+	{
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d100 4
+a103 47
+		std::string demandFileName = idir + "/demandDS2.csv";
+		DPgnrlDemandFile demandFile(demandFileName);
+		DPgnrlDemandFileIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; demandFileIter()!=NULL; ) {
+		    std::string solutionName = demandFileIter.solution();
+			std::string demandName = demandFileIter.demand();
+			float quantity = demandFileIter.quantityAsFloat();
+			float odds = demandFileIter.oddsAsFloat();
+			int period = demandFileIter.periodAsInt();
+			//check that the solution already exists
+            if ( !prob.solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob.demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+			//check whether the period is within the horizon
+            if ( period > nPeriods-1) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: period not within horizon"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   period: " <<period                   <<std::endl
+                <<"   planning horizon: " <<nPeriods       <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+d105 2
+a107 144
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check the odds
+            if (odds<0 || odds>1.0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand odds must be between 0 and 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add it
+			prob.addDemand(demandName,solutionName);
+			prob.setDemandQuantity(demandName, solutionName, period,quantity*odds);
+		}
+	}
+#endif
+
+	//read ongoing demand file
+	{
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/ongoingDemand.csv";
+		DPgnrlOngoingDemandFile ongoingDemandFile(demandFileName);
+		DPgnrlOngoingDemandFileIterator ongoingDemandFileIter(ongoingDemandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; ongoingDemandFileIter()!=NULL; ) {
+		    std::string solutionName = ongoingDemandFileIter.solution();
+			std::string demandName = ongoingDemandFileIter.demand();
+			float quantity = ongoingDemandFileIter.quantityAsFloat();
+			int remaining = ongoingDemandFileIter.remainingAsInt();
+			//check that the solution already exists
+            if ( !prob.solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob.demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+	
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add it
+			prob.addDemand(demandName,solutionName);
+			for (int i=0; i<remaining; i++)
+			   prob.setDemandQuantity(demandName, solutionName, i, quantity);
+		}
+	}
+	//read the wedge demand file
+	//this one is different in that we assume the requirements extend over
+	//the entire planning period (ignore duration)
+	{
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+
+		std::string demandFileName = idir + "/wedgeDemand.csv";
+		DPgnrlWedgeDemandFile wedgeDemandFile(demandFileName);
+		DPgnrlWedgeDemandFileIterator wedgeDemandFileIter(wedgeDemandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; wedgeDemandFileIter()!=NULL; ) {
+		    std::string solutionName = wedgeDemandFileIter.solution();
+			std::string demandName = "wedge";
+			float quantity = wedgeDemandFileIter.quantityAsFloat();
+			//check that the solution already exists
+            if ( !prob.solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (prob.demandExists(demandName,solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+	
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<wedgeDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<wedgeDemandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//add it
+			prob.addDemand(demandName,solutionName);
+			for (int i=0; i<nPeriods; i++)
+			    prob.setDemandQuantity(demandName, solutionName, i, quantity);
+		}
+	}
+	prob.writeModel("foobar");
+
+
+  }
+
+#endif
+d109 1
+d114 1
+a114 1
+              demandPlanningProblem & prob, 
+d116 2
+a117 2
+              const std::string & odir,
+			  bool  simulation) 
+d119 1
+a119 1
+
+d142 23
+a164 1
+	prob.setIsMrpProblem(mrpProblem);
+d186 2
+a187 2
+		prob.setDivisibleDemand(divisibleDemand);
+		if (divisibleDemand) prob.setEquitableAllocation(true);
+d190 1
+a190 1
+		prob.setDivisibleDemand(false);
+d193 3
+a195 16
+	//first need to get longest demand duration
+	//read solution file
+	int longestDuration = 0;
+	{
+		std::string demandFileName = idir + "/demand.csv";
+		DPgnrlDemandFile demandFile(demandFileName);
+		DPgnrlDemandFileIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in solution file
+	  
+		for ( ; demandFileIter()!=NULL; ) {
+			float duration = demandFileIter.durationAsFloat();
+			int intDuration = (int)floor(duration+.5);
+            if (intDuration>longestDuration) longestDuration=intDuration;
+		}
+	}
+d207 3
+a209 3
+	int extendedNPeriods = longestDuration+nPeriods;
+	prob.setNPeriods(extendedNPeriods);
+	prob.setUserNPeriods(nPeriods);
+d229 1
+a229 1
+        prob.addResourceIdentifierName(attr);
+d236 1
+a236 1
+		int numAttributes = prob.getResourceIdentifierNames().size();  
+d246 1
+a246 1
+				std::string attributeName = prob.getResourceIdentifierNames()[j];
+d250 2
+a251 2
+			if (!prob.resourceExists(resourceAttributeValues) ) {
+				prob.addResource(resourceAttributeValues);
+d255 1
+a255 1
+				prob.setResourceSupplyQuantity(resourceAttributeValues, supply);
+d274 1
+a274 1
+            if ( prob.solutionExists(solutionName)) {
+d286 1
+a286 1
+			prob.addSolution(solutionName);
+d294 1
+a294 1
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d306 1
+a306 1
+				std::string attributeName = prob.getResourceIdentifierNames()[j];
+d312 1
+a312 1
+            if ( !prob.solutionExists(solutionName)) {
+d324 1
+a324 1
+			if (!prob.resourceExists(resourceAttributeValues)) {
+d336 2
+a337 2
+			if (!prob.resourceExists(resourceAttributeValues))
+				prob.addResource(resourceAttributeValues);
+d351 1
+a351 1
+			prob.addResourceRequirement(solutionName,resourceAttributeValues,quantity);
+d361 1
+a361 1
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d364 1
+a364 1
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods,mrpProblem);
+d376 1
+a376 1
+			if (!mrpProblem) {
+d381 1
+a381 1
+					<<"Error: lateAllowance must be an integer greater than or equal to -1"                                <<std::endl
+d385 7
+d399 1
+a399 1
+            if ( !prob.solutionExists(solutionName)) {
+d410 1
+a410 1
+            if (prob.demandExists(demandName,specificSolutionName)) {
+d454 1
+a454 1
+			bool solExists = prob.solutionExists(specificSolutionName);
+d456 1
+a456 1
+				prob.addSolution(specificSolutionName);
+d458 1
+a458 1
+				prob.addAtomicSolutionRequirements(specificSolutionName, solutionName,intDuration);
+d472 4
+a475 3
+			prob.addDemand(demandName,specificSolutionName,"opportunity");
+			if (!mrpProblem)
+				prob.setDemandShipLateAllowance(demandName,specificSolutionName,lateAllowance);
+d513 1
+a513 1
+				prob.setDemandQuantity(demandName, specificSolutionName, i,quantity*odds*probability);
+d515 1
+a515 1
+					prob.setSolutionIncLotSize(specificSolutionName,quantity);
+d522 1
+d524 1
+a524 1
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d537 1
+a537 1
+            if ( !prob.solutionExists(solutionName)) {
+d548 1
+a548 1
+            if (prob.demandExists(demandName,solutionName)) {
+d576 4
+a579 1
+			prob.addSolution(specificSolutionName);
+a580 1
+			prob.addDemand(demandName,specificSolutionName,"ongoing"); 
+d582 1
+a582 1
+			prob.addAtomicSolutionRequirements(specificSolutionName, solutionName,remaining);
+d585 1
+a585 1
+			prob.setDemandQuantity(demandName, specificSolutionName, 0, quantity);
+d587 1
+a587 1
+					prob.setSolutionIncLotSize(specificSolutionName,quantity);
+d590 2
+d596 1
+a596 1
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d608 1
+a608 1
+            if ( !prob.solutionExists(solutionName)) {
+d619 1
+a619 1
+            if (prob.demandExists(demandName,solutionName)) {
+d643 3
+a645 1
+			prob.addDemand(demandName,solutionName,"wedge");
+d647 1
+a647 1
+			    prob.setDemandQuantity(demandName, solutionName, i, quantity);
+d654 6
+a659 1
+	prob.writeModel("foobar");
+@
+
+
+1.20
+log
+@incLotSize for ongoing
+@
+text
+@d532 26
+a557 1
+
+d735 1
+a735 1
+    CoinRelFltEq eq;
+d885 1
+a885 1
+			    if (!mrpProblem) 
+@
+
+
+1.19
+log
+@changes to deal properly with durations, incLotSize, simulation/implosion, etc.
+@
+text
+@d929 2
+@
+
+
+1.18
+log
+@implosion examples/code
+@
+text
+@d616 1
+a616 2
+	//read solution file; this adds the single period solutions, which will not be
+	//allowed to move (for ongoing and wedge demands)
+d646 1
+a646 2
+	//read bom file. Each solution only "exists" for one period. Demands
+	//will draw it out over the duration of the engagement.
+d743 1
+a743 1
+			std::string specificSolutionName = solutionName+dName;
+d780 1
+a780 1
+			//check the odds
+d790 9
+d807 10
+d830 9
+d860 2
+a861 1
+			
+d916 4
+d921 8
+a928 3
+			prob.addDemand(demandName,solutionName,"ongoing");
+			for (int i=0; i<remaining; i++)
+			   prob.setDemandQuantity(demandName, solutionName, i, quantity);
+@
+
+
+1.17
+log
+@added support for doing heuristic implosion given resource supply quantity
+@
+text
+@d30 1
+d204 2
+a205 1
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods);
+d496 3
+d505 1
+a505 2
+			  bool  simulation,
+			  bool mrpProblem) 
+d507 9
+a515 2
+	//it does not make sense for !simulation and !mrp
+	if (!simulation && !mrpProblem) {
+d518 1
+a518 1
+            <<"Error:  the combination of !simulation and MRP is illegal "                         <<std::endl
+d521 5
+d527 6
+d552 1
+a552 2
+    std::string globalAttrFileName = idir + "/globalAttr.csv";
+    DPglobalAttrFile globalAttrFile(globalAttrFileName);
+d679 1
+d689 6
+d720 1
+a720 1
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods);
+d731 12
+d802 4
+a805 1
+			prob.addDemand(demandName,specificSolutionName);
+d890 1
+a890 1
+			prob.addDemand(demandName,solutionName);
+d946 1
+a946 1
+			prob.addDemand(demandName,solutionName);
+@
+
+
+1.16
+log
+@misc
+@
+text
+@d48 1
+a48 1
+			int intDuration = floor(duration+0.5);
+d93 1
+a93 1
+		DPgnrlResourceFile resourceFile(resourceFileName,numAttributes);
+d178 1
+d213 1
+a213 1
+			int intDuration = floor(duration+0.5);
+d500 2
+a501 1
+			  bool  simulation) 
+d503 9
+d524 1
+a524 1
+			int intDuration = floor(duration+.5);
+d565 3
+a567 2
+	//read resource file; this will probably need to change to read supply values
+	//so it will need to be a different resource file format
+d571 1
+a571 1
+		DPgnrlResourceFile resourceFile(resourceFileName,numAttributes);
+d586 4
+d657 10
+a666 4
+			//check whether the resource exists. Should this be an error?
+			//for now, just add it
+			if (!prob.resourceExists(resourceAttributeValues))
+				prob.addResource(resourceAttributeValues);
+d702 1
+a702 1
+			int intDuration = floor(duration+0.5);
+@
+
+
+1.15
+log
+@handle non-integer durations (not quite done yet though). need to scale last period's quantity by fractional duration.
+@
+text
+@d38 1
+a38 1
+	float longestDuration = 0;
+d48 2
+a49 1
+            if (duration>longestDuration) longestDuration=duration;
+d64 1
+a64 2
+	int roundUpDuration = ceil(longestDuration);
+	int extendedNPeriods = roundUpDuration+nPeriods;
+d212 1
+d288 1
+a288 1
+				for (int j=0; j<duration; j++) {
+d503 1
+a503 1
+	float longestDuration = 0;
+d513 2
+a514 1
+            if (duration>longestDuration) longestDuration=duration;
+d529 1
+a529 2
+	float roundUpDuration = ceil(longestDuration);
+	int extendedNPeriods = roundUpDuration+nPeriods;
+d680 1
+d682 1
+a682 1
+            sprintf(dName,"d%f",duration);
+d736 1
+a736 1
+				prob.addAtomicSolutionRequirements(specificSolutionName, solutionName,duration);
+@
+
+
+1.14
+log
+@put back in a model which includes durations for projects (for
+avail to promise potential work).
+@
+text
+@d38 1
+a38 1
+	int longestDuration = 0;
+d47 1
+a47 1
+			int duration = demandFileIter.durationAsInt();
+d63 2
+a64 1
+	int extendedNPeriods = longestDuration+nPeriods;
+d194 1
+a194 1
+    CoinRelFltEq eq;
+d211 1
+a211 1
+			int duration = demandFileIter.durationAsInt();
+d502 1
+a502 1
+	int longestDuration = 0;
+d511 1
+a511 1
+			int duration = demandFileIter.durationAsInt();
+d527 2
+a528 1
+	int extendedNPeriods = longestDuration+nPeriods;
+d678 1
+a678 1
+			int duration = demandFileIter.durationAsInt();
+d680 1
+a680 1
+            sprintf(dName,"d%d",duration);
+@
+
+
+1.13
+log
+@changed to "one period" solutions to better handle ongoing and wedge demands
+@
+text
+@d490 170
+d661 229
+@
+
+
+1.12
+log
+@changed model to remove intermediate operation/part to do the 1/quantity. Now I just apply the probability directly to the quantity demanded.
+@
+text
+@d16 1
+d36 1
+a36 1
+	//first need to get longest solution duration
+d40 3
+a42 3
+		std::string solutionFileName = idir + "/solution.csv";
+		DPgnrlSolutionFile solutionFile(solutionFileName);
+		DPgnrlSolutionFileIterator solutionFileIter(solutionFile);
+d46 2
+a47 2
+		for ( ; solutionFileIter()!=NULL; ) {
+			int duration = solutionFileIter.durationAsInt();
+a121 1
+			int duration = solutionFileIter.durationAsInt();
+d134 1
+a134 11
+			//check the duration
+            if (duration<1) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution duration less than 1"                                <<std::endl
+                <<"   solution filename: " <<solutionFile.filename().c_str()    <<std::endl
+                <<"   solutin file line number: " <<solutionFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+a136 1
+			prob.setSolutionDuration(solutionName,duration);
+d141 2
+a142 1
+	//read bom file
+d188 1
+a188 1
+			prob.addConstantResourceRequirement(solutionName,resourceAttributeValues,quantity);
+d200 1
+a200 1
+		std::string demandFileName = idir + "/demandDS3.csv";
+d210 1
+a236 2
+			//check whether the END period is within the horizon
+			int duration = prob.getSolutionDuration(solutionName);
+a237 1
+	
+a268 1
+				prob.setDemandQuantity(demandName, solutionName, j,quantity*odds*probability);
+d281 9
+d293 2
+d373 1
+d379 1
+a379 1
+		std::string demandFileName = idir + "/demandDS4.csv";
+d413 3
+a415 3
+			//check whether the remainging is less than or equal to the duration
+            int duration = prob.getSolutionDuration(solutionName);
+			if ( remaining > duration) {
+d418 1
+a418 1
+                <<"Error: remaining time greater than solution duration"                                <<std::endl
+d421 42
+a464 2
+				<<"   remaining: " <<remaining                   <<std::endl
+                <<"   solution duration: " <<duration       <<std::endl
+a468 2
+
+	
+d475 2
+a476 2
+                <<"   demand filename: " <<ongoingDemandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<ongoingDemandFileIter.recNum()  <<std::endl
+d482 2
+a483 2
+			int virtualPeriod = remaining-duration;
+			prob.setDemandQuantity(demandName, solutionName, virtualPeriod, quantity);
+d486 1
+@
+
+
+1.11
+log
+@changed names of input and output files to match Jianying's terminology. Also set it up so that it reads *BOTH* the demand with uncertain start date (DS3) and the demand with definate start date (DS2)
+@
+text
+@d32 2
+a33 1
+              const std::string & odir) 
+d64 1
+d205 2
+a206 1
+	//read probabilistic demand file
+d281 2
+a282 2
+				prob.setDemandQuantity(demandName, solutionName, j,quantity*odds);
+				prob.setDemandProbability(demandName, solutionName, j,probability);
+d296 1
+a372 1
+			prob.setDemandProbability(demandName, solutionName, period,1.0); //assumed 0 everywhere else
+a445 1
+			prob.setDemandProbability(demandName, solutionName, virtualPeriod, 1.0);
+a449 1
+	prob.writeModel("demandsAdded.dat");
+@
+
+
+1.10
+log
+@improved the names of some routines
+@
+text
+@a63 20
+	std::string uncertainStart;
+    if ( globalAttrFile.keyExists("uncertainStart") ) {
+		uncertainStart=globalAttrFile.fieldAsString("uncertainStart","attrValue");
+	}
+	else
+		uncertainStart="no";
+
+	bool uncertainStartFlag;
+	if (uncertainStart=="yes")
+		uncertainStartFlag = 1;
+	else if (uncertainStart=="no")
+		uncertainStartFlag = 0;
+	else {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  uncertainStart in globalAttr.csv must be yes or no"                               <<std::endl
+             <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+
+	}
+d203 1
+a203 2
+	//read demand file
+	if (uncertainStartFlag==1)
+d207 1
+a207 1
+		std::string demandFileName = idir + "/demand.csv";
+d293 1
+a293 1
+	else //not uncertainStart
+d297 1
+a297 1
+		std::string demandFileName = idir + "/demand.csv";
+d377 1
+a377 1
+		std::string demandFileName = idir + "/ongoingDemand.csv";
+@
+
+
+1.9
+log
+@handle odds and uncertain start times. Unit test was updated as well
+@
+text
+@d216 1
+a216 1
+			prob.addBomEntries(solutionName,resourceAttributeValues,quantity);
+@
+
+
+1.8
+log
+@uncertain start probability
+@
+text
+@d237 2
+a263 1
+#if 0
+d267 3
+a269 1
+            if ( period+duration-1 > nPeriods-1) {
+d272 1
+a272 1
+                <<"Error: ending period not within horizon"                                <<std::endl
+a274 3
+                <<"   period: " <<period                   <<std::endl
+                <<"   planning horizon: " <<nPeriods       <<std::endl
+                <<"   solution duration: " <<duration       <<std::endl
+d278 2
+a279 4
+#endif	
+	
+			//check the quantity
+            if (quantity<0) {
+d282 1
+a282 1
+                <<"Error: demand quantity less than 0"                                <<std::endl
+a287 1
+			//add it for each period
+d291 1
+d299 2
+a300 1
+				prob.addDemand(demandName,solutionName,j,quantity*probability);
+d327 1
+d366 3
+a368 4
+			//check whether the END period is within the horizon
+			int duration = prob.getSolutionDuration(solutionName);
+
+            if ( period+duration-1 > nPeriods-1) {
+d371 1
+a371 1
+                <<"Error: ending period not within horizon"                                <<std::endl
+a373 3
+                <<"   period: " <<period                   <<std::endl
+                <<"   planning horizon: " <<nPeriods       <<std::endl
+                <<"   solution duration: " <<duration       <<std::endl
+d377 2
+a378 4
+	
+	
+			//check the quantity
+            if (quantity<0) {
+d381 1
+a381 1
+                <<"Error: demand quantity less than 0"                                <<std::endl
+d388 3
+a390 1
+			prob.addDemand(demandName,solutionName,period,quantity);
+d462 4
+a465 1
+			prob.addDemand(demandName,solutionName,remaining-duration,quantity);
+@
+
+
+1.7
+log
+@ongoing demand is now added
+@
+text
+@d8 2
+a9 1
+
+a12 1
+//#include "solutionFile.h"
+d14 1
+d34 15
+d61 24
+a84 1
+	prob.setNPeriods(nPeriods);
+a106 1
+		int nPeriods = prob.getNPeriods();  
+a125 1
+	prob.writeModel("resourcesAdded.dat");
+a130 1
+		int nPeriods = prob.getNPeriods();  
+a168 1
+	prob.writeModel("solutionsAdded.dat");
+a171 1
+		int nPeriods = prob.getNPeriods();  
+d220 2
+a221 1
+	prob.writeModel("solutionBomsAdded.dat");
+d224 92
+a316 1
+		int nPeriods = prob.getNPeriods();  
+d397 1
+a399 1
+		int nPeriods = prob.getNPeriods();  
+@
+
+
+1.6
+log
+@added trick with placing demand at *end* of solution duration, with positive
+offsets, and with first periods on boms set.
+@
+text
+@d14 1
+d271 72
+@
+
+
+1.5
+log
+@updates
+@
+text
+@d238 17
+@
+
+
+1.4
+log
+@data files
+@
+text
+@d13 1
+d44 1
+d186 39
+d226 27
+d254 1
+@
+
+
+1.3
+log
+@added files
+@
+text
+@d131 1
+a131 1
+#if 0
+d135 2
+d138 1
+a138 1
+		DPgnrlSolutionBomFile solutionBomFile(solutionBomFileName);
+a141 1
+	    int numAttributes = prob.getResourceIdentifierNames().size();
+d169 1
+a169 1
+            if (quantity<1) {
+d182 1
+a182 1
+#endif
+@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@d131 1
+a131 1
+
+d134 32
+d167 13
+d181 2
+@
+
+
+1.1
+log
+@new files
+@
+text
+@d14 2
+d91 37
+d130 1
+@
+

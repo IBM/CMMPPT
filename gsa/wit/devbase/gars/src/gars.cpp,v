@@ -1,0 +1,1681 @@
+head	1.5;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.5
+date	2001.09.26.18.50.26;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2001.08.11.02.00.04;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.06.08.16.27.39;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.04.10.17.04.59;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.02.22.16.46.43;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2001.02.22.16.46.43;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Updated to write out some problem size metrics
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <assert.h>
+#include <iostream.h>
+#include <float.h>
+
+
+#include "demand.h"
+#include "supply.h"
+#include "mtm.h"
+#include "bom.h"
+#include "loosep.h"
+#include "garsProblem.h"
+#include "OsiFloatEqual.h"
+
+void writeObjectiveTerms(
+                         GARSproblem & gp,
+                         std::string titlePrefix,
+                         std::string & outDir)
+{
+  
+  std::string headings="\"action\",\"name\",\"period\","
+    "\"objTerm\",\"unitValue\",\"qty\",\"altUnitCost\",\"altQty\""; 
+  
+  int m,p,t;
+  int np = gp.nPeriods();
+  std::string fullName = outDir+"/"+titlePrefix+"ObjTerms.csv";
+  FILE * objFilePtr = fopen(fullName.c_str(),"w");
+  fprintf(objFilePtr,"%s\n",headings.c_str());
+  
+  
+  // Write MTM Terms
+  {
+    const std::vector<std::string> & mtms = gp.mtmNames();
+    int nMtms=mtms.size();
+    for ( m=0; m<nMtms; ++m ) {
+      
+      // Get acquistion cost and quantity
+      std::vector<float> aq = gp.mtmAcquireQuantity(mtms[m]);
+      std::vector<float> ac = gp.mtmAcquireExecCost(mtms[m]);
+      
+      for ( t=0; t<np; ++t ) {
+        fprintf(objFilePtr,
+          "\"AcquireMtm\",\"%s\",%d,%f,%f,%f\n",
+          mtms[m].c_str(),t+1,
+          -ac[t]*aq[t],
+          ac[t],aq[t] );
+        
+      }     
+    }
+    for ( m=0; m<nMtms; ++m ) {
+      
+      // Get quantity sold whole and rev
+      std::vector<float> sp = gp.mtmSalePrice(mtms[m]);
+      std::vector<float> sw = gp.mtmSellWholeQuantity(mtms[m]);
+      
+      for ( t=0; t<np; ++t ) {
+        fprintf(objFilePtr,
+          "\"SellMtm\",\"%s\",%d,%f,%f,%f\n",
+          mtms[m].c_str(),t+1,
+          sp[t]*sw[t],
+          sp[t],sw[t] );
+      }     
+    }
+  }
+  
+  
+  // Write pn Terms
+  {
+    const std::vector<std::string> & pns = gp.pnNames();
+    int nPns=pns.size();
+    for ( p=0; p<nPns; ++p ) {
+      // Get interanl type 1 demand terms
+      std::vector<float> sv = gp.internalType1Coverage(pns[p]);
+      std::vector<float> rev = gp.type1Rev(pns[p]);
+      
+      for ( t=0; t<np; ++t ) {
+        fprintf(objFilePtr,
+          "\"ShipIntType1\",\"%s\",%d,%f,%f,%f\n",
+          pns[p].c_str(),t+1,
+          rev[t]*sv[t],
+          rev[t],sv[t] );
+      }  
+    }
+    for ( p=0; p<nPns; ++p ) {
+      // Get interanl type 4 demand terms
+      std::vector<float> sv = gp.internalType4Coverage(pns[p]);
+      std::vector<float> rev = gp.type4Rev(pns[p]);
+      
+      for ( t=0; t<np; ++t ) {
+        fprintf(objFilePtr,
+          "\"ShipIntType4\",\"%s\",%d,%f,%f,%f\n",
+          pns[p].c_str(),t+1,
+          rev[t]*sv[t],
+          rev[t],sv[t] );
+      }     
+    }     
+    for ( p=0; p<nPns; ++p ) {
+      // Get external demand terms
+      std::vector<float> sv = gp.externalCoverage(pns[p]);
+      std::vector<float> rev = gp.externalRev(pns[p]);
+      std::vector<float> subVol = gp.type1SubstitutingForTypeAfsVol(pns[p]);
+      std::vector<float> subCost = gp.type1SubstitutingForTypeAfsCost(pns[p]);
+      
+      for ( t=0; t<np; ++t ) {
+        fprintf(objFilePtr,
+          "\"ShipExt\",\"%s\",%d,%f,%f,%f,%f,%f\n",
+          pns[p].c_str(),t+1,
+          rev[t]*sv[t]-subCost[t]*subVol[t],
+          rev[t],sv[t], subCost[t], subVol[t] );
+      }     
+    }       
+    for ( p=0; p<nPns; ++p ) {
+      // Get internal type 1 or 4 demand terms
+      std::vector<float> sv1Or4  = gp.internalType1Or4Coverage(pns[p]);
+      std::vector<float> svNoSrc = gp.noSourceCoverage(pns[p]);
+      std::vector<float> rev = gp.type1Rev(pns[p]);
+      std::vector<float> subVol = gp.type4SubstitutingForType1Vol(pns[p]);
+      std::vector<float> subCost = gp.type4SubstitutingForType1Cost(pns[p]);      
+      std::vector<float> stock1Or4 = gp.stockVolType1Or4(pns[p]);
+      
+      for ( t=0; t<np; ++t ) {
+        // As many type 4's as possible go to no source.
+        float type4Usage = subVol[t] - svNoSrc[t];
+        if ( type4Usage < 0.0 ) type4Usage = 0.0;
+        assert( stock1Or4[t] == 0.0 );
+        
+        fprintf(objFilePtr,
+          "\"ShipInt1Or4\",\"%s\",%d,%f,%f,%f,%f,%f\n",
+          pns[p].c_str(),t+1,
+          rev[t]*sv1Or4[t]-subCost[t]*type4Usage,
+          rev[t],sv1Or4[t], subCost[t], type4Usage );
+      }     
+    }
+           
+    for ( p=0; p<nPns; ++p ) {
+      // Get no source demand terms
+      //std::vector<float> sv1Or4  = gp.internalType1Or4Coverage(pns[p]);
+      std::vector<float> svNoSrc = gp.noSourceCoverage(pns[p]);
+      //std::vector<float> rev = gp.type1Rev(pns[p]);
+      std::vector<float> subVol = gp.type4SubstitutingForType1Vol(pns[p]);
+      std::vector<float> subCost = gp.type4SubstitutingForType1Cost(pns[p]);      
+      std::vector<float> stock1Or4 = gp.stockVolType1Or4(pns[p]);
+      
+      for ( t=0; t<np; ++t ) {
+        // As many type 4's as possible go to no source.
+        float type4Usage = subVol[t];
+        if ( type4Usage > svNoSrc[t] ) type4Usage = svNoSrc[t];
+        assert( stock1Or4[t] == 0.0 );
+        
+        fprintf(objFilePtr,
+          "\"NoSource\",\"%s\",%d,%f, , ,%f,%f\n",
+          pns[p].c_str(),t+1,
+          -subCost[t]*type4Usage,
+           subCost[t], type4Usage );
+      }     
+    }
+  }
+  fprintf(objFilePtr,
+          "\"witObjectiveValue\",%f\n", gp.objectiveFunctionValue() );
+  fprintf(objFilePtr,
+          "\"witBndObjeValue\",%f\n", gp.boundObjectiveFunctionValue() );
+  fclose(objFilePtr);
+}
+
+
+
+void print(
+           GARSproblem & gp,
+           std::string titlePrefix,
+           std::string & outDir  )
+{
+
+	OsiRelFltEq eq;
+  
+  //writeObjectiveTerms(gp,titlePrefix,outDir);
+  
+  int np = gp.nPeriods();
+  // Write MTM info 
+  {
+    std::string mtmFileHeadings="\"mtm\",\"period\",\"supply\","
+      "\"acquired\",\"disassemble\",\"soldWhole\",\"additReq\",\"unitSale\",\"unitNib\"";    
+    std::string fullName = outDir+"/"+titlePrefix+"Mtm.csv";
+	cout <<"Writing file: " <<fullName.c_str() <<endl;
+    FILE * mtmFilePtr = fopen(fullName.c_str(),"w");
+    fprintf(mtmFilePtr,"%s\n",mtmFileHeadings.c_str());
+    
+    const std::vector<std::string> & mtms = gp.mtmNames();
+    
+    for ( int m=0; m<mtms.size(); ++m ) {
+      
+      // Get number of MTM's to be disassembled to satisfy economic 
+      // solution.
+      std::vector<float> supply = gp.mtmSupplyQuantity(mtms[m]);
+      std::vector<float> acquire = gp.mtmAcquireQuantity(mtms[m]);
+      std::vector<float> disman = gp.mtmDismantleQuantity(mtms[m]);
+      std::vector<float> sellWhole = gp.mtmSellWholeQuantity(mtms[m]);
+      std::vector<float> additionalReq = gp.mtmAdditionalRequiredToMeetAllDemand(mtms[m]);
+      std::vector<float> salePrice = gp.mtmSalePrice(mtms[m]);
+      std::vector<float> acquirePrice = gp.mtmNibPrice(mtms[m]);
+      
+      for ( int i=0; i<np; ++i ) {
+        if ( 
+          eq(supply[i],0.0) && 
+          eq(acquire[i],0.0) && 
+          eq(disman[i],0.0)  && 
+          eq(sellWhole[i],0.0) &&
+          eq(additionalReq[i],0.0) ) continue;
+        fprintf(mtmFilePtr, "\"%s\",%d,%f,%f,%f,%f,%f,%f,%f\n",
+          mtms[m].c_str(), i+1, 
+          supply[i],
+          acquire[i],disman[i],sellWhole[i],additionalReq[i],
+          salePrice[i],acquirePrice[i] );
+      }
+    }
+    fclose(mtmFilePtr);
+  }
+  
+  // Write Parts produced from MTMs
+  {
+    std::string headings="\"mtm\",\"period\",\"disassemble\","
+      "\"pn\",\"1ProdQty\",\"4ProdQty\",\"AfsProdQty\",\"int1Rev\",\"int4Rev\",\"extRev\",\"unitNib\"";    
+    std::string fullName = outDir+"/"+titlePrefix+"PartsFromMtms.csv";
+    cout <<"Writing file: " <<fullName.c_str() <<endl;
+    FILE * filePtr = fopen(fullName.c_str(),"w");
+    fprintf(filePtr,"%s\n",headings.c_str());
+    
+    const std::vector<std::string> & mtms = gp.mtmNames();
+    
+    for ( int m=0; m<mtms.size(); ++m ) {
+      
+      std::vector<std::string> prodParts = gp.partsProducedFromMtm(mtms[m]);
+      std::vector<float> disman = gp.mtmDismantleQuantity(mtms[m]);
+      //std::vector<float> additional = gp.mtmAdditionalRequiredToMeetAllDemand(mtms[m]);
+      std::vector<float> acquirePrice = gp.mtmNibPrice(mtms[m]);
+      
+      for ( int p=0; p<prodParts.size(); ++p ) {
+        
+        std::vector<float> prodQtyType1 = gp.productionVolType1(mtms[m],prodParts[p]);
+        std::vector<float> prodQtyType4 = gp.productionVolType4(mtms[m],prodParts[p]);
+        std::vector<float> prodQtyTypeAfs = gp.productionVolTypeAfs(mtms[m],prodParts[p]);
+        std::vector<float>   ri1 = gp.type1Rev(prodParts[p]);
+        std::vector<float>   ri4 = gp.type4Rev(prodParts[p]);
+        std::vector<float>   re = gp.externalRev(prodParts[p]);
+        
+        
+        for ( int i=0; i<np; ++i ) {
+          if ( 
+            eq(disman[i],0.0) && 
+            eq(prodQtyType1[i],0.0) &&
+            eq(prodQtyType4[i],0.0) &&
+            eq(prodQtyTypeAfs[i],0.0) ) continue;
+          
+          
+          fprintf(filePtr, "\"%s\",%d,%f,\"%s\",%f,%f,%f,%f,%f,%f,%f\n",
+            mtms[m].c_str(), i+1, 
+            disman[i],
+            prodParts[p].c_str(),
+            prodQtyType1[i],
+            prodQtyType4[i],
+			prodQtyTypeAfs[i],
+            ri1[i],
+            ri4[i],
+            re[i],
+            acquirePrice[i] );
+        }
+      }
+    }
+    fclose(filePtr);
+  }
+  
+  
+  // Write parts file
+  {
+    std::string partFileHeadings="\"part\",\"period\",\"1Stock\","
+      "\"4Stock\",\"AfsStock\",\"1&4Stock\",\"Afs&1Stock\"";    
+    std::string fullName = outDir+"/"+titlePrefix+"Part.csv";
+	cout <<"Writing file: " <<fullName.c_str() <<endl;
+    FILE * partFilePtr = fopen(fullName.c_str(),"w");
+    fprintf(partFilePtr,"%s\n",partFileHeadings.c_str());
+    
+    // Get list of parts
+    const std::vector<std::string> & pns = gp.pnNames();
+    int pSize = pns.size();
+    
+    // loop once for each part
+    for ( int p=0; p<pSize; ++p ) {
+      
+      // Get part data
+      std::vector<float> s1 = gp.stockVolType1(pns[p]);
+      std::vector<float> s4 = gp.stockVolType4(pns[p]);
+      std::vector<float> sAfs = gp.stockVolTypeAfs(pns[p]);
+      std::vector<float> s1A4 = gp.stockVolType1Or4(pns[p]);
+      std::vector<float> sAA1 = gp.stockVolTypeAfsOr1(pns[p]);     
+      for ( int i=0; i<np; ++i ) {
+        if ( 
+          eq(s1[i],0.0) && 
+          eq(s4[i],0.0) && 
+          eq(sAfs[i],0.0)  && 
+          eq(s1A4[i],0.0) && 
+          eq(sAA1[i],0.0) ) continue;
+        fprintf(partFilePtr, "\"%s\",%d,%f,%f,%f,%f,%f\n",
+          pns[p].c_str(), i+1, 
+          s1[i], s4[i],sAfs[i],s1A4[i],sAA1[i] );
+      } 
+    }     
+  fclose(partFilePtr);
+  }  
+
+  // Write demand file
+  {
+    std::string demFileHeadings="\"part\",\"period\","
+      "\"demInt1\",\"shpInt1\",\"demInt4\",\"shpInt4\",\"demInt1Or4\",\"shpInt1Or4\",\"demExt\",\"shpExt\",\"demNoSrc\",\"shpNoSrc\","
+      "\"4Subs1\",\"1SubsAfs\","     
+      "\"int1Rev\",\"int4Rev\",\"extRev\"";    
+    std::string fullName = outDir+"/"+titlePrefix+"Demand.csv";
+    cout <<"Writing file: " <<fullName.c_str() <<endl;
+    FILE * demFilePtr = fopen(fullName.c_str(),"w");
+    fprintf(demFilePtr,"%s\n",demFileHeadings.c_str());
+    
+    // Get list of parts
+    const std::vector<std::string> & pns = gp.pnNames();
+    int pSize = pns.size();
+    
+    // loop once for each part
+    for ( int p=0; p<pSize; ++p ) {
+      
+      // Get part data
+      std::vector<float>   di1 = gp.internalType1DemandQuantity(pns[p]);
+      std::vector<float>   di4 = gp.internalType4DemandQuantity(pns[p]);
+      std::vector<float>   di1Or4 = gp.internalType1Or4DemandQuantity(pns[p]);
+      std::vector<float>   de = gp.externalDemandQuantity(pns[p]);
+      std::vector<float>   dns = gp.noSourceDemandQuantity(pns[p]);
+
+      std::vector<float>   si1 = gp.internalType1Coverage(pns[p]);
+      std::vector<float>   si4 = gp.internalType4Coverage(pns[p]);
+      std::vector<float>   si1Or4 = gp.internalType1Or4Coverage(pns[p]);
+      std::vector<float>   se = gp.externalCoverage(pns[p]);
+      std::vector<float>   sns = gp.noSourceCoverage(pns[p]);
+
+      std::vector<float>   sub4For1   = gp.type4SubstitutingForType1Vol(pns[p]);
+      std::vector<float>   sub1ForAfs = gp.type1SubstitutingForTypeAfsVol(pns[p]);
+
+      std::vector<float>   ri1 = gp.type1Rev(pns[p]);
+      std::vector<float>   ri4 = gp.type4Rev(pns[p]);
+      std::vector<float>   re = gp.externalRev(pns[p]);
+      
+      for ( int i=0; i<np; ++i ) {
+        if ( 
+          eq(di1[i],0.0) && 
+          eq(di4[i],0.0) && 
+          eq(di1Or4[i],0.0)  && 
+          eq(de[i],0.0) && 
+          eq(dns[i],0.0) &&
+          eq(si1[i],0.0) && 
+          eq(si4[i],0.0) && 
+          eq(si1Or4[i],0.0)  && 
+          eq(se[i],0.0) && 
+          eq(sns[i],0.0) && 
+          eq(sub4For1[i],0.0) && 
+          eq(sub1ForAfs[i],0.0) 
+          ) continue;
+        fprintf(demFilePtr, "\"%s\",%d, %f,%f, %f,%f, %f,%f, %f,%f, %f,%f, %f,%f, %f,%f,%f\n",
+          pns[p].c_str(), i+1, 
+          di1[i], si1[i], 
+          di4[i], si4[i], 
+          di1Or4[i], si1Or4[i], 
+          de[i], se[i], 
+          dns[i], sns[i],
+          sub4For1[i], sub1ForAfs[i],
+          ri1[i],ri4[i],re[i]
+          );
+      } 
+    }     
+  fclose(demFilePtr);
+  }
+}
+
+
+//-----------------------------------------------------------------------
+
+
+int
+main (int argc, char * argv[])
+{
+  {
+    
+    // Put Parms into a vector
+    std::vector<std::string> args;
+    for (int i=0; i<argc; i++) 
+      args.push_back(argv[i]);
+    
+    int nPeriods = 1; 
+    double intType1CostFac = 0.5; 
+    double intType4CostFac = 0.3;  
+    double extCostFac = 0.8; 
+    
+    bool econScen1 = false;
+    bool econScen2 = false;
+    bool nonEconScen = false;
+    bool virtForecast = false;
+    
+    {
+      // Check parm passed to program
+      bool parmError = false;
+      
+      if ( args.size()> 1 ) {
+        if (args[1]=="?" ) {
+          parmError = true; // set flag to provide usage info
+        }
+      }
+      
+      if ( ! parmError ) {
+        if ( !(args.size()==7) ) {
+          // Wrong number of parms. Write message
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Wrong number of parmeters specified"                      <<endl
+            <<"  Number parameters specified: " <<args.size()-1          <<endl
+            <<"  Expected number of parameters: 6"                       <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }
+      
+      // Get scenario type
+      if ( args.size()>=2 ) {
+        std::string scenType = args[1];
+        if ( scenType=="e1" ) {
+          econScen1 = true;
+        }
+        else if ( scenType=="e2" ) {
+          econScen2 = true;
+        }
+        else if ( scenType=="ne" ) {
+          nonEconScen = true;
+        }
+        else if ( scenType=="vf" ) {
+          virtForecast = true;
+        }
+        else if ( scenType=="all" ) {
+          econScen1 = true;
+          econScen2 = true;
+          nonEconScen = true;
+          virtForecast = true;
+        }
+        else {
+          // unrecognized scenario type
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Unrecognized scenario type"                               <<endl
+            <<"  Value specied: " <<scenType.c_str()                     <<endl
+            <<"  Valid values: e1,e2,ne,vf,all"                          <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }  
+      
+      // Get number of periods
+      if ( args.size()>=4 ) {
+        nPeriods = atoi(args[3].c_str());
+        if (nPeriods<1 || nPeriods>12) {
+          // Wrong number of periods
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Invalid number of periods specifed."                      <<endl
+            <<"  Number or periods specified: " <<nPeriods               <<endl
+            <<"  Valid range: 1<= nPeriods <=12"                         <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }
+      
+      // Get internal type 1 cost factor
+      if ( args.size()>=5 ) {
+        intType1CostFac = atof(args[4].c_str());
+        if (intType1CostFac==0.0) {
+          // invalid internal cost factor
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Invalid intType1CostFac specifed."                          <<endl
+            <<"  intType1CostFac specified: " <<args[4].c_str()            <<endl
+            <<"  Valid numeric range: 0<intType1CostFac"                   <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }  
+      
+      // Get internal type 4 cost factor
+      if ( args.size()>=6 ) {
+        intType4CostFac = atof(args[5].c_str());
+        if (intType4CostFac==0.0) {
+          // invalid internal cost factor
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Invalid intType4CostFac specifed."                          <<endl
+            <<"  intType4CostFac specified: " <<args[5].c_str()            <<endl
+            <<"  Valid numeric range: 0<intType4CostFac"                   <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }   
+      
+      // Get external cost factor
+      if ( args.size()>=7 ) {
+        extCostFac = atof(args[6].c_str());
+        if (extCostFac==0.0) {
+          // invalid external cost factor
+          cerr 
+            <<"-------------------------------------------------------"  <<endl
+            <<"Invalid extCostFac specifed."                          <<endl
+            <<"  extCostFac specified: " <<args[6].c_str()            <<endl
+            <<"  Valid numeric range: 0<extCostFac"                   <<endl
+            <<"-------------------------------------------------------"  <<endl;
+          parmError = true;
+        }
+      }
+      
+      if ( parmError ) {
+        // Write correct usage
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<argv[0] <<" scenario dataDirectory nPeriods intType1CostFac intType4CostFac extCostFac" <<endl
+          <<"  where:"  
+          <<"    scenario: e1,e2,ne,vf,all"                            <<endl
+          <<"      e1 - economic 1"                                    <<endl
+          <<"      e2 - economic 2"                                    <<endl
+          <<"      ne - non-economic"                                  <<endl
+          <<"      vf - virtual forecast"                              <<endl
+          <<"      all- All scenarios"                                 <<endl                                               <<endl
+          <<"    dataDirectory:"                                       <<endl
+          <<"      Directory where input files are located and"        <<endl
+          <<"      output files are written."                          <<endl
+          /*
+          <<"      Input files are named: demand, supply, mtm, bom,"   <<endl
+          <<"      PN_rev and loosep."                                 <<endl
+          <<"      Output files are named: ECON_Parts, DEMAN_MTM"      <<endl
+          <<"      Not_Econ_Parts, Virtual_Parts."                     <<endl 
+          */
+          <<"    nPeriods:"                                            <<endl
+          <<"      Number of periods in the problem. This must be"     <<endl
+          <<"      in the range [1,12]."                               <<endl 
+          <<"    intType1CostFac:"                                     <<endl
+          <<"      internal type 1 cost factor."                       <<endl
+          <<"      The revenue associated with satisfying one unit of" <<endl
+          <<"      internal type 1 demand is (type1 rev)*intType1CostFac"   <<endl
+          <<"    intType4CostFac:"                                     <<endl
+          <<"      internal type 4 cost factor."                       <<endl
+          <<"      The revenue associated with satisfying one unit of" <<endl
+          <<"      internal type 4 demand is (type4 rev)*intType4CostFac"   <<endl
+          <<"    extCostFac:"                                          <<endl
+          <<"      external cost factor."                              <<endl
+          <<"      The revenue associated with satisfying one unit of" <<endl
+          <<"      external demand is (external rev)*extCostFac"       <<endl
+          <<"  example usage:"                                         <<endl
+          <<"    " <<argv[0] <<" e1 ../testData 1 0.5 0.4 0.8"          <<endl
+          <<"    " <<argv[0] <<" all /u/fasano/garsData 12 0.1 0.05 0.9"<<endl
+          /*
+          <<"  Output files (all comma seperated variable format)"     <<endl
+          <<"  are:"                                                   <<endl
+          <<"        ECON_Parts.csv with fields:"                      <<endl
+          <<"           pn - part name"                                <<endl
+          <<"           demand_type - Internal, External or NoSource"  <<endl
+          <<"           period - period number (first period is period"<<endl
+          <<"                    1"                                    <<endl
+          <<"           deman_qty - demanded quantity in period"       <<endl
+          <<"           econ_cov_qty - amount of deamnd_qty that can"  <<endl
+          <<"                    economically be satisfied"            <<endl
+          <<"           excessQty - "                                  <<endl
+          <<"           stockQty - "                                   <<endl
+          <<"           supply_rev - econ_cov_qty * newBuyCost"        <<endl
+          <<"        DEMAN_MTM.csv with fields:"                       <<endl
+          <<"           mtm - machine type model"                      <<endl
+          <<"           period - period number (first period is period"<<endl
+          <<"                    1"                                    <<endl
+          <<"           deman_qty - Quantity of mtm's to be"           <<endl
+          <<"                    disassembled in period to satisfy"    <<endl
+          <<"                    econ_cov_qty"                         <<endl
+          <<"        Not_Econ_Parts.csv - MTM are disassembled without"<<endl
+          <<"           regard to the MTM sale revenue."               <<endl
+          <<"           with fields:"                                  <<endl
+          <<"           pn - part name"                                <<endl
+          <<"           demand_type - Internal, External or NoSource"  <<endl
+          <<"           period - period number (first period is period"<<endl
+          <<"                    1"                                    <<endl
+          <<"           deman_qty - demanded quantity in period"       <<endl
+          <<"           not_econ_cov_qty - amount of deamnd_qty that"  <<endl
+          <<"                    can economically be satisfied"        <<endl
+          <<"           supply_rev - deman_qty * newBuyCost"           <<endl
+          <<"        Virtual_Parts.csv - These are the parts that"     <<endl
+          <<"           are available if all MTM's were disassembled," <<endl
+          <<"           with NoSource demands first satisfied."        <<endl
+          <<"           with fields:"                                  <<endl
+          <<"           pn - part name"                                <<endl
+          <<"           period - period number (first period is period"<<endl
+          <<"                    1"                                    <<endl
+          <<"           fcast_qty - number of parts that can be"       <<endl
+          <<"                    supplied"                             <<endl
+          <<"           supply_rev - fcast_qty * newBuyCost"           <<endl
+          */
+          <<"-------------------------------------------------------"  <<endl;
+        return 1;
+      }
+  }
+  
+  std::string outputDirectory=args[2];
+  GARSproblem gp;
+  gp.internalType1DemandCostFactor(intType1CostFac);
+  gp.internalType4DemandCostFactor(intType4CostFac);
+  gp.externalDemandCostFactor(extCostFac);
+  
+  cout <<"Reading input files" <<endl;
+  gp.readFiles(nPeriods,args[2]);
+
+#if 0
+  // Get some problem metrics
+  {
+    const std::vector<std::string> & parts = gp.pnNames();
+    int nParts = parts.size();
+    std::vector<std::string> partsWithRevAndDemand;;
+    std::vector<std::string> partsWithRevDemandAndMtmSupply;;
+    for ( int p=0; p<nParts; ++p ) {
+      std::vector<float> i1Dv = gp.internalType1DemandQuantity( parts[p]);
+      std::vector<float> i4Dv = gp.internalType4DemandQuantity( parts[p]);
+      std::vector<float> i1or4Dv = gp.internalType1Or4DemandQuantity( parts[p]);
+      std::vector<float> extDv = gp.externalDemandQuantity( parts[p]);
+      std::vector<float> nosrcDv = gp.noSourceDemandQuantity( parts[p]);
+      
+      std::vector<float> t1R = gp.type1Rev( parts[p] );
+      std::vector<float> t4R = gp.type4Rev( parts[p] );
+      std::vector<float> extR = gp.externalRev( parts[p] );
+      
+      for ( int t=0; t<nPeriods; ++t ) {
+        if ( i1Dv[t]>0.0 && t1R[t]>0 ) {
+          partsWithRevAndDemand.push_back(parts[p]);
+          break;
+        }
+        if ( i4Dv[t]>0.0 && t4R[t]>0 ) {
+          partsWithRevAndDemand.push_back(parts[p]);
+          break;
+        }
+        if ( i1or4Dv[t]>0.0 && (t1R[t]>0 || t4R[t]>0) ) {
+          partsWithRevAndDemand.push_back(parts[p]);
+          break;
+        }      
+        if ( extDv[t]>0.0 && extR[t]>0 ) {
+          partsWithRevAndDemand.push_back(parts[p]);
+          break;
+        }
+        if ( nosrcDv[t]>0.0 ) {
+          partsWithRevAndDemand.push_back(parts[p]);
+          break;
+        }
+      }
+      if (partsWithRevAndDemand.size()>0) {
+        cout <<partsWithRevAndDemand.size() <<" " <<partsWithRevAndDemand[partsWithRevAndDemand.size()-1].c_str() <<endl;
+      }
+    }
+
+    // For each part with demand and revenue determine if there are Mtms with supply
+    for ( int pwrd=0; pwrd<partsWithRevAndDemand.size(); pwrd++ ) {
+      const char * part = partsWithRevAndDemand[pwrd].c_str();
+      std::vector<std::string> mtms = gp.mtmsProducingPart(partsWithRevAndDemand[pwrd]);
+      
+      // loop once for each MTM to ensure that it has supply
+      for ( int m=0; m<mtms.size(); ++m ) {
+        
+        // Check to see if there is a supply of these mtms
+        std::vector<float> sv = gp.mtmSupplyQuantity(mtms[m]);
+        bool nonZeroSupply=false;
+        for ( int t=0; t<nPeriods; ++t ) {
+          if ( sv[t]>0.0 ) {
+            nonZeroSupply=true;
+            break;
+          }
+        }
+        
+        if ( nonZeroSupply ) {
+          partsWithRevDemandAndMtmSupply.push_back(partsWithRevAndDemand[pwrd]);
+          cout <<partsWithRevAndDemand[pwrd].c_str() <<endl;
+          break;
+        }
+      }
+    }
+
+    int numShipableParts = partsWithRevDemandAndMtmSupply.size();
+    cout <<"Num of shippable parts = " <<numShipableParts <<endl;
+  }
+#endif
+  
+  
+  
+  if ( econScen1 ) {
+    cout <<"Solving economic scenario 1" <<endl;
+    gp.economicScenario1();
+    print( gp, "econScen1", outputDirectory );
+    //gp.compareSolutions(args[2]);
+  }
+  
+  
+  if ( econScen2 ) {
+    cout <<"Solving economic scenario 2" <<endl;
+    gp.economicScenario2();
+    print( gp, "econScen2",outputDirectory);
+  }
+  
+  
+  if ( nonEconScen ) {
+    cout <<"Solving non-economic" <<endl;
+    gp.nonEconomic();
+    print( gp, "nonEcon",outputDirectory);
+  }
+  
+  if ( virtForecast ) {
+    
+    cout <<"Solving virtual forecast" <<endl;
+    gp.virtualForecast();
+    print( gp, "virFcst",outputDirectory);
+  }
+  
+  cout <<"Gars Wit Application finished writing all files." <<endl;
+  }
+  cout <<"Gars Wit Application is finished." <<endl;
+  return 0;
+}
+
+
+@
+
+
+1.4
+log
+@Changed directory for running on windows
+@
+text
+@d191 1
+a191 1
+    const std::vector<std::string> & mtms = gp.machineTypeModelNames();
+d231 1
+a231 1
+    const std::vector<std::string> & mtms = gp.machineTypeModelNames();
+d243 2
+a244 2
+		std::vector<float> prodQtyType4 = gp.productionVolType4(mtms[m],prodParts[p]);
+		std::vector<float> prodQtyTypeAfs = gp.productionVolTypeAfs(mtms[m],prodParts[p]);
+d248 1
+a248 1
+
+d254 4
+a257 4
+			eq(prodQtyType4[i],0.0) &&
+			eq(prodQtyTypeAfs[i],0.0) ) continue;
+   
+
+d286 1
+a286 1
+    const std::vector<std::string> & pns = gp.partNames();
+d320 1
+a320 1
+	cout <<"Writing file: " <<fullName.c_str() <<endl;
+d325 1
+a325 1
+    const std::vector<std::string> & pns = gp.partNames();
+d617 76
+@
+
+
+1.3
+log
+@updated files
+@
+text
+@d559 2
+a560 2
+          <<"    " <<argv[0] <<"e1 ../testData 1 0.5 0.4 0.8"          <<endl
+          <<"    " <<argv[0] <<"all /u/fasano/garsData 12 0.1 0.05 0.9"<<endl
+@
+
+
+1.2
+log
+@Updated with code from windows platform
+@
+text
+@d17 1
+d173 3
+a175 2
+   std::string titlePrefix,
+   std::string & outDir,
+d177 3
+a179 30
+   std::vector<float> (GARSproblem::*mtmSupply)( const std::string & mtm ) const,
+   std::vector<float> (GARSproblem::*mtmAcquire)( const std::string & mtm ) const,
+   std::vector<float> (GARSproblem::*mtmDisassemble)( const std::string & mtm ) const,
+   std::vector<float> (GARSproblem::*mtmSoldWhole)( const std::string & mtm ) const,
+   std::vector<float> (GARSproblem::*mtmSalePrice)( const std::string & mtm ) const,
+   std::vector<float> (GARSproblem::*mtmAcquirePrice)( const std::string & mtm ) const,
+ 
+   std::vector<float> (GARSproblem::*stock1)( const std::string & pn ) const, 
+   std::vector<float> (GARSproblem::*stock4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*stockAfs)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*stock1And4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*stockAfsAnd1)( const std::string & pn ) const,
+
+   std::vector<float> (GARSproblem::*demVolInt1)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*demVolInt4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*demVolInt1Or4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*demVolExt)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*demVolNoSrc)( const std::string & pn ) const,
+
+   std::vector<float> (GARSproblem::*shipVolInt1)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*shipVolInt4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*shipVolInt1Or4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*shipVolExt)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*shipVolNoSrc)( const std::string & pn ) const,
+
+   std::vector<float> (GARSproblem::*revInt1)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*revInt4)( const std::string & pn ) const,
+   std::vector<float> (GARSproblem::*revExt)( const std::string & pn ) const
+   )
+{
+a180 2
+  writeObjectiveTerms(gp,titlePrefix,outDir);
+
+d185 1
+a185 1
+      "\"acquired\",\"disassemble\",\"soldWhole\",\"unitSale\",\"unitNib\"";    
+d187 1
+d197 7
+a203 6
+      std::vector<float> supply = (gp.*mtmSupply)(mtms[m]);
+      std::vector<float> acquire = (gp.*mtmAcquire)(mtms[m]);
+      std::vector<float> disman = (gp.*mtmDisassemble)(mtms[m]);
+      std::vector<float> sellWhole = (gp.*mtmSoldWhole)(mtms[m]);
+      std::vector<float> salePrice = (gp.*mtmSalePrice)(mtms[m]);
+      std::vector<float> acquirePrice = (gp.*mtmAcquirePrice)(mtms[m]);
+d207 6
+a212 5
+          supply[i]==0.0 && 
+          acquire[i]==0.0 && 
+          disman[i]==0.0  && 
+          sellWhole[i]==0.0 ) continue;
+        fprintf(mtmFilePtr, "\"%s\",%d,%f,%f,%f,%f,%f,%f\n",
+d215 1
+a215 1
+          acquire[i],disman[i],sellWhole[i],
+d222 54
+d281 1
+d293 5
+a297 5
+      std::vector<float> s1 = (gp.*stock1)(pns[p]);
+      std::vector<float> s4 = (gp.*stock4)(pns[p]);
+      std::vector<float> sAfs = (gp.*stockAfs)(pns[p]);
+      std::vector<float> s1A4 = (gp.*stock1And4)(pns[p]);
+      std::vector<float> sAA1 = (gp.*stockAfsAnd1)(pns[p]);     
+d300 5
+a304 5
+          s1[i]==0.0 && 
+          s4[i]==0.0 && 
+          sAfs[i]==0.0  && 
+          s1A4[i]==0.0 && 
+          sAA1[i]==0.0 ) continue;
+d318 1
+a318 1
+      "\"int1Rev\",\"int4Rev\",extRev\"";    
+d320 1
+d332 11
+a342 11
+      std::vector<float>   di1 = (gp.*demVolInt1)(pns[p]);
+      std::vector<float>   di4 = (gp.*demVolInt4)(pns[p]);
+      std::vector<float>   di1Or4 = (gp.*demVolInt1Or4)(pns[p]);
+      std::vector<float>   de = (gp.*demVolExt)(pns[p]);
+      std::vector<float>   dns = (gp.*demVolNoSrc)(pns[p]);
+
+      std::vector<float>   si1 = (gp.*shipVolInt1)(pns[p]);
+      std::vector<float>   si4 = (gp.*shipVolInt4)(pns[p]);
+      std::vector<float>   si1Or4 = (gp.*shipVolInt1Or4)(pns[p]);
+      std::vector<float>   se = (gp.*shipVolExt)(pns[p]);
+      std::vector<float>   sns = (gp.*shipVolNoSrc)(pns[p]);
+d347 3
+a349 3
+      std::vector<float>   ri1 = (gp.*revInt1)(pns[p]);
+      std::vector<float>   ri4 = (gp.*revInt4)(pns[p]);
+      std::vector<float>   re = (gp.*revExt)(pns[p]);
+d353 12
+a364 12
+          di1[i]==0.0 && 
+          di4[i]==0.0 && 
+          di1Or4[i]==0.0  && 
+          de[i]==0.0 && 
+          dns[i]==0.0 &&
+          si1[i]==0.0 && 
+          si4[i]==0.0 && 
+          si1Or4[i]==0.0  && 
+          se[i]==0.0 && 
+          sns[i]==0.0 && 
+          sub4For1[i]==0.0 && 
+          sub1ForAfs[i]==0.0 
+a388 16
+  
+  // Put Parms into a vector
+  std::vector<std::string> args;
+  for (int i=0; i<argc; i++) 
+    args.push_back(argv[i]);
+  
+  int nPeriods = 1; 
+  double intType1CostFac = 0.5; 
+  double intType4CostFac = 0.3;  
+  double extCostFac = 0.8; 
+  
+  bool econScen1 = false;
+  bool econScen2 = false;
+  bool nonEconScen = false;
+  bool virtForecast = false;
+
+a389 2
+    // Check parm passed to program
+    bool parmError = false;
+d391 129
+a519 3
+    if ( args.size()> 1 ) {
+      if (args[1]=="?" ) {
+        parmError = true; // set flag to provide usage info
+d521 3
+a523 98
+    }
+    
+    if ( ! parmError ) {
+      if ( !(args.size()==7) ) {
+        // Wrong number of parms. Write message
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<"Wrong number of parmeters specified"                      <<endl
+          <<"  Number parameters specified: " <<args.size()-1          <<endl
+          <<"  Expected number of parameters: 5"                       <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        parmError = true;
+      }
+    }
+    
+    // Get scenario type
+    if ( args.size()>=2 ) {
+      std::string scenType = args[1];
+      if ( scenType=="e1" ) {
+        econScen1 = true;
+      }
+      else if ( scenType=="e2" ) {
+        econScen2 = true;
+      }
+      else if ( scenType=="ne" ) {
+        nonEconScen = true;
+      }
+      else if ( scenType=="vf" ) {
+        virtForecast = true;
+      }
+      else if ( scenType=="all" ) {
+        econScen1 = true;
+        econScen2 = true;
+        nonEconScen = true;
+        virtForecast = true;
+      }
+      else {
+        // unrecognized scenario type
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<"Unrecognized scenario type"                               <<endl
+          <<"  Value specied: " <<scenType.c_str()                     <<endl
+          <<"  Valid values: e1,e2,ne,vf,all"                          <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        parmError = true;
+      }
+    }  
+    
+    // Get number of periods
+    if ( args.size()>=4 ) {
+      nPeriods = atoi(args[3].c_str());
+      if (nPeriods<1 || nPeriods>12) {
+        // Wrong number of periods
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<"Invalid number of periods specifed."                      <<endl
+          <<"  Number or periods specified: " <<nPeriods               <<endl
+          <<"  Valid range: 1<= nPeriods <=12"                         <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        parmError = true;
+      }
+    }
+        
+    // Get internal type 1 cost factor
+    if ( args.size()>=5 ) {
+      intType1CostFac = atof(args[4].c_str());
+      if (intType1CostFac==0.0) {
+        // invalid internal cost factor
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<"Invalid intType1CostFac specifed."                          <<endl
+          <<"  intType1CostFac specified: " <<args[4].c_str()            <<endl
+          <<"  Valid numeric range: 0<intType1CostFac"                   <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        parmError = true;
+      }
+    }  
+    
+    // Get internal type 4 cost factor
+    if ( args.size()>=6 ) {
+      intType4CostFac = atof(args[5].c_str());
+      if (intType4CostFac==0.0) {
+        // invalid internal cost factor
+        cerr 
+          <<"-------------------------------------------------------"  <<endl
+          <<"Invalid intType4CostFac specifed."                          <<endl
+          <<"  intType4CostFac specified: " <<args[5].c_str()            <<endl
+          <<"  Valid numeric range: 0<intType4CostFac"                   <<endl
+          <<"-------------------------------------------------------"  <<endl;
+        parmError = true;
+      }
+    }   
+    
+    // Get external cost factor
+    if ( args.size()>=7 ) {
+      extCostFac = atof(args[6].c_str());
+      if (extCostFac==0.0) {
+        // invalid external cost factor
+d526 78
+a603 3
+          <<"Invalid extCostFac specifed."                          <<endl
+          <<"  extCostFac specified: " <<args[6].c_str()            <<endl
+          <<"  Valid numeric range: 0<extCostFac"                   <<endl
+d605 1
+a605 1
+        parmError = true;
+a606 87
+    }
+
+    if ( parmError ) {
+      // Write correct usage
+      cerr 
+        <<"-------------------------------------------------------"  <<endl
+        <<argv[0] <<" dataDirectory nPeriods intType1CostFac intType4CostFac extCostFac" <<endl
+        <<"  where:"                                                 <<endl
+        <<"    dataDirectory:"                                       <<endl
+        <<"      Directory where input files are located and"        <<endl
+        <<"      output files are written."                          <<endl
+        /*
+        <<"      Input files are named: demand, supply, mtm, bom,"   <<endl
+        <<"      PN_rev and loosep."                                 <<endl
+        <<"      Output files are named: ECON_Parts, DEMAN_MTM"      <<endl
+        <<"      Not_Econ_Parts, Virtual_Parts."                     <<endl 
+        */
+        <<"    scenario: e1,e2,ne,vf,all"                            <<endl
+        <<"      e1 - economic 1"                                    <<endl
+        <<"      e2 - economic 2"                                    <<endl
+        <<"      ne - non-economic"                                  <<endl
+        <<"      vf - virtual forecast"                              <<endl
+        <<"      all- All scenarios"                                 <<endl
+        <<"    nPeriods:"                                            <<endl
+        <<"      Number of periods in the problem. This must be"     <<endl
+        <<"      in the range [1,12]."                               <<endl 
+        <<"    intType1CostFac:"                                     <<endl
+        <<"      internal type 1 cost factor."                       <<endl
+        <<"      The revenue associated with satisfying one unit of" <<endl
+        <<"      internal type 1 demand is (type1 rev)*intType1CostFac"   <<endl
+        <<"    intType4CostFac:"                                     <<endl
+        <<"      internal type 4 cost factor."                       <<endl
+        <<"      The revenue associated with satisfying one unit of" <<endl
+        <<"      internal type 4 demand is (type4 rev)*intType4CostFac"   <<endl
+        <<"    extCostFac:"                                          <<endl
+        <<"      external cost factor."                              <<endl
+        <<"      The revenue associated with satisfying one unit of" <<endl
+        <<"      external demand is (external rev)*extCostFac"       <<endl
+        <<"  example usage:"                                         <<endl
+        <<"    " <<argv[0] <<"e1 ../testData 1 0.5 0.4 0.8"          <<endl
+        <<"    " <<argv[0] <<"all /u/fasano/garsData 12 0.1 0.05 0.9"<<endl
+        /*
+        <<"  Output files (all comma seperated variable format)"     <<endl
+        <<"  are:"                                                   <<endl
+        <<"        ECON_Parts.csv with fields:"                      <<endl
+        <<"           pn - part name"                                <<endl
+        <<"           demand_type - Internal, External or NoSource"  <<endl
+        <<"           period - period number (first period is period"<<endl
+        <<"                    1"                                    <<endl
+        <<"           deman_qty - demanded quantity in period"       <<endl
+        <<"           econ_cov_qty - amount of deamnd_qty that can"  <<endl
+        <<"                    economically be satisfied"            <<endl
+        <<"           excessQty - "                                  <<endl
+        <<"           stockQty - "                                   <<endl
+        <<"           supply_rev - econ_cov_qty * newBuyCost"        <<endl
+        <<"        DEMAN_MTM.csv with fields:"                       <<endl
+        <<"           mtm - machine type model"                      <<endl
+        <<"           period - period number (first period is period"<<endl
+        <<"                    1"                                    <<endl
+        <<"           deman_qty - Quantity of mtm's to be"           <<endl
+        <<"                    disassembled in period to satisfy"    <<endl
+        <<"                    econ_cov_qty"                         <<endl
+        <<"        Not_Econ_Parts.csv - MTM are disassembled without"<<endl
+        <<"           regard to the MTM sale revenue."               <<endl
+        <<"           with fields:"                                  <<endl
+        <<"           pn - part name"                                <<endl
+        <<"           demand_type - Internal, External or NoSource"  <<endl
+        <<"           period - period number (first period is period"<<endl
+        <<"                    1"                                    <<endl
+        <<"           deman_qty - demanded quantity in period"       <<endl
+        <<"           not_econ_cov_qty - amount of deamnd_qty that"  <<endl
+        <<"                    can economically be satisfied"        <<endl
+        <<"           supply_rev - deman_qty * newBuyCost"           <<endl
+        <<"        Virtual_Parts.csv - These are the parts that"     <<endl
+        <<"           are available if all MTM's were disassembled," <<endl
+        <<"           with NoSource demands first satisfied."        <<endl
+        <<"           with fields:"                                  <<endl
+        <<"           pn - part name"                                <<endl
+        <<"           period - period number (first period is period"<<endl
+        <<"                    1"                                    <<endl
+        <<"           fcast_qty - number of parts that can be"       <<endl
+        <<"                    supplied"                             <<endl
+        <<"           supply_rev - fcast_qty * newBuyCost"           <<endl
+        */
+        <<"-------------------------------------------------------"  <<endl;
+      return 1;
+    }
+d623 2
+a624 30
+    print( gp, "econScen1",outputDirectory,
+      &GARSproblem::mtmSupplyQuantity,      
+      &GARSproblem::mtmAcquireQuantity,
+      &GARSproblem::mtmDismantleQuantity,
+      &GARSproblem::mtmSellWholeQuantity,
+      &GARSproblem::mtmSalePrice,
+      &GARSproblem::mtmNibPrice,
+      
+      &GARSproblem::stockVolType1,
+      &GARSproblem::stockVolType4,
+      &GARSproblem::stockVolTypeAfs,
+      &GARSproblem::stockVolType1Or4,
+      &GARSproblem::stockVolTypeAfsOr1,
+      
+      &GARSproblem::internalType1DemandQuantity,
+      &GARSproblem::internalType4DemandQuantity,
+      &GARSproblem::internalType1Or4DemandQuantity,
+      &GARSproblem::externalDemandQuantity,
+      &GARSproblem::noSourceDemandQuantity,
+      
+      &GARSproblem::internalType1Coverage,
+      &GARSproblem::internalType4Coverage,
+      &GARSproblem::internalType1Or4Coverage,
+      &GARSproblem::externalCoverage,
+      &GARSproblem::noSourceCoverage,
+      
+      &GARSproblem::type1Rev,
+      &GARSproblem::type4Rev,
+      &GARSproblem::externalRev
+      );
+d631 1
+a631 30
+    print( gp, "econScen2",outputDirectory,
+      &GARSproblem::mtmSupplyQuantity,      
+      &GARSproblem::mtmAcquireQuantity,
+      &GARSproblem::mtmDismantleQuantity,
+      &GARSproblem::mtmSellWholeQuantity,
+      &GARSproblem::mtmSalePrice,
+      &GARSproblem::mtmNibPrice,
+      
+      &GARSproblem::stockVolType1,
+      &GARSproblem::stockVolType4,
+      &GARSproblem::stockVolTypeAfs,
+      &GARSproblem::stockVolType1Or4,
+      &GARSproblem::stockVolTypeAfsOr1,
+      
+      &GARSproblem::internalType1DemandQuantity,
+      &GARSproblem::internalType4DemandQuantity,
+      &GARSproblem::internalType1Or4DemandQuantity,
+      &GARSproblem::externalDemandQuantity,
+      &GARSproblem::noSourceDemandQuantity,
+      
+      &GARSproblem::internalType1Coverage,
+      &GARSproblem::internalType4Coverage,
+      &GARSproblem::internalType1Or4Coverage,
+      &GARSproblem::externalCoverage,
+      &GARSproblem::noSourceCoverage,
+      
+      &GARSproblem::type1Rev,
+      &GARSproblem::type4Rev,
+      &GARSproblem::externalRev
+      );
+d638 1
+a638 30
+    print( gp, "nonEcon",outputDirectory,
+      &GARSproblem::mtmSupplyQuantity,      
+      &GARSproblem::mtmAcquireQuantity,
+      &GARSproblem::mtmDismantleQuantity,
+      &GARSproblem::mtmSellWholeQuantity,
+      &GARSproblem::mtmSalePrice,
+      &GARSproblem::mtmNibPrice,
+      
+      &GARSproblem::stockVolType1,
+      &GARSproblem::stockVolType4,
+      &GARSproblem::stockVolTypeAfs,
+      &GARSproblem::stockVolType1Or4,
+      &GARSproblem::stockVolTypeAfsOr1,
+      
+      &GARSproblem::internalType1DemandQuantity,
+      &GARSproblem::internalType4DemandQuantity,
+      &GARSproblem::internalType1Or4DemandQuantity,
+      &GARSproblem::externalDemandQuantity,
+      &GARSproblem::noSourceDemandQuantity,
+      
+      &GARSproblem::internalType1Coverage,
+      &GARSproblem::internalType4Coverage,
+      &GARSproblem::internalType1Or4Coverage,
+      &GARSproblem::externalCoverage,
+      &GARSproblem::noSourceCoverage,
+      
+      &GARSproblem::type1Rev,
+      &GARSproblem::type4Rev,
+      &GARSproblem::externalRev
+      );
+d645 1
+a645 30
+    print( gp, "virFcst",outputDirectory,
+      &GARSproblem::mtmSupplyQuantity,      
+      &GARSproblem::mtmAcquireQuantity,
+      &GARSproblem::mtmDismantleQuantity,
+      &GARSproblem::mtmSellWholeQuantity,
+      &GARSproblem::mtmSalePrice,
+      &GARSproblem::mtmNibPrice,
+      
+      &GARSproblem::stockVolType1,
+      &GARSproblem::stockVolType4,
+      &GARSproblem::stockVolTypeAfs,
+      &GARSproblem::stockVolType1Or4,
+      &GARSproblem::stockVolTypeAfsOr1,
+      
+      &GARSproblem::internalType1DemandQuantity,
+      &GARSproblem::internalType4DemandQuantity,
+      &GARSproblem::internalType1Or4DemandQuantity,
+      &GARSproblem::externalDemandQuantity,
+      &GARSproblem::noSourceDemandQuantity,
+      
+      &GARSproblem::internalType1Coverage,
+      &GARSproblem::internalType4Coverage,
+      &GARSproblem::internalType1Or4Coverage,
+      &GARSproblem::externalCoverage,
+      &GARSproblem::noSourceCoverage,
+      
+      &GARSproblem::type1Rev,
+      &GARSproblem::type4Rev,
+      &GARSproblem::externalRev
+      );
+d648 3
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@a9 1
+//#include <wit.h>
+d18 149
+a166 2
+// Function Prototypes. Function definitions is in this file.
+void testingMessage( const char * const msg );
+d170 184
+d363 10
+a372 1
+  int nPeriods = 1;  // set default
+d384 1
+a384 1
+      if ( !(args.size()==2 || args.size()==3 )) {
+d390 1
+a390 1
+          <<"  Expected number of parameters: 1 or 2"                  <<endl
+d396 36
+a431 3
+    // Get optional number of periods
+    if ( args.size()>=3 ) {
+      nPeriods = atoi(args[2].c_str());
+d443 15
+d459 30
+d493 1
+a493 1
+        <<argv[0] <<" dataDirectory nPeriods"                        <<endl
+d498 1
+d500 1
+a500 1
+        <<"      and loosep"                                         <<endl
+d503 8
+a510 1
+        <<"    nPeriods: (optional with default 1)"                  <<endl
+d512 13
+a524 1
+        <<"      in the range [1,12]."                               <<endl
+d526 3
+a528 2
+        <<"    " <<argv[0] <<" ../testData"                          <<endl
+        <<"    " <<argv[0] <<" /u/fasano/garsData 12"                <<endl
+d539 2
+d570 1
+d576 1
+d578 44
+a621 3
+  gp.readFiles(nPeriods,args[1]);
+  gp.solve();
+  //gp.writeResults(args[1]);
+d623 72
+a694 137
+  // Write Results
+  {
+    std::string outputDirectory=args[1];
+    std::string econPartsFileName = outputDirectory + "/ECON_Parts.csv";
+    std::string demanMtmFileName = outputDirectory + "/DEMAN_MTM.csv";
+    std::string nonEconPartsFileName = outputDirectory + "/Not_Econ_Parts.csv";
+    std::string virtualPartsFileName = outputDirectory + "/Virtual_Parts.csv";
+    
+    std::string econPartsFileHeadings="\"pn\",\"demand_type\",\"period\",\"deman_qty\",\"econ_cov_qty\",\"supply_rev\"";
+    std::string demanMtmFileHeadings="\"mtm\",\"period\",\"deman_qty\"";
+    std::string nonEconPartsFileHeadings="\"pn\",\"demand_type\",\"period\",\"deman_qty\",\"not_econ_cov_qty\",\"supply_rev\"";
+    std::string virtualPartsFileHeadings="\"pn\",\"period\",\"fcast_qty\",\"supply_rev\"";
+    
+    // Write econ_parts file
+    {
+      // Open and write heading
+      FILE * filePtr = fopen(econPartsFileName.c_str(),"w");
+      fprintf(filePtr,"%s\n",econPartsFileHeadings.c_str() );
+      
+      // Get list of parts
+      const std::vector<std::string> & pns = gp.partNames();
+      
+      // loop once for each part
+      for ( int p=0; p<pns.size(); ++p ) {
+        
+        // Get parts new cost
+        double nc = gp.newCost(pns[p]);
+        
+        // Get econmic coverage of part
+        const std::vector<float> & intCov = gp.internalEconomicCoverage(pns[p]);
+        const std::vector<float> & extCov = gp.externalEconomicCoverage(pns[p]);
+        const std::vector<float> & noSrcCov = gp.noSourceEconomicCoverage(pns[p]);
+        
+        // Get the demand quantity
+        const std::vector<float> & intDemQty = gp.internalDemandQuantity(pns[p]);
+        const std::vector<float> & extDemQty = gp.externalDemandQuantity(pns[p]);
+        const std::vector<float> & noSrcDemQty = gp.noSourceDemandQuantity(pns[p]);
+        
+        // Write internal demand info
+        int i;
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( intDemQty[i]==0 && intCov[i]==0 ) continue;
+          float rev = intCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "Internal", i+1, intDemQty[i], intCov[i], rev );
+        }
+        // Write external demand info
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( extDemQty[i]==0 && extCov[i]==0 ) continue;
+          float rev = extCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "External", i+1, extDemQty[i], extCov[i], rev );
+        }
+        // Write noSource demand info
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( noSrcDemQty[i]==0 && noSrcCov[i]==0 ) continue;
+          float rev = noSrcCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "NoSource", i+1, noSrcDemQty[i], noSrcCov[i], rev );
+        }
+      }
+    }
+    
+    // Write non_econ_parts file
+    {
+      // Open and write heading
+      FILE * filePtr = fopen(nonEconPartsFileName.c_str(),"w");
+      fprintf(filePtr,"%s\n",nonEconPartsFileHeadings.c_str() );
+      
+      // Get list of parts
+      const std::vector<std::string> & pns = gp.partNames();
+      
+      // loop once for each part
+      for ( int p=0; p<pns.size(); ++p ) {
+        
+        // Get parts new cost
+        double nc = gp.newCost(pns[p]);
+        
+        // Get econmic coverage of part
+        const std::vector<float> & intCov = gp.internalNonEconomicCoverage(pns[p]);
+        const std::vector<float> & extCov = gp.externalNonEconomicCoverage(pns[p]);
+        const std::vector<float> & noSrcCov = gp.noSourceNonEconomicCoverage(pns[p]);
+        
+        // Get the demand quantity
+        const std::vector<float> & intDemQty = gp.internalDemandQuantity(pns[p]);
+        const std::vector<float> & extDemQty = gp.externalDemandQuantity(pns[p]);
+        const std::vector<float> & noSrcDemQty = gp.noSourceDemandQuantity(pns[p]);
+        
+        // Write internal demand info
+        int i;
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( intDemQty[i]==0 && intCov[i]==0 ) continue;
+          float rev = intCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "Internal", i+1, intDemQty[i], intCov[i], rev );
+        }
+        // Write external demand info
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( extDemQty[i]==0 && extCov[i]==0 ) continue;
+          float rev = extCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "External", i+1, extDemQty[i], extCov[i], rev );
+        }
+        // Write noSource demand info
+        for ( i=0; i<nPeriods; ++i ) {
+          if ( noSrcDemQty[i]==0 && noSrcCov[i]==0 ) continue;
+          float rev = noSrcCov[i] * nc;
+          fprintf(filePtr,"\"%s\",\"%s\",%d,%f,%f,%f\n",
+            pns[p].c_str(), "NoSource", i+1, noSrcDemQty[i], noSrcCov[i], rev );
+        }
+      }
+    }
+
+          
+    // Write MTM demand to satisfy EconCovered Parts
+    {
+      FILE * disassembleFilePtr = fopen(demanMtmFileName.c_str(),"w");
+      fprintf(disassembleFilePtr,"%s\n",demanMtmFileHeadings.c_str());
+      
+      const std::vector<std::string> & mtms = gp.machineTypeModelNames();
+      
+      for ( int m=0; m<mtms.size(); ++m ) {
+        
+        // Get number of MTM's to be disassembled to satisfy economic 
+        // solution.
+        const std::vector<float> & mtmDem = gp.mtmDemandQuantity(mtms[m]);
+        int mtmDemSize = mtmDem.size();
+        
+        for ( int i=0; i<mtmDemSize; ++i ) {
+          if ( mtmDem[i]==0 ) continue;
+          fprintf(disassembleFilePtr, "\"%s\",%d,%f\n",
+            mtms[m].c_str(), i+1, mtmDem[i] );
+        }
+      }
+      fclose(disassembleFilePtr);
+    }
+
+d696 32
+a727 166
+    // Write Virtual Forecast Report
+    {
+      std::string fileName = virtualPartsFileName;
+      FILE * filePtr = fopen(fileName.c_str(),"w");
+      fprintf(filePtr,"%s\n",virtualPartsFileHeadings.c_str());
+      
+      // Get list of parts
+      const std::vector<std::string> & pns = gp.partNames();
+      
+      // loop once for each part
+      for ( int p=0; p<pns.size(); ++p ) {
+        
+        // Get Forecast quantity
+        // This the number of parts that would be available if all MTM's were disassembled
+        std::vector<float> fq = gp.virtualForecastQuantity(pns[p]);
+        
+        // Get part's new cost
+        double nc = gp.newCost(pns[p]);
+        
+        for ( int i=0; i<fq.size(); ++i ) {
+          float rev = fq[i] * nc;
+          fprintf(filePtr,"\"%s\",%d,%f,%f\n",
+            pns[p].c_str(), i+1, fq[i], rev );
+        }
+      }
+      fclose(filePtr);
+    }
+
+    // consolidated report in 1 file
+    
+    std::string consolidatedReportFileName = outputDirectory + "/consolidatedReport.csv";
+    std::string consolidatedReportFileHeadings1=
+      "\"pn\",\"period\",\"virForQty\",\"intDemQty\",\"extDemQty\",\"nsrcDemQty\",\"intNEcCov\",\"extNEcCov\",\"nsrcNEcCov\",\"intEcCov\",\"extEcCov\",\"nsrcEcCov\",\"virForRev\",\"intDemRev\",\"extDemRev\",\"nsrcDemRev\",\"intNEcCovRev\",\"extNEcCovRev\",\"nsrcNEcCovRev\",\"intEcCovRev\",\"extEcCovRev\",\"nsrcEcCovRev\"";
+    std::string consolidatedReportFileHeadings2=
+      "\"mtm\",\"period\",\"supplyQty\",\"demanQty\"";
+ 
+    {
+      
+      std::string fileName = consolidatedReportFileName;
+      FILE * filePtr = fopen(fileName.c_str(),"w");
+      fprintf(filePtr,"%s\n",consolidatedReportFileHeadings1.c_str());
+      
+      // Get list of parts
+      const std::vector<std::string> & pns = gp.partNames();
+      // loop once for each part
+      for ( int p=0; p<pns.size(); ++p ) {
+        
+        // Get Wit derived attributes of a part
+        const std::vector<float> &   intEcCov = gp.internalEconomicCoverage( pns[p] ); 
+        const std::vector<float> &   extEcCov = gp.externalEconomicCoverage( pns[p] );  
+        const std::vector<float> &  nsrcEcCov = gp.noSourceEconomicCoverage( pns[p] ); 
+        const std::vector<float> &  intNEcCov = gp.internalNonEconomicCoverage( pns[p] ); 
+        const std::vector<float> &  extNEcCov = gp.externalNonEconomicCoverage( pns[p] );  
+        const std::vector<float> & nsrcNEcCov = gp.noSourceNonEconomicCoverage( pns[p] );   
+        const std::vector<float> &  virForQty = gp.virtualForecastQuantity( pns[p] );
+ 
+
+        // Get input attributes of a part
+        const std::vector<float> & intDemQty  = gp.internalDemandQuantity( pns[p] ); 
+        const std::vector<float> & extDemQty  = gp.externalDemandQuantity( pns[p] );  
+        const std::vector<float> & nsrcDemQty = gp.noSourceDemandQuantity( pns[p] ); 
+        double nc = gp.newCost(pns[p]);
+
+                 
+        fprintf(filePtr,
+        "assert( eq(%f,gp.newCost(\"%s\")) );\n",
+                       gp.newCost(pns[p]),
+                       pns[p].c_str());
+
+        
+        // Loop once for each period in problem
+        for ( int i=0; i<nPeriods; ++i ) {
+                 
+        fprintf(filePtr,
+        "assert( eq(%f,gp.internalEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.internalEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );                 
+        fprintf(filePtr,
+        "assert( eq(%f,gp.externalEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.externalEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );                 
+        fprintf(filePtr,
+        "assert( eq(%f,gp.noSourceEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.noSourceEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );                 
+        fprintf(filePtr,
+        "assert( eq(%f,gp.internalNonEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.internalNonEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );             
+        fprintf(filePtr,
+        "assert( eq(%f,gp.externalNonEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.externalNonEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );             
+        fprintf(filePtr,
+        "assert( eq(%f,gp.noSourceNonEconomicCoverage(\"%s\")[%d]) );\n",
+                       gp.noSourceNonEconomicCoverage(pns[p])[i], pns[p].c_str(), i  );            
+        fprintf(filePtr,
+        "assert( eq(%f,gp.virtualForecastQuantity(\"%s\")[%d]) );\n",
+                       gp.virtualForecastQuantity(pns[p])[i], pns[p].c_str(), i  );           
+        fprintf(filePtr,
+        "assert( eq(%f,gp.internalDemandQuantity(\"%s\")[%d]) );\n",
+                       gp.internalDemandQuantity(pns[p])[i], pns[p].c_str(), i  );          
+        fprintf(filePtr,
+        "assert( eq(%f,gp.externalDemandQuantity(\"%s\")[%d]) );\n",
+                       gp.externalDemandQuantity(pns[p])[i], pns[p].c_str(), i  );          
+        fprintf(filePtr,
+        "assert( eq(%f,gp.noSourceDemandQuantity(\"%s\")[%d]) );\n",
+                       gp.noSourceDemandQuantity(pns[p])[i], pns[p].c_str(), i  );
+
+
+
+
+          // compute revenue associated with each qty and coverage
+          double   intEcCovRev =   intEcCov[i]*nc;
+          double   extEcCovRev =   extEcCov[i]*nc;
+          double  nsrcEcCovRev =  nsrcEcCov[i]*nc;
+          double  intNEcCovRev =  intNEcCov[i]*nc;
+          double  extNEcCovRev =  extNEcCov[i]*nc;
+          double nsrcNEcCovRev = nsrcNEcCov[i]*nc;
+          double     virForRev =  virForQty[i]*nc;
+          double     intDemRev =  intDemQty[i]*nc;
+          double     extDemRev =  extDemQty[i]*nc;
+          double    nsrcDemRev = nsrcDemQty[i]*nc;
+#if 0
+          fprintf(filePtr,"\"%s\",%d, %f, %f,%f,%f, %f,%f,%f, %f,%f,%f, %f, %f,%f,%f, %f,%f,%f, %f,%f,%f\n",
+            pns[p].c_str(), i+1, 
+            virForQty[i],
+            intDemQty[i],
+            extDemQty[i],
+            nsrcDemQty[i],
+            intNEcCov[i],
+            extNEcCov[i],
+            nsrcNEcCov[i],
+            intEcCov[i],
+            extEcCov[i],
+            nsrcEcCov[i],
+            virForRev,
+            intDemRev,
+            extDemRev,
+            nsrcDemRev,
+            intNEcCovRev,
+            extNEcCovRev,
+            nsrcNEcCovRev,
+            intEcCovRev,
+            extEcCovRev,
+            nsrcEcCovRev
+            );
+#endif
+          
+        }
+      }
+      
+      // Write MTM data
+      fprintf(filePtr,"%s\n",consolidatedReportFileHeadings2.c_str());
+      // Get list of mtms
+      const std::vector<std::string> & mtms = gp.machineTypeModelNames();
+      // loop once for each mtm
+      for ( int m=0; m<mtms.size(); ++m ) {
+        
+        // Get Wit derived attributes of an mtm
+        std::vector<float>   mtmSupQty = gp.mtmSupplyQuantity( mtms[m] ); 
+        const std::vector<float> &   mtmDemQty = gp.mtmDemandQuantity( mtms[m] ); 
+
+        int mtmDemQtySize = mtmDemQty.size();
+        for ( int i=0; i<mtmDemQtySize; ++i ) {
+          fprintf(filePtr, "\"%s\",%d,%f,%f\n",
+            mtms[m].c_str(), i+1, mtmSupQty[i], mtmDemQty[i] );
+        }
+      }
+      fclose(filePtr);
+    }
+d729 1
+a733 7
+// Display message on stdout and stderr
+void testingMessage( const char * const msg )
+{
+  cerr <<msg;
+  //cout <<endl <<"*****************************************"
+  //     <<endl <<msg <<endl;
+}
+@
+
+
+1.1.1.1
+log
+@Gars
+@
+text
+@@

@@ -1,0 +1,177 @@
+head	1.1;
+access;
+symbols
+	beforeTiersAdded:1.1;
+locks; strict;
+comment	@// @;
+
+
+1.1
+date	2002.04.09.15.41.54;	author barahon;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@I added code to set up a MIP model and solve it with OSL.
+@
+text
+@#include <fstream.h>
+#include <list>
+#include <string>
+#include <vector>
+#include <map>
+//#include <hash_map.h>
+#include "VOL_vector.h"
+#include "lp.h"
+
+Lp::Lp() : mrow(), mcstrt(),
+  dels(), dcost(), dloc(), dupc(), dlor(), dupr(), intnums()
+{
+    ncols=0;
+    nints=0;
+    nrows=0;
+}
+//
+
+//
+void Lp::addcol(double cost, double lb, double ub){
+    dc.push_back(cost);
+    dl.push_back(lb);
+    du.push_back(ub);
+    std::vector<std::pair<int,double> > aux;
+    col.push_back(aux);
+    std::map<const int, int> aux1;
+    count.push_back(aux1);
+    ++ncols;
+}
+void Lp::intcol(int j){
+  intn.push_back(j);
+  ++nints;
+}
+void Lp::addel(int row, int column, double el){
+  if ( el == 0.0 ) return;
+  if( row < 0 ){
+    cout << " error in addel " << row << " " << nrows << endl;
+    abort();
+  }
+  if ( column < 0 || column >= ncols ){
+    cout << " error in addel " << column << " " << ncols << endl;
+    abort();
+  }  
+  if ( count[column][row] == 0 ){
+      std::pair<int,double> p;
+      p.first=row;
+      p.second=el;
+      col[column].push_back(p);
+      count[column][row]=col[column].size();
+  }
+  else {
+      cout << " duplicated element " << endl;
+      abort();
+  }
+}
+void Lp::rhs(int row, double lb, double ub){
+  lor.push_back(lb);
+  upr.push_back(ub);
+  if ( lor.size() != row+1 ){
+    cout << " error in rhs1 " << endl;
+    abort();
+  }
+  ++nrows;
+}
+void Lp::finish_up(){
+  typedef std::vector<std::pair<int,double> >::iterator LI;
+  int i,j;
+  double xx;
+  nels=0;
+  int num=0;
+  for (j=0; j<ncols; ++j) num+=col[j].size();
+  dels.allocate(num);
+  mrow.allocate(num);
+  mcstrt.allocate(ncols+1);
+  for (j=0; j<ncols; ++j){
+      mcstrt[j]=nels;
+      for ( LI ii=col[j].begin(); ii!=col[j].end(); ++ii ){
+	  i=(*ii).first;
+	  xx=(*ii).second;
+	  mrow[nels]=i;
+	  dels[nels++]=xx;
+      }
+  }
+  mcstrt[ncols]=nels;
+  //
+  col.resize(0);
+  std::vector<std::vector<std::pair<int,double> > > tmp1=col;
+  col.swap(tmp1);
+  //
+  count.resize(0);
+  std::vector<std::map<const int, int > > tt=count;
+  count.swap(tt);
+  //
+  dcost.allocate(ncols);
+  dloc.allocate(ncols);
+  dupc.allocate(ncols);
+  for ( i=0; i<ncols; ++i){
+      dcost[i]=dc[i];
+      dloc[i]=dl[i];
+      dupc[i]=du[i];
+  }
+  dc.resize(0);
+  std::vector<double> tmp2=dc;
+  dc.swap(tmp2); 
+  dl.resize(0);
+  std::vector<double> tmp3=dl;
+  dl.swap(tmp3); 
+  du.resize(0);
+  std::vector<double> tmp4=du;
+  du.swap(tmp4);
+  dlor.allocate(nrows);
+  dupr.allocate(nrows);
+  for ( i=0; i<nrows; ++i ){
+      dlor[i]=lor[i];
+      dupr[i]=upr[i];
+  }
+  lor.resize(0);
+  std::vector<double> tmp5=lor;
+  lor.swap(tmp5);
+  upr.resize(0);
+  std::vector<double> tmp6=upr;
+  upr.swap(tmp6);
+  //
+  intnums.allocate(nints);
+  for ( i=0; i<nints; ++i ){
+      intnums[i]=intn[i];
+  }
+  intn.resize(0);
+  std::vector<int> tmp7=intn;
+  intn.swap(tmp7);
+  // Fortran indexing
+  //  for (i=0; i < nels; i++) mrow[i]++;
+  //for (i=0; i < nints; i++) intnums[i]++;
+  //for (i=0; i <= ncols; i++) mcstrt[i]++;
+  //
+
+}
+
+void Lp::outp(){
+  int j;
+  ofstream file("data.lp");
+  file << ncols << " " << nrows << " " << nels << endl;
+  for (j=0; j< ncols ; j++) file << j << " " 
+				 << dcost[j] << " "
+				 << dloc[j] << " " << dupc[j] << endl;
+  for (j=0; j<nrows ; j++) file << j << " " << dlor[j] << " " 
+				<< dupr[j] << endl;  
+  for (j=0; j<nels ; j++) {
+    file << dels[j] << " " << mrow[j] << " ";
+    if ( j/10*10==j ) file << endl;
+  }
+  for (j=0; j<=ncols ; j++) file << mcstrt[j] << endl;
+}
+@

@@ -1,0 +1,710 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2002.04.12.21.02.05;	author rjw;	state dead;
+branches;
+next	1.1;
+
+1.1
+date	2002.04.11.15.36.31;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "SplitMgr1.C"
+//
+// Contains the implementation of class SplitMgr.
+//------------------------------------------------------------------------------
+
+#include <SplitMgr1.h>
+#include <Selector.h>
+#include <SelMgr.h>
+#include <SelCand.h>
+#include <SelPt.h>
+#include <Splitter.h>
+#include <SplitCntr.h>
+#include <SplitPt.h>
+#include <ExpRest.h>
+#include <RtAn.h>
+#include <PmrMgr.h>
+#include <CmrMgr.h>
+#include <HeurAtor.h>
+#include <PairStack.h>
+#include <Archive.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class SplitMgr.
+//------------------------------------------------------------------------------
+
+WitSplitMgr::WitSplitMgr (WitSelector * theSelector):
+      WitProbAssoc  (theSelector),
+
+      mySelector_   (theSelector),
+      mySplitter_   (theSelector->mySplitter ()),
+      myExpRest_    (NULL),
+      myRtAnalyzer_ (NULL),
+      penExec_      (witFALSE),
+      zeroPts_      (myProblem ()),
+      nBSsDone_     (0),
+      nBSsSkipped_  (0),
+      nBatches_     (0)
+   {
+   stronglyAssert (mySelector_->selSplit ());
+
+   penExec_ = mySelector_->penExec ();
+
+   if (penExec_)
+      {
+      if (! myGlobalComp ()->allowSSPE ())
+         myMsgFac () ("ssPeNotAllowedSMsg");
+
+      myExpRest_    = theSelector->myExpRest ();
+      myRtAnalyzer_ = theSelector->myRtAnalyzer ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitSplitMgr::~WitSplitMgr ()
+   {
+   if (myGlobalComp ()->selPrintLevel () >= 1)
+      fprintf (msgFile (), 
+         "# SS BS's Done:         %7d\n"
+         "# SS BS's Skipped:      %7d\n"
+         "# Split Batches:        %7d\n",
+         nBSsDone_,
+         nBSsSkipped_,
+         nBatches_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::commitMaxQty (double & netQty)
+   {
+   WitBoolean scNeeded;
+   WitBoolean unresFound;
+   WitSelPt * theSelPt;
+
+   while (witTRUE)
+      {
+      mySelector_->failResAlt_ = witFALSE;
+
+      if (penExec_)
+         myRtAnalyzer ()->modifyRouting ();
+
+      mySplitter_->startFlowMon ();
+
+      mySelector_->myHeurAtor ()->commitMaxQtySel (netQty);
+
+      if ((netQty <= 0.0) || ! resAltOrRest ())
+         {
+         mySplitter_->finishFlowMon ();
+
+         break;
+         }
+
+      scNeeded = splitCommitNeeded ();
+      
+      mySplitter_->finishFlowMon ();
+
+      if (scNeeded)
+         if (! mySelector_->myHeurAtor ()->failedOn1 ())
+            if (mySelector_->myHeurAtor ()->tempCommit (1.0))
+               scNeeded = witFALSE;
+
+      if (scNeeded)
+         {
+         splitCommit (unresFound);
+
+         if (unresFound)
+            break;
+         }
+      else
+         {
+         if (penExec_)
+            myExpRest ()->updatePsSup ();
+
+         if (mySelector_->getPendingPt (theSelPt))
+            mySelector_->alterSelection (theSelPt);
+         }
+      }
+
+   if (penExec_)
+      myExpRest ()->updatePsSup ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::splitCommitNeeded ()
+   {
+   WitSelPt * theSelPt;
+   double     flowGap;
+
+   WitObjStack <WitSelPt> chgSelPts (myProblem ());
+
+   findHypoChanges (chgSelPts);
+
+   while (chgSelPts.pop (theSelPt))
+      if (mySplitter_->splitIsNeeded (theSelPt, witTRUE, flowGap))
+         return witTRUE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::splitCommit (WitBoolean & unresFound)
+   {
+   int         nItrs;
+   WitBoolean  tcOK;
+   WitBoolean  splitFound;
+   WitSelPt *  theSelPt;
+   WitSelMgr * theSelMgr;
+
+   unresFound = witFALSE;
+   nItrs      = 0;
+   tcOK       = witFALSE;
+
+   mySplitter_->splitCommActive_ = witTRUE;
+
+   mySplitter_->mySplitCntr_->initCurSplits ();
+
+   while (! tcOK)
+      {
+      nItrs ++;
+
+      if (nItrs > myGlobalComp ()->splitItrUB ())
+         break;
+
+      buildZeroPts (unresFound, splitFound);
+
+      if (unresFound)
+         break;
+
+      if (splitFound)
+         splitSels ();
+
+      clearSplitItr ();
+
+      stronglyAssert (resAltOrRest ());
+
+      if (mySelector_->getPendingPt (theSelPt))
+         mySelector_->alterSelection (theSelPt);
+
+      if (penExec_)
+         {
+         myExpRest ()   ->updatePsSup ();
+
+         myRtAnalyzer ()->modifyRouting ();
+         }
+
+      tcOK = mySelector_->myHeurAtor ()->tempCommit (1.0);
+      }
+
+   if (tcOK)
+      mySelector_->myHeurAtor ()->permCommit1SS ();
+
+   mySplitter_->mySplitCntr_->countSplits (tcOK);
+
+   mySplitter_->splitCommActive_ = witFALSE;
+
+   forEachEl (theSelMgr, mySelector_->mySelMgrs ())
+      theSelMgr->postSplitCommit ();
+
+   deleteContents (mySplitter_->mySplitPts_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::buildZeroPts (
+      WitBoolean & unresFound, 
+      WitBoolean & splitFound)
+   {
+   WitBoolean addedZeroPts;
+
+   stronglyAssert (zeroPts_.isEmpty ());
+
+   unresFound = witFALSE;
+   splitFound = witFALSE;
+
+   while (! splitFound)
+      {
+      unresFound = ! resAltOrRest ();
+
+      if (unresFound)
+         {
+         clearSplitItr ();
+
+         return;
+         }
+
+      addedZeroPts = addChgPtsToZeroPts ();
+
+      if (! addedZeroPts)
+         return;
+
+      splitFound = tempCommDiscZeroPts ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::clearSplitItr ()
+   {
+   WitObjStack <WitSplitPt> revSplitPts (myProblem ());
+   WitSplitPt *             theSplitPt;
+
+   zeroPts_.clear ();
+
+   mySplitter_->mySplitPts_.revCopyInto (revSplitPts);
+
+   mySplitter_->mySplitPts_.clear ();
+
+   while (revSplitPts.pop (theSplitPt))
+      if (theSplitPt->revSplitList_.isEmpty ())
+         delete theSplitPt;
+      else
+         mySplitter_->mySplitPts_.push (theSplitPt);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::addChgPtsToZeroPts ()
+   {
+   WitBoolean addedZeroPts;
+   WitSelPt * theSelPt;
+
+   WitObjStack <WitSelPt> chgSelPts (myProblem ());
+
+   addedZeroPts = witFALSE;
+
+   findHypoChanges (chgSelPts);
+
+   while (chgSelPts.pop (theSelPt))
+      {
+      if (! theSelPt->isSplit ())
+         mySplitter_->mySplitPts_.push (new WitSplitPt (mySelector_, theSelPt));
+
+      else if (zeroPts_.contains (theSelPt->mySplitPt ()))
+         continue;
+
+      zeroPts_.push (theSelPt->mySplitPt ());
+
+      addedZeroPts = witTRUE;
+      }
+
+   return addedZeroPts;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::splitSels ()
+   {
+   WitBoolean   success;
+   WitSplitPt * searchPt;
+   WitBoolean   splitNeeded;
+   double       flowGap;
+   double       splitBound;
+
+   mySplitter_->startFlowMon ();
+
+   success = witTRUE;
+
+   while (success)
+      {
+      stronglyAssert (! zeroPts_.isEmpty ());
+
+      searchPt = findLowestZeroPt ();
+
+      zeroPts_.remove (searchPt);
+
+      success = tempCommDiscZeroPts ();
+      }
+
+   splitNeeded =
+      mySplitter_->splitIsNeeded (searchPt->mySelPt_, witFALSE, flowGap);
+
+   if (splitNeeded)
+      splitBound = findSplitBound (searchPt, flowGap);
+   else
+      splitBound = 0.0;
+
+   if (resAltOrRest ())
+      splitChgPts (searchPt, splitBound);
+   else
+      {
+      success = mySelector_->myHeurAtor ()->tempCommit (1.0);
+
+      stronglyAssert (! success);
+      }
+
+   mySplitter_->finishFlowMon ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::resAltOrRest ()
+   {
+   if (mySelector_->failResAlt_)
+      return witTRUE;
+
+   else if (penExec_)
+      return myExpRest () ->failRestShortOnly ();
+
+   else
+      return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+WitSplitPt * WitSplitMgr::findLowestZeroPt ()
+   {
+   WitSplitPt * lowZeroPt;
+   WitSplitPt * theZeroPt;
+
+   WitObjStItr <WitSplitPt> theItr;
+
+   lowZeroPt = NULL;
+
+   theItr.attachTo (zeroPts_);
+
+   while (theItr.advance (theZeroPt))
+      if ((lowZeroPt == NULL) || firstIsLower (theZeroPt, lowZeroPt))
+         lowZeroPt = theZeroPt;
+
+   stronglyAssert (lowZeroPt != NULL);
+
+   return lowZeroPt;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::firstIsLower (
+      WitSplitPt * theSplitPt1,
+      WitSplitPt * theSplitPt2)
+   {
+   WitPart * thePart1;
+   int       caseIdx1;
+   WitPeriod thePer1;
+
+   WitPart * thePart2;
+   int       caseIdx2;
+   WitPeriod thePer2;
+
+   witAssert (theSplitPt1 != NULL);
+   witAssert (theSplitPt2 != NULL);
+
+   theSplitPt1->mySelPt_->getSortData (thePart1, caseIdx1, thePer1);
+   theSplitPt2->mySelPt_->getSortData (thePart2, caseIdx2, thePer2);
+
+   if (thePart1->sortedPartIndex () < thePart2->sortedPartIndex ())
+      return witTRUE;
+
+   if (thePart1->sortedPartIndex () > thePart2->sortedPartIndex ())
+      return witFALSE;
+
+   if (caseIdx1 < caseIdx2)
+      return witTRUE;
+
+   if (caseIdx1 > caseIdx2)
+      return witFALSE;
+
+   if (thePer1 > thePer2)
+      return witTRUE;
+
+   if (thePer1 < thePer2)
+      return witFALSE;
+
+   return witFALSE;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSplitMgr::findSplitBound (WitSplitPt * searchPt, double theFlowVol)
+   {
+   WitBoolean success;
+   double     splitBound;
+
+   success = tempCommForSearch (searchPt, mySplitter_->splitRes_);
+
+   if (success)
+      splitBound = binarySearch (searchPt, theFlowVol);
+   else
+      {
+      nBSsSkipped_ ++;
+
+      splitBound = 0.0;
+      }
+
+   return splitBound;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitSplitMgr::binarySearch (WitSplitPt * searchPt, double theFlowVol)
+   {
+   int        upperGP;
+   int        lowerGP;
+   int        midGP;
+   WitBoolean success;
+
+   nBSsDone_ ++;
+
+   lowerGP  = 1;
+   upperGP  = ceil (theFlowVol / mySplitter_->splitRes_);
+
+   stronglyAssert (upperGP >= 2);
+
+   while (upperGP - lowerGP > 1)
+      {
+      midGP   = (lowerGP + upperGP) / 2;
+
+      success = tempCommForSearch (searchPt, midGP * mySplitter_->splitRes_);
+
+      if (success)
+         lowerGP = midGP;
+      else
+         upperGP = midGP;
+      }
+
+   return (lowerGP * mySplitter_->splitRes_);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::tempCommForSearch (
+      WitSplitPt * searchPt, 
+      double       searchVol)
+   {
+   WitBoolean success;
+
+   stronglyAssert (searchVol >= 0.0);
+
+   stronglyAssert (searchPt->netSearchVol_ < -0.5);
+
+   searchPt->netSearchVol_ = searchVol;
+
+   success                 = tempCommDiscZeroPts ();
+
+   searchPt->netSearchVol_ = -1.0;
+
+   return success;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitSplitMgr::tempCommDiscZeroPts ()
+   {
+   WitObjStItr <WitSplitPt> theItr;
+   WitSplitPt *             theZeroPt;
+   WitBoolean               success;
+
+   theItr.attachTo (zeroPts_);
+
+   while (theItr.advance (theZeroPt))
+      {
+      stronglyAssert (theZeroPt->netSearchVol_ < -0.5);
+
+      theZeroPt->netSearchVol_ = 0.0;
+      }
+
+   success = mySelector_->myHeurAtor ()->tempCommit (1.0);
+
+   theItr.attachTo (zeroPts_);
+
+   while (theItr.advance (theZeroPt))
+      theZeroPt->netSearchVol_ = -1.0;
+
+   return success;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::splitChgPts (WitSplitPt * searchPt, double splitBound)
+   {
+   WitSplitPt * theSplitPt;
+
+   WitObjStack <WitSplitPt> chgSplitPts (myProblem ());
+   WitObjStItr <WitSplitPt> theItr;
+
+   nBatches_ ++;
+
+   findChgSplitPts (chgSplitPts);
+
+   theItr.attachTo (chgSplitPts);
+
+   while (theItr.advance (theSplitPt))
+      {
+      stronglyAssert (theSplitPt->totFlowVol_ < -0.5);
+
+      theSplitPt->totFlowVol_ = 0.0;
+      }
+
+   compChgPtFlowVols ();
+
+   theItr.attachTo (chgSplitPts);
+
+   while (theItr.advance (theSplitPt))
+      {
+      if (theSplitPt->totFlowVol_ > NET_TOL)
+         {
+         theSplitPt->splitSelection (theSplitPt->totFlowVol_);
+
+         mySplitter_->mySplitCntr_->countCurSplits ();
+         }
+
+      theSplitPt->totFlowVol_ = -1.0;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::findChgSplitPts (WitObjStack <WitSplitPt> & chgSplitPts)
+   {
+   WitSelPt * theSelPt;
+
+   WitObjStack <WitSelPt> chgSelPts (myProblem ());
+
+   findHypoChanges (chgSelPts);
+
+   while (chgSelPts.pop (theSelPt))
+      {
+      if (! theSelPt->isSplit ())
+         mySplitter_->mySplitPts_.push (new WitSplitPt (mySelector_, theSelPt));
+
+      chgSplitPts.push (theSelPt->mySplitPt ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::findHypoChanges (WitObjStack <WitSelPt> & chgSelPts)
+   {
+   if (penExec_)
+      findHypoChangesPE (chgSelPts);
+   else
+      {
+      chgSelPts.clear ();
+
+      if (! mySelector_->pendingPts_.isEmpty ())
+         chgSelPts.push (mySelector_->pendingPts_.firstObject ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::findHypoChangesPE (WitObjStack <WitSelPt> & chgSelPts)
+   {
+   WitSelPt *     altSelPt;
+   WitSelCand *   savedSelCand;
+   WitBopEntry *  theBopEnt;
+   WitPeriod      thePer;
+   WitConsEntry * theConsEnt;
+   WitSelPt *     modSelPt;
+
+   WitBopEntPerStack  modBopEntPers  (myProblem ());
+   WitConsEntPerStack modConsEntPers (myProblem ());
+
+   stronglyAssert (penExec_);
+
+   if (! mySelector_->pendingPts_.isEmpty ())
+      {
+      altSelPt     = mySelector_->pendingPts_.firstObject ();
+
+      savedSelCand = altSelPt->selSelCand ();
+
+      altSelPt->tempAlterSel ();
+      }
+   else
+      altSelPt = NULL;
+
+   myExpRest ()   ->startTempMode ();
+
+   myExpRest ()   ->updatePsSup ();
+
+   myRtAnalyzer ()->findRoutingMods (modBopEntPers, modConsEntPers);
+
+   myExpRest ()   ->finishTempMode ();
+
+   chgSelPts.clear ();
+
+   while (modBopEntPers.pop (theBopEnt, thePer))
+      {
+      modSelPt =
+         mySelector_->myPmrMgr ()->mySelPt (theBopEnt->myPart (), thePer);
+
+      chgSelPts.push (modSelPt);
+      }
+
+   while (modConsEntPers.pop (theConsEnt, thePer))
+      {
+      modSelPt =
+         mySelector_->myCmrMgr ()->mySelPt (theConsEnt->myBomEnt (), thePer);
+
+      chgSelPts.push (modSelPt);
+      }
+
+   if (altSelPt != NULL)
+      {
+      altSelPt->restoreSel (savedSelCand);
+
+      if (! chgSelPts.contains (altSelPt))
+         chgSelPts.push (altSelPt);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSplitMgr::compChgPtFlowVols ()
+   {
+   WitSelPt *   theSelPt;
+   double       incFlowVol;
+   WitSplitPt * theSplitPt;
+
+   WitPairStItr <WitSelPt, double> theItr;
+
+   theItr.attachTo (mySplitter_->okFlowPairs_);
+
+   while (theItr.advance (theSelPt, incFlowVol))
+      if (theSelPt->isSplit ())
+         {  
+         theSplitPt = theSelPt->mySplitPt ();
+
+         if (theSplitPt->totFlowVol_ > -0.5)
+            theSplitPt->totFlowVol_ += incFlowVol;
+         }
+   }
+@
+
+
+1.1
+log
+@Continued implementation of sel-split for pen-exec.
+@
+text
+@@
+

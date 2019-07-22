@@ -1,0 +1,265 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@// @;
+
+
+1.8
+date	2004.11.15.16.50.23;	author fasano;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2004.11.10.04.11.31;	author fasano;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2004.11.09.18.29.44;	author fasano;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2004.11.09.05.12.12;	author fasano;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.11.06.23.51.18;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2004.11.06.19.47.32;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2004.10.29.01.42.16;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.15.51.28;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Added code to write a report describing the input model
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#endif
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include "populateOvpt.h"
+#include "ovptProblem.h"
+#include "scoFile.h"
+#include "scoException.h"
+#include "writeResults.h"
+
+void displayMsgOnlyLogfile(const std::string & logFileName, const std::string & msg, std::string fileMode="a" ){
+  FILE * fp = fopen(logFileName.c_str(),fileMode.c_str());
+  fprintf(fp,"%s",msg.c_str());
+  fclose(fp);
+}
+
+void displayMsg(const std::string & logFileName, const std::string & msg ){
+  displayMsgOnlyLogfile(logFileName,msg);
+  std::cout <<msg <<std::endl;
+}
+ 
+int
+main (int argc, char * argv[])
+{
+  
+  int retVal = 0;
+  std::string ovptLogFileName;
+  
+  std::string headerMsg = std::string("Optimized Value Planning Tool(ovpt) Build date: ") + __DATE__ + "\n";
+  std::cout <<headerMsg;
+  
+  // Put Parms into a vector
+  std::vector<std::string> args;
+  for (int i=0; i<argc; i++) 
+    args.push_back(argv[i]);
+  
+  {
+    // Check parm passed to program
+    bool parmError = false;
+    
+    if ( args.size()> 1 ) {
+      if (args[1]=="?" ) {
+        parmError = true; // set flag to provide usage info
+      }
+    }
+    
+    if ( ! parmError ) {
+      if ( args.size()!=2 ) {
+        // Wrong number of parms. Write message
+        std::cerr 
+          <<"-------------------------------------------------------"  <<std::endl
+          <<"Wrong number of parmeters specified"                      <<std::endl
+          <<"  Number parameters specified: " <<args.size()-1          <<std::endl
+          <<"  Expected number of parameters: 1"                       <<std::endl
+          <<"-------------------------------------------------------"  <<std::endl;
+        parmError = true;
+      }
+    }
+    
+    
+    
+    if ( parmError ) {
+      // Write correct usage
+      std::cerr 
+        <<"-------------------------------------------------------"  <<std::endl
+        <<argv[0] <<" dataDirectory "                                <<std::endl
+        <<"  where:"                                                 <<std::endl
+        <<"    dataDirectory:"                                       <<std::endl
+        <<"      Directory where input files are located and"        <<std::endl
+        <<"      output files are written."                          <<std::endl
+        <<"  example usage:"                                         <<std::endl
+        <<"    " <<argv[0] <<" example1"                             <<std::endl
+        <<"-------------------------------------------------------"  <<std::endl;
+      return 1;
+    }
+  }
+  
+  try {
+
+    
+    std::string outputDirectory=std::string(args[1]);
+    std::string inputDirectory=outputDirectory;
+    ovptLogFileName = outputDirectory + "/ovptLog.txt";
+    displayMsgOnlyLogfile(ovptLogFileName,headerMsg,"w");
+    
+    ECCovptProblem prob(outputDirectory);
+    ECCpopulateProblem(prob, inputDirectory, ovptLogFileName).readDirectoryFiles();
+
+    displayMsgOnlyLogfile(ovptLogFileName, prob.modelReport() );
+    
+    // Solve the problem
+    prob.solve();
+    
+    // Write Results
+    writeResults(prob,outputDirectory);
+    
+  }
+
+
+  catch ( SCOexception e ) {
+    displayMsg(ovptLogFileName,e.what());
+    retVal = 1;
+  }
+  
+  std::string finishedMsg = "Optimized Value Planning Tool(ovpt) application is finished.\n";
+  displayMsg(ovptLogFileName,finishedMsg);
+
+  return retVal;
+
+}
+@
+
+
+1.7
+log
+@added code to write output files.
+added code to set scrapVol
+@
+text
+@d92 2
+@
+
+
+1.6
+log
+@modified to have 3 logfiles: osl, wit, ovpt
+@
+text
+@d13 1
+d97 1
+@
+
+
+1.5
+log
+@Changes to have a witLog and oslLog file written to output directory.
+@
+text
+@d14 10
+d30 1
+d32 2
+a33 1
+  std::cout <<"Optimized Value Planning Tool(ovpt) Build date: " <<__DATE__ <<std::endl;
+d86 2
+d90 1
+a90 3
+    FILE * mesgFile = prob.getWitMesgFilePtr();
+    ECCpopulateProblem(prob, inputDirectory, mesgFile).readDirectoryFiles();
+    
+d101 1
+a101 1
+    std::cerr <<e.what() <<std::endl;
+d105 3
+a107 1
+  std::cout <<"Optimized Value Planning Tool(ovpt) application is finished." <<std::endl;
+@
+
+
+1.4
+log
+@Modified so populate method is now a class
+@
+text
+@d75 3
+a77 2
+    ECCovptProblem prob;
+    ECCpopulateProblem(prob, inputDirectory).readDirectoryFiles();
+@
+
+
+1.3
+log
+@updated to call solve
+@
+text
+@d76 1
+a76 1
+    populate(prob,inputDirectory);
+@
+
+
+1.2
+log
+@Updated so populate uses ovptProblem.
+@
+text
+@d80 1
+a80 1
+    //rcpProb.solve();
+@
+
+
+1.1
+log
+@Initial effort on popluate and main program
+@
+text
+@d10 1
+d75 2
+a76 2
+    //RCPproblem rcpProb;
+    populate(inputDirectory);
+@
+

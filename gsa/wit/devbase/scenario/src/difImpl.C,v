@@ -1,0 +1,337 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.47;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.33;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.40;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.40;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.28;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+#include <scenario/src/difImpl.h>
+
+
+// Set problem title
+void
+LgFrDataInterfaceImplementation::title(
+    std::string t)
+{
+    title_ = t;
+}
+
+// Return problem title
+// LgFrDataInterfaceEssentials* is needed for derived class,such as
+// LgFrDataInterfaceImplementationFromCmrpFile 
+
+std::string 
+LgFrDataInterfaceImplementation::title(
+    const LgFrDataInterfaceEssentials * difEssenPt)
+const
+{
+  return title_;
+}
+
+
+void
+LgFrDataInterfaceImplementation::registerFunction(
+    const std::string& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType,
+    const LgFrAttributeValueType& attrValueType,
+    LgFrPtrToValueExtractionFunction valFuncPtr)
+{
+  LgFrAttributeInformation attrInfo(itemType, itemSubType,
+                                    attrValueType, valFuncPtr);
+  attributeTable_.registerFunction(attributeName, itemSubType,
+                                   itemType, attrValueType, valFuncPtr);
+}
+
+void
+LgFrDataInterfaceImplementation::unregisterFunction(
+    const std::string& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+{
+  attributeTable_.unregisterFunction(attributeName, itemSubType, itemType);
+}
+
+LgFrAttributeValueType
+LgFrDataInterfaceImplementation::attributeValueType(
+    const std::string& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+const
+{
+  return attributeTable_.attributeValueType
+           (attributeName, itemSubType, itemType);
+}
+
+void *
+LgFrDataInterfaceImplementation::getAttributeValue(
+    const std::string& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType,
+    const LgFrItemPtrVector& pv,
+    const LgFrDataInterfaceEssentials* difEssenPtr
+    )
+const
+{
+  LgFrPtrToValueExtractionFunction vfunc =
+    attributeTable_.getAttributeFunction
+      (attributeName, itemSubType, itemType);
+  LgFrError status;
+  return vfunc(this,&pv,status, difEssenPtr);
+}
+
+bool
+LgFrDataInterfaceImplementation::isAttributeFunctionImplemented(
+    const std::string& attributeName,
+    const LgFrItemSubType& itemSubType,
+    const LgFrItemType& itemType)
+const
+{
+  bool isImp = true;
+  LgFrPtrToValueExtractionFunction vf =
+         attributeTable_.getAttributeFunction(attributeName,
+                                              itemSubType,
+                                              itemType);
+  if ( vf == 0 ) isImp = false;
+  return isImp;
+}
+
+// Assignment
+LgFrDataInterfaceImplementation&
+LgFrDataInterfaceImplementation::operator=(const LgFrDataInterfaceImplementation& rhs)
+{
+  if (this != &rhs) {           // Check for assignment to self
+     title_ = rhs.title_;
+//      attributeTable_ = rhs.attributeTable_;
+  }
+  return *this;
+}
+
+// clone 
+LgFrDataInterfaceImplementation *
+LgFrDataInterfaceImplementation::clone()
+const
+{
+  return new LgFrDataInterfaceImplementation(*this);
+}
+
+// Copy constructor in same scenario
+LgFrDataInterfaceImplementation::LgFrDataInterfaceImplementation
+  (const LgFrDataInterfaceImplementation& copy)
+      : title_(copy.title_),
+	attributeTable_(copy.attributeTable_)
+{
+// nothing to do here
+}
+
+// Default constructor
+LgFrDataInterfaceImplementation::LgFrDataInterfaceImplementation()
+    : title_("Unknown")
+{
+// nothing to do here
+}
+
+// Another constructor
+LgFrDataInterfaceImplementation::LgFrDataInterfaceImplementation(std::string t)
+    : title_(t)
+{
+// nothing to do here
+}
+
+// Destructor
+LgFrDataInterfaceImplementation::~LgFrDataInterfaceImplementation()
+{
+// nothing to do here
+}
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 4
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 3
+d10 1
+a10 1
+    RWCString t)
+d19 1
+a19 1
+RWCString 
+d30 1
+a30 1
+    const RWCString& attributeName,
+d44 1
+a44 1
+    const RWCString& attributeName,
+d53 1
+a53 1
+    const RWCString& attributeName,
+d64 1
+a64 1
+    const RWCString& attributeName,
+d67 1
+a67 1
+    const LgFrOrderedVectorItemPtr& pv,
+d79 1
+a79 1
+RWBoolean
+d81 1
+a81 1
+    const RWCString& attributeName,
+d86 1
+a86 1
+  RWBoolean isImp = TRUE;
+d91 1
+a91 1
+  if ( vf == NULL ) isImp = FALSE;
+a105 8
+// Return type identifier
+isAReturnType
+LgFrDataInterfaceImplementation::isA()
+const
+{
+  return __LGFRDATAINTERFACEIMPLEMENTATION;
+}
+
+d131 1
+a131 1
+LgFrDataInterfaceImplementation::LgFrDataInterfaceImplementation(RWCString t)
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@a0 3
+// RW2STL -- inserted:
+#include <string>
+// End of RW2STL -- inserted includes.
+d7 1
+a7 1
+    std::string t)
+d16 1
+a16 1
+std::string 
+d27 1
+a27 1
+    const std::string& attributeName,
+d41 1
+a41 1
+    const std::string& attributeName,
+d50 1
+a50 1
+    const std::string& attributeName,
+d61 1
+a61 1
+    const std::string& attributeName,
+d64 1
+a64 1
+    const LgFrItemPtrVector& pv,
+d76 1
+a76 1
+bool
+d78 1
+a78 1
+    const std::string& attributeName,
+d83 1
+a83 1
+  bool isImp = true;
+d88 1
+a88 1
+  if ( vf == 0 ) isImp = false;
+d103 8
+d136 1
+a136 1
+LgFrDataInterfaceImplementation::LgFrDataInterfaceImplementation(std::string t)
+@
+

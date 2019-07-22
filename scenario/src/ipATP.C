@@ -1,0 +1,984 @@
+#include <rw/rstream.h>
+
+#include <assert.h>
+#include <wit/src/wit.h>
+
+#include <scenario/src/ipATP.h>
+#include <scenario/src/dif.h>
+#include <scenario/src/difEssSc.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/sOfParts.h>
+#include <scenario/src/sOfDemds.h>
+#include <scenario/src/generVc.h>
+#include <scenario/src/outInter.h>
+#include <scenario/src/schdDeSt.h>
+#include <scenario/src/schFcATP.h>
+#include <scenario/src/partSchP.h>
+#include <scenario/src/witRunVn.h>
+#include <scenario/src/customer.h>
+
+// Returns a description of the problem that is suitable for use as a
+// window heading. This can not be used to set the title; only to query
+// it.
+RWCString
+LgFrInitialProblemForATP::title(const LgFrDataInterfaceEssentials* difEssenPtr)
+     const
+{
+  RWCString theTitle("ATP: ");
+  theTitle.append(ATPscenario()->dataInterface()->title(difEssenPtr));
+  return theTitle;
+}
+
+// get the scenario
+LgFrScenarioForATPSmartPointer
+LgFrInitialProblemForATP::ATPscenario()
+     const
+{
+  return LgFrScenarioForATPSmartPointer(scenario());
+}
+
+
+// Populates the WitRun's data structures 
+void
+LgFrInitialProblemForATP::feedInto(
+				     LgFrLastProblemSolved & lps)
+{
+  LgFrDataInterface*  difPtr
+    = (LgFrDataInterface*)(ATPscenario()->dataInterface());
+  LgFrDataInterface&  dif      = *difPtr;
+  LgFrCalendar&     calendar   = ATPscenario()->calendar();
+  LgFrSetOfParts& universalSOP =
+                 ATPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+  LgFrSetOfParts& defaultSOP   =
+                 ATPscenario()->setOfParts(LGFR_DEFAULT_SET);
+#endif  
+  LgFrSetOfDemands& universalSOD =
+                 ATPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  LgFrSetOfDemands& defaultSOD   =
+                 ATPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfParts& capacitySOP   =
+                 ATPscenario()->setOfParts(LGFR_CAPACITY_SET);
+  LgFrSetOfParts& materialSOP   =
+                 ATPscenario()->setOfParts(LGFR_MATERIAL_SET);
+  LgFrSetOfDemands& committedSOD   =
+                 ATPscenario()->setOfDemands(LGFR_COMMITTED_DEMANDS);
+  LgFrSetOfDemands& newOpportunitySOD   =
+                 ATPscenario()->setOfDemands(LGFR_NEWOPPOR_DEMANDS);
+  LgFrSetOfDemands& firmForecastSOD   =
+                 ATPscenario()->setOfDemands(LGFR_FIRMFORECAST_DEMANDS);
+#ifdef USING_RISK_FORECAST
+  LgFrSetOfDemands& riskForecastSOD   =
+                 ATPscenario()->setOfDemands(LGFR_RISKFORECAST_DEMANDS);
+#endif
+  LgFrSortingPartScheduleFloat* masterPartVolumesPtr = ATPscenario()->masterPartVolumes();
+  LgFrSortingDemandScheduleFloat* masterDemandVolumesPtr = ATPscenario()->masterDemandVolumes();
+
+#if 0
+  //  cout << "\nLgFrInitialProblemForATP::feedinto() ---> " << this->title() << "\n";
+#endif  
+  
+#ifdef LGFR_ALLOW_BUILD_AHEAD
+  int buildAheadLimit = calendar.nPeriods() - 1;
+#else
+  int buildAheadLimit = 0;
+#endif
+  
+  // get the witRun pointer from lps
+  WitRun * theWitRun = lps.witRun();
+ 
+  witBoolean exists;
+  witReturnCode rc;
+  int i;
+  size_t        numberOfPeriods = calendar.nPeriods();
+  
+  // ********************************************************
+  // ****** Set some GLOBAL WIT parameters ******************
+  // ********************************************************
+
+  rc = witSetNPeriods(theWitRun, numberOfPeriods);
+  assert (rc < WitWARNING_RC);
+
+#ifndef LGFR_ALLOW_PROCURMENT_OF_UNCONSTRAINED_PARTS
+  rc = witSetBuildWhenEmpty(theWitRun, WitFALSE);
+  assert (rc < WitWARNING_RC);
+#else
+  rc = witSetBuildWhenEmpty(theWitRun, WitTRUE);
+  assert (rc < WitWARNING_RC);
+#endif
+  
+  
+  
+  // ********************************************************
+  // ****** Get all the RAW parts from dif and process ******
+  // ********************************************************
+  
+  // get the raw parts
+  LgFrDataInterfaceEssentialsFromScenario difEssen(&(*ATPscenario()));
+  LgFrOrderedVectorPart pv;
+  RWCString itemSubTypeStr = "material";  
+  {
+    LgFrOrderedVectorPart* rawPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(
+                                                   pv, itemSubTypeStr,
+                                                   "rawParts", &difEssen);
+    LgFrOrderedVectorPart& rawParts = *rawPartsPtr;
+
+    // get supplyVol's
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(
+                                                    rawParts, itemSubTypeStr,
+                                                    "rawSupplyVol", &difEssen);
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+
+
+    // get unitCosts
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(
+                                             rawParts, itemSubTypeStr,
+                                             "rawUnitCost", &difEssen);
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+
+
+#ifdef LGFR_ALLOW_PROCURMENT_OF_UNCONSTRAINED_PARTS
+    float * negativeCycleTime = new float[numberOfPeriods];
+    for (i=0; i<numberOfPeriods; i++) negativeCycleTime[i] = -1.0;
+
+    // determine which are constrained
+    LgFrVectorInt* constrainedPtr
+      = (LgFrVectorInt*) dif.partAttribute(rawParts, itemSubTypeStr,
+                                           "rawConstrained",
+                                           &difEssen);
+    LgFrVectorInt& constrainedRawVec = *constrainedPtr;
+
+    // get procurementLeadTime
+    LgFrVectorTimeVecFloat* procLeadTimePtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(rawParts,
+                                                    itemSubTypeStr,
+                                                    "rawProcLeadTime",
+                                                    &difEssen);
+    LgFrVectorTimeVecFloat& procLeadTime = *procLeadTimePtr;
+#endif
+
+    for (i=0; i<rawParts.entries(); i++) {
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, rawParts[i].name().data(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+      // add the raw parts
+      //    cerr << "Adding raw part: " << rawParts[i].name() << "\n";
+      // put the part into the default and material sets
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+      defaultSOP.insert(rawParts[i]);
+#endif    
+      materialSOP.insert(rawParts[i]);
+
+      rc = witAddPartVa(theWitRun, rawParts[i].name().data(), 
+#ifndef LGFR_ALLOW_PROCURMENT_OF_UNCONSTRAINED_PARTS
+                        WitRAW,
+#else
+                        WitPRODUCT,
+                        WitNcycleTime,
+                           (constrainedRawVec[i] ?
+                           negativeCycleTime : procLeadTime[i].data()),
+#endif
+                        WitNsupplyVol, supplyVol[i].data(),
+                        WitNunitCost,  unitCost[i],
+                        NULL);
+      assert (rc < WitWARNING_RC);
+
+      // fill supply volume schedule
+      masterPartVolumesPtr->insertKeyAndValue(rawParts[i], supplyVol[i]);
+
+    }
+
+#ifdef LGFR_ALLOW_PROCURMENT_OF_UNCONSTRAINED_PARTS
+    delete [] negativeCycleTime;
+    delete procLeadTimePtr;
+    delete constrainedPtr;
+#endif
+    delete rawPartsPtr;
+    delete unitCostPtr;
+    delete supplyVolPtr;
+  }
+
+  // *************************************************************
+  // ****** Get all the CAPACITY parts from dif and process ******
+  // *************************************************************
+  {
+    // get the capacity parts
+    LgFrOrderedVectorPart* capacityPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(
+                                                   pv, itemSubTypeStr,
+                                                   "capacityParts", &difEssen);
+    LgFrOrderedVectorPart& capacityParts = *capacityPartsPtr;
+
+    // get supplyVol's
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(
+                                                    capacityParts, itemSubTypeStr,
+                                                    "capacitySupplyVol",
+                                                    &difEssen);
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+
+    // get unitCosts
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(
+                                             capacityParts, itemSubTypeStr,
+                                             "capacityUnitCost", &difEssen);
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+
+
+    for ( i=0; i<capacityParts.entries(); i++) {
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, capacityParts[i].name().data(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+      //    cerr << "Adding capacity part: " << capacityParts[i].name() << "\n";
+      // put the part into the default and capacity sets
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+      defaultSOP.insert(capacityParts[i]);
+#endif    
+      capacitySOP.insert(capacityParts[i]);
+
+      // add the part as a product
+      rc = witAddPartVa(theWitRun, capacityParts[i].name().data(), WitCAPACITY,
+                        WitNsupplyVol, supplyVol[i].data(),
+                        WitNunitCost,  unitCost[i],
+                        NULL);
+      assert (rc < WitWARNING_RC);
+
+      // fill supply volume schedule
+      masterPartVolumesPtr->insertKeyAndValue(capacityParts[i], supplyVol[i]);
+
+    }
+
+    delete unitCostPtr;
+    delete supplyVolPtr;
+    delete capacityPartsPtr;
+  }
+
+  // ************************************************************
+  // ****** Get all the PRODUCT parts from dif and process ******
+  // ************************************************************
+
+  {
+    // get the product parts
+    LgFrOrderedVectorPart* productPartsPtr
+      = (LgFrOrderedVectorPart*) dif.partAttribute(
+                                                   pv, itemSubTypeStr,
+                                                   "productParts", &difEssen);
+    LgFrOrderedVectorPart& productParts = *productPartsPtr;
+
+    // get supplyVol's
+    LgFrVectorTimeVecFloat* supplyVolPtr
+      = (LgFrVectorTimeVecFloat*) dif.partAttribute(
+                                                    productParts, itemSubTypeStr,
+                                                    "productSupplyVol", &difEssen);
+    LgFrVectorTimeVecFloat& supplyVol = *supplyVolPtr;
+
+    // get unitCosts
+    LgFrVectorFloat* unitCostPtr
+      = (LgFrVectorFloat*) dif.partAttribute(
+                                             productParts, itemSubTypeStr,
+                                             "productUnitCost", &difEssen);
+    LgFrVectorFloat& unitCost = *unitCostPtr;
+
+
+    for (i=0; i<productParts.entries(); i++) {
+      // do a sanity check to make sure part is not in WIT yet
+      rc = witGetPartExists(theWitRun, productParts[i].name().data(), &exists);
+      assert (rc < WitWARNING_RC);
+      assert (! exists);
+
+      //    cerr << "Adding product part: " << productParts[i].name() << "\n";
+      // add the part as a product
+      // put the part into the default set
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP    
+      defaultSOP.insert(productParts[i]);
+#endif    
+      materialSOP.insert(productParts[i]);
+
+      rc = witAddPartVa(theWitRun, productParts[i].name().data(), WitPRODUCT,
+                        WitNsupplyVol, supplyVol[i].data(),
+                        WitNunitCost,  unitCost[i],
+                        NULL);
+      assert (rc < WitWARNING_RC);
+
+      // fill supply volume schedule
+      masterPartVolumesPtr->insertKeyAndValue(productParts[i], supplyVol[i]);
+    }
+    delete unitCostPtr;
+    delete supplyVolPtr;
+    delete productPartsPtr;
+  }
+
+
+  //  delete masterPartVolumesPtr;
+
+  // ************************************************************
+  // ****** Process DEMANDS *************************************
+  // ************************************************************
+  
+  size_t totalNumberOfDemands = 0;
+  int * priority = new int[numberOfPeriods];
+
+  // get the committed demands
+  LgFrOrderedVectorDemand dv;
+
+
+  LgFrOrderedVectorDemand* committedDemandsPtr
+    = (LgFrOrderedVectorDemand*) dif.demandAttribute(
+                                                     dv, "committedDemands",
+                                                     &difEssen );
+  LgFrOrderedVectorDemand& committedDemands = *committedDemandsPtr;
+  totalNumberOfDemands += committedDemands.entries();
+
+  // get demandVol's
+  LgFrVectorTimeVecFloat *demandVolVectPtr 
+    = (LgFrVectorTimeVecFloat *) dif.demandAttribute(
+                                                     committedDemands,
+                                                     "demandVol", &difEssen);
+  LgFrVectorTimeVecFloat& demandVol = *demandVolVectPtr;
+
+  // get grossRev's
+  LgFrVectorFloat* grossRevPtr
+    = (LgFrVectorFloat*) dif.demandAttribute(
+                                             committedDemands,
+                                             "demandGrossRev", &difEssen);
+  LgFrVectorFloat& grossRev = *grossRevPtr;
+
+
+  // get priority
+  //  priority = dif.demandAttribute(committedDemands, attrPriority);
+  for (i=0; i<numberOfPeriods; i++)
+    priority[i] = 1;
+
+  for (i=0; i<committedDemands.entries(); i++) {
+    // do a few sanity check's
+    rc = witGetPartExists(theWitRun, committedDemands[i].partPtr()->name().data(),
+                          &exists);
+    assert (rc < WitWARNING_RC);
+    assert (exists);
+
+    // add the demand
+    //    cerr << "Adding demand: " << committedDemands[i].name() << "("
+    //         << committedDemands[i].partPtr()->name() << ")\n";
+    rc = witAddDemandVa(theWitRun, committedDemands[i].partPtr()->name().data(),
+                        committedDemands[i].name().data(),
+                        WitNdemandVol,       demandVol[i].data(),
+                        WitNgrossRev,        grossRev[i],
+                        WitNbuildAheadLimit, buildAheadLimit,
+                        WitNpriority,        priority, 
+                        NULL);
+    assert (rc < WitWARNING_RC);
+
+    // fill demand volume schedule
+    masterDemandVolumesPtr->insertKeyAndValue(committedDemands[i],
+					      demandVol[i]);
+    
+    // put the demand into the default set
+    defaultSOD.insert(committedDemands[i]);
+
+    // put the demand into the committed set
+    committedSOD.insert(committedDemands[i]);
+
+  }
+
+  delete demandVolVectPtr;
+  delete grossRevPtr;
+  delete committedDemandsPtr;
+
+
+  // zeroVec is used to set demand volumes to 0.0
+  LgFrTimeVecFloat zeroVec(numberOfPeriods, 0.0);
+
+#if 0
+  // ATP INITIAL PROBLEM IS NO LONGER ESTABLISHING NEW OP DEMANDS
+  // ADDING NEW OPP DEMANDS IS DONE BY THE USER ON THE FLY
+
+
+  // get the newOpportunity demands
+  LgFrOrderedVectorDemand* newOpportunityDemandsPtr
+    = (LgFrOrderedVectorDemand*) dif.demandAttribute(dv,
+                                                     "newOpportunityDemands",
+                                                     &difEssen );
+  
+  LgFrOrderedVectorDemand& newOpportunityDemands
+    = *newOpportunityDemandsPtr; 
+
+  // get demandVol's
+  LgFrVectorTimeVecFloat* demandVolVectPtr 
+    = (LgFrVectorTimeVecFloat *) dif.demandAttribute(
+                                                     newOpportunityDemands,
+                                                     "demandVol", &difEssen);
+  LgFrVectorTimeVecFloat& demandVol = *demandVolVectPtr;
+  
+  // get grossRev's
+  LgFrVectorFloat* grossRevPtr
+    = (LgFrVectorFloat*) dif.demandAttribute(
+                                             newOpportunityDemands,
+                                             "demandGrossRev", &difEssen);
+  LgFrVectorFloat& grossRev = *grossRevPtr;
+
+  // get priority
+  LgFrVectorInt* priorityPtr
+    = (LgFrVectorInt *) dif.demandAttribute(
+                                            newOpportunityDemands,
+                                            "demandPriority", &difEssen);
+  //  priority = (int*)(*priorityPtr);
+  LgFrVectorInt& newOpPriority = *priorityPtr;
+
+  for (i = 0; i < numberOfPeriods; i++)
+    newOpPriority[i] = 1;
+
+  for (i = 0; i < newOpportunityDemands.entries(); i++) {
+    // do a few sanity check's
+    rc = witGetPartExists(theWitRun, 
+			  newOpportunityDemands[i].partPtr()->name().data(), 
+			  &exists);
+    assert (rc < WitWARNING_RC);
+    assert (exists);
+
+    // add the demand, initialize the new opportunity demands in WIT to zero
+    //    cerr << "Adding demand: " << newOpportunityDemands[i].name() << "("
+    //         << newOpportunityDemands[i].partPtr()->name() << ")\n";
+    rc = witAddDemandVa(theWitRun,
+                        newOpportunityDemands[i].partPtr()->name().data(),
+                        newOpportunityDemands[i].name().data(),
+                        WitNdemandVol,       zeroVec.data(),
+                        WitNgrossRev,        grossRev[i],
+                        WitNbuildAheadLimit, buildAheadLimit,
+                        WitNpriority,        newOpPriority, 
+                        NULL);
+    assert (rc < WitWARNING_RC);
+
+    // fill demand volume schedule
+    masterDemandVolumesPtr->insertKeyAndValue(newOpportunityDemands[i],
+                                              demandVol[i]);
+
+    // put the demand into the default set of demands
+    defaultSOD.insert(newOpportunityDemands[i]);
+
+    // put the demand into the newOpportunity set of demands
+    newOpportunitySOD.insert(newOpportunityDemands[i]);
+
+  }
+
+  delete demandVolVectPtr;
+  delete priorityPtr;
+  delete grossRevPtr;
+  delete newOpportunityDemandsPtr;
+
+
+#endif
+
+  {
+    // get the firmForecast demands
+    LgFrOrderedVectorDemand* firmForecastDemandsPtr
+      = (LgFrOrderedVectorDemand*) dif.demandAttribute(
+                                                      dv, "firmForecastDemands",
+                                                      &difEssen );
+    LgFrOrderedVectorDemand& firmForecastDemands = *firmForecastDemandsPtr;
+    totalNumberOfDemands += firmForecastDemands.entries();
+
+    // nettedForecast -- compute the size of the (potential) netted forecast
+    // vector.  (Need to declare firmForecastDemands and totCommDemand here
+    // so that they don't go out of scope
+    int sizeOfNettedDemandVol;
+    if (dif.title(&difEssen) == "witlib") 
+      sizeOfNettedDemandVol = firmForecastDemands.entries();
+    else
+      sizeOfNettedDemandVol = 0;
+    LgFrVectorTimeVecFloat nettedDemandVol(sizeOfNettedDemandVol);
+    LgFrSortingPartScheduleFloatSmartPointer totCommDemand;
+
+
+    // get demandVol's
+    LgFrVectorTimeVecFloat* demandVolVectPtr 
+      = (LgFrVectorTimeVecFloat *) dif.demandAttribute(
+                                                       firmForecastDemands,
+                                                       "demandVol", &difEssen);
+    LgFrVectorTimeVecFloat& demandVol = *demandVolVectPtr;
+    
+    // MUST net-out the committed demand from the forecast
+    // for mapics dif
+
+    if (dif.title(&difEssen) == "witlib")    {
+      // get a schFctry
+      const LgFrScheduleFactory * sfact = ATPscenario()->scheduleFactory();
+      totCommDemand = sfact->newPartSchedule(LGFRTotalCommittedDemandVol);
+      const LgFrSortingPartScheduleFloat & constTotCommDemand = *totCommDemand;
+
+      for (i=0; i<firmForecastDemands.entries(); i++) {
+        const LgFrPart * partPtr = firmForecastDemands[i].partPtr();
+        const LgFrTimeVecFloat & tcdvTVF = (constTotCommDemand[*partPtr]).timeVecFloat();
+        const LgFrTimeVecFloat & forecastTVF = demandVol[i];
+        LgFrTimeVecFloat nettedForecastTVF = forecastTVF.cumulativeNet(tcdvTVF);
+        nettedDemandVol[i] = nettedForecastTVF;
+      }
+    }
+
+
+    // get grossRev's
+    LgFrVectorFloat* grossRevPtr
+      = (LgFrVectorFloat*) dif.demandAttribute(
+                                               firmForecastDemands,
+                                               "demandGrossRev", &difEssen);
+    LgFrVectorFloat& grossRev = *grossRevPtr;
+
+    // get priority
+    //  priority = dif.demandAttribute(firmForecastDemands, attrPriority);
+    for (i=0; i<numberOfPeriods; i++)
+      priority[i] = 1;
+
+    for (i = 0; i < firmForecastDemands.entries(); i++) {
+      // do a few sanity check's
+      rc = witGetPartExists(theWitRun,
+                            firmForecastDemands[i].partPtr()->name().data(),
+                            &exists);
+      assert (rc < WitWARNING_RC);
+      assert (exists);
+
+      // add the demand, initialize the firm forecast demands in WIT to zero
+      //    cerr << "Adding demand: " << firmForecastDemands[i].name() << "("
+      //         << firmForecastDemands[i].partPtr()->name() << ")\n";
+      if (dif.title(&difEssen) == "witlib")    {    
+        rc = witAddDemandVa(theWitRun, firmForecastDemands[i].partPtr()->name().data(),
+                            firmForecastDemands[i].name().data(),
+                            WitNdemandVol,       nettedDemandVol[i].data(),
+                            WitNgrossRev,        grossRev[i],
+                            WitNbuildAheadLimit, buildAheadLimit,
+                            WitNpriority,        priority, 
+                            NULL);
+        assert (rc < WitWARNING_RC);
+
+        // fill demand volume schedule
+        masterDemandVolumesPtr->insertKeyAndValue(firmForecastDemands[i],
+                                                  nettedDemandVol[i]);
+      }
+      else {
+        rc = witAddDemandVa(theWitRun,
+                            firmForecastDemands[i].partPtr()->name().data(),
+                            firmForecastDemands[i].name().data(),
+                            WitNdemandVol,       zeroVec.data(),
+                            WitNgrossRev,        grossRev[i],
+                            WitNbuildAheadLimit, buildAheadLimit,
+                            WitNpriority,        priority, 
+                            NULL);
+        assert (rc < WitWARNING_RC);
+
+
+        // fill demand volume schedule
+        masterDemandVolumesPtr->insertKeyAndValue(firmForecastDemands[i],
+                                                  demandVol[i]);
+      }    
+      // put the demand into the default set
+      defaultSOD.insert(firmForecastDemands[i]);
+
+      // put the demand into the firmForecast set
+      firmForecastSOD.insert(firmForecastDemands[i]);
+
+    }
+
+    delete grossRevPtr; 
+    delete demandVolVectPtr;        
+    delete firmForecastDemandsPtr;
+  }
+
+#ifdef USING_RISK_FORECAST
+  // get the riskForecast demands
+  {
+    Lgfrorderedvectordemand* riskForecastDemandsPtr
+      = (LgFrOrderedVectorDemand*) dif.demandAttribute(dv,
+                                                       "riskForecastDemands",
+                                                       &difEssen );
+    LgFrOrderedVectorDemand& riskForecastDemands
+      = *riskForecastDemandsPtr;
+    totalNumberOfDemands += riskForecastDemands.entries();
+
+    // get demandVol's
+    demandVolVectPtr 
+      = (LgFrVectorTimeVecFloat *) dif.demandAttribute(
+                                                       riskForecastDemands,
+                                                       "demandVol", &difEssen);
+    demandVol = *demandVolVectPtr;
+
+    // get grossRev's
+    grossRevPtr
+      = (LgFrVectorFloat*) dif.demandAttribute(
+                                               riskForecastDemands,
+                                               "demandGrossRev", &difEssen);
+    grossRev = *grossRevPtr;
+
+
+    // get priority
+    //  priority = dif.demandAttribute(riskForecastDemands, attrPriority);
+    for (i=0; i<numberOfPeriods; i++)
+      priority[i] = 1;
+
+    for (i = 0; i < riskForecastDemands.entries(); i++) {
+      // do a few sanity check's
+      rc = witGetPartExists(theWitRun,
+                            riskForecastDemands[i].partPtr()->name().data(),
+                            riskForecastDemands[i].partPtr()->&exists);
+      assert (rc < WitWARNING_RC);
+      assert (exists);
+
+      // add the demand, initialize the risk forecast demands in WIT to zero
+      //    cerr << "Adding demand: " << riskForecastDemands[i].name() << "("
+      //         << riskForecastDemands[i].partPtr()->name() << ")\n";
+      rc = witAddDemandVa(theWitRun,
+                          riskForecastDemands[i].partPtr()->name().data(),
+                          riskForecastDemands[i].name().data(),
+                          WitNdemandVol,       zeroVec.data(),
+                          WitNgrossRev,        grossRev[i],
+                          WitNbuildAheadLimit, buildAheadLimit,
+                          WitNpriority,        priority, 
+                          NULL);
+      assert (rc < WitWARNING_RC);
+
+      // fill demand volume schedule
+      masterDemandVolumesPtr->insertKeyAndValue(riskForecastDemands[i],
+                                                demandVol[i]);
+
+      // put the demand into the default set
+      defaultSOD.insert(riskForecastDemands[i]);
+
+      // put the demand into the riskForecast set
+      riskForecastSOD.insert(riskForecastDemands[i]);
+
+    }
+
+    delete grossRevPtr;
+    delete demandVolVectPtr;       
+    delete riskForecastDemandsPtr;
+  }
+#endif    
+
+  delete [] priority;
+
+  // ********************************************************
+  // ****** Set Equitability based on number of demands and periods
+  // ********************************************************
+  lps.equitability (
+#ifdef LGFR_NO_EQUITABILITY
+		    1
+#else
+		    ( numberOfPeriods * totalNumberOfDemands > 500 )
+		    ? 10
+		    : 100
+#endif
+		   );
+
+  // ************************************************************
+  // ****** Set build-ahead *************************************
+  // ************************************************************
+  lps.buildAhead (  (buildAheadLimit == 0) ? FALSE : TRUE  );
+
+  // ************************************************************
+  // ****** Process BOM *****************************************
+  // ************************************************************
+
+  dif.partAttribute(
+                    pv, itemSubTypeStr, "defineBom", &difEssen);
+
+}
+
+RWBoolean
+LgFrInitialProblemForATP::addNewNewOppDemand(LgFrLastProblemSolved & lps,
+                                             const RWCString & demandName,
+                                             const LgFrPart & part )
+{
+  LgFrCalendar&     calendar   = ATPscenario()->calendar();
+  LgFrSetOfParts& universalSOP =
+                 ATPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+  LgFrSetOfParts& defaultSOP   =
+                 ATPscenario()->setOfParts(LGFR_DEFAULT_SET);
+#endif  
+  LgFrSetOfDemands& universalSOD =
+                 ATPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+  LgFrSetOfDemands& defaultSOD =
+                 ATPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+  LgFrSetOfDemands& newOpportunitySOD   =
+                 ATPscenario()->setOfDemands(LGFR_NEWOPPOR_DEMANDS);
+
+  LgFrSortingPartScheduleFloat* masterPartVolumesPtr =
+                 ATPscenario()->masterPartVolumes();
+  LgFrSortingDemandScheduleFloat* masterDemandVolumesPtr =
+                 ATPscenario()->masterDemandVolumes();
+
+#ifdef LGFR_ALLOW_BUILD_AHEAD
+  int buildAheadLimit = calendar.nPeriods() - 1;
+#else
+  int buildAheadLimit = 0;
+#endif
+
+// get the witRun pointer from lps
+  WitRun * theWitRun = lps.witRun();
+
+  witBoolean exists;
+  witReturnCode rc;
+  int i;
+  size_t        numberOfPeriods = calendar.nPeriods();
+
+
+  // If this demand already exists in the universalSOD, then return FALSE
+  // Implementors Note: In general, it is possible that this demand may
+  // already exists in the universal SOD, but for some reason may not
+  // have been added to wit.  For now, there is no filtering within
+  // the feedInto() method that would allow for this.  If such cases ever
+  // become possible, it will be necessary to do some more checking here
+  // before bailing out with FALSE.
+  if (universalSOD.findValue(demandName, part.name()) != NULL)
+    return FALSE;
+  
+  // check to see that the part is in WIT BEFORE doing a new,Demand()
+  rc = witGetPartExists(theWitRun, part.name().data(), &exists);
+    assert (rc < WitWARNING_RC);
+  if (! exists) return FALSE;
+  
+  // Make a part pointer guaranteed to point to a part in the Universal 
+  // Set of Parts, since parts in other sets can be moved during resizings
+  const LgFrPart * partInUnivSetPtr = universalSOP.findValue(part.name());
+  assert (partInUnivSetPtr != NULL);
+
+  // Get a new demand
+  LgFrDemand demand = universalSOD.newDemand(demandName, partInUnivSetPtr);
+  
+  // priority 
+  int * priority = new int[numberOfPeriods];
+
+  // increment the priority (each new demand gets a lower (higher numerical)
+  // priority
+  newOppPriority_ ++;
+  for (i=0; i<numberOfPeriods; i++)
+    priority[i] = newOppPriority_;
+
+  // demand vol is set to zero
+  LgFrTimeVecFloat demandVol(numberOfPeriods, 0.0);
+
+  
+  // add the demand to WIT
+  cerr << "INFO: Adding a new NewOp demand: " << demand.name() << "("
+       << demand.partPtr()->name() << ")  with priority="
+       << newOppPriority_ << "\n";
+  rc = witAddDemandVa(theWitRun, demand.partPtr()->name().data(),
+                      demand.name().data(),
+                      WitNbuildAheadLimit, buildAheadLimit,
+                      WitNpriority,        priority, 
+                      NULL);
+  assert (rc < WitWARNING_RC);
+
+  // fill demand volume schedule
+  masterDemandVolumesPtr->insertKeyAndValue(demand, demandVol);
+
+  // put the demand into the default set of demands
+  defaultSOD.insert(demand);
+
+  // put the demand into the newOpportunity set of demands
+  newOpportunitySOD.insert(demand);
+
+  delete [] priority;
+  return TRUE;
+}
+
+
+// Make scenario clone copy of object
+LgFrInitialProblemAndParameters *
+LgFrInitialProblemForATP::clone(
+   LgFrScenarioSmartPointer newScenario)
+const
+{
+  LgFrInitialProblemAndParameters* newInst =
+      new LgFrInitialProblemForATP(newScenario);
+  return (newInst);
+}
+
+
+
+LgFrInitialProblemForATP::~LgFrInitialProblemForATP()
+{
+  // Nothing to do, so do nothing but return
+}
+
+// Assignment operator.
+LgFrInitialProblemForATP&
+LgFrInitialProblemForATP::operator=(
+            const LgFrInitialProblemForATP& rhs)
+{
+  return *new LgFrInitialProblemForATP(rhs.ATPscenario());
+}
+
+// Copy constructor
+LgFrInitialProblemForATP::LgFrInitialProblemForATP(
+            const LgFrInitialProblemForATP& source)
+:
+   LgFrInitialProblemAndParameters(source.scenario()),
+   newOppPriority_(source.newOppPriority_)
+{
+  // All the work is done in the initialization part
+}
+
+// Default Constructor
+LgFrInitialProblemForATP::LgFrInitialProblemForATP()
+:
+LgFrInitialProblemAndParameters(
+	LgFrScenarioSmartPointer::nullScenarioSmartPointer),
+    newOppPriority_(0)
+{
+  // All the work is done in the initialization part
+}
+
+// the preferred Constructor
+LgFrInitialProblemForATP::LgFrInitialProblemForATP(LgFrScenarioSmartPointer scenario)
+:
+    LgFrInitialProblemAndParameters(scenario),
+    newOppPriority_(0)
+{
+  // All the work is done in the initialization part
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+// Test this class
+void
+LgFrInitialProblemForATP::test()
+{
+
+  
+}
+
+
+// Context sensitive test using 
+void
+LgFrInitialProblemForATP::contextTest(
+    LgFrInitialProblemForATP      & ippTest,
+    LgFrInitialProblemForATP      & ippPWatp)
+{
+	cerr << "\nEntering IPPforATP::contextTest\n";
+	LgFrDataInterface&  dif      
+	    = *((LgFrDataInterface*)(ippTest.ATPscenario()->dataInterface()));
+	
+	LgFrCalendar&     calendar   = ippTest.ATPscenario()->calendar();
+	LgFrSetOfParts& universalSOP =
+		ippTest.ATPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+	LgFrSetOfParts& defaultSOP   =
+		ippTest.ATPscenario()->setOfParts(LGFR_DEFAULT_SET);
+#endif        
+	LgFrSetOfDemands& universalSOD =
+		ippTest.ATPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+	LgFrSetOfDemands& defaultSOD   =
+		ippTest.ATPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+        LgFrSetOfParts& capacitySOP   =
+                ippTest.ATPscenario()->setOfParts(LGFR_CAPACITY_SET);
+        LgFrSetOfParts& materialSOP   =
+                ippTest.ATPscenario()->setOfParts(LGFR_MATERIAL_SET);
+	LgFrSetOfDemands& committedSOD   =
+		ippTest.ATPscenario()->setOfDemands(LGFR_COMMITTED_DEMANDS);
+	LgFrSetOfDemands& newOpportunitySOD   =
+		ippTest.ATPscenario()->setOfDemands(LGFR_NEWOPPOR_DEMANDS);
+	LgFrSetOfDemands& firmForecastSOD   =
+		ippTest.ATPscenario()->setOfDemands(LGFR_FIRMFORECAST_DEMANDS);
+#ifdef USING_RISK_FORECAST
+	LgFrSetOfDemands& riskForecastSOD   =
+		ippTest.ATPscenario()->setOfDemands(LGFR_RISKFORECAST_DEMANDS);
+#endif
+	assert(universalSOP.entries() == 3);
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+	assert(defaultSOP.entries() == 3);
+#endif        
+        assert(capacitySOP.entries() == 1);
+        assert(materialSOP.entries() == 2);
+#ifdef USING_RISK_FORECAST
+// In difPWatp, newOpportunitySOD = 1, but in ipATP:feedinto()
+// newOpportunityDemand is not used. Therefore, N_DEMANDS should be
+// decremented by one and newOpportunitySOD.entries() == 0.
+// #define N_DEMANDS 4
+#define N_DEMANDS 3
+#else
+// #define N_DEMANDS 3
+#define N_DEMANDS 2
+#endif
+
+	assert(universalSOD.entries() == N_DEMANDS);
+	assert(defaultSOD.entries() == N_DEMANDS);
+	assert(committedSOD.entries() == 1);
+	assert(newOpportunitySOD.entries() == 0);
+	assert(firmForecastSOD.entries() == 1);
+
+#ifdef USING_RISK_FORECAST
+	assert(riskForecastSOD.entries() == 1);
+#endif
+#undef N_DEMANDS
+
+	
+	// Now test the problem fedInto via DIFFromPWatp
+	// ===============================================
+	LgFrCalendar&     calendarPWatp = ippPWatp.ATPscenario()->calendar();
+	LgFrSetOfParts& universalSOPPWatp =
+		ippPWatp.ATPscenario()->setOfParts(LGFR_UNIVERSAL_SET);
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+	LgFrSetOfParts& defaultSOPPWatp   =
+		ippPWatp.ATPscenario()->setOfParts(LGFR_DEFAULT_SET);
+#endif        
+	LgFrSetOfDemands& universalSODPWatp =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_UNIVERSAL_SET);
+	LgFrSetOfDemands& defaultSODPWatp   =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_DEFAULT_SET);
+        LgFrSetOfParts& capacitySOPPWatp   =
+                ippPWatp.ATPscenario()->setOfParts(LGFR_CAPACITY_SET);
+        LgFrSetOfParts& materialSOPPWatp   =
+                ippPWatp.ATPscenario()->setOfParts(LGFR_MATERIAL_SET);
+	LgFrSetOfDemands& committedSODPWatp   =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_COMMITTED_DEMANDS);
+	LgFrSetOfDemands& newOpportunitySODPWatp   =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_NEWOPPOR_DEMANDS);
+	LgFrSetOfDemands& firmForecastSODPWatp   =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_FIRMFORECAST_DEMANDS);
+#ifdef USING_RISK_FORECAST
+	LgFrSetOfDemands& riskForecastSODPWatp   =
+		ippPWatp.ATPscenario()->setOfDemands(LGFR_RISKFORECAST_DEMANDS);
+#endif
+// nraws = 9, nproducts = 12, ncapacities = 4	
+	assert(universalSOPPWatp.entries() == 25);
+#ifdef DEFAULT_SOP_DIFFERS_FROM_UNIVERSAL_SOP
+	assert(defaultSOPPWatp.entries() == 25);
+#endif        
+        assert(capacitySOPPWatp.entries() == 4);
+        assert(materialSOPPWatp.entries() == 21);
+
+
+// In difPWatp, committed = 9, newOp = 3, firm = 8, risk = 3
+// In ipATP, newOp = 0
+#ifdef USING_RISK_FORECAST
+// #define N_DEMANDS 23
+#define N_DEMANDS 20
+#else
+// #define N_DEMANDS 20
+#define N_DEMANDS 17
+#endif
+	assert(universalSODPWatp.entries() == N_DEMANDS);
+	assert(defaultSODPWatp.entries() == N_DEMANDS);
+#undef N_DEMANDS
+	assert(committedSODPWatp.entries() == 9);
+//	assert(newOpportunitySODPWatp.entries() == 3);
+	assert(newOpportunitySODPWatp.entries() == 0);
+	assert(firmForecastSODPWatp.entries() == 8);
+#ifdef USING_RISK_FORECAST
+	assert(riskForecastSODPWatp.entries() == 3);
+#endif
+
+	const LgFrSolutionOutputInterface& soi = ippPWatp.ATPscenario()->solutionOutputInterface();  
+
+  // this really belongs after IP has been created but since this is
+  //  a fix just for ATP, I didn't want to play with the Builder
+  ippPWatp.ATPscenario()->emitGoToCI();
+
+}

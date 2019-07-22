@@ -1,0 +1,132 @@
+#!/bin/ksh -x
+
+# This is a translation of the C-shell script dsMakeLibAix43 into ksh.
+# I did this because the C-shell script was having mysterious
+# problems when I compiled on an AIX v5 system.
+#
+# The lines setting linkerFlags and files caused csh (on crab.yamato.ibm.com)
+# to either hang or segfault; crab is an AIX 5 machine.
+# I tried working around this, but it seems that if there are more
+# than 25 "words" in a value to be assigned to a variable,
+# then csh segfaults.  25 is just the value I got; perhaps it
+# is actually the number of characters, or something else.
+#
+# This is pretty much a word-for-word translation, with one exception:
+# I didn't hard-code the path for makeC++SharedLib.
+# That means that this script should also be useable for 
+# other systems.  However, I've left it as a separate script for now.
+#
+# in the csh script, "set echo" is used to tell csh to start
+# printing commands.
+# I don't know how to do this in ksh, if it can in fact be done.
+# instead, I just have it print all executed commands with the "-x" flag.
+# I've left the set and unset commands in, but commented-out the unset
+# commands, since they return a non-0 status if the variable being unset
+# is not in fact set.
+
+# Make a library
+
+# This command is designed to be used on AIX.  It can be changed to work
+# on other operating systems too, but it doesn't do that right now.
+
+# $Id: dsMakeLibAix5.sh,v 1.1 2002/08/02 13:21:57 austel Exp $
+
+# double parens for arithmetic expressions in ksh
+if (( $# < 4 )); then
+    echo "Format: dsMakeLib"
+    echo "           shared_flag"
+    echo "           ar_update_flags"
+    echo "           linker_flag1 ... linker_flagN"
+    echo "           library o_file1 ... o_fileN"
+    echo "where shared_flag = -s means make a shared library and any"
+    echo "other value means don't make a shared library"
+    exit 1
+fi
+
+# Let user override $sharedFlag
+if [ $DS_MAKE_NONSHARED_LIBRARIES ]; then
+    sharedFlag='-ns'
+else
+    sharedFlag=$1
+fi
+
+#if OBJECT_MODE is set and not null, set arFlags to the stuff after ":+";
+# otherwise, arFlags remains unset
+if [ $OBJECT_MODE ]; then
+    arFlags="-X${OBJECT_MODE} $2"
+else
+    arFlags=$2
+fi
+
+shift; shift;
+
+# now $* refers to arguments 3 and up
+
+# Get linker flags.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument (\012 is ASCII newline code) and
+# using egrep to find the ones that start with a dash
+linkerFlags=$(echo $* | /bin/tr ' ' '\012' | /bin/egrep -e '^-')
+
+# Get file arguments.
+# Do this by using /bin/tr to make the 2nd through Nth argument
+# be on one line per argument and
+# using egrep to find the ones that don't start with a dash
+library=$(echo $* | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' | head -1)
+oFiles=$( echo $* | /bin/tr ' ' '\012' | /bin/egrep -v -e '^-' | tail +2)
+
+
+# Make the library
+if [[ $sharedFlag = '-s' ]]; then
+	nonSharedLibrary=$(echo $library | sed 's/\.a/ns.a/')
+	expFile=$(echo $nonSharedLibrary | sed 's/\.a/.exp/')
+	sharedOFile=$(echo $nonSharedLibrary | sed 's/\.a/.o/')
+
+	set echo
+
+	if [[ -e $library ]]; then
+		/bin/rm -f $library
+	fi
+
+	# Make non-shared library file
+	/usr/bin/ar $arFlags $nonSharedLibrary $oFiles
+	if (( $? != 0 )); then
+		exit 2
+	fi
+
+	/usr/bin/ranlib $nonSharedLibrary
+	if (( $? != 0 )); then
+		exit 3
+	fi
+
+	# Generate export symbols
+	${DS_DIR}bin/genexlist $nonSharedLibrary > $expFile
+	if (( $? != 0 )); then
+		exit 4
+	fi
+
+	# Make .o file containing entry points for
+	# what is in the non-shared library file
+	/usr/vacpp/bin/makeC++SharedLib -o $sharedOFile \
+		-bloadmap:loadmap -p2100 -E$expFile $linkerFlags $nonSharedLibrary
+	if (( $? != 0 )) then
+		exit 5
+	fi
+
+	# Make a shared library
+	/usr/bin/ar $arFlags $library $sharedOFile
+	if (( $? != 0 )) then
+		exit 6
+	fi
+
+	# Remove the funny .o file and the exports list
+	/bin/rm -f $sharedOFile $expFile
+	if (( $? != 0 )) then
+		exit 7
+	fi
+	#unset echo
+else
+	set echo
+	/usr/bin/ar $arFlags $library $oFiles
+	#unset echo
+fi

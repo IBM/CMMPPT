@@ -1,0 +1,256 @@
+head	1.2;
+access;
+symbols
+	EndRw-branch:1.1.1.1.0.4
+	Root-of-EndRw:1.1.1.1
+	rwToStl:1.1.1.1.0.2
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2009.01.28.15.58.19;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.33.16;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.33.16;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Updated api.3 to avoid using undocumented API functions.
+@
+text
+@/****************************************************************************** 
+ *
+ * Sample WIT API Program
+ *
+ ******************************************************************************/
+ 
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <wit.h>
+
+int main (int argc, char * argv[])
+{
+
+  /* Setup the WitRun */
+  WitRun * theWitRun;
+  witNewRun( &theWitRun );
+  witInitialize ( theWitRun );
+
+  /* Set global attributes */
+  witSetNPeriods    ( theWitRun, 4 );
+
+  /* Create objects */
+
+  /* Create part A, operation A, and connecting BOP */
+  {
+  float stockCost[] = { 50., 50., 50., 50. };
+  float scrapCost[] = { 50., 50., 50., 50. };
+  witAddPartWithOperation( theWitRun, "A" );
+  witSetPartStockCost    ( theWitRun, "A", stockCost );
+  witSetPartScrapCost    ( theWitRun, "A", scrapCost );
+  }
+
+  /* Create part B */
+  {
+  float stockCost[] = {  1.,   1.,  1.,  1. };
+  float scrapCost[] = { 10.,  10., 10., 10. };
+  float supplyVol    [] = {  0., 100.,  0., 50. };
+  witAddPart         ( theWitRun, "B", WitMATERIAL );
+  witSetPartSupplyVol( theWitRun, "B", supplyVol     );
+  witSetPartStockCost( theWitRun, "B", stockCost );
+  witSetPartScrapCost( theWitRun, "B", scrapCost );
+  }
+
+  /* Create capacity C */
+  {
+  float supplyVol    [] = {  30.,  30.,  30.,  30. };
+  witAddPart         ( theWitRun, "C", WitCAPACITY );
+  witSetPartSupplyVol( theWitRun, "C", supplyVol     );
+  }
+
+  /* Create part E */
+  {
+  float stockCost[] = {   1.,   1.,   1.,   1. };
+  float scrapCost[] = {  10.,  10.,  10.,  10. };
+  float supplyVol    [] = {  25.,  25.,  25.,  25. };
+  witAddPart         ( theWitRun, "E", WitMATERIAL );
+  witSetPartSupplyVol( theWitRun, "E", supplyVol     );
+  witSetPartStockCost( theWitRun, "E", stockCost );
+  witSetPartScrapCost( theWitRun, "E", scrapCost );
+  }
+
+  /* Create demand F on part A */
+  witAddDemand( theWitRun, "A", "F" );
+
+  /* Create operation D */
+  witAddOperation( theWitRun, "D" );
+
+  /* Create Bill-of-manufacturing entries */
+  witAddBomEntry( theWitRun, "A", "C" );
+  witAddBomEntry( theWitRun, "A", "B" );
+  witAddBomEntry( theWitRun, "D", "E" );
+
+  /* Create Substitute BOM Entry where part E may be used in place */
+  /* of part B in the BOM entry representing the consumption of    */
+  /* part B by operation A.                                        */
+  witAddSubsBomEntry( theWitRun, "A", 1, "E" );
+
+  /* Create Bill-of-process entries */
+  witAddBopEntry( theWitRun, "D", "A" );
+
+  /* Set object attributes */
+
+  /* Set part A attributes */
+  {
+  float softLowerBound[] = { 10., 10., 10., 10. };
+  float hardUpperBound[] = { 30., 30., 20., 20. };
+  float supplyVol     [] = { 17.,  0.,  0.,  0. };
+  witSetPartStockBounds( theWitRun, "A", 
+                         NULL, softLowerBound, hardUpperBound );
+  witSetPartSupplyVol  ( theWitRun, "A", supplyVol );
+  }
+
+  /* Set demand F on part A attributes */
+  {
+  float demandVol        [] = {   50.,   60.,   70.,   80. };
+  float shipReward   [] = { 1000., 1000., 1000., 1000. };
+  float cumShipReward[] = {   10.,   10.,   10.,   10. };
+  witSetDemandDemandVol    ( theWitRun, "A", "F", demandVol );
+  witSetDemandShipReward   ( theWitRun, "A", "F", shipReward );
+  witSetDemandCumShipReward( theWitRun, "A", "F", cumShipReward );
+  }
+
+  /* Set operation A attributes */
+  {
+  int yield[] = {   95,   95,   95,   95 };
+  witSetOperationYield( theWitRun, "A", yield );
+  }
+
+  /* Set BOM Entry attributes */
+  {
+  float offset[] = { 1., 1., 1., 1. };
+  witSetBomEntryOffset( theWitRun, "A", 1, offset );
+  }
+
+  /* Set substitute BOM Entry attributes */
+  witSetSubsBomEntryLatestPeriod( theWitRun, "A", 1, 0, 2 );
+
+  /* Set BOP Entry attributes */
+  witSetBopEntryProdRate( theWitRun, "A", 0, 2 );
+   
+
+  /* Perform Implosion and write production and shipment schedule */
+  witOptImplode( theWitRun );
+  witWriteExecSched( theWitRun, WitSTDOUT, WitBSV );
+  witWriteShipSched( theWitRun, WitSTDOUT, WitBSV );
+
+  /* Get and print a few attribute values for part B */
+  {
+  int     i, nPeriods;
+  float * supplyVol;
+  float * consVol;
+  float * stockVol;
+  float * excessVol;
+  witGetNPeriods     ( theWitRun,      &nPeriods  );
+  witGetPartSupplyVol( theWitRun, "B", &supplyVol );
+  witGetPartConsVol  ( theWitRun, "B", &consVol   );
+  witGetPartStockVol ( theWitRun, "B", &stockVol  );
+  witGetPartExcessVol( theWitRun, "B", &excessVol );
+  for( i=0; i<nPeriods; i++ ) 
+     printf( "part B: supplyVol[%d]=%f, consVol[%d]  =%f\n"
+             "        stockVol[%d] =%f, excessVol[%d]=%f\n",
+             i, supplyVol[i], 
+             i, consVol[i], 
+             i, stockVol[i], 
+             i, excessVol[i] );
+  free( supplyVol );
+  free( consVol   );
+  free( stockVol  );
+  free( excessVol );
+  }
+
+  witDeleteRun( theWitRun );
+
+} /* main */
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d12 1
+a12 1
+void main (int argc, char * argv[])
+a21 3
+  witSetExecEmptyBom( theWitRun, WitTRUE );
+  witSetObjChoice   ( theWitRun, 1 );
+  witSetTitle       ( theWitRun, "quote mark: \" back slash: \\" );
+d27 2
+a28 2
+  float obj1StockCost[] = { 50., 50., 50., 50. };
+  float obj1ScrapCost[] = { 50., 50., 50., 50. };
+d30 2
+a31 2
+  witSetPartObj1StockCost( theWitRun, "A", obj1StockCost );
+  witSetPartObj1ScrapCost( theWitRun, "A", obj1ScrapCost );
+d36 2
+a37 2
+  float obj1StockCost[] = {  1.,   1.,  1.,  1. };
+  float obj1ScrapCost[] = { 10.,  10., 10., 10. };
+d39 4
+a42 4
+  witAddPart             ( theWitRun, "B", WitMATERIAL );
+  witSetPartSupplyVol    ( theWitRun, "B", supplyVol     );
+  witSetPartObj1StockCost( theWitRun, "B", obj1StockCost );
+  witSetPartObj1ScrapCost( theWitRun, "B", obj1ScrapCost );
+d48 2
+a49 2
+  witAddPart             ( theWitRun, "C", WitCAPACITY );
+  witSetPartSupplyVol    ( theWitRun, "C", supplyVol     );
+d54 2
+a55 2
+  float obj1StockCost[] = {   1.,   1.,   1.,   1. };
+  float obj1ScrapCost[] = {  10.,  10.,  10.,  10. };
+d57 4
+a60 4
+  witAddPart             ( theWitRun, "E", WitMATERIAL );
+  witSetPartSupplyVol    ( theWitRun, "E", supplyVol     );
+  witSetPartObj1StockCost( theWitRun, "E", obj1StockCost );
+  witSetPartObj1ScrapCost( theWitRun, "E", obj1ScrapCost );
+d97 5
+a101 5
+  float obj1ShipReward   [] = { 1000., 1000., 1000., 1000. };
+  float obj1CumShipReward[] = {   10.,   10.,   10.,   10. };
+  witSetDemandDemandVol        ( theWitRun, "A", "F", demandVol );
+  witSetDemandObj1ShipReward   ( theWitRun, "A", "F", obj1ShipReward );
+  witSetDemandObj1CumShipReward( theWitRun, "A", "F", obj1CumShipReward );
+@
+
+
+1.1.1.1
+log
+@Import samples
+@
+text
+@@

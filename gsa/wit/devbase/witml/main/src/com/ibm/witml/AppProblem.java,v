@@ -1,0 +1,343 @@
+head	1.4;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.4
+date	2011.05.16.20.42.22;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.05.16.19.05.43;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.05.13.23.58.01;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.13.19.54.08;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@Primitive List.
+@
+text
+@
+//==============================================================================
+// WIT-ML Source File AppProblem.java.
+//==============================================================================
+
+package       com.ibm.witml;
+
+import static com.ibm.witml.Utility.*;
+
+import java.util.List;
+
+/*******************************************************************************
+ * An AppProblem is the central object representing a WIT application problem,
+ * i.e., a problem that is to be solved by using WIT. </br> </br>
+ * 
+ * Please Note: </br>
+ * The factory method for creating instances of this class is method
+ * newAppProblem of class Scheme.
+ *******************************************************************************
+ */
+public final class AppProblem
+{
+//==============================================================================
+// Public
+//==============================================================================
+
+/*******************************************************************************
+ * Factory method: <br>
+ * Constructs a new Primitive that will belong to this AppProblem.
+ *   
+ * @@param  thePrimCat               The PrimitiveCategory to which the Primitive
+ *                                  will belong
+ * @@param  theName                  The name for the Primitive 
+ * @@return                          The new Primitive
+ * @@throws NullPointerException     If thePrimCat is null
+ * @@throws NullPointerException     If theName    is null
+ * @@throws IllegalArgumentException If the Scheme of thePrimCat does not match
+ *                                  the Scheme of this AppProblem
+ * @@throws IllegalArgumentException If theName matches the name of an existing
+ *                                  Primitive for thePrimCat in theAppProble
+ *******************************************************************************
+ */
+   public Primitive newPrimitive (
+         PrimitiveCategory thePrimCat,
+         String            theName)
+      {
+      prohibitNull (thePrimCat, "thePrimCat");
+      prohibitNull (theName,    "theName");
+      
+      requireSchemeMatch (thePrimCat);
+      prohibitDupName    (thePrimCat, theName);
+      
+      return getPrimitiveMgr (thePrimCat).newPrimitive (theName);
+      }
+   
+/*******************************************************************************
+ * Primitive List method
+ * 
+ * @@return An unmodifiable List of all Primitives in this AppProblem that belong
+ * to thePrimCat, listed in the order in which they were created.
+ * 
+ * @@throws NullPointerException     If thePrimCat is null
+ * @@throws IllegalArgumentException If the Scheme of thePrimCat does not match
+ *                                  the Scheme of this AppProblem
+ *******************************************************************************
+ */
+   public List <Primitive> get (PrimitiveCategory thePrimCat)
+      {
+      prohibitNull       (thePrimCat, "thePrimCat");
+      
+      requireSchemeMatch (thePrimCat);
+      
+      return getPrimitiveMgr (thePrimCat).getPrimitives ();
+      }
+   
+/*******************************************************************************
+ * Primitive look-up method
+ * 
+ * @@return The Primitive in this AppProblem that belongs to thePrimCat and whose
+ *         name matches theName, if any; otherwise null
+ *         
+ * @@throws NullPointerException     If thePrimCat is null
+ * @@throws NullPointerException     If theName    is null
+ * @@throws IllegalArgumentException If the Scheme of thePrimCat does not match
+ *                                  the Scheme of this AppProblem
+ *******************************************************************************
+ */
+   public Primitive get (PrimitiveCategory thePrimCat, String theName)
+      {
+      prohibitNull       (thePrimCat, "thePrimCat");
+      prohibitNull       (theName,    "theName");
+      
+      requireSchemeMatch (thePrimCat);
+      
+      return getPrimitiveMgr (thePrimCat).getPrimitive (theName);
+      }
+   
+/*******************************************************************************
+ * Override from class Object
+ * 
+ * @@return Format: <br>
+ *         AppProblem "{getName ()}" of {getScheme ()}
+ *******************************************************************************
+ */
+   public String toString ()
+      {
+      return "AppProblem \"" + myName + "\"";
+      }
+   
+/*******************************************************************************
+ * Accessor.
+ * 
+ * @@return The name of this AppProblem
+ *******************************************************************************
+ */
+   public String getName ()
+      {
+      return myName;
+      }
+
+/*******************************************************************************
+ * Accessor
+ * 
+ * @@return The Scheme of this AppProblem
+ *******************************************************************************
+ */
+   public Scheme getScheme ()
+      {
+      return myScheme;
+      }
+
+//==============================================================================
+// Package Internal
+//==============================================================================
+   
+/*******************************************************************************
+ * Constructor.
+ *******************************************************************************
+ */
+   AppProblem (Scheme theScheme, String theName)
+      {
+      int          nPrimCats;
+      PrimitiveMgr thePrimitiveMgr;
+      
+      assert (theScheme != null);
+      assert (theName   != null);
+      
+      assert (theScheme.isFrozen ());
+      
+      myScheme          = theScheme;
+      myName            = theName;
+      
+      nPrimCats         = theScheme.getPrimitiveCategories ().size ();
+      
+      myPrimitiveMgrArr = new PrimitiveMgr[nPrimCats];
+      
+      for (PrimitiveCategory thePrimCat: theScheme.getPrimitiveCategories ())
+         {
+         thePrimitiveMgr = new PrimitiveMgr (this, thePrimCat);
+         
+         myPrimitiveMgrArr[thePrimCat.getIndex ()] = thePrimitiveMgr;
+         }
+      }
+
+//==============================================================================
+// Private
+//==============================================================================
+
+/*******************************************************************************
+ * Verifies that the Scheme of theElCat matches the Scheme of this
+ * AppProblem. <br>
+ *******************************************************************************
+ */
+   private final void requireSchemeMatch (ElementCategory theElCat)
+      {
+      if (theElCat.getScheme () != myScheme)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   An ElementCategory was passed as an argument to an\n"
+             + "   AppProblem method, where the Scheme of the ElementCategory\n"
+             + "   does not match the Scheme of theAppProblem.\n"
+             + "\n"
+             + "      ElementCategory Scheme: " + theElCat.getScheme () + "\n"
+             + "      AppProblem      Scheme: " +          getScheme () + "\n");
+      }
+   
+/*******************************************************************************
+ * Verifies that theName does not match the name of a Primitive of thePromCat in
+ * myAppProblem. </br>
+ * To be called by newPrimitive (...).
+ *******************************************************************************
+ */
+   private final void prohibitDupName (
+         PrimitiveCategory thePrimCat,
+         String            theName)
+      {
+      if (getPrimitiveMgr (thePrimCat).getPrimitive (theName) != null)
+         throw
+            new IllegalArgumentException (
+               "\n\n"
+             + "   theAppProblem.newPrimitive (thePrimCat, theName) was\n"
+             + "   called where the theName matches the name of an existing\n"
+             + "   Primitive for thePrimCat in theAppProblem.\n"
+             + "\n"
+             + "      PrimitiveCategory: "   + thePrimCat.getName () + "\n"
+             + "      Name:              \"" + theName               + "\"\n");
+      }
+   
+/*******************************************************************************
+ * @@return the PrimitiveMgr for thePrimCat in this AppProblem.
+ *******************************************************************************
+ */
+   private final PrimitiveMgr getPrimitiveMgr (PrimitiveCategory thePrimCat)
+      {
+      assert (thePrimCat.getScheme () == myScheme);
+         
+      return myPrimitiveMgrArr[thePrimCat.getIndex ()];
+      }
+   
+/*******************************************************************************
+ * The Scheme of AppProblem
+ *******************************************************************************
+ */
+   private final Scheme myScheme;
+   
+/*******************************************************************************
+ * The name of this AppProblem
+ *******************************************************************************
+*/
+   private final String myName;
+   
+/*******************************************************************************
+ * myPrimitiveMgrArr[thePrimCat.getIndex ()] is the PrimitiveMgr for thePrimCat
+ * in this AppProblem.
+ *******************************************************************************
+*/
+   private final PrimitiveMgr[] myPrimitiveMgrArr;
+   
+//==============================================================================
+}
+@
+
+
+1.3
+log
+@Primitive look-up.
+@
+text
+@d10 2
+d57 20
+d107 1
+a107 1
+      return "AppProblem \"" + myName + "\" of " + myScheme; 
+@
+
+
+1.2
+log
+@Added class PrimitiveMgr.
+@
+text
+@d37 2
+d55 22
+d148 1
+a148 1
+ * Verifies that the Scheme of thePrimCat matches the Scheme of this
+a149 1
+ * To be called by newPrimitive (...).
+d152 1
+a152 1
+   private final void requireSchemeMatch (PrimitiveCategory thePrimCat)
+d154 1
+a154 1
+      if (thePrimCat.getScheme () != myScheme)
+d158 3
+a160 3
+             + "   theAppProblem.newPrimitive (thePrimCat, theName) was\n"
+             + "   called where the Scheme of thePrimCat does not match\n"
+             + "   the Scheme of theAppProblem.\n"
+d162 2
+a163 3
+             + "      thePrimCat   .getScheme (): "
+             +        thePrimCat   .getScheme ()                   + "\n"
+             + "      theAppProblem.getScheme (): " + getScheme () + "\n");
+@
+
+
+1.1
+log
+@Realization ==> AppProblem
+@
+text
+@d47 1
+d49 1
+a49 1
+      return new Primitive (this, thePrimCat, theName);
+d96 3
+d102 15
+a116 2
+      myScheme = theScheme;
+      myName   = theName;
+d145 33
+d189 7
+@
+

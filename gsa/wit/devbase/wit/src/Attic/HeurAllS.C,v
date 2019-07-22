@@ -1,0 +1,1300 @@
+head	1.17;
+access;
+symbols
+	EndRw-branch:1.16.0.6
+	Root-of-EndRw:1.16
+	rwToStl:1.16.0.4
+	latest_sce_3_10_20010924:1.16.0.2
+	sce_3_10_20010924:1.16
+	latest_sce_3_00_20010601:1.15.0.2
+	sce_3_00_20010601:1.15
+	latest_sce_2_31_20010308:1.14.0.2
+	sce_2_31_20010308:1.14
+	latest_sce_2_31_20001003:1.7.0.2
+	sce_2_31_20001003:1.7;
+locks; strict;
+comment	@ * @;
+
+
+1.17
+date	2003.03.03.23.26.47;	author rjw;	state dead;
+branches;
+next	1.16;
+
+1.16
+date	2001.07.25.16.08.15;	author bobw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2001.03.21.21.55.46;	author bobw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2001.02.09.22.55.47;	author bobw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2001.01.20.00.44.17;	author bobw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2001.01.15.19.01.50;	author bobw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2000.12.28.22.13.36;	author bobw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2000.12.06.19.58.37;	author bobw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2000.12.04.22.07.36;	author bobw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2000.11.21.20.03.23;	author bobw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2000.06.29.21.22.44;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2000.05.18.00.16.00;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2000.05.08.21.56.12;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2000.05.02.20.43.13;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.04.24.19.55.22;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.04.21.17.42.49;	author bobw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.04.19.22.35.31;	author bobw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.17
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.16
+log
+@Initial implementation of pegging.
+@
+text
+@@
+
+
+1.15
+log
+@Continued implementation of selection splitting with the new design.
+@
+text
+@a0 491
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "HeurAllS.C"
+//
+// Contains the implementation of the following classes:
+//
+//    AllocMode
+//    AvailSched
+//    ReqSched
+//    HeurCritList
+//
+// These classes belong to the heuristic allocation subsystem.
+//------------------------------------------------------------------------------
+
+#include <AllMode.h>
+#include <AvSched.h>
+#include <ReqSched.h>
+#include <HeurCrit.h>
+#include <Dated.h>
+#include <Dense.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class AllocMode.
+//------------------------------------------------------------------------------
+
+WitAllocMode::WitAllocMode (WitHeurAllPerf * thePerf, WitAccFlag * theAccFlag):
+      WitProbAssoc    (thePerf),
+      
+      myAccFlag_      (theAccFlag),
+      myHeurAllPerf_  (thePerf),
+      temp_           (witFALSE),
+      tempExecVol_    (myProblem (), 0.0),
+      alteredOpnPers_ (myProblem ()),
+      permAvailSched_ (NULL),
+      tempAvailSched_ (NULL),
+      curAvailSched_  (NULL)
+   {
+   WitAvailSched::construct (permAvailSched_, tempAvailSched_, myProblem ());
+
+   curAvailSched_ = permAvailSched_;
+   }
+
+//------------------------------------------------------------------------------
+
+WitAllocMode::~WitAllocMode ()
+   {
+   WitAvailSched::destruct (tempAvailSched_, permAvailSched_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAllocMode::enterTempMode ()
+   {
+   witAssert (! temp_);
+
+   temp_          = witTRUE;
+   curAvailSched_ = tempAvailSched_;
+
+   resetTempData ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAllocMode::leaveTempMode ()
+   {
+   witAssert (temp_);
+
+   temp_          = witFALSE;
+   curAvailSched_ = permAvailSched_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAllocMode::resetTempData ()
+   {
+   WitOperation * theOpn;
+   WitPeriod      thePer;
+
+   tempAvailSched_->reset ();
+
+   while (alteredOpnPers_.pop (theOpn, thePer))
+      tempExecVol_ (theOpn, thePer) = execVol (theOpn)[thePer];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAllocMode::incExecVol (
+      WitOperation * theOpn,
+      WitPeriod      thePer,
+      double         delta)
+   {
+   if (temp_)
+      tempExecVol_ (theOpn)         [thePer] += delta;
+   else
+      execVol      (theOpn).elemRef (thePer) += delta;
+
+   alteredOpnPers_.push (theOpn, thePer);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AvailSched.
+//------------------------------------------------------------------------------
+
+void WitAvailSched::construct (
+      WitAvailSched * & firstAvailSched,
+      WitAvailSched * & secondAvailSched,
+      WitProblem *      theProblem)
+   {
+   firstAvailSched  = new WitAvailSched (theProblem);
+   secondAvailSched = new WitAvailSched (theProblem);
+
+   firstAvailSched-> companion_ = secondAvailSched;
+   secondAvailSched->companion_ = firstAvailSched;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::destruct (
+      WitAvailSched * & firstAvailSched,
+      WitAvailSched * & secondAvailSched)
+   {
+   delete firstAvailSched;
+   delete secondAvailSched;
+
+   firstAvailSched  = NULL;
+   secondAvailSched = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::reset ()
+   {
+   resetOn (            altPPs_);
+   resetOn (companion_->altPPs_);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::netWithPreAll (
+      WitPart * thePart,
+      WitPeriod reqPer,
+      double &  theReqVol)
+   {
+   double preAllVol;
+   double totReqVol;
+   double availVol;
+   double deltaVol;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   preAllVol = preallocVol (thePart, reqPer);
+
+   totReqVol = theReqVol + preAllVol;
+
+   availVol  = availToNet (thePart, reqPer, totReqVol);
+
+   deltaVol  = 
+      (availVol == totReqVol)?
+         theReqVol:
+         availVol - preAllVol;
+
+   if (deltaVol < NET_TOL)
+      return;
+
+   theReqVol -= deltaVol;
+
+   addToIncAvail (thePart, reqPer, - deltaVol);
+   }
+
+//------------------------------------------------------------------------------
+
+WitPeriod WitAvailSched::netAndRoll (
+      WitPart * thePart, 
+      WitPeriod reqPer,
+      double &  theReqVol,
+      double &  rollVol)
+   {
+   WitPeriod rollPer;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   rollVol = availToNet (thePart, reqPer, theReqVol);
+
+   if (rollVol < NET_TOL)
+      return -1;
+
+   theReqVol -= rollVol;
+
+   addToIncAvail (thePart, reqPer, - rollVol);
+
+   rollPer = rollPeriod (thePart, reqPer);
+
+   if (rollPer >= 0)
+      addToIncAvail (thePart, rollPer, rollVol);
+
+   return rollPer;
+   }
+
+//------------------------------------------------------------------------------
+
+double WitAvailSched::availToNet (
+      WitPart * thePart, 
+      WitPeriod reqPer,
+      double    theReqVol)
+   {
+   double    availVol;
+   WitPeriod thePer;
+   double    theIncAvail;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   availVol = 0.0;
+
+   for (thePer = reqPer; thePer >= 0; thePer --)
+      {
+      if (thePer < reqPer)
+         if (! thePart->canStock (thePer))
+            return availVol;
+
+      theIncAvail = incAvail (thePart, thePer);
+
+      if (theIncAvail == 0.0)
+         continue;
+
+      availVol += theIncAvail;
+
+      if (availVol >= theReqVol - NET_TOL)
+         return theReqVol;
+      }
+
+   return availVol;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::addToNextIncAvail (
+      WitMaterial * theMat, 
+      WitPeriod     thePer, 
+      double        deltaVol)
+   {
+   witAssert (! theMat->mandEC ()[thePer]);
+
+   if (thePer < lastPeriod ())
+      addToIncAvail (theMat, thePer + 1, deltaVol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::addToIncAvail (
+      WitPart * thePart, 
+      WitPeriod thePer, 
+      double    deltaVol)
+   {
+   WitMaterial * theMat;
+
+   double & theIncAvailVal = incAvail_ (thePart, thePer);
+
+   if (theIncAvailVal == companion_->incAvail (thePart, thePer))
+      altPPs_.push (thePart, thePer);
+
+   theIncAvailVal += deltaVol;
+
+   if (theIncAvailVal < - NET_TOL)
+      if (thePart->isaMaterial (theMat))
+         setToMax (lastDecPer_ (theMat), thePer);
+   }
+
+//------------------------------------------------------------------------------
+
+WitAvailSched::WitAvailSched (WitProblem * theProblem):
+      WitProbAssoc (theProblem),
+
+      companion_   (NULL),
+
+      incAvail_    (myProblem (), 0.0),
+      lastDecPer_  (myProblem (), -1),
+      altPPs_      (myProblem ())
+   {
+   WitPart * thePart;
+
+   forEachPart (thePart, myProblem ())
+      copyInto (incAvail_ (thePart), thePart->supplyVol ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitAvailSched::~WitAvailSched ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAvailSched::resetOn (WitPartPerStack & thePPs)
+   {
+   WitPart *     thePart;
+   WitPeriod     thePer;
+   WitMaterial * theMat;
+
+   while (thePPs.pop (thePart, thePer))
+      {
+      incAvail_ (thePart, thePer) = companion_->incAvail (thePart, thePer);
+
+      if (thePart->isaMaterial (theMat))
+         lastDecPer_ (theMat) = companion_->lastDecPer_ (theMat);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+double WitAvailSched::preallocVol (WitPart * thePart, WitPeriod reqPer)
+   {
+   WitPeriod     lastPer;
+   WitMaterial * theMat;
+   double        curPreAllVol;
+   double        maxPreAllVol;
+   WitPeriod     thePer;
+
+   lastPer = 
+      thePart->isaMaterial (theMat)?
+         lastDecPer_ (theMat):
+         reqPer;
+
+   curPreAllVol = 0.0;
+   maxPreAllVol = 0.0;
+
+   for (thePer = reqPer + 1; thePer <= lastPer; thePer ++)
+      {
+      if (! thePart->canStock (thePer - 1))
+         break;
+
+      curPreAllVol -= incAvail (thePart, thePer);
+
+      setToMax (maxPreAllVol, curPreAllVol);
+      }
+
+   return maxPreAllVol;
+   }
+
+//------------------------------------------------------------------------------
+
+WitPeriod WitAvailSched::rollPeriod (WitPart * thePart, WitPeriod fromPer)
+   {
+   WitMaterial * theMat;
+   WitPeriod     thePer;
+
+   if (thePart->isaMaterial (theMat))
+      if (fromPer < lastDecPer_ (theMat))
+         for (thePer = fromPer + 1; thePer < nPeriods (); thePer ++)
+            {
+            if (! thePart->canStock (thePer - 1))
+               break;
+
+            if (incAvail (thePart, thePer) < - NET_TOL)
+               return thePer;
+            }
+
+   return -1;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ReqSched.
+//------------------------------------------------------------------------------
+
+WitReqSched::WitReqSched (WitHeurAllPerf * theHeurAllPerf):
+      WitProbAssoc   (theHeurAllPerf),
+
+      myHeurAllPerf_ (theHeurAllPerf),
+      reqVol_        (myProblem (), 0.0),
+      firstPer_      (myProblem (), nPeriods ()),
+      lastPer_       (myProblem (), -1)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitReqSched::~WitReqSched ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqSched::init (double qty)
+   {
+   WitPart * topPartVal;
+   WitPeriod topPerVal;
+   WitPart * thePart;
+   WitPeriod thePer;
+
+   topPartVal = myHeurAllPerf_->topPart ();
+   topPerVal  = myHeurAllPerf_->topPer  ();
+
+   forEachElDense (thePart, topPartVal->belowList ())
+      {
+      if (lastPer_ (thePart) == -1)
+         continue;
+
+      for ( thePer =  firstPer_ (thePart); 
+            thePer <= lastPer_  (thePart);
+            thePer ++)
+         reqVol_ (thePart, thePer) = 0.0;
+
+      firstPer_ (thePart) = nPeriods ();
+      lastPer_  (thePart) = -1;
+      }
+
+   reqVol_   (topPartVal)[topPerVal] = qty;
+   firstPer_ (topPartVal)            = topPerVal;
+   lastPer_  (topPartVal)            = topPerVal;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitReqSched::addTo (WitPart * thePart, WitPeriod thePer, double qty)
+   {
+   witAssert (qty >= NET_TOL);
+
+   reqVol_ (thePart)[thePer] += qty;
+
+   setToMin (firstPer_ (thePart), thePer);
+   setToMax (lastPer_  (thePart), thePer);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class HeurCritList.
+//------------------------------------------------------------------------------
+
+WitHeurCritList::WitHeurCritList (
+         WitProblem * theProblem,
+         WitAccFlag * theAccFlag):
+
+      WitProbAssoc   (theProblem),
+
+      myAccFlag_     (theAccFlag),
+      culpritPart_   (NULL),
+      culpritPeriod_ (0),
+      listed_        (myProblem (), witFALSE)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitHeurCritList::~WitHeurCritList ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurCritList::setCulprit (WitPart * thePart, WitPeriod thePer)
+   {
+   witAssert (thePart != NULL);
+
+   culpritPart_   = thePart;
+   culpritPeriod_ = thePer;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurCritList::appendCulprit ()
+   {
+   WitDatedPart * theDP;
+
+   if (culpritPart_ == NULL)
+      return;
+
+   if (listed_ (culpritPart_, culpritPeriod_))
+      return;
+
+   theDP = new WitDatedPart (culpritPart_, culpritPeriod_);
+
+   criticalList (myGlobalComp ()).append (theDP);
+
+   listed_ (culpritPart_, culpritPeriod_) = witTRUE;
+
+   culpritPart_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurCritList::initSoln ()
+   {
+   while (!   criticalList (myGlobalComp ()).isEmpty ())
+      delete criticalList (myGlobalComp ()).get ();
+   }
+@
+
+
+1.14
+log
+@Fixed a particularly difficult bug in coarse selection splitting.
+@
+text
+@d372 2
+a373 2
+WitReqSched::WitReqSched (WitProblem * theProblem):
+      WitProbAssoc (theProblem),
+d375 4
+a378 3
+      reqVol_      (myProblem (), 0.0),
+      firstPer_    (myProblem (), nPeriods ()),
+      lastPer_     (myProblem (), -1)
+d390 1
+a390 1
+void WitReqSched::init (WitPart * topPart, WitPeriod topPer, double qty)
+d392 2
+d397 4
+a400 1
+   forEachElDense (thePart, topPart->belowList ())
+d414 3
+a416 4
+   reqVol_   (topPart)[topPer] = qty;
+
+   firstPer_ (topPart)         = topPer;
+   lastPer_  (topPart)         = topPer;
+@
+
+
+1.13
+log
+@Implemented and used class SelMgr.
+@
+text
+@d170 3
+@
+
+
+1.12
+log
+@Fixed some bugs in coarse selection splitting.
+@
+text
+@d481 2
+a482 1
+   criticalList (myGlobalComp ()).clearContents ();
+@
+
+
+1.11
+log
+@Completed a limited implementation of coarse selection splitting for BOP
+entries.
+@
+text
+@d89 1
+a89 1
+   while (alteredOpnPers_.get (theOpn, thePer))
+d105 1
+a105 1
+   alteredOpnPers_.put (theOpn, thePer);
+d264 1
+a264 1
+      altPPs_.put (thePart, thePer);
+d304 1
+a304 1
+   while (thePPs.get (thePart, thePer))
+@
+
+
+1.10
+log
+@Some minor changes.
+@
+text
+@d89 1
+a89 1
+   while (alteredOpnPers_.pop (theOpn, thePer))
+d105 1
+a105 1
+   alteredOpnPers_.push (theOpn, thePer);
+d264 1
+a264 1
+      altPPs_.push (thePart, thePer);
+d304 1
+a304 1
+   while (thePPs.pop (thePart, thePer))
+@
+
+
+1.9
+log
+@Added print_global control parameter.
+Completed a very restricted form of coarse selection splitting.
+@
+text
+@d28 1
+@
+
+
+1.8
+log
+@Began implementation of coarse selection splitting.
+Made DynStack classes more general.
+@
+text
+@d297 1
+a297 1
+void WitAvailSched::resetOn (WitPartPerDynStack & thePPs)
+@
+
+
+1.7
+log
+@Fixed bug: MCL Client Error on emptyBom msg.
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+d286 1
+a286 1
+      copyTo (incAvail_ (thePart), thePart->supplyVol ());
+d297 1
+a297 1
+void WitAvailSched::resetOn (WitDynPerStack (WitPart) & thePPs)
+@
+
+
+1.6
+log
+@Began implementation of stock bounds.
+Changed the default value of the stockRealloc attribute to FALSE.
+@
+text
+@a14 1
+//    DupTVec
+a22 1
+#include <DupTVec.h>
+a29 28
+// Implementation of class DupTVec.
+//------------------------------------------------------------------------------
+
+WitDupTVec::WitDupTVec (WitTVec (float) & theVec, double theValue):
+      duplicate_ (),
+      origVec_   (theVec)
+   {
+   duplicate_.resize (origVec_.length (), theValue);
+
+   origVec_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+WitDupTVec::~WitDupTVec ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDupTVec::copy (const WitTVec (double) & theVec)
+   {
+   duplicate_ = theVec;
+
+   ::copy (origVec_, duplicate_);
+   }
+
+//------------------------------------------------------------------------------
+d33 2
+a34 2
+WitAllocMode::WitAllocMode (WitHeurAllPerf * thePerf):
+      WitProbAssoc     (thePerf),
+d36 8
+a43 7
+      myHeurAllPerf_   (thePerf),
+      temp_            (witFALSE),
+      tempExecVol_     (myProblem (), 0.0),
+      alteredOpnPers_  (myProblem ()),
+      permAvailSched_  (NULL),
+      tempAvailSched_  (NULL),
+      curAvailSched_   (NULL)
+d89 1
+a89 2
+      tempExecVol_ (theOpn, thePer) = 
+         permExecVolDup (theOpn)->duplicate ()[thePer];
+d100 1
+a100 1
+      tempExecVol_   (theOpn)      [thePer] += delta;
+d102 1
+a102 1
+      permExecVolDup (theOpn)->inc (thePer,    delta);
+d286 1
+a286 1
+      copy (incAvail_ (thePart), thePart->supplyVol ());
+@
+
+
+1.5
+log
+@Finished implementing stock reallocation.
+@
+text
+@d235 48
+a339 35
+   }
+
+//------------------------------------------------------------------------------
+
+double WitAvailSched::availToNet (
+      WitPart * thePart, 
+      WitPeriod reqPer,
+      double    theReqVol)
+   {
+   double    availVol;
+   WitPeriod thePer;
+   double    theIncAvail;
+
+   witAssert (theReqVol >= NET_TOL);
+
+   availVol = 0.0;
+
+   for (thePer = reqPer; thePer >= 0; thePer --)
+      {
+      if (thePer < reqPer)
+         if (! thePart->canStock (thePer))
+            return availVol;
+
+      theIncAvail = incAvail (thePart, thePer);
+
+      if (theIncAvail == 0.0)
+         continue;
+
+      availVol += theIncAvail;
+
+      if (availVol >= theReqVol - NET_TOL)
+         return theReqVol;
+      }
+
+   return availVol;
+@
+
+
+1.4
+log
+@Made HeurAllPerf::findMaxQty test desQty when it's < minQty.
+   This fixed a "commit failed" error, by making the heuristic function
+   properly in cases in which commit fails at a lower desQty than one in which
+   it succeeds.
+Moved top-level net into commitMaxQtySel.
+@
+text
+@a67 4
+      permNetSupp_     (),
+      tempNetSupp_     (),
+      netSuppAltered_  (),
+      netSuppAltParts_ (myProblem ()),
+d74 1
+a74 3
+   if (stockRealloc ())
+      {
+      WitAvailSched::construct (permAvailSched_, tempAvailSched_, myProblem ());
+d76 1
+a76 8
+      curAvailSched_ = permAvailSched_;
+      }
+   else
+      {
+      permNetSupp_   .allocate (myProblem (), 0.0);
+      tempNetSupp_   .allocate (myProblem (), 0.0);
+      netSuppAltered_.allocate (myProblem (), witFALSE);
+      }
+a111 1
+   WitPart *      thePart;
+d115 1
+a115 9
+   if (stockRealloc ())
+      tempAvailSched_->reset ();
+   else
+      while (netSuppAltParts_.pop (thePart))
+         {
+         tempNetSupp_    (thePart) = permNetSupp_ (thePart);
+
+         netSuppAltered_ (thePart) = witFALSE;
+         }
+a123 19
+WitTVec (double) & WitAllocMode::curNetSuppForUpdate (WitPart * thePart)
+   {
+   witAssert (! stockRealloc ());
+
+   if (! netSuppAltered_ (thePart))
+      {
+      netSuppAltered_       (thePart) = witTRUE;
+
+      netSuppAltParts_.push (thePart);
+      }
+                                   
+   return 
+      temp_?
+         tempNetSupp_ (thePart):
+         permNetSupp_ (thePart);
+   }
+
+//------------------------------------------------------------------------------
+
+a145 2
+   witAssert (theProblem->myGlobalComp ()->stockRealloc ());
+
+d386 1
+a386 1
+      WitProbAssoc   (theProblem),
+d388 3
+a390 4
+      reqVol_        (myProblem (), 0.0),
+      firstPer_      (myProblem (), nPeriods ()),
+      lastPer_       (myProblem (), -1),
+      trackInterval_ (witFALSE)
+a391 13
+   if (myGlobalComp ()->trackInterval () || myGlobalComp ()->stockRealloc ())
+      {
+      trackInterval_ = witTRUE;
+
+      if (DEVELOPMENT)
+         fprintf (myMsgFac ().myFile (), "ReqVol intervals will be tracked.\n");
+      }
+
+   if (! trackInterval_)
+      {
+      firstPer_ = 0;
+      lastPer_  = lastPeriod ();
+      }
+d408 3
+a410 15
+      if (trackInterval_)
+         {
+         if (lastPer_ (thePart) == -1)
+            continue;
+
+         for ( thePer =  firstPer_ (thePart); 
+               thePer <= lastPer_  (thePart);
+               thePer ++)
+            reqVol_ (thePart, thePer) = 0.0;
+
+         firstPer_ (thePart) = nPeriods ();
+         lastPer_  (thePart) = -1;
+         }
+      else
+         reqVol_ (thePart) = 0.0;
+d412 4
+a415 1
+   reqVol_ (topPart)[topPer] = qty;
+d417 2
+a418 4
+   if (trackInterval_)
+      {
+      firstPer_ (topPart) = topPer;
+      lastPer_  (topPart) = topPer;
+d420 5
+d435 2
+a436 5
+   if (trackInterval_)
+      {
+      setToMin (firstPer_ (thePart), thePer);
+      setToMax (lastPer_  (thePart), thePer);
+      }
+@
+
+
+1.3
+log
+@Continued implementation of stock reallocation.
+Added emptyFss development control parameter.
+@
+text
+@d434 1
+a434 1
+      trackInterval_ (myGlobalComp ()->stockRealloc ())
+d436 8
+@
+
+
+1.2
+log
+@Continued implementation of stock reallocation.
+@
+text
+@d78 1
+a78 1
+   if (stockReAlloc ())
+d129 1
+a129 1
+   if (stockReAlloc ())
+d148 1
+a148 1
+   witAssert (! stockReAlloc ());
+d187 1
+a187 1
+   witAssert (theProblem->myGlobalComp ()->stockReAlloc ());
+d231 1
+a231 1
+   preAllVol = preAllocVol (thePart, reqPer);
+d294 1
+a294 1
+         WitUtil::setToMax (lastDecPer_ (theMat), thePer);
+d374 1
+a374 1
+double WitAvailSched::preAllocVol (WitPart * thePart, WitPeriod reqPer)
+d397 1
+a397 1
+      WitUtil::setToMax (maxPreAllVol, curPreAllVol);
+d434 1
+a434 1
+      trackInterval_ (myGlobalComp ()->stockReAlloc ())
+d439 1
+a439 1
+      lastPer_  = nPeriods () - 1;
+d492 2
+a493 2
+      WitUtil::setToMin (firstPer_ (thePart), thePer);
+      WitUtil::setToMax (lastPer_  (thePart), thePer);
+@
+
+
+1.1
+log
+@Continued implementation of stock re-allocation.
+@
+text
+@d17 1
+d26 1
+d64 1
+a64 1
+      WitProbAssoc       (thePerf),
+d66 11
+a76 13
+      myHeurAllPerf_     (thePerf),
+      temp_              (witFALSE),
+      permNetSupp_       (),
+      tempNetSupp_       (),
+      netSuppAltered_    (),
+      netSuppAltParts_   (myProblem ()),
+      tempExecVol_       (myProblem (), 0.0),
+      alteredOpnPers_    (myProblem ()),
+      permIncAvail_      (),
+      tempIncAvail_      (),
+      incAvailAltPPs_    (myProblem ()),
+      permLastAvDecPer_  (),
+      tempLastAvDecPer_  ()
+d79 5
+a83 1
+      initIncAvail ();
+d96 1
+d105 2
+a106 1
+   temp_ = witTRUE;
+d117 2
+a118 1
+   temp_ = witFALSE;
+d126 1
+a127 2
+   WitMaterial *  theMat;
+   WitOperation * theOpn;
+d130 1
+a130 7
+      while (incAvailAltPPs_.pop (thePart, thePer))
+         {
+         tempIncAvail_ (thePart, thePer) = permIncAvail_ (thePart, thePer);
+
+         if (thePart->isaMaterial (theMat))
+            tempLastAvDecPer_ (theMat) = permLastAvDecPer_ (theMat);
+         }
+d179 2
+d182 4
+a185 4
+void WitAllocMode::oldNetOnGoingAvail (
+      WitPart * thePart,
+      WitPeriod reqPer,
+      double &  theReqVol)
+d187 1
+a187 5
+   double        deltaVol;
+   double        curAvail;
+   WitPeriod     thePer;
+   WitPeriod     lastPer;
+   WitMaterial * theMat;
+d189 2
+a190 2
+   witAssert (stockReAlloc ());
+   witAssert (theReqVol >= NET_TOL);
+d192 3
+a194 1
+   curAvail = 0.0;
+d196 1
+a196 4
+   for (thePer = reqPer - 1; thePer >= 0; thePer --)
+      {
+      if (! thePart->canStock (thePer))
+         break;
+d198 6
+a203 2
+      curAvail += curIncAvail (thePart)[thePer];
+      }
+d205 3
+a207 4
+   lastPer = 
+      thePart->isaMaterial (theMat)?
+         curLastAvDecPer (theMat):
+         reqPer;
+d209 1
+a209 1
+   deltaVol = theReqVol;
+d211 4
+a214 19
+   for (thePer = reqPer; ; thePer ++)
+      {
+      curAvail += curIncAvail (thePart)[thePer];
+
+      WitUtil::setToMin (deltaVol, curAvail);
+
+      if (deltaVol < NET_TOL)
+         return;
+
+      if (thePer >= lastPer)
+         break;
+
+      if (! thePart->canStock (thePer))
+         break;
+      }
+
+   theReqVol -= deltaVol;
+
+   addToCurIncAvail (thePart, reqPer, - deltaVol);
+d219 1
+a219 1
+void WitAllocMode::netWithPreAll (
+a228 1
+   witAssert (stockReAlloc ());
+d237 1
+a237 1
+   deltaVol     = 
+d244 1
+a244 1
+   addToCurIncAvail (thePart, reqPer, - deltaVol);
+d249 1
+a249 1
+WitPeriod WitAllocMode::netAndRoll (
+a256 1
+   witAssert (stockReAlloc ());
+d266 1
+a266 1
+   addToCurIncAvail (thePart, reqPer, - rollVol);
+d271 1
+a271 1
+      addToCurIncAvail (thePart, rollPer, rollVol);
+d278 1
+a278 1
+void WitAllocMode::addToCurIncAvail (
+d285 1
+a285 1
+   witAssert (stockReAlloc ());
+d287 2
+a288 7
+   if (tempIncAvail_ (thePart, thePer) == permIncAvail_ (thePart, thePer))
+      incAvailAltPPs_.push (thePart, thePer);
+
+   double & theIncAvailVal = 
+      temp_? 
+         tempIncAvail_ (thePart, thePer): 
+         permIncAvail_ (thePart, thePer);
+d294 1
+a294 1
+         WitUtil::setToMax (curLastAvDecPer  (theMat), thePer);
+d299 8
+a306 1
+void WitAllocMode::initIncAvail ()
+d310 3
+a312 4
+   permIncAvail_    .allocate (myProblem (), 0.0);
+   tempIncAvail_    .allocate (myProblem (), 0.0);
+   permLastAvDecPer_.allocate (myProblem (), -1);
+   tempLastAvDecPer_.allocate (myProblem (), -1);
+d314 1
+a314 2
+   forEachPart (thePart, myProblem ())
+      copy (permIncAvail_ (thePart), thePart->supplyVol ());
+d316 2
+a317 1
+   tempIncAvail_ = permIncAvail_;
+d322 1
+a322 1
+double WitAllocMode::preAllocVol (WitPart * thePart, WitPeriod reqPer)
+d324 2
+a325 1
+   WitPeriod     lastPer;
+a326 13
+   double        curPreAllVol;
+   double        maxPreAllVol;
+   WitPeriod     thePer;
+
+   witAssert (stockReAlloc ());
+
+   lastPer = 
+      thePart->isaMaterial (theMat)?
+         curLastAvDecPer (theMat):
+         reqPer;
+
+   curPreAllVol = 0.0;
+   maxPreAllVol = 0.0;
+d328 1
+a328 1
+   for (thePer = reqPer + 1; thePer <= lastPer; thePer ++)
+d330 1
+a330 2
+      if (! thePart->canStock (thePer - 1))
+         break;
+d332 2
+a333 3
+      curPreAllVol -= curIncAvail (thePart)[thePer];
+
+      WitUtil::setToMax (maxPreAllVol, curPreAllVol);
+a334 2
+
+   return maxPreAllVol;
+d339 1
+a339 1
+double WitAllocMode::availToNet (
+a347 1
+   witAssert (stockReAlloc ());
+d358 1
+a358 1
+      theIncAvail = curIncAvail (thePart)[thePer];
+d374 1
+a374 1
+WitPeriod WitAllocMode::rollPeriod (WitPart * thePart, WitPeriod fromPer)
+d376 1
+d378 2
+d382 4
+a385 1
+   witAssert (stockReAlloc ());
+d387 2
+a388 7
+   if (thePart->isaMaterial (theMat))
+      {
+      if (fromPer >= curLastAvDecPer (theMat))
+         return -1;
+      }
+   else 
+      return -1;
+d390 1
+a390 1
+   for (thePer = fromPer + 1; thePer < nPeriods (); thePer ++)
+d393 3
+a395 1
+         return -1;
+d397 1
+a397 2
+      if (curIncAvail (thePart)[thePer] < - NET_TOL)
+         return thePer;
+d400 21
+d431 1
+a431 1
+      mySched_       (myProblem (), 0.0),
+d465 1
+a465 1
+            mySched_ (thePart, thePer) = 0.0;
+d471 1
+a471 1
+         mySched_ (thePart) = 0.0;
+d473 1
+a473 1
+   mySched_ (topPart)[topPer] = qty;
+d488 1
+a488 1
+   mySched_ (thePart)[thePer] += qty;
+@
+

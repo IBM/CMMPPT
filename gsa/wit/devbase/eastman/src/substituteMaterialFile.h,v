@@ -1,0 +1,197 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.2
+date	2004.11.08.23.23.20;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.10.28.16.48.43;	author grzes;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Fixed up to recognize and test for records with duplicate keys.
+@
+text
+@#ifndef ECCsubstituteMaterialFile_h
+#define ECCsubstituteMaterialFile_h
+
+#include "scoFile.h"
+
+
+class ECCsubstituteMaterialFile : public SCOcsvFormatFile {
+public:
+
+  // Fields
+  getFieldH(operation);
+  getFieldH(material);
+  getFieldH(substituteMaterial);
+
+  
+  // preferred constructor
+  ECCsubstituteMaterialFile(std::string filename)
+    : SCOcsvFormatFile(filename)
+  {  
+    fieldSeperator(',');
+    strip(true);
+    //insertField("mtm");
+    //insertField("plantLoc");
+    //insertField("period");
+    //insertField("productionRate");
+    //insertField("wfmv");
+    hasHeaderRecord(3);
+    commentRecords(true);
+
+    // don't normally call initialize here, but doing this for eastman
+    // to make sure duplicate records are found.
+    initialize();  
+  };
+  
+
+  // compute key for storing record in dictionary
+  static std::string key( 
+    const std::string & operation,
+	const std::string & material,
+	const std::string & substituteMaterial) 
+  {
+    std::string retVal = operation+uniqueString()+material+uniqueString()+substituteMaterial;
+    return retVal;
+  };
+  
+  // destructor
+  ~ECCsubstituteMaterialFile(){/*nothing to do here*/};
+  
+  // Self-test
+  static void test()
+  {
+    ECCsubstituteMaterialFile file("../data/example1/substituteMaterial.csv");
+
+    // Test reading first record
+    assert( file.operation(0) == "CombineFlakes" );
+	assert( file.material(0) == "B81Flake" );
+	assert( file.substituteMaterial(0) == "PrimesterFlake" );
+
+    assert( file.operation(0) == "CombineFlakes" );
+	assert( file.material(0) == "B81Flake" );
+	assert( file.substituteMaterial(0) == "PrimesterFlake" );
+
+    // Test reading record by key    
+    assert( file.substituteMaterial(file.key("CombineFlakes","B81Flake","PrimesterFlake")) == "PrimesterFlake" );
+
+    int nr = file.numRecords();
+    assert( nr == 1 );
+
+  }
+  
+protected:
+  
+  // compute key for storing record in dictionary
+  virtual std::string key( unsigned int recNum ) const
+  {
+    std::string retVal = key(
+      operation(recNum),
+	  material(recNum),
+      substituteMaterial(recNum) );
+    return retVal;
+  };
+
+private:
+  
+  // default constructor -- don't use!
+  ECCsubstituteMaterialFile();
+  
+  // copy constructor  -- don't use!
+  ECCsubstituteMaterialFile( const ECCsubstituteMaterialFile& source );
+  
+  // assignment operator -- don't use!
+  ECCsubstituteMaterialFile&
+  operator=(const ECCsubstituteMaterialFile& rhs);
+
+  
+};
+
+
+
+class ECCsubstituteMaterialFileIterator : public SCOfileIterator {
+public:
+  
+  // fields 
+  
+  getFieldFileWithIteratorH(operation);
+  getIntFieldFileWithIteratorH(material);
+  getFloatFieldFileWithIteratorH(substituteMaterial);
+  
+  // preferred constructor
+  ECCsubstituteMaterialFileIterator(const ECCsubstituteMaterialFile & file)
+    :SCOfileIterator(file)
+  { /* Nothing to do here */};
+  
+  // destructor
+  ~ECCsubstituteMaterialFileIterator(){/* nothing to do here */};
+  
+  // Self-test
+  static void test()
+  {
+    ECCsubstituteMaterialFile file("../data/example1/substituteMaterial.csv");
+    ECCsubstituteMaterialFileIterator fileIter(file);
+    
+    // loop once for each record
+    int recNo=0;
+    for ( ; fileIter()!=NULL; ) {    
+      if ( recNo == 0 ) {
+        assert( fileIter.operation() == "CombineFlakes" );
+		assert( fileIter.material() == "B81Flake" );
+		assert( fileIter.substituteMaterial() == "PrimesterFlake" );
+
+      }   
+      else if ( recNo == 1 ) {
+		assert( fileIter.operation() == "CombineFlakes" );
+		assert( fileIter.material() == "B81Flake" );
+		assert( fileIter.substituteMaterial() == "PrimesterFlake" );
+          
+      }
+      recNo++;
+    }
+    
+  }
+
+private:
+  
+  
+  // default constructor -- don't use!
+  ECCsubstituteMaterialFileIterator();
+  
+  // copy constructor  -- don't use!
+  ECCsubstituteMaterialFileIterator( const ECCsubstituteMaterialFileIterator& source );
+  
+  // assignment operator -- don't use!
+  ECCsubstituteMaterialFileIterator&
+  operator=(const ECCsubstituteMaterialFileIterator& rhs);
+
+  
+};
+#endif
+@
+
+
+1.1
+log
+@Added substituteMaterialFile.h.
+Fixed a couple of nasty bugs in previously added files.
+@
+text
+@d29 4
+@
+

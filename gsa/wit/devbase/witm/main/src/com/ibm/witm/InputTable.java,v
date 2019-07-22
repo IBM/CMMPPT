@@ -1,0 +1,1124 @@
+head	1.16;
+access;
+symbols
+	start:1.1.1.1 dummy-vendor:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.16
+date	2011.10.05.23.07.33;	author rjw;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2011.10.05.22.51.40;	author rjw;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2011.10.04.22.57.12;	author rjw;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2011.10.04.22.35.49;	author rjw;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2011.09.30.20.42.23;	author rjw;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2011.09.30.00.02.44;	author rjw;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2011.09.22.22.32.16;	author rjw;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2011.09.21.16.18.55;	author rjw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2011.09.20.23.22.22;	author rjw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2011.09.20.19.32.33;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2011.09.15.23.05.46;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2011.09.15.20.29.26;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2011.07.08.20.45.58;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2011.07.01.15.56.22;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2011.06.30.23.43.48;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2011.05.16.22.08.55;	author rjw;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2011.05.16.22.08.55;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.16
+log
+@ban ==> rej
+@
+text
+@
+////////////////////////////////////////////////////////////////////////////////
+// WIT-M Source File InputTable.java.
+////////////////////////////////////////////////////////////////////////////////
+
+package com.ibm.witm;
+
+import static com.ibm.witm.Utility.*;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/*******************************************************************************
+ * An InputTable represents a table of Strings that was read in from a CSV file.
+ * Immutable class
+ *******************************************************************************
+ */
+public final class InputTable
+{
+////////////////////////////////////////////////////////////////////////////////
+// Private Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The value of testMode.get () indicates which test action is to be taken
+ * during the next call to newInputTable in the current Thread:<br>
+ * 1: Throw an IOException when reading the file.<br>
+ * 2: Throw an IOException when closing the file.<br>
+ * Anything else: Take no test action.
+ *******************************************************************************
+ */
+   private static final ThreadLocal <Integer> testMode =
+      new ThreadLocal <Integer> ()
+         {                @@Override
+         protected Integer initialValue ()
+            {
+            return 0;
+            }
+         };
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Fields
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * The name of the file from which this InputTable was read.
+ *******************************************************************************
+ */
+   private final String myFileName;
+
+/*******************************************************************************
+ * The list InputRows that make up this InputTable:
+ * an unmodifiable view of an ArrayList
+ *******************************************************************************
+ */
+   private final List <InputRow> myInputRows;
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Constructor
+////////////////////////////////////////////////////////////////////////////////
+   
+   private InputTable (String theFileName)
+      {
+      ArrayList <String> theLines;
+   
+      myFileName      = theFileName;
+      
+      theLines        = readFile ();
+   
+      myInputRows = buildRows (theLines);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Private Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+   
+/*******************************************************************************
+ * Creates and returns a new BufferedReader file myFileName.
+ *******************************************************************************
+ */
+   private BufferedReader newBufferedReader ()
+      {
+      FileReader theFileReader;
+      
+      try
+         {
+         theFileReader = new FileReader (myFileName);
+         }
+      
+      catch (FileNotFoundException theFNFExc)
+         {
+         throw
+            new FileFormatException (
+               "\n\n"
+             + "   Input data file not found.\n"
+             + "\n"
+             + "      File Name: " + myFileName + "\n");
+         }
+         
+      return new BufferedReader (theFileReader);
+      }
+
+/*******************************************************************************
+ * Reads and returns a line from theBuffReader.
+ * 
+ * @@throws FileFormatException if an I/O error occurs.
+ *******************************************************************************
+ */
+   private String readLine (BufferedReader theBuffReader)
+      {
+      try
+         {
+         return theBuffReader.readLine ();
+         }
+      
+      catch (IOException theIOExc)
+         {
+         FileFormatException theFFExc;
+         
+         try
+            {
+            theBuffReader.close ();
+            }
+         
+         catch (IOException theIOExc2)
+            {
+            }
+         
+         theFFExc =
+            new FileFormatException (
+               "\n\n"
+             + "   An I/O error occurred when reading an input data file.\n"
+             + "\n"
+             + "      File Name: " + myFileName             + "\n"
+             + "      I/O Error: " + theIOExc.getMessage () + "\n");
+         
+         theFFExc.initCause (theIOExc);
+                  
+         throw theFFExc;
+         }
+      }
+
+/*******************************************************************************
+ * Closes theBuffReader.
+ * 
+ * @@throws FileFormatException if an I/O error occurs.
+ *******************************************************************************
+ */
+   private void close (BufferedReader theBuffReader)
+      {
+      try
+         {
+         if (testMode.get ().equals (2))
+            {
+            testMode.set (0);
+            
+            throw new IOException ("(Artificial error for test purposes)");
+            }
+      
+         theBuffReader.close ();
+         }
+      
+      catch (IOException theIOExc)
+         {
+         FileFormatException theFFExc;
+         
+         theFFExc =
+            new FileFormatException (
+               "\n\n"
+             + "   An I/O error occurred when closing an input data file.\n"
+             + "\n"
+             + "      File Name: " + myFileName             + "\n"
+             + "      I/O Error: " + theIOExc.getMessage () + "\n");
+         
+         theFFExc.initCause (theIOExc);
+                  
+         throw theFFExc;
+         }
+      }
+
+/*******************************************************************************
+ * Reads the file for this InputTable.
+ * 
+ * @@return             The lines of the file as an ArrayList <String>.
+ * @@throws IOException If thrown when reading the file.
+ *******************************************************************************
+ */
+   private ArrayList <String> readFile ()
+      {
+      BufferedReader     theBuffReader;
+      ArrayList <String> theLines;
+      String             theLine;
+      
+      theBuffReader = newBufferedReader ();
+
+      if (testMode.get ().equals (1))
+         {
+         testMode.set (0);
+         
+         close (theBuffReader);
+         }
+      
+      theLines = new ArrayList <String> ();
+      
+      while (true)
+         {
+         theLine = readLine (theBuffReader);
+            
+         if (theLine == null)
+            break;
+            
+         theLines.add (theLine);
+         }
+      
+      close (theBuffReader);
+         
+      theLines.trimToSize ();
+      
+      return theLines;
+      }
+
+/*******************************************************************************
+ * Creates a List of InputRows from a List of lines from a file.
+ * 
+ * @@param theLines The lines.
+ * @@return         An unmodifiable view of an ArrayList of the newly created
+ *                 InputRows.
+ *******************************************************************************
+ */
+   private List <InputRow> buildRows (ArrayList <String> theLines)
+      {
+      ArrayList <InputRow> theInputRows;
+      int                  theIdx;
+      InputRow             theRow;
+      
+      theInputRows = new ArrayList <InputRow> (theLines.size ());
+      
+      theIdx       = 0;
+      
+      for (String theLine: theLines)
+         {
+         theIdx ++;
+         
+         theRow = new InputRow (this, theIdx, theLine);
+         
+         theInputRows.add (theRow);
+         }
+      
+      return Collections.unmodifiableList (theInputRows);
+      }
+
+/*******************************************************************************
+ * Verifies that the row index passed to getInputRow is within range.
+ *******************************************************************************
+ */
+   private void rejIndexOutOfBounds (int rowIdx)
+      {
+      if ((rowIdx < 1) || (rowIdx > myInputRows.size ()))
+         throw
+            new IndexOutOfBoundsException (
+               "\n\n"
+             + "   Call to InputTable.getInputRow (rowIdx) with an index\n"
+             + "   that's outside of the range 1 <= rowIdx <= # of InputRows.\n"
+             + "\n"
+             + "      RowIdx:         " + rowIdx              + "\n"
+             + "      # of InputRows: " + myInputRows.size () + "\n"
+             + "      File:           " + getFileName ()      + "\n");
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package-Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * @@return The name of the file from which this InputTable was read.
+ *******************************************************************************
+ */
+   String getFileName ()
+      {
+      return myFileName;
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+// Public Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * For development use only.
+ *******************************************************************************
+ */
+   public static void setTestMode (int theMode)
+      {
+      testMode.set (theMode);
+      }
+
+/*******************************************************************************
+ * Factory method: Constructs a new InputTable that stores the data given in a
+ * CSV file.
+ * 
+ * @@param  theFileName          The name of the CSV file.
+ * @@return                      The new InputTable
+ * @@throws NullPointerException If any argument is null
+ * @@throws IOException          If thrown when reading the file
+ *******************************************************************************
+ */
+   public static InputTable newInputTable (String theFileName)
+      {
+      rejNull (theFileName, "theFileName");
+   
+      return new InputTable (theFileName);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Public Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * {@@inheritDoc}
+ *******************************************************************************
+ */             @@Override
+   public String toString ()
+      {
+      return concatenation ("InputTable from file \"", myFileName, "\"");
+      }
+   
+/*******************************************************************************
+ * @@return The List of InputRows for this InputTable, as an unmodifiable view of
+ *         an ArrayList
+ *******************************************************************************
+ */
+   public List <InputRow> getInputRows ()
+      {
+      return myInputRows;
+      }
+
+/*******************************************************************************
+ * Returns An InputRow of this InputTable.
+ * 
+ * @@param  rowIdx                    A row index into this InputTable.
+ * @@return                           The InputRow for the InputTable whose row
+ *                                   index is rowIdx.
+ * @@throws IndexOutOfBoundsException If rowIdx < 1 or rowIdx > # InputRows in
+ *                                   InputTable.
+ *******************************************************************************
+ */
+   public InputRow getInputRow (int rowIdx)
+      {
+      rejIndexOutOfBounds (rowIdx);
+      
+      return myInputRows.get (rowIdx - 1);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+}
+@
+
+
+1.15
+log
+@getInputRow
+@
+text
+@d261 1
+a261 1
+   private void banIndexOutOfBounds (int rowIdx)
+d313 1
+a313 1
+      banNull (theFileName, "theFileName");
+d353 1
+a353 1
+      banIndexOutOfBounds (rowIdx);
+@
+
+
+1.14
+log
+@bar ==> ban
+@
+text
+@d257 18
+d332 2
+a333 3
+ * Returns the List of InputRows for this InputTable.
+ * 
+ * @@return The List of InputRows, as an unmodifiable view of an ArrayList
+d341 17
+@
+
+
+1.13
+log
+@getCellAsPeriod (...)
+@
+text
+@d295 1
+a295 1
+      barNull (theFileName, "theFileName");
+@
+
+
+1.12
+log
+@FileFormatException
+@
+text
+@d37 8
+a44 1
+   private static final ThreadLocal <Integer> testMode;
+a46 16
+// Static Initialization Block
+////////////////////////////////////////////////////////////////////////////////
+
+   static
+      {
+      testMode =
+         new ThreadLocal <Integer> ()
+            {                @@Override
+            protected Integer initialValue ()
+               {
+               return 0;
+               }
+            };
+      }
+   
+////////////////////////////////////////////////////////////////////////////////
+a66 5
+/*******************************************************************************
+ * @@param triggerIOExc True, iff an I/O exception is to be triggered while
+ *                     reading the file, for testing purposes.
+ *******************************************************************************
+ */
+d71 3
+a73 3
+      myFileName  = theFileName;
+
+      theLines    = readFile ();
+@
+
+
+1.11
+log
+@InputTable
+@
+text
+@d26 31
+a56 1
+// Private Fields
+d81 1
+a81 3
+   private InputTable (String theFileName, boolean triggerIOExc)
+      throws
+         IOException
+d87 1
+a87 1
+      theLines    = readFile (triggerIOExc);
+d97 1
+a97 6
+ * Reads the file for this InputTable.
+ * 
+ * @@param triggerIOExc True, iff an I/O exception is to be deliberately
+ *                     triggered while reading the file, for testing purposes.
+ * @@return             The lines of the file as an ArrayList <String>.
+ * @@throws IOException If thrown when reading the file.
+d100 1
+a100 3
+   private ArrayList <String> readFile (boolean triggerIOExc)
+      throws 
+         IOException
+d102 1
+a102 4
+      ArrayList <String> theLines;
+      FileReader         theFileReader;
+      BufferedReader     theBuffReader = null;
+      String             theLine;
+d104 4
+a107 1
+      theLines = new ArrayList <String> ();
+d109 21
+d132 6
+a137 2
+         theFileReader = new FileReader     (myFileName);
+         theBuffReader = new BufferedReader (theFileReader);
+d139 34
+a172 1
+         while (true)
+d174 1
+a174 7
+            if (triggerIOExc)
+               theBuffReader.close ();
+            
+            theLine = theBuffReader.readLine ();
+            
+            if (theLine == null)
+               break;
+d176 1
+a176 1
+            theLines.add (theLine);
+d178 2
+d182 1
+a182 1
+      catch (FileNotFoundException theFNFExc)
+d184 3
+a186 1
+         throw
+d189 1
+a189 1
+             + "   Input data file not found.\n"
+d191 29
+a219 1
+             + "      File Name: " + myFileName + "\n");
+d222 3
+a224 1
+      finally
+d226 6
+a231 2
+         if (theBuffReader != null)
+            theBuffReader.close ();
+d234 2
+d289 9
+a307 16
+      throws
+         IOException
+      {
+      barNull (theFileName, "theFileName");
+   
+      return new InputTable (theFileName, false);
+      }
+
+/*******************************************************************************
+ * Same as newInputTable, but internally throws an IOException while reading
+ * the file. To be used for testing this class.
+ *******************************************************************************
+ */
+   public static InputTable newInputTableWithIOExc (String theFileName)
+      throws
+         IOException
+d311 1
+a311 1
+      return new InputTable (theFileName, true);
+@
+
+
+1.10
+log
+@FileFormatException
+@
+text
+@d46 6
+a51 1
+   private InputTable (String theFileName)
+d59 1
+a59 1
+      theLines    = readFile ();
+d71 4
+a74 3
+ * @@return             The lines of the file as an ArrayList <String>
+ * 
+ * @@throws IOException If thrown when reading the file
+d77 1
+a77 1
+   private ArrayList <String> readFile ()
+d82 2
+a83 2
+      FileReader         theFileReader = null;
+      BufferedReader     theBuffReader;
+d95 3
+d119 2
+a120 2
+         if (theFileReader != null)
+            theFileReader.close ();
+d191 15
+a205 1
+      return new InputTable (theFileName);
+@
+
+
+1.9
+log
+@InputTables
+@
+text
+@d11 1
+d98 10
+@
+
+
+1.8
+log
+@InputTables
+@
+text
+@d139 13
+@
+
+
+1.7
+log
+@InputTables
+@
+text
+@d29 6
+d45 3
+a47 1
+   private InputTable (ArrayList <String> theLines)
+d49 7
+a55 18
+      ArrayList <InputRow> theInputRows;
+      int                  theIdx;
+      InputRow             theRow;
+      
+      theInputRows = new ArrayList <InputRow> (theLines.size ());
+      
+      theIdx       = 0;
+      
+      for (String theLine: theLines)
+         {
+         theIdx ++;
+         
+         theRow = new InputRow (theIdx, theLine);
+         
+         theInputRows.add (theRow);
+         }
+      
+      myInputRows = Collections.unmodifiableList (theInputRows);
+d59 1
+a59 1
+// Private Static Methods
+d63 1
+a63 1
+ * Reads a file.
+a64 1
+ * @@param  theFileName The name of the file
+d70 1
+a70 1
+   private static ArrayList <String> readFile (String theFileName)
+d83 1
+a83 1
+         theFileReader = new FileReader     (theFileName);
+d108 30
+a155 2
+      ArrayList <String> theLines;
+   
+d158 1
+a158 3
+      theLines = readFile (theFileName);
+   
+      return new InputTable (theLines);
+d166 9
+@
+
+
+1.6
+log
+@Table reading.
+@
+text
+@d10 2
+a11 1
+import java.io.FileNotFoundException;
+a14 2
+import java.util.HashMap;
+import java.util.LinkedList;
+a26 6
+   
+/*******************************************************************************
+ * myColIndexMap.get (theHeading) is the column index for theHeading.
+ *******************************************************************************
+ */
+   private final HashMap <String, Integer> myColIndexMap;
+d29 2
+a30 2
+ * myRows.get (rowIdx-1) is the InputRow that represents row #rowIdx in this
+ * InputTable.
+d33 1
+a33 1
+   private final ArrayList <InputRow> myRows;
+d39 1
+a39 4
+   private InputTable (String theFileName)
+      throws
+         FileNotFoundException,
+         IOException
+d41 18
+a58 10
+      ArrayList  <String>             theHeadings;
+      LinkedList <ArrayList <String>> theCellRows;
+
+      theHeadings   = new ArrayList  <String>             (0);
+      theCellRows   = new LinkedList <ArrayList <String>> ();
+
+      CsvFileReader.read (theFileName, theHeadings, theCellRows);
+
+      myColIndexMap = buildColIndexMap (theHeadings);
+      myRows        = buildRows        (theCellRows);
+d62 1
+a62 1
+// Private Non-Static Methods
+d66 6
+a71 1
+ * Builds and returns the Map to be used as myColIndexMap, based on theHeadings.
+d74 3
+a76 2
+   private HashMap <String, Integer> buildColIndexMap (
+         List <String> theHeadings)
+d78 8
+a85 7
+      HashMap <String, Integer> theColIndexMap;
+      String                    theHeading;
+      int                       colIdx;
+
+      theColIndexMap = new HashMap <String, Integer> (theHeadings.size () * 3);
+
+      for (colIdx = 1; colIdx <= theHeadings.size (); colIdx ++)
+d87 12
+a98 5
+         theHeading = theHeadings.get (colIdx - 1);
+
+         assert (! theColIndexMap.containsKey (theHeading));
+
+         theColIndexMap.put (theHeading, colIdx);
+d100 2
+a101 20
+
+      return theColIndexMap;
+      }
+
+/*******************************************************************************
+ * Creates the InputRows for this InputTable from theCellRows, stores them in an
+ * ArrayList, and returns it.
+ *******************************************************************************
+ */
+   private ArrayList <InputRow> buildRows (
+         List <ArrayList <String>> theCellRows)
+      {
+      ArrayList <InputRow> theRows;
+      int                  rowIdx;
+      ArrayList <String>   theCells;
+      InputRow             theRow;
+
+      theRows = new ArrayList <InputRow> (theCellRows.size ());
+
+      for (rowIdx = 1; rowIdx <= theCellRows.size (); rowIdx ++)
+d103 2
+a104 7
+         theCells = theCellRows.get (rowIdx - 1);
+
+         assert (theCells.size () == myColIndexMap.size ());
+
+         theRow   = new InputRow (this, rowIdx, theCells);
+
+         theRows.add (theRow);
+d106 4
+a109 20
+
+      return theRows;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Package-Internal Non-Static Methods
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Returns the index of the column whose heading matches theHeading, if any,
+ * otherwise 0.
+ *******************************************************************************
+ */
+   int getColumnIndex (String theHeading)
+      {
+      Integer colIdx;
+
+      colIdx = myColIndexMap.get (theHeading);
+
+      return (colIdx != null)? colIdx: 0;
+d120 4
+a123 8
+ * @@param theFileName            The name of the CSV file.
+ * @@return                       The new InputTable
+ * @@throws FileNotFoundException If thrown when reading the file
+ * @@throws IOException           If thrown when reading the file
+ * @@throws IllegalStateException If the file is empty
+ * @@throws IllegalStateException If two or more column headings are identical
+ * @@throws IllegalStateException If a row is read whose length does not match
+ *                               the number of column headings
+a127 1
+         FileNotFoundException,
+d130 2
+d133 4
+a136 2
+      
+      return new InputTable (theFileName);
+a143 27
+ * Returns an array listing all of the Strings given in a list of Strings that
+ * are not column headings in this InputTable.
+ * 
+ * @@param theHeadings The list of Strings
+ * @@return            (See summary)
+ *******************************************************************************
+ */
+   public String[] findNonHeadings (String... theHeadings)
+      {
+      ArrayList <String> nonHeads;
+
+      barNullArray (theHeadings, "theHeadings");
+   
+      nonHeads = new ArrayList <String> (theHeadings.length);
+
+      for (String theHeading: theHeadings)
+         {
+         if (! myColIndexMap.containsKey (theHeading))
+            {
+            nonHeads.add (theHeading);
+            }
+         }
+
+      return nonHeads.toArray (new String[0]);
+      }
+
+/*******************************************************************************
+d149 1
+a149 1
+   public List <InputRow> getRows ()
+d151 1
+a151 1
+      return Collections.unmodifiableList (myRows);
+@
+
+
+1.5
+log
+@Re-ordered members
+@
+text
+@d8 2
+d162 2
+d183 2
+@
+
+
+1.4
+log
+@Class ProblemMgr.
+@
+text
+@d24 1
+a24 1
+// Public
+d26 1
+a26 1
+
+d28 1
+a28 11
+ * Factory method: Constructs a new InputTable that stores the data given in a
+ * CSV file.
+ * 
+ * @@param theFileName            The name of the CSV file.
+ * @@return                       The new InputTable
+ * @@throws FileNotFoundException If thrown when reading the file
+ * @@throws IOException           If thrown when reading the file
+ * @@throws IllegalStateException If the file is empty
+ * @@throws IllegalStateException If two or more column headings are identical
+ * @@throws IllegalStateException If a row is read whose length does not match
+ *                               the number of column headings
+d31 1
+a31 7
+   public static InputTable newInputTable (String theFileName)
+      throws
+         FileNotFoundException,
+         IOException
+      {
+      return new InputTable (theFileName);
+      }
+d34 2
+a35 5
+ * Returns an array listing all of the Strings given in a list of Strings that
+ * are not column headings in this InputTable.
+ * 
+ * @@param theHeadings The list of Strings
+ * @@return            (See summary)
+d38 1
+a38 27
+   public String[] findNonHeadings (String... theHeadings)
+      {
+      ArrayList <String> nonHeads;
+
+      nonHeads = new ArrayList <String> (theHeadings.length);
+
+      for (String theHeading: theHeadings)
+         {
+         if (! myColIndexMap.containsKey (theHeading))
+            {
+            nonHeads.add (theHeading);
+            }
+         }
+
+      return nonHeads.toArray (new String[0]);
+      }
+
+/*******************************************************************************
+ * Returns the List of InputRows for this InputTable.
+ * 
+ * @@return The List of InputRows, as an unmodifiable view of an ArrayList
+ *******************************************************************************
+ */
+   public List <InputRow> getRows ()
+      {
+      return Collections.unmodifiableList (myRows);
+      }
+d41 1
+a41 19
+// Package-Internal
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Returns the index of the column whose heading matches theHeading, if any,
+ * otherwise 0.
+ *******************************************************************************
+ */
+   int getColumnIndex (String theHeading)
+      {
+      Integer colIdx;
+
+      colIdx = myColIndexMap.get (theHeading);
+
+      return (colIdx != null)? colIdx: 0;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+// Private
+a43 4
+/*******************************************************************************
+ * Constructor.
+ *******************************************************************************
+ */
+d61 4
+d119 22
+d142 31
+a172 1
+ * myColIndexMap.get (theHeading) is the column index for theHeading.
+d175 16
+a190 1
+   private final HashMap <String, Integer> myColIndexMap;
+d193 3
+a195 2
+ * myRows.get (rowIdx-1) is the InputRow that represents row #rowIdx in this
+ * InputTable.
+d198 4
+a201 1
+   private final ArrayList <InputRow> myRows;
+@
+
+
+1.3
+log
+@Moved newProperty to class Category
+@
+text
+@d6 1
+a6 1
+package       com.ibm.witm;
+@
+
+
+1.2
+log
+@//=== ==> /////
+@
+text
+@a7 2
+import static com.ibm.witm.Utility.*;
+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d2 1
+a2 1
+//==============================================================================
+d4 1
+a4 1
+//==============================================================================
+d25 1
+a25 1
+//==============================================================================
+d27 1
+a27 1
+//==============================================================================
+d87 1
+a87 1
+//==============================================================================
+d89 1
+a89 1
+//==============================================================================
+d105 1
+a105 1
+//==============================================================================
+d107 1
+a107 1
+//==============================================================================
+d197 1
+a197 1
+//==============================================================================
+@
+
+
+1.1.1.1
+log
+@Renaming WIT-ML to WIT-M.
+
+@
+text
+@@

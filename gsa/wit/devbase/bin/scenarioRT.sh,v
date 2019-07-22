@@ -1,0 +1,142 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	latest_sce4_20_OSL:1.1.1.1.0.12
+	sce_4_20_OSL:1.1.1.1
+	sce_4_05_20040511:1.1.1.1
+	sce_4_00_20040201:1.1.1.1
+	nextGenBranch:1.1.1.1.0.10
+	nextGenRoot:1.1.1.1
+	sce_3_30_20030627:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#!/bin/rexx
+/*
+ * Scenario Regression Test
+ * Run unitTest, atptest, and cmrptest and compare results with
+ * previous run
+ */
+
+parse arg parms
+parse source . . fullExecutableName
+executableName = substr( fullExecutableName, lastpos("/",fullExecutableName)+1 )
+
+test=""
+provideHelp=0
+stop=0
+keep=0
+myReturnCode = 0
+
+do forever
+   parse var parms "-" parm parms
+   if parm="all" then do
+      test = test "unitTest atpTest cmrpTest"
+      end
+   else if parm="unitTest"   then test = test "unitTest"
+   else if parm="atpTest"    then test = test "atpTest"
+   else if parm="cmrpTest"   then test = test "cmrpTest"
+   else if parm="keep"       then keep = 1
+   else do
+      provideHelp=1
+      leave
+   end
+   if strip(parms)="" then leave
+end
+
+if provideHelp then do
+  say executableName" - run scenario regresson test"
+  say "syntax:" executableName  "[-all] "
+  say "                      [-unitTest] [-atpTest] [-cmrpTest]"
+  say "                      [-keep]"
+  say "        unitTest    - run unitTest regression test"
+  say "        atpTest     - run atpTest regression test"
+  say "        cmrpTest    - run cmrpTest regression test"
+  say "        all         - run all of the above regression tests"
+  say "        keep        - output from running executable is not removed"
+  exit 
+end
+ 
+
+/* Loop once for each test to be run */
+do i=1 to words(test) 
+
+  curTest = word(test, i)
+  tempFileName = curTest || ".rt.temp"
+  archiveFileName =  curTest || ".rt.out"
+
+  say "Running:" curTest
+  curTest ">" || tempFileName "2>&1"
+  retCode = rc
+  if retCode <> 0 then do
+    say "Error executing" curTest
+    myReturnCode = 1
+  end
+  else do
+    say "Checking output of" curTest
+    "diff" archiveFileName tempFileName
+    retCode = rc
+    if retCode <> 0 then do
+      say curTest "failed."
+      say "Output does not match archived output in file named:",
+          archiveFileName 
+      myReturnCode = 1
+    end
+    else do
+      say curTest "passed."
+    end
+  end
+  
+  if ( \keep ) then "rm" tempFileName
+
+end
+
+if myReturnCode=0 then
+  say "All Tests Passed"
+else
+  say "A test FAILED"
+
+exit myReturnCode
+@
+
+
+1.1.1.1
+log
+@Import bin
+@
+text
+@@

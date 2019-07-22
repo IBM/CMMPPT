@@ -1,0 +1,1138 @@
+head	1.4;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.4
+date	2001.04.06.19.19.18;	author liusz;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2001.04.05.18.19.17;	author liusz;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2001.04.05.16.28.09;	author liusz;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2001.04.04.18.43.50;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.4
+log
+@By Shuzheng Liu: modified function "CompareParts" on comparing part category.
+@
+text
+@/*
+ *	Description: WitXMLApi.C
+ *		function WitXMLRead is used to read an input file in xml format for
+ *		project WIT	
+ *		
+ *	Owner:
+ *		IBM T. J. Watson Research Center
+ *		Route 134
+ *		Yorktown Heights, NY 10598
+ *
+ *	Author: Shuzheng Liu (LSZ)     
+ *		35-238   liusz@@watson.ibm.com    8-862-2952
+ *
+ *	Proprietary Statement:
+ *		IBM Confidential
+ *		(C) Copyright IBM Corp. 2000
+ *
+ * 	Change History:
+ *    	March, 2001  LSZ: New code.
+ */
+
+
+#include "witXMLApi.h"
+
+void PrintErrorMsg(char *objname,char *name);
+void PrintErrorMsg(char *objname,char *name1,char *name2);
+void PrintErrorMsg(char *objname,int number1,int number2);
+void PrintErrorMsg(char *objname,char* attrname,int value1,int value2);
+void PrintErrorMsg(char *objname,char* attrname,float value1,float value2);
+void PrintErrorMsg(char *objname,char* attrname,char *value1,char *value2);
+void PrintErrorMsg(char *objname,char* attrname,int *value1,int *value2,int nperiods);
+void PrintErrorMsg(char *objname,char* attrname,float *value1,float *value2,int nperiods);
+
+int witXMLRead(	WitRun * const theWitRun,
+				const char *fn 			)	// name of input file
+{
+	int retVal;
+	WitXML awitXML;
+
+	retVal = awitXML.WitReadXML(theWitRun,fn);
+
+	if (!retVal)
+		cout << "\nFinished reading file '" << fn << "'.\n\n";
+
+	return retVal;
+}
+
+int witXMLWrite(WitRun * const theWitRun,
+				const char *fndtd,		// name of dtd file
+				const char *fnout,		// name of output file
+				const char *release	)	// release
+
+{
+	int nPeriod,retVal;
+
+	// Get NPeriods
+	witGetNPeriods(theWitRun,&nPeriod);
+
+	WitXML awitXML(nPeriod);
+		
+	retVal = awitXML.WitWriteXML(theWitRun,fndtd,fnout,release);
+
+	if (!retVal)
+		cout << "\nFile '" << fnout << "' has been successfully generated.\n\n";
+
+	return retVal;
+}
+
+void witXMLTerminate()
+{
+	// Call the termination method
+	XMLPlatformUtils::Terminate();
+}
+
+int CompareWitRuns(WitRun *wr1,WitRun *wr2)
+{
+	int NPeriods;
+
+	CompareProblems(wr1,wr2);
+	witGetNPeriods(wr1,&NPeriods);
+	CompareParts(wr1,wr2,NPeriods);
+	CompareDemands(wr1,wr2,NPeriods);
+	CompareOperations(wr1,wr2,NPeriods);
+	CompareBomEntries(wr1,wr2,NPeriods);
+	CompareBopEntries(wr1,wr2,NPeriods);
+	CompareSubEntries(wr1,wr2,NPeriods);
+
+	return 0;
+}
+
+int CompareProblems(WitRun *wr1,WitRun *wr2)
+{
+	witBoolean boolVal1,boolVal2;
+	int intVal1,intVal2;
+	float floatVal1,floatVal2;
+	char *charVal1,*charVal2;
+
+	witGetAccAfterOptImp(wr1,&boolVal1);
+	witGetAccAfterOptImp(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","accAfterOptImp",boolVal1,boolVal2);
+
+	witGetAccAfterSoftLB(wr1,&boolVal1);
+	witGetAccAfterSoftLB(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","accAfterSoftLB",boolVal1,boolVal2);
+   
+	witGetAutoPriority(wr1,&boolVal1);
+	witGetAutoPriority(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","autoPriority",boolVal1,boolVal2);
+
+	witGetCapCost(wr1,&floatVal1);
+	witGetCapCost(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","capCost",floatVal1,floatVal2);
+
+	witGetComputeCriticalList(wr1,&boolVal1);
+	witGetComputeCriticalList(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","computeCriticalList",boolVal1,boolVal2);
+
+	witGetEquitability(wr1,&intVal1);
+	witGetEquitability(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","equitability",intVal1,intVal2);
+
+	witGetExecEmptyBom(wr1,&intVal1);
+	witGetExecEmptyBom(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","execEmptyBom",intVal1,intVal2);
+
+	witGetExpCutoff(wr1,&floatVal1);
+	witGetExpCutoff(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","expCutoff",floatVal1,floatVal2);
+
+	witGetForcedMultiEq(wr1,&boolVal1);
+	witGetForcedMultiEq(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","forcedMultiEq",boolVal1,boolVal2);
+
+	witGetHashTableSize(wr1,&intVal1);
+	witGetHashTableSize(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","hashTableSize",intVal1,intVal2);
+
+	witGetIndependentOffsets(wr1,&intVal1);
+	witGetIndependentOffsets(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","independentOffsets",intVal1,intVal2);
+
+	witGetInvCost(wr1,&floatVal1);
+	witGetInvCost(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","invCost",floatVal1,floatVal2);
+
+	witGetLotSizeTol(wr1,&floatVal1);
+	witGetLotSizeTol(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","lotSizeTol",floatVal1,floatVal2);
+
+	witGetMultiExec(wr1,&boolVal1);
+	witGetMultiExec(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","multiExec",boolVal1,boolVal2);
+
+	witGetMultiRoute(wr1,&boolVal1);
+	witGetMultiRoute(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","multiRoute",boolVal1,boolVal2);
+
+	witGetNPeriods(wr1,&intVal1);
+	witGetNPeriods(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","NPeriods",intVal1,intVal2);
+
+	witGetObj2Winv(wr1,&floatVal1);
+	witGetObj2Winv(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","obj2Winv",floatVal1,floatVal2);
+
+	witGetObj2Wrev(wr1,&floatVal1);
+	witGetObj2Wrev(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","obj2Wrev",floatVal1,floatVal2);
+
+	witGetObj2Wserv(wr1,&floatVal1);
+	witGetObj2Wserv(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","obj2Wserv",floatVal1,floatVal2);
+
+	witGetObj2Wsub(wr1,&floatVal1);
+	witGetObj2Wsub(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","obj2Wsub",floatVal1,floatVal2);
+
+	witGetObjChoice(wr1,&intVal1);
+	witGetObjChoice(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","objChoice",intVal1,intVal2);
+
+	witGetOptInitMethod(wr1,&charVal1);
+	witGetOptInitMethod(wr2,&charVal2);
+	if (  strcmp(charVal1,charVal2) )
+		PrintErrorMsg("problem","optInitMethod",charVal1,charVal2);
+#ifndef _MSC_VER
+	witFree(charVal1);
+	witFree(charVal2);
+#endif
+
+	witGetOslMesgFileName(wr1,&charVal1);
+	witGetOslMesgFileName(wr2,&charVal2);
+	if (  strcmp(charVal1,charVal2) )
+		PrintErrorMsg("problem","oslMesgFileName",charVal1,charVal2);
+#ifndef _MSC_VER
+	witFree(charVal1);
+	witFree(charVal2);
+#endif
+
+	witGetOutputPrecision(wr1,&intVal1);
+	witGetOutputPrecision(wr2,&intVal2);
+	if ( intVal1!=intVal2 )
+		PrintErrorMsg("problem","outputPrecision",intVal1,intVal2);
+
+	witGetPenExec(wr1,&boolVal1);
+	witGetPenExec(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","penExec",boolVal1,boolVal2);
+
+	witGetPeriodsPerYear(wr1,&floatVal1);
+	witGetPeriodsPerYear(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","periodsPerYear",floatVal1,floatVal2);
+
+	witGetRoundReqVols(wr1,&boolVal1);
+	witGetRoundReqVols(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","roundReqVols",boolVal1,boolVal2);
+
+	witGetSkipFailures(wr1,&boolVal1);
+	witGetSkipFailures(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","skipFailures",boolVal1,boolVal2);
+
+	witGetTitle(wr1,&charVal1);
+	witGetTitle(wr2,&charVal2);
+	if (  CompareStrings(charVal1,charVal2) )
+		PrintErrorMsg("problem","title",charVal1,charVal2);
+#ifndef _MSC_VER
+	witFree(charVal1);
+	witFree(charVal2);
+#endif
+
+	witGetTruncOffsets(wr1,&boolVal1);
+	witGetTruncOffsets(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","truncOffsets",boolVal1,boolVal2);
+
+	witGetTwoWayMultiExec(wr1,&boolVal1);
+	witGetTwoWayMultiExec(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","twoWayMultiExec",boolVal1,boolVal2);
+
+	witGetUseFocusHorizons(wr1,&boolVal1);
+	witGetUseFocusHorizons(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","useFocusHorizons",boolVal1,boolVal2);
+
+	witGetWbounds(wr1,&floatVal1);
+	witGetWbounds(wr2,&floatVal2);
+	if ( floatVal1!=floatVal2 )
+		PrintErrorMsg("problem","",floatVal1,floatVal2);
+
+	witGetWit34Compatible(wr1,&boolVal1);
+	witGetWit34Compatible(wr2,&boolVal2);
+	if ( boolVal1!=boolVal2 )
+		PrintErrorMsg("problem","wit34Compatible",boolVal1,boolVal2);
+
+	return 0;
+}
+
+int CompareParts(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean partExists,boolVal1,boolVal2;
+	int nparts1,nparts2,objChoice,*intsVal1,*intsVal2;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2,*hardLB1,*softLB1,*hardUB1,*hardLB2,*softLB2,*hardUB2;
+	char **partList1,**partList2;
+	witAttr partCategory1,partCategory2;
+
+	witGetParts(wr1,&nparts1,&partList1);
+	witGetParts(wr2,&nparts2,&partList2);
+	if ( nparts1!=nparts2 )
+		PrintErrorMsg("part",nparts1,nparts2);
+
+	witGetObjChoice(wr1,&objChoice);
+
+	for ( int p=0; p<nparts1; p++ )
+	{
+		witGetPartExists( wr2,partList1[p],&partExists);
+		if ( !partExists )
+			PrintErrorMsg("part",partList1[p]);
+
+		if ( strcmp(partList1[p],partList2[p]))
+			PrintErrorMsg("part",partList1[p],partList2[p]);
+
+		witGetPartCategory(wr1,partList1[p],&partCategory1);
+		witGetPartCategory(wr2,partList2[p],&partCategory2);
+		if ( strcmp(partCategory1, partCategory2) )
+			PrintErrorMsg(partList1[p],"category",partCategory1,partCategory2);
+
+		if (partCategory1==WitMATERIAL)
+		{
+			witGetPartBuildAheadUB(wr1,partList1[p],&intsVal1);
+			witGetPartBuildAheadUB(wr2,partList2[p],&intsVal2);
+			if ( CompareIntVector(intsVal1,intsVal2,NPeriods))
+				PrintErrorMsg("part","buildAheadUB",intsVal1,intsVal2,NPeriods);
+
+			witGetPartBuildAsap(wr1,partList1[p],&boolVal1);
+			witGetPartBuildAsap(wr2,partList2[p],&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("part","buildAsap",boolVal1,boolVal2);
+
+			witGetPartBuildNstn(wr1,partList1[p],&boolVal1);
+			witGetPartBuildNstn(wr2,partList2[p],&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("part","buildNstn",boolVal1,boolVal2);
+
+			if (objChoice==1)
+			{
+				witGetPartObj1StockCost(wr1,partList1[p],&floatsVal1);
+				witGetPartObj1StockCost(wr2,partList2[p],&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("part","obj1StockCost",intsVal1,intsVal2,NPeriods);
+			}
+
+			witGetPartStockBounds(wr1,partList1[p],&hardLB1,&softLB1,&hardUB1);
+			witGetPartStockBounds(wr2,partList2[p],&hardLB2,&softLB2,&hardUB2);
+			if ( CompareFloatVector(hardLB1,hardLB2,NPeriods) )
+				PrintErrorMsg("part","stockBounds hardLB",hardLB1,hardLB2,NPeriods);
+
+			if ( CompareFloatVector(softLB1,softLB2,NPeriods) )
+				PrintErrorMsg("part","stockBounds softLB",softLB1,softLB2,NPeriods);
+
+			if ( CompareFloatVector(hardUB1,hardUB2,NPeriods) )
+				PrintErrorMsg("part","stockBounds hardUB",hardUB1,hardUB2,NPeriods);
+		}
+
+		if (objChoice==1)
+		{
+			witGetPartObj1ScrapCost(wr1,partList1[p],&floatsVal1);
+			witGetPartObj1ScrapCost(wr2,partList2[p],&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("part","obj1ScrapCost",floatsVal1,floatsVal2,NPeriods);
+		}
+
+		witGetPartSelForDel(wr1,partList1[p],&boolVal1);
+		witGetPartSelForDel(wr2,partList2[p],&boolVal2);
+		if ( boolVal1!=boolVal2 )
+			PrintErrorMsg("part","selForDel",boolVal1,boolVal2);
+
+		witGetPartSupplyVol(wr1,partList1[p],&floatsVal1);
+		witGetPartSupplyVol(wr2,partList2[p],&floatsVal2);
+		if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+			PrintErrorMsg("part","supplyVol",floatsVal1,floatsVal2,NPeriods);
+
+		witGetPartUnitCost(wr1,partList1[p],&floatVal1); 
+		witGetPartUnitCost(wr2,partList2[p],&floatVal2); 
+		if ( floatVal1!=floatVal2 )
+			PrintErrorMsg("part","unitCost",floatVal1,floatVal2);
+
+		witFree( partList1[p] );
+		witFree( partList2[p] );
+	}
+         
+	witFree( partList1 );
+	witFree( partList2 );
+
+	return 0;
+}
+
+// get Demands from wr1 and wr2 and assert they are equal
+int CompareDemands(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean boolVal1,boolVal2;
+	int nparts,objChoice,ndemands1,ndemands2,intVal1,intVal2,*intsVal1,*intsVal2;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2,*hardLB1,*softLB1,*hardUB1,*hardLB2,*softLB2,*hardUB2;
+	char **partList,**demandList1,**demandList2;
+
+	witGetParts(wr1,&nparts,&partList);
+	witGetObjChoice(wr1,&objChoice);
+
+	for ( int p=0; p<nparts; p++ )
+	{
+		witGetPartDemands(wr1,partList[p],&ndemands1,&demandList1);
+		witGetPartDemands(wr2,partList[p],&ndemands2,&demandList2);
+		if ( ndemands1!=ndemands2 )
+			PrintErrorMsg("demand",ndemands1,ndemands2);
+
+		for (int d=0; d<ndemands1; d++)
+		{
+			if ( strcmp(demandList1[d],demandList2[d]))
+				PrintErrorMsg("demand",demandList1[d],demandList2[d]);
+
+			witGetDemandBuildAheadUB(wr1,partList[p],demandList1[d],&intsVal1);
+			witGetDemandBuildAheadUB(wr2,partList[p],demandList2[d],&intsVal2);
+			if ( CompareIntVector(intsVal1,intsVal2,NPeriods))
+				PrintErrorMsg("demand","buildAheadUB",intsVal1,intsVal2,NPeriods);
+
+			witGetDemandDemandVol(wr1,partList[p],demandList1[d],&floatsVal1);
+			witGetDemandDemandVol(wr2,partList[p],demandList2[d],&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("demand","demandVol",floatsVal1,floatsVal2,NPeriods);
+
+			witGetDemandFocusHorizon(wr1,partList[p],demandList1[d],&intVal1);
+			witGetDemandFocusHorizon(wr2,partList[p],demandList2[d],&intVal2);
+			if (intVal1!=intVal2)
+				PrintErrorMsg("demand","focusHorizon",intVal1,intVal2);
+
+			witGetDemandFssShipVol(wr1,partList[p],demandList1[d],&floatsVal1);
+			witGetDemandFssShipVol(wr2,partList[p],demandList2[d],&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("demand","fssShipVol",floatsVal1,floatsVal2,NPeriods);
+
+			witGetDemandGrossRev(wr1,partList[p],demandList1[d],&floatVal1);
+			witGetDemandGrossRev(wr2,partList[p],demandList2[d],&floatVal2);
+			if ( floatVal1!=floatVal2 )
+				PrintErrorMsg("demand","grossRev",floatVal1,floatVal2);
+
+			if (objChoice==1)
+			{
+				witGetDemandObj1CumShipReward(wr1,partList[p],demandList1[d],&floatsVal1);
+				witGetDemandObj1CumShipReward(wr2,partList[p],demandList2[d],&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("demand","obj1CumShipReward",floatsVal1,floatsVal2,NPeriods);
+
+				witGetDemandObj1ShipReward(wr1,partList[p],demandList1[d],&floatsVal1);
+				witGetDemandObj1ShipReward(wr2,partList[p],demandList2[d],&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("demand","obj1ShipReward",floatsVal1,floatsVal2,NPeriods);
+			}
+
+			witGetDemandPrefBuildAhead(wr1,partList[p],demandList1[d],&intVal1);
+			witGetDemandPrefBuildAhead(wr2,partList[p],demandList2[d],&intVal2);
+			if (intVal1!=intVal2)
+				PrintErrorMsg("demand","prefBuildAhead",intVal1,intVal2);
+
+			witGetDemandPriority(wr1,partList[p],demandList1[d],&intsVal1);
+			witGetDemandPriority(wr2,partList[p],demandList2[d],&intsVal2);
+			if ( CompareIntVector(intsVal1,intsVal2,NPeriods))
+				PrintErrorMsg("demand","priority",intsVal1,intsVal2,NPeriods);
+
+			witGetDemandSelForDel(wr1,partList[p],demandList1[d],&boolVal1);
+			witGetDemandSelForDel(wr2,partList[p],demandList2[d],&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("demand","selForDel",boolVal1,boolVal2);
+
+			witGetDemandShipLateUB(wr1,partList[p],demandList1[d],&intsVal1);
+			witGetDemandShipLateUB(wr2,partList[p],demandList2[d],&intsVal2);
+			if ( CompareIntVector(intsVal1,intsVal2,NPeriods))
+				PrintErrorMsg("demand","shipLateUB",intsVal1,intsVal2,NPeriods);
+
+			witGetDemandShipVol(wr1,partList[p],demandList1[d],&floatsVal1);
+			witGetDemandShipVol(wr2,partList[p],demandList2[d],&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("demand","shipVol",floatsVal1,floatsVal2,NPeriods);
+
+			witGetDemandCumShipBounds(wr1,partList[p],demandList1[d],&hardLB1,&softLB1,&hardUB1);
+			witGetDemandCumShipBounds(wr2,partList[p],demandList2[d],&hardLB2,&softLB2,&hardUB2);
+			if ( CompareFloatVector(hardLB1,hardLB2,NPeriods) )
+				PrintErrorMsg("demand","cumShipBounds hardLB",floatsVal1,floatsVal2,NPeriods);
+			if ( CompareFloatVector(softLB1,softLB2,NPeriods) )
+				PrintErrorMsg("demand","cumShipBounds softLB",floatsVal1,floatsVal2,NPeriods);
+			if ( CompareFloatVector(hardUB1,hardUB2,NPeriods) )
+				PrintErrorMsg("demand","cumShipBounds hardUB",floatsVal1,floatsVal2,NPeriods);
+
+			witFree( demandList1[d] );
+			witFree( demandList2[d] );
+		}
+
+		witFree( demandList1 );
+		witFree( demandList2 );
+		witFree( partList[p] );
+	}
+         
+	witFree( partList );
+	return 0;
+}
+
+// get Operations from wr1 and wr2 and assert they are equal
+int CompareOperations(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean opExists,boolVal1,boolVal2;
+	int nops1,nops2,objChoice;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2,*hardLB1,*softLB1,*hardUB1,*hardLB2,*softLB2,*hardUB2;
+	char **opList1,**opList2;
+
+	witGetOperations(wr1,&nops1,&opList1);
+	witGetOperations(wr2,&nops2,&opList2);
+	if ( nops1!=nops2 )
+		PrintErrorMsg("operation",nops1,nops2);
+
+	witGetObjChoice(wr1,&objChoice);
+   
+	for ( int op=0; op<nops1; op++ )
+	{
+		witGetOperationExists(wr2,opList1[op],&opExists);
+		if ( !opExists )
+			PrintErrorMsg("operation",opList1[op]);
+
+		if ( strcmp(opList1[op],opList2[op]))
+			PrintErrorMsg("operation",opList1[op],opList2[op]);
+
+		witGetOperationExecPenalty(wr1,opList1[op],&floatVal1);
+		witGetOperationExecPenalty(wr2,opList2[op],&floatVal2);
+		if ( floatVal1!=floatVal2 )
+			PrintErrorMsg("operation","execPenalty",floatVal1,floatVal2);
+
+		witGetOperationExecVol(wr1,opList1[op],&floatsVal1);
+		witGetOperationExecVol(wr2,opList2[op],&floatsVal2);
+		if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+			PrintErrorMsg("operation","execVol",floatsVal1,floatsVal2,NPeriods);
+
+		witGetOperationIncLotSize(wr1,opList1[op],&floatsVal1);
+		witGetOperationIncLotSize(wr2,opList2[op],&floatsVal2);
+		if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+			PrintErrorMsg("operation","incLotSize",floatsVal1,floatsVal2,NPeriods);
+
+		witGetOperationMinLotSize(wr1,opList1[op],&floatsVal1);
+		witGetOperationMinLotSize(wr2,opList2[op],&floatsVal2);
+		if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+			PrintErrorMsg("operation","minLotSize",floatsVal1,floatsVal2,NPeriods);
+
+		if (objChoice==1)
+		{
+			witGetOperationObj1ExecCost(wr1,opList1[op],&floatsVal1);
+			witGetOperationObj1ExecCost(wr2,opList2[op],&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("operation","obj1ExecCost",floatsVal1,floatsVal2,NPeriods);
+		}
+
+		witGetOperationObj2AuxCost(wr1,opList1[op],&floatVal1);
+		witGetOperationObj2AuxCost(wr2,opList2[op],&floatVal2);
+		if ( floatVal1!=floatVal2 )
+			PrintErrorMsg("operation","obj2AuxCost",floatVal1,floatVal2);
+
+		witGetOperationSelForDel(wr1,opList1[op],&boolVal1);
+		witGetOperationSelForDel(wr2,opList2[op],&boolVal2);
+		if ( boolVal1!=boolVal2 )
+			PrintErrorMsg("operation","selForDel",boolVal1,boolVal2);
+
+		witGetOperationYieldRate(wr1,opList1[op],&floatsVal1);
+		witGetOperationYieldRate(wr2,opList2[op],&floatsVal2);
+		if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+			PrintErrorMsg("operation","yelForDel",floatsVal1,floatsVal2,NPeriods);
+
+		witGetOperationExecBounds(wr1,opList1[op],&hardLB1,&softLB1,&hardUB1);
+		witGetOperationExecBounds(wr2,opList2[op],&hardLB2,&softLB2,&hardUB2);
+		if ( CompareFloatVector(hardLB1,hardLB2,NPeriods) )
+			PrintErrorMsg("operation","execBounds hardLB",floatsVal1,floatsVal2,NPeriods);
+
+		if ( CompareFloatVector(softLB1,softLB2,NPeriods) )
+			PrintErrorMsg("operation","execBounds softLB",floatsVal1,floatsVal2,NPeriods);
+
+		if ( CompareFloatVector(hardUB1,hardUB2,NPeriods) )
+			PrintErrorMsg("operation","execBounds hardUB",floatsVal1,floatsVal2,NPeriods);
+
+		witFree( opList1[op] );
+		witFree( opList2[op] );
+	}
+
+	witFree( opList1 );
+	witFree( opList2 );
+
+	return 0;
+}
+
+// get BomEntries from wr1 and wr2 and assert they are equal
+int CompareBomEntries(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean boolVal1,boolVal2;
+	int nops,nentries1,nentries2,intVal1,intVal2;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2;
+	char **opList;
+
+	witGetOperations(wr1,&nops,&opList);
+
+	for ( int op=0; op<nops; op++ )
+	{
+		witGetOperationNBomEntries(wr1,opList[op],&nentries1);
+		witGetOperationNBomEntries(wr2,opList[op],&nentries2);
+		if ( nentries1!=nentries2 )
+			PrintErrorMsg("bomEntry",nentries1,nentries2);
+
+		for (int en=0; en<nentries1; en++)
+		{
+			witGetBomEntryConsRate(wr1,opList[op],en,&floatsVal1);
+			witGetBomEntryConsRate(wr2,opList[op],en,&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("bomEntry","consRate",floatsVal1,floatsVal2,NPeriods);
+
+			witGetBomEntryEarliestPeriod(wr1,opList[op],en,&intVal1);
+			witGetBomEntryEarliestPeriod(wr2,opList[op],en,&intVal2);
+			if (intVal1!=intVal2)
+				PrintErrorMsg("bomEntry","earliestPeriod",intVal1,intVal2);
+
+			witGetBomEntryFalloutRate(wr1,opList[op],en,&floatVal1);
+			witGetBomEntryFalloutRate(wr2,opList[op],en,&floatVal2);
+			if ( floatVal1!=floatVal2 )
+				PrintErrorMsg("bomEntry","falloutRate",floatVal1,floatVal2);
+
+			witGetBomEntryLatestPeriod(wr1,opList[op],en,&intVal1);
+			witGetBomEntryLatestPeriod(wr2,opList[op],en,&intVal2);
+			if ( intVal1!=intVal2 )
+				PrintErrorMsg("bomEntry","latestPeriod",intVal1,intVal2);
+
+			witGetBomEntryMandEC(wr1,opList[op],en,&boolVal1);
+			witGetBomEntryMandEC(wr2,opList[op],en,&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("bomEntry","mandEC",boolVal1,boolVal2);
+
+			witGetBomEntryOffset(wr1,opList[op],en,&floatsVal1);
+			witGetBomEntryOffset(wr2,opList[op],en,&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("bomEntry","offset",floatsVal1,floatsVal2,NPeriods);
+
+			witGetBomEntrySelForDel(wr1,opList[op],en,&boolVal1);
+			witGetBomEntrySelForDel(wr2,opList[op],en,&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("bomEntry","selForDel",boolVal1,boolVal2);
+		}
+
+		witFree( opList[op] );
+	}
+
+	witFree( opList );
+
+	return 0;
+}
+
+// get BopEntries from wr1 and wr2 and assert they are equal
+int CompareBopEntries(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean boolVal1,boolVal2;
+	int nops,nentries1,nentries2,intVal1,intVal2;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2;
+	char **opList;
+
+	witGetOperations(wr1,&nops,&opList);
+
+	for ( int op=0; op<nops; op++ )
+	{
+		witGetOperationNBopEntries(wr1,opList[op],&nentries1);
+		witGetOperationNBopEntries(wr2,opList[op],&nentries2);
+		if ( nentries1!=nentries2 )
+			PrintErrorMsg("bopEntry",nentries1,nentries2);
+
+		for (int en=0; en<nentries1; en++)
+		{
+			witGetBopEntryEarliestPeriod(wr1,opList[op],en,&intVal1);
+			witGetBopEntryEarliestPeriod(wr2,opList[op],en,&intVal2);
+			if (intVal1!=intVal2)
+				PrintErrorMsg("bopEntry","earliestPeriod",intVal1,intVal2);
+
+			witGetBopEntryExpAllowed(wr1,opList[op],en,&boolVal1);
+			witGetBopEntryExpAllowed(wr2,opList[op],en,&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("bopEntry","expAllowed",boolVal1,boolVal2);
+
+			witGetBopEntryExpAversion(wr1,opList[op],en,&floatVal1);
+			witGetBopEntryExpAversion(wr2,opList[op],en,&floatVal2);
+			if ( floatVal1!=floatVal2 )
+				PrintErrorMsg("bopEntry","expAversion",floatVal1,floatVal2);
+
+			witGetBopEntryLatestPeriod(wr1,opList[op],en,&intVal1);
+			witGetBopEntryLatestPeriod(wr2,opList[op],en,&intVal2);
+			if (intVal1!=intVal2)
+				PrintErrorMsg("bopEntry","latestPeriod",intVal1,intVal2);
+
+			witGetBopEntryOffset(wr1,opList[op],en,&floatsVal1);
+			witGetBopEntryOffset(wr2,opList[op],en,&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("bopEntry","offset",floatsVal1,floatsVal2,NPeriods);
+
+			witGetBopEntryProductRate(wr1,opList[op],en,&floatsVal1);
+			witGetBopEntryProductRate(wr2,opList[op],en,&floatsVal2);
+			if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+				PrintErrorMsg("bopEntry","productRate",floatsVal1,floatsVal2,NPeriods);
+
+			witGetBopEntrySelForDel(wr1,opList[op],en,&boolVal1);
+			witGetBopEntrySelForDel(wr2,opList[op],en,&boolVal2);
+			if ( boolVal1!=boolVal2 )
+				PrintErrorMsg("bopEntry","selForDel",boolVal1,boolVal2);
+		}
+
+		witFree( opList[op] );
+	}
+
+	witFree( opList );
+
+	return 0;
+}
+
+// get SubEntries from wr1 and wr2 and assert they are equal
+int CompareSubEntries(WitRun *wr1,WitRun *wr2,int NPeriods)
+{
+	witBoolean boolVal1,boolVal2;
+	int nops,objChoice,offSet,nentries,nsubentries1,nsubentries2,intVal1,intVal2;
+	float floatVal1,floatVal2,*floatsVal1,*floatsVal2;
+	char **opList;
+
+	witGetOperations(wr1,&nops,&opList);
+	witGetObjChoice(wr1,&objChoice);
+	witGetIndependentOffsets(wr1,&offSet);
+
+	for ( int op=0; op<nops; op++ )
+	{
+		witGetOperationNBomEntries(wr1,opList[op],&nentries);
+
+		for (int en=0; en<nentries; en++)
+		{
+			witGetBomEntryNSubsBomEntries(wr1,opList[op],en,&nsubentries1);
+			witGetBomEntryNSubsBomEntries(wr2,opList[op],en,&nsubentries2);
+			if ( nsubentries1!=nsubentries2 )
+				PrintErrorMsg("subEntry",nsubentries1,nsubentries2);
+
+			for (int sen=0; sen<nsubentries1; sen++)
+			{
+				witGetSubsBomEntryConsRate(wr1,opList[op],en,sen,&floatsVal1);
+				witGetSubsBomEntryConsRate(wr2,opList[op],en,sen,&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("subEntry","consRate",floatsVal1,floatsVal2,NPeriods);
+
+				witGetSubsBomEntryEarliestPeriod(wr1,opList[op],en,sen,&intVal1);
+				witGetSubsBomEntryEarliestPeriod(wr2,opList[op],en,sen,&intVal2);
+				if (intVal1!=intVal2)
+					PrintErrorMsg("subEntry","earliestPeriod",intVal1,intVal2);
+
+				witGetSubsBomEntryExpAllowed(wr1,opList[op],en,sen,&boolVal1);
+				witGetSubsBomEntryExpAllowed(wr2,opList[op],en,sen,&boolVal2);
+				if ( boolVal1!=boolVal2 )
+					PrintErrorMsg("subEntry","expAllowed",boolVal1,boolVal2);
+
+				witGetSubsBomEntryExpNetAversion(wr1,opList[op],en,sen,&floatVal1);
+				witGetSubsBomEntryExpNetAversion(wr2,opList[op],en,sen,&floatVal2);
+				if ( floatVal1!=floatVal2 )
+					PrintErrorMsg("subEntry","expNetAversion",floatVal1,floatVal2);
+
+				witGetSubsBomEntryFalloutRate(wr1,opList[op],en,sen,&floatVal1);
+				witGetSubsBomEntryFalloutRate(wr2,opList[op],en,sen,&floatVal2);
+				if ( floatVal1!=floatVal2 )
+					PrintErrorMsg("subEntry","falloutRate",floatVal1,floatVal2);
+
+				witGetSubsBomEntryLatestPeriod(wr1,opList[op],en,sen,&intVal1);
+				witGetSubsBomEntryLatestPeriod(wr2,opList[op],en,sen,&intVal2);
+				if (intVal1!=intVal2)
+					PrintErrorMsg("subEntry","latestPeriod",intVal1,intVal2);
+
+				witGetSubsBomEntryMrpNetAllowed(wr1,opList[op],en,sen,&boolVal1);
+				witGetSubsBomEntryMrpNetAllowed(wr2,opList[op],en,sen,&boolVal2);
+				if ( boolVal1!=boolVal2 )
+					PrintErrorMsg("subEntry","mrpNetAllowed",boolVal1,boolVal2);
+
+				witGetSubsBomEntryNetAllowed(wr1,opList[op],en,sen,&boolVal1);
+				witGetSubsBomEntryNetAllowed(wr2,opList[op],en,sen,&boolVal2);
+				if ( boolVal1!=boolVal2 )
+					PrintErrorMsg("subEntry","netAllowed",boolVal1,boolVal2);
+
+				if (objChoice==1)
+				{
+					witGetSubsBomEntryObj1SubCost(wr1,opList[op],en,sen,&floatsVal1);
+					witGetSubsBomEntryObj1SubCost(wr2,opList[op],en,sen,&floatsVal2);
+					if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+						PrintErrorMsg("subEntry","obj1SubCost",floatsVal1,floatsVal2,NPeriods);
+				}
+
+				witGetSubsBomEntryObj2SubPenalty(wr1,opList[op],en,sen,&floatVal1);
+				witGetSubsBomEntryObj2SubPenalty(wr2,opList[op],en,sen,&floatVal2);
+				if ( floatVal1!=floatVal2 )
+					PrintErrorMsg("subEntry","obj2SubPenalty",floatVal1,floatVal2);
+
+				witGetSubsBomEntryOffset(wr1,opList[op],en,sen,&floatsVal1);
+				witGetSubsBomEntryOffset(wr2,opList[op],en,sen,&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("subEntry","offset",floatsVal1,floatsVal2,NPeriods);
+
+				witGetSubsBomEntrySelForDel(wr1,opList[op],en,sen,&boolVal1);
+				witGetSubsBomEntrySelForDel(wr2,opList[op],en,sen,&boolVal2);
+				if ( boolVal1!=boolVal2 )
+					PrintErrorMsg("subEntry","selForDel",boolVal1,boolVal2);
+
+				witGetSubsBomEntrySubVol(wr1,opList[op],en,sen,&floatsVal1);
+				witGetSubsBomEntrySubVol(wr2,opList[op],en,sen,&floatsVal2);
+				if ( CompareFloatVector(floatsVal1,floatsVal2,NPeriods) )
+					PrintErrorMsg("subEntry","subVol",floatsVal1,floatsVal2,NPeriods);
+			}
+		}
+
+		witFree( opList[op] );
+	}
+
+	witFree( opList );
+
+	return 0;
+}
+
+int CompareStrings(char *str1,char *str2)
+{
+	int size1,size2,i;
+
+	if (strcmp(str1,str2)==0)
+		return 0;
+
+	size1 = strlen(str1) - 1;
+	size2 = strlen(str2) - 1;
+	if (size1==size2)
+		return 1;
+
+    for (i=size1;i>=0;i--)		// remove trailing white space
+		if (str1[i]!=' ' && str1[i]!='\t')
+			break;
+	size1 = i;
+	str1[i+1] = 0;
+    for (i=size2;i>=0;i--)
+		if (str2[i]!=' ' && str1[i]!='\t')
+			break;
+	size2 = i;
+	str2[i+1] = 0;
+
+	for (i=0;i<size1;i++)		// remove leading white space
+		if (str1[i]!=' ' && str1[i]!='\t')
+			break;
+	str1 += i;
+	for (i=0;i<size2;i++)
+		if (str2[i]!=' ' && str2[i]!='\t')
+			break;
+	str2 += i;
+
+	if (strcmp(str1,str2)==0)
+		return 0;
+
+	return 1;
+}
+
+int CompareIntVector(int *vector1,int *vector2,int NPeriods)
+{
+	for (int i=0;i<NPeriods;i++)
+		if (vector1[i]!=vector2[i])
+			return 1;
+
+	witFree(vector1);
+	witFree(vector2);
+	return 0;
+}
+
+int CompareFloatVector(float *vector1,float *vector2,int NPeriods)
+{
+	for (int i=0;i<NPeriods;i++)
+		if (vector1[i]!=vector2[i])
+			return 1;
+
+	witFree(vector1);
+	witFree(vector2);
+	return 0;
+}
+
+void PrintErrorMsg(char *objname,char *name)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: " << objname <<" '" << name << "' in the first WitRun does not \n";
+	cerr << "exist in the second WitRun\n";
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char *name1,char *name2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The name of 2 " << objname << "s are different," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << name1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << name2 << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,int number1,int number2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The number of an object is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tNumber of the object," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << number1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << number2 << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char* attrname,int value1,int value2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The value of an attribute is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << value1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << value2 << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char* attrname,float value1,float value2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The value of an attribute is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << value1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << value2 << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char *attrname,char *value1,char *value2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The value of an attribute is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << value1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << value2 << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char* attrname,int *value1,int *value2,int nperiods)
+{
+	int i;
+
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The values of an attribute are different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t";
+	for (i=0;i<nperiods;i++)
+		cerr << value1[i] << " ";
+	cerr << endl;
+	cerr << "\t\tfor the second WitRun: \t";
+	for (i=0;i<nperiods;i++)
+		cerr << value2[i] << " ";
+	cerr << endl;
+	exit (1);
+}
+
+void PrintErrorMsg(char *objname,char* attrname,float *value1,float *value2,int nperiods)
+{
+	int i;
+
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The values of an attribute are different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t";
+	for (i=0;i<nperiods;i++)
+		cerr << value1[i] << " ";
+	cerr << endl;
+	cerr << "\t\tfor the second WitRun: \t";
+	for (i=0;i<nperiods;i++)
+		cerr << value2[i] << " ";
+	cerr << endl;
+	exit (1);
+}
+@
+
+
+1.3
+log
+@By Shuzheng Liu: remove some redundant files.
+@
+text
+@d309 2
+a310 4
+		if ( partCategory1==WitMATERIAL && partCategory2!=WitMATERIAL )
+			PrintErrorMsg(partList1[p],"material",partList2[p],"capacity");
+		if ( partCategory1==WitCAPACITY && partCategory2!=WitCAPACITY )
+			PrintErrorMsg(partList1[p],"capacity",partList2[p],"material");
+@
+
+
+1.2
+log
+@By Shuzheng Liu,
+  unitTest.C: put the temp file in working directory.
+  witXML.C: modify function WriteProblem so that the value of optInitMethod will not be printed out.
+  witXMLApi.C: change the error message so the reference to the WitRun is the first/second WitRun instead of WitRun1/WitRun2.
+@
+text
+@d25 1
+a25 1
+void PrintErrorMsg(char *objname,char *partname);
+a27 2
+void PrintErrorMsg(char *objname,char* attrname,char *name1,char *name2);
+void PrintErrorMsg(char *objname,char* attrname,bool value1,bool value2);
+a32 1
+void PrintPartErrorMsg(char *part1,char *category1,char *part2,char *category2);
+a896 11
+void PrintErrorMsg(char *objname,char* attrname,bool name1,bool name2)
+{
+	cerr << "Found discrepancy when comparing 2 WitRuns." <<endl;
+	cerr << "\tMessage: The name of an object is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tName of the object," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << name1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << name2 << endl;
+	exit (1);
+}
+
+a932 12
+void PrintErrorMsg(char *objname,char* attrname,void *value1,void *value2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: The value of an attribute is different." << endl;
+	cerr << "\tObject name:\t" << objname << endl;
+	cerr << "\tAttribute Name:\t" << attrname << endl;
+	cerr << "\tValue of the attribute," << endl;
+	cerr << "\t\tfor the first WitRun: \t" << value1 << endl;
+	cerr << "\t\tfor the second WitRun: \t" << value2 << endl;
+	exit (1);
+}
+
+a969 8
+	exit (1);
+}
+
+void PrintPartErrorMsg(char *part1,char *category1,char *part2,char *category2)
+{
+	cerr << "Found a discrepancy when comparing 2 WitRuns." << endl;
+	cerr << "\tMessage: Part '" << part1 << "' in the first WitRun is " << category1;
+	cerr << ", while part '" << part2 << "' in the second WitRun is " << category2 << endl;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d29 1
+d875 2
+a876 2
+	cerr << "\tMessage: " << objname <<" '" << name << "' in WitRun1 does not \n";
+	cerr << "exist in WitRun2\n";
+d884 2
+a885 2
+	cerr << "\t\tfor WitRun1: \t" << name1 << endl;
+	cerr << "\t\tfor WitRun2: \t" << name2 << endl;
+d895 13
+a907 2
+	cerr << "\t\tfor WitRun1: \t" << number1 << endl;
+	cerr << "\t\tfor WitRun2: \t" << number2 << endl;
+d918 2
+a919 2
+	cerr << "\t\tfor WitRun1: \t" << value1 << endl;
+	cerr << "\t\tfor WitRun2: \t" << value2 << endl;
+d930 2
+a931 2
+	cerr << "\t\tfor WitRun1: \t" << value1 << endl;
+	cerr << "\t\tfor WitRun2: \t" << value2 << endl;
+d942 14
+a955 2
+	cerr << "\t\tfor WitRun1: \t" << value1 << endl;
+	cerr << "\t\tfor WitRun2: \t" << value2 << endl;
+d968 1
+a968 1
+	cerr << "\t\tfor WitRun1: \t";
+d972 1
+a972 1
+	cerr << "\t\tfor WitRun2: \t";
+d988 1
+a988 1
+	cerr << "\t\tfor WitRun1: \t";
+d992 1
+a992 1
+	cerr << "\t\tfor WitRun2: \t";
+d1002 2
+a1003 2
+	cerr << "\tMessage: Part '" << part1 << "' in WitRun1 is " << category1;
+	cerr << ", while part '" << part2 << "' in WitRun2 is " << category2 << endl;
+@
+
+
+1.1.1.1
+log
+@Importing wit xml code
+@
+text
+@@

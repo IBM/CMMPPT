@@ -1,0 +1,427 @@
+head	1.3;
+access;
+symbols
+	sce_5_01_20080919:1.3
+	latest_sce_4_20_20060523:1.3.0.6
+	sce_4_20_20060523:1.3
+	latest_sce4_20_OSL:1.3.0.4
+	sce_4_20_OSL:1.3
+	sce_4_05_20040511:1.3
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.1.1.1.0.14
+	Root-of-EndRw:1.1.1.1
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.3
+date	2003.01.15.23.05.46;	author fasano;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2003.01.15.19.36.27;	author rwToStl;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.15.29.36;	author wit;	state Exp;
+branches
+	1.1.1.1.14.1;
+next	;
+
+1.1.1.1.14.1
+date	2003.01.08.17.42.25;	author rwToStl;	state Exp;
+branches;
+next	1.1.1.1.14.2;
+
+1.1.1.1.14.2
+date	2003.01.09.13.54.43;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.3
+log
+@Modified to build on windows laptop that was causing compiler to run out of stack space
+@
+text
+@
+#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#endif
+
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+
+#include <scenario/src/backlgSS.h>
+#include <scenario/src/itemTimV.h>
+#include <scenario/src/scenario.h>
+#include <scenario/src/zeroTvFS.h>
+#include <scenario/src/machdep.h>
+#include <scenario/src/demdSchP.h>
+
+// Populate Schedule with itemTimeVecs
+void
+LgFrBacklogScheduleStrategy::kernalOfPopulate(
+   LgFrSortingScheduleFloat& schedule )
+const
+{
+  LgFrDemand demand;
+  LgFrTimeVecFloat tv;
+  LgFrItemTimeVecPairFloat itv( demand, tv );
+
+  // Loop once for each demand
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+
+     demand = setOfDemands()[i];
+
+     // Make itemTimeVec
+     itv.item( demand );
+     itv.timeVecFloat(
+           implodePtr_->lastProblemSolved().backlogVolume( &demand )   );
+
+     // Check to see if i'th itemTimeVec is to be filtered out
+     if ( schedule.filterStrategy().exclude( itv ) ) continue;
+
+     // Insert itemTimeVec into schedule
+     schedule.localInsert( itv );
+
+  }
+
+}
+
+
+// Make clone copy of object
+LgFrAttributeScheduleStrategy *
+LgFrBacklogScheduleStrategy::clone()
+const
+{
+  LgFrBacklogScheduleStrategy* newInst = 
+      new LgFrBacklogScheduleStrategy(*this);
+  return (newInst);
+}
+
+// Make clone copy of object with new Scenario
+LgFrAttributeScheduleStrategy *
+LgFrBacklogScheduleStrategy::clone(LgFrScenario& newScenario)
+const
+{
+  LgFrBacklogScheduleStrategy* newInst = 
+      new LgFrBacklogScheduleStrategy(*this, newScenario);
+  return (newInst);
+}
+
+// Assignment operator
+LgFrBacklogScheduleStrategy &
+LgFrBacklogScheduleStrategy::operator=(
+	  const LgFrBacklogScheduleStrategy& rhs)
+{
+  if (this != &rhs) {		// Check for assignment to self
+
+    (this->LgFrDemandScheduleStrategy::operator= ) (rhs);
+
+    implodePtr_ = rhs.implodePtr_;
+
+  }
+  return *this;
+}
+
+
+// Copy constructor
+LgFrBacklogScheduleStrategy::
+   LgFrBacklogScheduleStrategy (
+      const LgFrBacklogScheduleStrategy & source)
+:  LgFrDemandScheduleStrategy( source ), 
+   implodePtr_( source.implodePtr_ ),
+   id_(__LGFRBACKLOGSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Copy constructor with newScenario
+LgFrBacklogScheduleStrategy::
+   LgFrBacklogScheduleStrategy (
+      const LgFrBacklogScheduleStrategy & source,
+      LgFrScenario & newScenario)
+:  LgFrDemandScheduleStrategy( 
+         source, 
+         newScenario ),
+   implodePtr_( &(implode(newScenario)) ),
+   id_(__LGFRBACKLOGSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Constructor
+LgFrBacklogScheduleStrategy::
+   LgFrBacklogScheduleStrategy (
+     LgFrScenario & scenario )
+:  LgFrDemandScheduleStrategy( 
+      LgFrAttributeScheduleStrategy::setOfDemands(scenario), 
+      &(implode(scenario)) ),
+   implodePtr_( &(implode(scenario)) ),
+   id_(__LGFRBACKLOGSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Default Constructor
+// This is a private member function.
+LgFrBacklogScheduleStrategy::
+   LgFrBacklogScheduleStrategy ()
+:  LgFrDemandScheduleStrategy( LgFrSetOfDemands(), 0 ),
+   implodePtr_( 0 ),
+   id_(__LGFRBACKLOGSCHEDULESTRATEGY)
+{
+  // Nothing to do here
+}
+
+// Destructor
+LgFrBacklogScheduleStrategy::
+   ~LgFrBacklogScheduleStrategy ()
+{
+  // Nothing to do here
+}
+
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+// test LgFrBacklogScheduleStrategy methods.
+void
+LgFrBacklogScheduleStrategy::test()
+{
+}
+
+
+// test LgFrBacklogScheduleStrategy methods.
+// Expects the data in testScenario to come from
+// "/u/implode/wit/data/examples/diner12/wit.data"
+void
+LgFrBacklogScheduleStrategy::contextTest
+  (
+   LgFrScenario          & testScenario,
+   LgFrLastProblemSolved & lps,			// testScenario's 
+   LgFrSetOfDemands      & sod)			// testScenario's 
+{
+  int i;
+
+  // Test constructor
+  LgFrBacklogScheduleStrategy cs1(testScenario);
+
+  // Test copy constructor
+  LgFrBacklogScheduleStrategy cs2(cs1);
+
+  // Test assignment operator
+  LgFrBacklogScheduleStrategy cs3;
+  cs3 = cs2;
+
+  {
+    // Test clone method
+    LgFrAttributeScheduleStrategy *cs4Ptr = cs1.clone();
+
+    // Test destructor
+    delete cs4Ptr;
+  }
+
+  // Test populate.  Should be populated with demandVolume timeVec because
+  // a shimpment schedule does not yet exist (an implode has not yet been
+  // done).
+  LgFrSortingDemandScheduleFloatSmartPointer schedule;
+  const LgFrSortingDemandScheduleFloat & constSchedule = *schedule;
+  cs1.populate( *schedule );
+  for ( i=0; i<sod.size(); i++ ) {
+     assert(  schedule->contains( sod[i] )  );
+     assert(  constSchedule [sod[i]].timeVecFloat() 
+	    == lps.demandVolume(&sod[i]).scan(LgFrAdd) );
+  }
+
+  // Test populate, due to new implosion solution.
+  schedule->attributeScheduleStrategy( cs1 );
+  testScenario.newImplosionSolution();
+  // cs1.populate( schedule );
+  // std::cout << std::endl <<"LgFrBacklogScheduleStrategy" << std::endl
+  //      <<schedule->format() << std::endl;
+
+  for ( i=0; i<sod.size(); i++ ) {
+     assert(  schedule->contains( sod[i] )  );
+     assert( lps.backlogVolume(&sod[i]) == 
+                constSchedule[sod[i]].timeVecFloat() );
+  }
+
+  // Test populate with filter
+  schedule->filterStrategy( LgFrZeroTimeVecFilterStrategy() );
+  schedule->attributeScheduleStrategy( cs1 );
+  testScenario.newImplosionSolution();
+
+  cs1.populate( *schedule );
+  // std::cout << std::endl <<"LgFrBacklogScheduleStrategy with zero filter" << std::endl
+  //      <<schedule->format() << std::endl;
+
+  for ( i=0; i<schedule->size(); i++ ) {
+     assert(  !(constSchedule[i].timeVecFloat() == 0.0)  );
+  }
+}
+
+@
+
+
+1.2
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 5
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 4
+a4 1
+#include <iostream.h>
+d24 2
+a25 1
+  for ( size_t i=0; i<setOfDemands().entries(); i++ ) {
+a64 8
+// Return schedule strategy identifier
+isAReturnType
+LgFrBacklogScheduleStrategy::isA()
+const
+{
+   return id_;
+}
+
+a69 1
+  assert( id_ == rhs.id_ );
+d123 2
+a124 2
+:  LgFrDemandScheduleStrategy( LgFrSetOfDemands(), NULL ),
+   implodePtr_( NULL ),
+a161 4
+  assert( cs1.id_ == __LGFRBACKLOGSCHEDULESTRATEGY );
+
+  // Test isA method
+  assert( cs1.isA() == __LGFRBACKLOGSCHEDULESTRATEGY );
+a164 1
+  assert( cs2.isA() == __LGFRBACKLOGSCHEDULESTRATEGY );
+a168 1
+  assert( cs3.isA() == cs2.isA() );
+a172 1
+    assert( cs4Ptr->isA() == cs1.isA() );
+d184 1
+a184 1
+  for ( i=0; i<sod.entries(); i++ ) {
+d194 2
+a195 2
+  // cout <<endl <<"LgFrBacklogScheduleStrategy" <<endl
+  //      <<schedule->format() <<endl;
+d197 1
+a197 1
+  for ( i=0; i<sod.entries(); i++ ) {
+d209 2
+a210 2
+  // cout <<endl <<"LgFrBacklogScheduleStrategy with zero filter" <<endl
+  //      <<schedule->format() <<endl;
+d212 1
+a212 1
+  for ( i=0; i<schedule->entries(); i++ ) {
+@
+
+
+1.1.1.1
+log
+@Import scenario
+@
+text
+@@
+
+
+1.1.1.1.14.1
+log
+@Roguewave is gone
+@
+text
+@d1 1
+a1 4
+// RW2STL -- inserted:
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL -- inserted includes.
+#include <iostream>
+d21 1
+a21 2
+  size_t i = 0; // Pulled out of the for below by RW2STL
+  for ( i=0; i<setOfDemands().size(); i++ ) {
+d61 8
+d74 1
+d128 2
+a129 2
+:  LgFrDemandScheduleStrategy( LgFrSetOfDemands(), 0 ),
+   implodePtr_( 0 ),
+d167 4
+d174 1
+d179 1
+d184 1
+d196 1
+a196 1
+  for ( i=0; i<sod.size(); i++ ) {
+d209 1
+a209 1
+  for ( i=0; i<sod.size(); i++ ) {
+d224 1
+a224 1
+  for ( i=0; i<schedule->size(); i++ ) {
+@
+
+
+1.1.1.1.14.2
+log
+@Removed STD_CPP_LIB #ifdefs
+and went to std for cout
+@
+text
+@d194 2
+a195 2
+  // std::cout << std::endl <<"LgFrBacklogScheduleStrategy" << std::endl
+  //      <<schedule->format() << std::endl;
+d209 2
+a210 2
+  // std::cout << std::endl <<"LgFrBacklogScheduleStrategy with zero filter" << std::endl
+  //      <<schedule->format() << std::endl;
+@
+
+

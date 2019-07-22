@@ -1,0 +1,127 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	latest_sce4_20_OSL:1.1.1.1.0.12
+	sce_4_20_OSL:1.1.1.1
+	sce_4_05_20040511:1.1.1.1
+	sce_4_00_20040201:1.1.1.1
+	nextGenBranch:1.1.1.1.0.10
+	nextGenRoot:1.1.1.1
+	sce_3_30_20030627:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.23.17.02.57;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#!/bin/csh
+
+# Compare the results of Base and test runs of regressionRunProg
+
+# $Id: regressionCompare.sh,v 1.3 1994/05/24 21:28:36 wally Exp $
+
+
+unset noclobber		# Allow files to be overwritten by I/O redirection
+
+set wit_dir=/u/implode/wit
+set mit_dir=$wit_dir/../devroot/pmrp
+set mit_data_dir=$mit_dir/data
+
+cd $mit_data_dir
+foreach x (*)
+    pushd $x > /dev/null
+    foreach curr_data (*)
+	echo -n Testing $x/$curr_data .
+	pushd $curr_data  > /dev/null
+
+	# Find out if there are significant differences between the base
+	# and new files and set gros_status greater than 0 if there are.
+	@@ gross_status = 0
+	foreach baseFile (*.base)
+	    if (baseFile != 'wit.log.base') then
+		set newFile = `echo $baseFile | sed 's/.base$/.new/' `
+		echo -n '.'
+		if (-e $newFile) then
+		    if ($baseFile == 'echo.out.base') then
+			egrep -v '^Run on ' < $baseFile > /tmp/$baseFile.$$
+			egrep -v '^Run on ' < $newFile > /tmp/$newFile.$$
+			cmp /tmp/$baseFile.$$ /tmp/$newFile.$$
+		    	@@ gross_status = $gross_status + $status
+		    else
+			cmp -s $baseFile $newFile
+			@@ gross_status = $gross_status + $status
+		    endif
+		    # Note: gross_status can not be set here because
+		    # $status gets changed by getting to endif
+		else
+		    @@ gross_status = $gross_status + 1
+		endif
+	    endif
+	end
+
+	## Print result of test and give feedback if there were significant
+	## differences
+	if ($gross_status == 0) then
+	    echo ' OK'
+	else
+	    echo ' Results had more differences than just timestamps\!'
+	    echo --------------------------------------------------------
+	    foreach baseFile (*.base)
+		set newFile = `echo $baseFile | sed 's/.base$/.new/' `
+		if (-e $newFile) then
+		    echo diff $baseFile $newFile
+		    diff $baseFile $newFile
+		else
+		    echo "$newFile should have been created but was not."
+		endif
+	    end
+	    echo --------------------------------------------------------
+	endif
+	popd  > /dev/null
+    end
+    popd > /dev/null
+end
+
+if (-e /tmp/echo.out.base.$$) then
+    /bin/rm /tmp/echo.out.base.$$ /tmp/echo.out.new.$$
+endif
+@
+
+
+1.1.1.1
+log
+@Import bin
+@
+text
+@@

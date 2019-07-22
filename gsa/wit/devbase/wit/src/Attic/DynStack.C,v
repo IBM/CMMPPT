@@ -1,0 +1,1294 @@
+head	1.8;
+access;
+symbols
+	EndRw-branch:1.7.0.10
+	Root-of-EndRw:1.7
+	rwToStl:1.7.0.8
+	latest_sce_3_10_20010924:1.7.0.6
+	sce_3_10_20010924:1.7
+	latest_sce_3_00_20010601:1.7.0.4
+	sce_3_00_20010601:1.7
+	latest_sce_2_31_20010308:1.7.0.2
+	sce_2_31_20010308:1.7
+	latest_sce_2_31_20001003:1.3.0.2
+	sce_2_31_20001003:1.3
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2003.03.03.23.26.44;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2000.12.05.19.05.28;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2000.12.04.22.07.35;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2000.11.22.23.11.39;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2000.11.21.20.03.21;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.05.18.00.15.57;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.03.07.16.55.38;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.13.53.21;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.13.53.21;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.7
+log
+@Some minor modifications.
+@
+text
+@@
+
+
+1.6
+log
+@Added print_global control parameter.
+Completed a very restricted form of coarse selection splitting.
+@
+text
+@a0 640
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "DynStack.C"
+//
+// Contains the implementation of the following classes:
+//
+//    DynStack
+//    ObjDynStack  (ObjType)
+//    PairDynStack (ObjType, ValType)
+//    DynItr
+//    PairDynItr   (ObjType, ValType)
+//    DynLinkMgr
+//    ObjDynLinkMgr
+//    PairDynLinkMgr         (ValType)
+//    DynLink
+//    ObjDynLink
+//    PairDynLink            (ValType)
+//------------------------------------------------------------------------------
+
+#include <DynLink.h>
+#include <DynMgr.h>
+#include <DynItr.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class DynStack.
+//------------------------------------------------------------------------------
+
+void WitDynStack::clear ()
+   {
+   WitTypelessPtr theObject;
+
+   while (popAbs ());
+   }
+
+//------------------------------------------------------------------------------
+
+int WitDynStack::nElements () const
+   {
+   int          nEl;
+   WitDynLink * theLink;
+
+   nEl = 0;
+
+   for (
+         theLink  = firstDynLink_;
+         theLink != NULL;
+         theLink  = theLink->next ())
+
+      nEl ++;
+
+   return nEl;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynStack::reverse ()
+   {
+   WitDynLink * oldFirstLink;
+   WitDynLink * theLink;
+
+   oldFirstLink  = firstDynLink_;
+   firstDynLink_ = NULL;
+
+   while (oldFirstLink != NULL)
+      {
+      theLink       = oldFirstLink;
+      oldFirstLink  = oldFirstLink->next ();
+
+      theLink->linkTo (firstDynLink_);
+
+      firstDynLink_ = theLink;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+WitProblem * WitDynStack::myProblem () const
+   {
+   return myDynLinkMgr_->myProblem ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynStack::WitDynStack (WitDynLinkMgr * theDynLinkMgr):
+      myDynLinkMgr_ (theDynLinkMgr),
+      firstDynLink_ (NULL)
+   {
+   witAssert (theDynLinkMgr != NULL);
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynStack::~WitDynStack ()
+   {
+   clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynStack::pushAbs ()
+   {
+   firstDynLink_ = myDynLinkMgr_->freshLink (firstDynLink_);
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitDynStack::popAbs ()
+   {
+   if (isEmpty ())
+      return witFALSE;
+
+   WitDynLink * theLink;
+
+   theLink       = firstDynLink_;
+   firstDynLink_ = theLink->next ();
+
+   myDynLinkMgr_->recycle (theLink);
+
+   return witTRUE;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynStack::takeContentsAbs (WitDynStack & theDynStack)
+   {
+   clear ();
+
+   firstDynLink_             = theDynStack.firstDynLink_;
+
+   theDynStack.firstDynLink_ = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynStack::reverseCopyOfAbs (const WitDynStack & theDynStack)
+   {
+   WitDynLink * theLink;
+
+   clear ();
+
+   theLink = theDynStack.firstDynLink_;
+
+   while (theLink != NULL)
+      {
+      pushAbs ();
+      
+      myDynLinkMgr_->copyDataInto (firstDynLink_, theLink);
+
+      theLink = theLink->next ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class ObjDynStack (ObjType).
+//------------------------------------------------------------------------------
+
+#define WitObjDynStackimplement(ObjType)                                       \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitObjDynStack (ObjType)::WitObjDynStack (ObjType) (WitProblem * theProblem):  \
+      WitDynStack (theProblem->myObjDynLinkMgr ())                             \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitObjDynStack (ObjType)::~WitObjDynStack (ObjType) ()                         \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitObjDynStack (ObjType)::push (ObjType * theObject)                      \
+   {                                                                           \
+   pushAbs ();                                                                 \
+                                                                               \
+   firstObjDynLink ()->setDataTo ((WitTypelessPtr) theObject);                 \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitBoolean WitObjDynStack (ObjType)::pop (ObjType * & theObject)               \
+   {                                                                           \
+   if (! isEmpty ())                                                           \
+      theObject = (ObjType *) firstObjDynLink ()->myObject ();                 \
+                                                                               \
+   return popAbs ();                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+ObjType * WitObjDynStack (ObjType)::firstObject () const                       \
+   {                                                                           \
+   witAssert (! isEmpty ());                                                   \
+                                                                               \
+   return (ObjType *) firstObjDynLink ()->myObject ();                         \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic global function
+// reverseCopyInto (ObjDynStack (ObjType) &, const List (ObjType) &)
+//------------------------------------------------------------------------------
+
+#define reverseCopyInto_ObjDynStackimplement(ObjType)                          \
+                                                                               \
+void reverseCopyInto (                                                         \
+      WitObjDynStack (ObjType) & theObjDynStack,                               \
+      const WitList (ObjType) &  theList)                                      \
+   {                                                                           \
+   WitListItr theItr (theList);                                                \
+   ObjType *  theObject;                                                       \
+                                                                               \
+   theObjDynStack.clear ();                                                    \
+                                                                               \
+   while (theList.advance (theItr, theObject))                                 \
+      theObjDynStack.push (theObject);                                         \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class PairDynStack (ObjType, ValType).
+//------------------------------------------------------------------------------
+
+#define WitPairDynStackimplement2(ObjType, ValType)                            \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynStack (ObjType, ValType)::WitPairDynStack (ObjType, ValType) (       \
+         WitProblem * theProblem):                                             \
+                                                                               \
+      WitDynStack (WitPairDynLinkMgr (ValType)::itsInstance (theProblem))      \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynStack (ObjType, ValType)::~WitPairDynStack (ObjType, ValType) ()     \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitPairDynStack (ObjType, ValType)::push (                                \
+      ObjType * theObject,                                                     \
+      ValType   theVal)                                                        \
+   {                                                                           \
+   pushAbs ();                                                                 \
+                                                                               \
+   firstPairDynLink ()->setDataTo ((WitTypelessPtr) theObject, theVal);        \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitBoolean WitPairDynStack (ObjType, ValType)::pop (                           \
+      ObjType * & theObject,                                                   \
+      ValType &   theVal)                                                      \
+   {                                                                           \
+   if (! isEmpty ())                                                           \
+      {                                                                        \
+      theObject = (ObjType *) firstPairDynLink ()->myObject ();                \
+      theVal    =             firstPairDynLink ()->myValue ();                 \
+      }                                                                        \
+                                                                               \
+   return popAbs ();                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+ObjType * WitPairDynStack (ObjType, ValType)::firstObject () const             \
+   {                                                                           \
+   witAssert (! isEmpty ());                                                   \
+                                                                               \
+   return (ObjType *) firstPairDynLink ()->myObject ();                        \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementation of class DynItr.
+//------------------------------------------------------------------------------
+
+WitDynItr::WitDynItr ():
+      firstDynLink_ (NULL),
+      curDynLink_   (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynItr::~WitDynItr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynItr::attachToAbs (const WitDynStack & theDynStack)
+   {
+   firstDynLink_ = theDynStack.firstDynLink_;
+   curDynLink_   = NULL;
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitDynItr::advanceAbs ()
+   {
+   curDynLink_ = 
+      (curDynLink_ == NULL)?
+         firstDynLink_:
+         curDynLink_->next ();
+
+   return (curDynLink_ != NULL);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class PairDynItr (ObjType, ValType).
+//------------------------------------------------------------------------------
+
+#define WitPairDynItrimplement2(ObjType, ValType)                              \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynItr (ObjType, ValType)::WitPairDynItr (ObjType, ValType) ():         \
+      WitDynItr ()                                                             \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynItr (ObjType, ValType)::~WitPairDynItr (ObjType, ValType) ()         \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitPairDynItr (ObjType, ValType)::attachTo (                              \
+      const WitPairDynStack (ObjType, ValType) & thePairDynStack)              \
+   {                                                                           \
+   WitDynItr::attachToAbs (thePairDynStack);                                   \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitBoolean WitPairDynItr (ObjType, ValType)::advance (                         \
+      ObjType * & theObject,                                                   \
+      ValType &   theVal)                                                      \
+   {                                                                           \
+   WitBoolean stillValid;                                                      \
+                                                                               \
+   stillValid = advanceAbs ();                                                 \
+                                                                               \
+   if (stillValid)                                                             \
+      {                                                                        \
+      theObject = (ObjType *) curPairDynLink ()->myObject ();                  \
+      theVal    =             curPairDynLink ()->myValue ();                   \
+      }                                                                        \
+                                                                               \
+   return stillValid;                                                          \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementation of class DynLinkMgr.
+//------------------------------------------------------------------------------
+
+WitDynLinkMgr::WitDynLinkMgr (WitProblem * theProblem):
+      WitProbAssoc     (theProblem),
+
+      firstUnusedLink_ (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynLinkMgr::deleteInstance (WitDynLinkMgr * theDynLinkMgr)
+   {
+   WitDynLink * theLink;
+   WitDynLink * deadLink;
+
+   if (theDynLinkMgr = NULL)
+      return;
+
+   theLink = theDynLinkMgr->firstUnusedLink_;
+
+   while (theLink != NULL)
+      {
+      deadLink = theLink;
+      theLink  = theLink->next ();
+
+      theDynLinkMgr->deleteLink (deadLink);
+      }
+
+   delete theDynLinkMgr;
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynLink * WitDynLinkMgr::freshLink (WitDynLink * theLink)
+   {
+   WitDynLink * theFreshLink;
+
+   if (firstUnusedLink_ == NULL)
+      theFreshLink     = newLink ();
+   else
+      {
+      theFreshLink     = firstUnusedLink_;
+      firstUnusedLink_ = theFreshLink->next ();
+      }
+
+   theFreshLink->linkTo (theLink);
+
+   return theFreshLink;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynLinkMgr::recycle (WitDynLink * theLink)
+   {
+   theLink->linkTo (firstUnusedLink_);
+
+   firstUnusedLink_ = theLink;
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynLinkMgr::~WitDynLinkMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ObjDynLinkMgr.
+//------------------------------------------------------------------------------
+
+WitObjDynLinkMgr::WitObjDynLinkMgr (WitProblem * theProblem):
+      WitDynLinkMgr (theProblem)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjDynLinkMgr::copyDataInto (WitDynLink * dstLink, WitDynLink * srcLink)
+   {
+   asanObjDynLink (dstLink)->setDataTo (asanObjDynLink (srcLink)->myObject ());
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjDynLinkMgr::~WitObjDynLinkMgr ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynLink * WitObjDynLinkMgr::newLink ()
+   {
+   return new WitObjDynLink;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitObjDynLinkMgr::deleteLink (WitDynLink * theLink)
+   {
+   delete asanObjDynLink (theLink);
+   }
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class PairDynLinkMgr (ValType).
+//------------------------------------------------------------------------------
+
+#define WitPairDynLinkMgrimplement(ValType)                                    \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynLinkMgr (ValType)::WitPairDynLinkMgr (ValType) (                     \
+         WitProblem * theProblem):                                             \
+                                                                               \
+      WitDynLinkMgr (theProblem)                                               \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynLinkMgr (ValType) * WitPairDynLinkMgr (ValType)::itsInstance (       \
+      WitProblem * theProblem)                                                 \
+   {                                                                           \
+   WitPairDynLinkMgr (ValType) * theInstance;                                  \
+                                                                               \
+   theProblem->getMyInstance (theInstance);                                    \
+                                                                               \
+   return theInstance;                                                         \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitPairDynLinkMgr (ValType)::copyDataInto (                               \
+      WitDynLink * dstLink,                                                    \
+      WitDynLink * srcLink)                                                    \
+   {                                                                           \
+   asaPairDynLink (dstLink)->setDataTo (                                       \
+      asaPairDynLink (srcLink)->myObject (),                                   \
+      asaPairDynLink (srcLink)->myValue ());                                   \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynLinkMgr (ValType)::~WitPairDynLinkMgr (ValType) ()                   \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitDynLink * WitPairDynLinkMgr (ValType)::newLink ()                           \
+   {                                                                           \
+   return new WitPairDynLink (ValType);                                        \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitPairDynLinkMgr (ValType)::deleteLink (WitDynLink * theLink)            \
+   {                                                                           \
+   delete asaPairDynLink (theLink);                                            \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementation of class DynLink.
+//------------------------------------------------------------------------------
+
+void WitDynLink::linkTo (WitDynLink * theLink)
+   {
+   next_ = theLink;
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynLink::WitDynLink ():
+      next_ (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitDynLink::~WitDynLink ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class ObjDynLink.
+//------------------------------------------------------------------------------
+
+WitObjDynLink::WitObjDynLink ():
+      WitDynLink (),
+
+      myObject_  (NULL)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitObjDynLink::~WitObjDynLink ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+ 
+void WitObjDynLink::setDataTo (WitTypelessPtr theObject)
+   {
+   myObject_ = theObject;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation macro for generic class PairDynLink (ValType).
+//------------------------------------------------------------------------------
+
+#define WitPairDynLinkimplement(ValType)                                       \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynLink (ValType)::WitPairDynLink (ValType) ():                         \
+      WitDynLink (),                                                           \
+                                                                               \
+      myObject_  (NULL),                                                       \
+      myValue_   ()                                                            \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+WitPairDynLink (ValType)::~WitPairDynLink (ValType) ()                         \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+void WitPairDynLink (ValType)::setDataTo (                                     \
+      WitTypelessPtr theObject,                                                \
+      ValType        theVal)                                                   \
+   {                                                                           \
+   myObject_ = theObject;                                                      \
+   myValue_  = theVal;                                                         \
+   }                                                                           \
+
+//------------------------------------------------------------------------------
+// Implementations of all specific cases of the generic classes functions 
+// implemented in this file.
+//------------------------------------------------------------------------------
+
+implement  (WitObjDynStack,              WitPart)
+implement  (WitObjDynStack,              WitOperation)
+implement  (WitObjDynStack,              WitSubEntry)
+implement  (WitObjDynStack,              WitBopEntry)
+implement  (WitObjDynStack,              WitConsEntry)
+implement  (WitObjDynStack,              WitAltPt)
+implement  (WitObjDynStack,              WitReqPt)
+implement  (WitObjDynStack,              WitReqPtPtr)
+implement  (WitObjDynStack,              WitMeSelPt)
+
+implement  (reverseCopyInto_ObjDynStack, WitPart)
+implement  (reverseCopyInto_ObjDynStack, WitOperation)
+implement  (reverseCopyInto_ObjDynStack, WitSubEntry)
+
+implement2 (WitPairDynStack,             WitPart,      WitPeriod)
+implement2 (WitPairDynStack,             WitDemand,    WitPeriod)
+implement2 (WitPairDynStack,             WitOperation, WitPeriod)
+implement2 (WitPairDynStack,             WitBopEntry,  WitPeriod)
+implement2 (WitPairDynStack,             WitConsEntry, WitPeriod)
+implement2 (WitPairDynStack,             WitConsEntry, double)
+
+implement2 (WitPairDynItr,               WitDemand,    WitPeriod)
+implement2 (WitPairDynItr,               WitBopEntry,  WitPeriod)
+implement2 (WitPairDynItr,               WitConsEntry, WitPeriod)
+
+implement  (WitPairDynLinkMgr,                         WitPeriod)
+implement  (WitPairDynLinkMgr,                         double)
+
+implement  (WitPairDynLink,                            WitPeriod)
+implement  (WitPairDynLink,                            double)
+@
+
+
+1.5
+log
+@Refactoring for selection splitting.
+@
+text
+@a30 1
+#include <Problem.h>
+d85 7
+d142 20
+d213 1
+a213 1
+#define reverseCopyInto_ObjDynStackimplement(ObjType)                         \
+d302 1
+a302 1
+void WitDynItr::attach (const WitDynStack & theDynStack)
+d310 1
+a310 1
+WitBoolean WitDynItr::advance ()
+d341 1
+a341 1
+void WitPairDynItr (ObjType, ValType)::operator = (                            \
+d344 1
+a344 1
+   attach (thePairDynStack);                                                   \
+d349 1
+a349 1
+WitBoolean WitPairDynItr (ObjType, ValType)::operator () (                     \
+d355 1
+a355 1
+   stillValid = advance ();                                                    \
+d370 3
+a372 1
+WitDynLinkMgr::WitDynLinkMgr ():
+d438 2
+a439 2
+WitObjDynLinkMgr::WitObjDynLinkMgr ():
+      WitDynLinkMgr ()
+d478 4
+a481 2
+WitPairDynLinkMgr (ValType)::WitPairDynLinkMgr (ValType) ():                   \
+      WitDynLinkMgr ()                                                         \
+@
+
+
+1.4
+log
+@Began implementation of coarse selection splitting.
+Made DynStack classes more general.
+@
+text
+@a94 22
+WitDynStack::WitDynStack (const WitDynStack & theDynStack):
+      myDynLinkMgr_ (theDynStack.myDynLinkMgr_),
+      firstDynLink_ (NULL)
+   {
+   WitDynLink *   theLink;
+   WitTypelessPtr theObject;
+
+   for (
+         theLink =  theDynStack.firstDynLink_;
+         theLink != NULL;
+         theLink =  theLink->next ())
+      {
+      pushAbs ();
+
+      myDynLinkMgr_->copyDataInto (firstDynLink_, theLink);
+      }
+
+   reverse ();
+   }
+
+//------------------------------------------------------------------------------
+
+a149 9
+WitObjDynStack (ObjType)::WitObjDynStack (ObjType) (                           \
+         const WitObjDynStack (ObjType) & theObjDynStack):                     \
+                                                                               \
+      WitDynStack (theObjDynStack)                                             \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+a218 9
+WitPairDynStack (ObjType, ValType)::WitPairDynStack (ObjType, ValType) (       \
+         const WitPairDynStack (ObjType, ValType) & theDynStack):              \
+                                                                               \
+      WitDynStack (theDynStack)                                                \
+   {                                                                           \
+   }                                                                           \
+                                                                               \
+/*---------------------------------------------------------------------------*/\
+                                                                               \
+d600 1
+d607 1
+d610 1
+@
+
+
+1.3
+log
+@Began implementation of stock bounds.
+Changed the default value of the stockRealloc attribute to FALSE.
+@
+text
+@d15 8
+a22 3
+//    AbsDynStack
+//    AbsDynPerStack
+//    AbsDynPerItr
+d24 2
+a25 3
+//    DynLinkMgr
+//    DynPerLink
+//    DynPerLinkMgr
+a27 2
+#include <DynPer.h>
+#include <DynStack.h>
+d29 2
+d34 1
+a34 1
+// Implementation of class AbsDynStack.
+d37 1
+a37 1
+void WitAbsDynStack::clear ()
+d41 1
+a41 1
+   while (pop (theObject));
+d46 1
+a46 1
+int WitAbsDynStack::nElements () const
+d54 1
+a54 1
+         theLink  = firstLink_;
+d65 1
+a65 1
+void WitAbsDynStack::reverse ()
+d70 2
+a71 2
+   oldFirstLink = firstLink_;
+   firstLink_   = NULL;
+d75 2
+a76 2
+      theLink      = oldFirstLink;
+      oldFirstLink = oldFirstLink->next ();
+d78 1
+a78 1
+      theLink->set (firstLink_);
+d80 1
+a80 1
+      firstLink_   = theLink;
+d86 3
+a88 3
+WitAbsDynStack::WitAbsDynStack (WitProblem * theProblem):
+      myLinkMgr_ (theProblem->myDynLinkMgr ()),
+      firstLink_ (NULL)
+d90 1
+a90 1
+   witAssert (theProblem != NULL);
+d95 3
+a97 3
+WitAbsDynStack::WitAbsDynStack (const WitAbsDynStack & theStack):
+      myLinkMgr_ (theStack.myLinkMgr_),
+      firstLink_ (NULL)
+d103 1
+a103 1
+         theLink =  theStack.firstLink_;
+d106 2
+d109 2
+a110 1
+      push (theLink->myObject ());
+d117 1
+a117 8
+WitAbsDynStack::~WitAbsDynStack ()
+   {
+   clear ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAbsDynStack::reverseCopyOf (const WitAbsList & theAbsList)
+a118 3
+   WitListItr     theItr (theAbsList);
+   WitTypelessPtr theObject;
+
+a119 3
+
+   while (theItr.advance (theObject, theAbsList))
+      push (theObject);
+d124 1
+a124 1
+void WitAbsDynStack::push (WitTypelessPtr theObject)
+d126 1
+a126 3
+   witAssert (theObject != NULL);
+
+   firstLink_ = myLinkMgr_->freshLink (firstLink_, theObject);
+d131 1
+a131 1
+WitBoolean WitAbsDynStack::pop (WitTypelessPtr & theObject)
+d138 2
+a139 3
+   theLink    = firstLink_;
+   theObject  = theLink->myObject ();
+   firstLink_ = theLink->next ();
+d141 1
+a141 1
+   myLinkMgr_->recycle (theLink);
+d148 1
+a148 1
+WitTypelessPtr WitAbsDynStack::first ()
+d150 1
+a150 1
+   witAssert (! isEmpty ());
+d152 3
+a154 1
+   return firstLink_->myObject ();
+d158 1
+a158 1
+// Implementation of class AbsDynPerStack.
+d161 144
+a304 1
+void WitAbsDynPerStack::clear ()
+a305 4
+   WitTypelessPtr theObject;
+   WitPeriod      thePer;
+
+   while (pop (theObject, thePer));
+d310 1
+a310 1
+void WitAbsDynPerStack::reverse ()
+a311 15
+   WitDynPerLink * oldFirstLink;
+   WitDynPerLink * theLink;
+
+   oldFirstLink = firstLink_;
+   firstLink_   = NULL;
+
+   while (oldFirstLink != NULL)
+      {
+      theLink      = oldFirstLink;
+      oldFirstLink = oldFirstLink->next ();
+
+      theLink->set (firstLink_);
+
+      firstLink_   = theLink;
+      }
+d316 63
+a378 6
+WitAbsDynPerStack::WitAbsDynPerStack (WitProblem * theProblem):
+      myLinkMgr_ (theProblem->myDynPerLinkMgr ()),
+      firstLink_ (NULL)
+   {
+   witAssert (theProblem != NULL);
+   }
+d381 2
+d384 2
+a385 1
+WitAbsDynPerStack::~WitAbsDynPerStack ()
+a386 1
+   clear ();
+d391 1
+a391 1
+void WitAbsDynPerStack::push (WitTypelessPtr theObject, WitPeriod thePer)
+d393 2
+a394 1
+   witAssert (theObject != NULL);
+d396 2
+a397 2
+   firstLink_ = myLinkMgr_->freshLink (firstLink_, theObject, thePer);
+   }
+d399 1
+a399 1
+//------------------------------------------------------------------------------
+d401 4
+a404 6
+WitBoolean WitAbsDynPerStack::pop (
+      WitTypelessPtr & theObject, 
+      WitPeriod &      thePer)
+   {
+   if (isEmpty ())
+      return witFALSE;
+d406 2
+a407 6
+   WitDynPerLink * theLink;
+
+   theLink    = firstLink_;
+   theObject  = theLink->myObject ();
+   thePer     = theLink->myPeriod ();
+   firstLink_ = theLink->next ();
+d409 1
+a409 3
+   myLinkMgr_->recycle (theLink);
+
+   return witTRUE;
+d414 1
+a414 1
+void WitAbsDynPerStack::takeContents (WitAbsDynPerStack & theStack)
+d416 9
+a424 1
+   clear ();
+d426 1
+a426 1
+   firstLink_          = theStack.firstLink_;
+d428 1
+a428 1
+   theStack.firstLink_ = NULL;
+d433 1
+a433 1
+WitTypelessPtr WitAbsDynPerStack::firstObject () const
+d435 1
+a435 1
+   witAssert (! isEmpty ());
+d437 1
+a437 1
+   return firstLink_->myObject ();
+a440 2
+// Implementation of class AbsDynPerItr.
+//------------------------------------------------------------------------------
+d442 1
+a442 3
+WitAbsDynPerItr::WitAbsDynPerItr ():
+      firstLink_ (NULL),
+      myLink_    (NULL)
+d447 2
+d450 2
+a451 1
+WitAbsDynPerItr::~WitAbsDynPerItr ()
+d457 1
+a457 1
+void WitAbsDynPerItr::attach (const WitAbsDynPerStack & theStack)
+d459 1
+a459 2
+   firstLink_ = theStack.firstLink_;
+   myLink_    = NULL;
+d464 1
+a464 3
+WitBoolean WitAbsDynPerItr::advance (
+      WitTypelessPtr & theObject, 
+      WitPeriod &      thePer)
+a465 12
+   myLink_ = 
+      (myLink_ == NULL)?
+         firstLink_:
+         myLink_->next ();
+
+   if (myLink_ == NULL)
+      return witFALSE;
+
+   theObject = myLink_->myObject ();
+   thePer    = myLink_->myPeriod ();
+   
+   return witTRUE;
+a468 2
+// Implementation of class DynLink.
+//------------------------------------------------------------------------------
+d470 1
+a470 3
+WitDynLink::WitDynLink ():
+      next_     (NULL),
+      myObject_ (NULL)
+d472 1
+d477 1
+a477 1
+WitDynLink::~WitDynLink ()
+d479 1
+d483 2
+d486 51
+a536 5
+void WitDynLink::set (WitDynLink * theLink, WitTypelessPtr theObject)
+   {
+   next_     = theLink;
+   myObject_ = theObject;
+   }
+d539 2
+d542 1
+a542 1
+void WitDynLink::set (WitDynLink * theLink)
+a547 2
+// Implementation of class DynLinkMgr.
+//------------------------------------------------------------------------------
+d549 2
+a550 2
+WitDynLinkMgr::WitDynLinkMgr ():
+      firstUnusedLink_ (NULL)
+d556 1
+a556 1
+WitDynLinkMgr::~WitDynLinkMgr ()
+a557 12
+   WitDynLink * theLink;
+   WitDynLink * deadLink;
+
+   theLink = firstUnusedLink_;
+
+   while (theLink != NULL)
+      {
+      deadLink = theLink;
+      theLink  = theLink->next ();
+
+      delete deadLink;
+      }
+d561 1
+a561 20
+
+WitDynLink * WitDynLinkMgr::freshLink (
+      WitDynLink *   theLink,
+      WitTypelessPtr theObject)
+   {
+   WitDynLink * theFreshLink;
+
+   if (firstUnusedLink_ == NULL)
+      theFreshLink     = new WitDynLink;
+   else
+      {
+      theFreshLink     = firstUnusedLink_;
+      firstUnusedLink_ = theFreshLink->next ();
+      }
+
+   theFreshLink->set (theLink, theObject);
+
+   return theFreshLink;
+   }
+
+d564 2
+a565 10
+void WitDynLinkMgr::recycle (WitDynLink * theLink)
+   {
+   theLink->set (firstUnusedLink_, NULL);
+
+   firstUnusedLink_ = theLink;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class DynPerLink.
+//------------------------------------------------------------------------------
+d567 1
+a567 4
+WitDynPerLink::WitDynPerLink ():
+      next_     (NULL),
+      myObject_ (NULL),
+      myPeriod_ (-1)
+d573 1
+a573 1
+WitDynPerLink::~WitDynPerLink ()
+d578 2
+a579 5
+
+void WitDynPerLink::set (
+      WitDynPerLink * theLink, 
+      WitTypelessPtr  theObject,
+      WitPeriod       thePer)
+a580 1
+   next_     = theLink;
+a581 1
+   myPeriod_ = thePer;
+d585 1
+a585 15
+
+void WitDynPerLink::set (WitDynPerLink * theLink)
+   {
+   next_ = theLink;
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class DynPerLinkMgr.
+//------------------------------------------------------------------------------
+
+WitDynPerLinkMgr::WitDynPerLinkMgr ():
+      firstUnusedLink_ (NULL)
+   {
+   }
+
+d588 56
+a643 15
+WitDynPerLinkMgr::~WitDynPerLinkMgr ()
+   {
+   WitDynPerLink * theLink;
+   WitDynPerLink * deadLink;
+
+   theLink = firstUnusedLink_;
+
+   while (theLink != NULL)
+      {
+      deadLink = theLink;
+      theLink  = theLink->next ();
+
+      delete deadLink;
+      }
+   }
+d645 1
+a645 1
+//------------------------------------------------------------------------------
+d647 1
+a647 28
+WitDynPerLink * WitDynPerLinkMgr::freshLink (
+      WitDynPerLink * theLink,
+      WitTypelessPtr  theObject,
+      WitPeriod       thePer)
+   {
+   WitDynPerLink * theFreshLink;
+
+   if (firstUnusedLink_ == NULL)
+      theFreshLink     = new WitDynPerLink;
+   else
+      {
+      theFreshLink     = firstUnusedLink_;
+      firstUnusedLink_ = theFreshLink->next ();
+      }
+
+   theFreshLink->set (theLink, theObject, thePer);
+
+   return theFreshLink;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitDynPerLinkMgr::recycle (WitDynPerLink * theLink)
+   {
+   theLink->set (firstUnusedLink_, NULL, -1);
+
+   firstUnusedLink_ = theLink;
+   }
+@
+
+
+1.2
+log
+@Updating wit/src in /u/wit/devbase to be in synch with /u/implode/devbase
+@
+text
+@d50 1
+a50 1
+         theLink =  firstLink_;
+d52 1
+a52 1
+         theLink =  theLink->next ())
+d113 13
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+@
+
+
+1.1.1.1
+log
+@Import wit
+@
+text
+@@

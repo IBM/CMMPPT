@@ -1,0 +1,269 @@
+head	1.1;
+branch	1.1.1;
+access;
+symbols
+	beforeTiersAdded:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2002.03.04.13.48.12;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#ifndef GRSORTABLEPORTFOLIO_h
+#define GRSORTABLEPORTFOLIO_h
+
+#include <float.h>
+#include <vector>
+#include <algorithm>
+#include "grProblem.h"
+
+
+class GRsortablePortfolio  {
+public:
+
+  const std::string & portfolioName()const {return portfolioName_;};
+  const GRproblem & grProblem() const {return *grpPtr_;};
+  
+  // preferred constructor
+  GRsortablePortfolio(
+    const std::string & portfolioName,
+    const GRproblem & grp)
+    : 
+    portfolioName_(portfolioName),
+    grpPtr_(&grp)
+  {
+    //nothing to do here
+  };
+  
+  // copy constructor
+  GRsortablePortfolio( const GRsortablePortfolio& source )
+    :portfolioName_(source.portfolioName_),
+    grpPtr_(source.grpPtr_)
+  {
+    //nothing to do here
+  };
+  
+  
+  // assignment operator
+  GRsortablePortfolio & operator=(const GRsortablePortfolio& rhs)
+  {  
+    if (this != &rhs) {        
+      portfolioName_=rhs.portfolioName_;   
+      grpPtr_=rhs.grpPtr_;
+    }
+    return *this;
+  };  
+
+  //virtual GRsortablePortfolio * clone() const = 0;
+
+  // destructor
+  virtual ~GRsortablePortfolio(){};
+  
+  
+protected:
+  
+  // constructor
+  GRsortablePortfolio(){};
+
+  
+  // Self-test
+  //static void test();
+
+  void setVector(int len, const float * inputVec, std::vector<float> & outputVec )
+  {
+    int i;
+    for ( i=0; outputVec.size()<len; ++i ) outputVec.push_back(0.0);
+    for ( i=0; i<len; ++i ) outputVec[i] = inputVec[i];
+  };
+
+private:
+  std::string portfolioName_;
+  const GRproblem * grpPtr_;
+};
+
+
+
+//---------------------------------------------------
+inline float GRmin(float f1, float f2)
+{
+  float retVal = f1;
+  if ( f2<f1 ) retVal=f2;
+  return retVal;
+}
+
+inline float GRmax(float f1, float f2)
+{
+  float retVal = f1;
+  if ( f2>f1 ) retVal=f2;
+  return retVal;
+}
+
+inline bool GRgreater(float f1, float f2)
+{
+  return f1>f2;
+}
+
+inline bool GRless(float f1, float f2)
+{
+  return f1<f2;
+}
+
+
+
+//---------------------------------------------------
+bool GRalphabeticPortLocName(const GRsortablePortfolio& sortablePort1, 
+                           const GRsortablePortfolio& sortablePort2) 
+{
+  const std::string* ports[2];
+  ports[0] = &sortablePort1.portfolioName();
+  ports[1] = &sortablePort2.portfolioName();
+  
+  bool retVal; 
+  retVal = ports[0] < ports[1]; 
+  return retVal;
+}
+
+
+//---------------------------------------------------
+
+bool GRCompareComparePortLocAttribute(
+  const GRsortablePortfolio& sortablePort1, 
+  const GRsortablePortfolio& sortablePort2,
+  float (GRproblem::*getPortfolioLocationAttribute)(const std::string & portName, const std::string & locName ) const,
+  float (*comparePortLocAttr)(float,float),
+  bool  (*comparePort)(float,float) )
+{
+  const std::string* ports[2];
+  ports[0] = &sortablePort1.portfolioName();
+  ports[1] = &sortablePort2.portfolioName();
+  const GRproblem * grpPtrs[2];
+  grpPtrs[0] = &sortablePort1.grProblem();
+  grpPtrs[1] = &sortablePort2.grProblem();
+  float metric[2];
+  metric[0]=FLT_MAX;
+  metric[1]=FLT_MAX;
+  if ( comparePortLocAttr(FLT_MAX,0.0)==FLT_MAX ) {
+    metric[0]=-FLT_MAX;
+    metric[1]=-FLT_MAX;
+  }
+  
+  // Loop once for each portfolio
+  for ( int p=0; p<2; p++ ) {
+
+    // Loop once for each location where portfolio can be performed
+    std::vector<std::string> locs=grpPtrs[p]->getPortfolioLocs(*(ports[p]));
+
+    for( int l=0; l<locs.size(); l++ ) {
+
+      // If can not do portfolio at loc, then don't bother considering cost
+      if ( !grpPtrs[p]->getPortfolioLocationExecutable(*(ports[p]),locs[l]) ) continue;
+
+      // Get the minumum cost at portfolio p
+      float attrVal = (grpPtrs[p]->*getPortfolioLocationAttribute)(*(ports[p]),locs[l]);
+      //if ( attrVal<metric[p] ) metric[p]=attrVal;
+      //attrVal = GRmin(attrVal,metric[p]);
+      metric[p] = comparePortLocAttr(attrVal,metric[p]);
+    }
+    
+  }
+  
+  bool retVal;
+  if ( metric[0]==metric[1] ) {
+    retVal = ports[0] < ports[1];
+  }
+  else {
+    //retVal = metric[0] > metric[1];
+    //retVal = GRgreater(metric[0],metric[1]);
+    retVal = comparePort(metric[0],metric[1]);
+  }
+  return retVal;
+}
+
+//---------------------------------------------------
+//---------------------------------------------------
+
+bool GRmaxMinPortLocCost(const GRsortablePortfolio& sortablePort1, 
+                       const GRsortablePortfolio& sortablePort2) 
+{
+  return GRCompareComparePortLocAttribute(
+    sortablePort1,
+    sortablePort2,
+    &GRproblem::getPortfolioLocationCost,
+    &GRmin,            //Min. Min cost of amoung all ways to produce a portfolio
+    &GRgreater);       //max  Max of min is higheset priority portfolio
+}
+//---------------------------------------------------
+
+
+bool GRmaxMaxPortLocCost(const GRsortablePortfolio& sortablePort1, 
+                       const GRsortablePortfolio& sortablePort2) 
+{
+  return GRCompareComparePortLocAttribute(
+    sortablePort1,
+    sortablePort2,
+    &GRproblem::getPortfolioLocationCost,
+    &GRmax,            //Max (second max). Max cost of amoung all ways to produce a portfolio
+    &GRgreater);       //max (first max)   Max of Max is higheset priority
+}
+//---------------------------------------------------
+//---------------------------------------------------
+
+bool GRmaxMinPortLocConsVol(const GRsortablePortfolio& sortablePort1, 
+                       const GRsortablePortfolio& sortablePort2) 
+{
+  return GRCompareComparePortLocAttribute(
+    sortablePort1,
+    sortablePort2,
+    &GRproblem::getPortfolioLocationUnitConsVol,
+    &GRmin,            //Min. Min consVol of amoung all ways to produce a portfolio
+    &GRgreater);       //max  Max of min is higheset priority portfolio
+}
+//---------------------------------------------------
+
+
+bool GRmaxMaxPortLocConsVol(const GRsortablePortfolio& sortablePort1, 
+                       const GRsortablePortfolio& sortablePort2) 
+{
+  return GRCompareComparePortLocAttribute(
+    sortablePort1,
+    sortablePort2,
+    &GRproblem::getPortfolioLocationUnitConsVol,
+    &GRmax,            //Max (second max). Max unitConsVol of amoung all ways to produce a portfolio
+    &GRgreater);       //max (first max)   Max of Max is higheset priority
+}
+
+
+
+
+#endif
+@
+
+
+1.1.1.1
+log
+@globalResource import
+@
+text
+@@

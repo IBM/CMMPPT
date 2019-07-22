@@ -1,0 +1,2252 @@
+head	1.30;
+access;
+symbols
+	start:1.1.1.1 IBM:1.1.1;
+locks; strict;
+comment	@// @;
+
+
+1.30
+date	2006.10.06.17.11.22;	author gresh;	state Exp;
+branches;
+next	1.29;
+
+1.29
+date	2006.10.06.17.07.35;	author gresh;	state Exp;
+branches;
+next	1.28;
+
+1.28
+date	2006.08.18.17.47.45;	author gresh;	state Exp;
+branches;
+next	1.27;
+
+1.27
+date	2006.08.17.18.11.15;	author gresh;	state Exp;
+branches;
+next	1.26;
+
+1.26
+date	2006.08.01.14.21.12;	author gresh;	state Exp;
+branches;
+next	1.25;
+
+1.25
+date	2006.06.09.17.44.33;	author gresh;	state Exp;
+branches;
+next	1.24;
+
+1.24
+date	2006.06.09.13.46.45;	author gresh;	state Exp;
+branches;
+next	1.23;
+
+1.23
+date	2006.06.08.16.19.55;	author gresh;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2006.05.25.18.16.29;	author gresh;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2006.05.25.18.04.12;	author gresh;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2006.05.25.17.06.10;	author gresh;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2006.05.24.16.48.25;	author gresh;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2006.05.24.16.42.20;	author gresh;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2006.05.22.15.32.05;	author gresh;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2006.05.18.17.23.18;	author gresh;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2006.05.16.16.42.29;	author gresh;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2006.05.15.14.26.28;	author gresh;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2006.05.08.16.05.33;	author gresh;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2006.04.18.13.27.04;	author gresh;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2006.03.21.19.22.37;	author gresh;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2006.03.21.15.22.41;	author gresh;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2006.03.17.17.49.16;	author gresh;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2006.03.15.15.43.02;	author gresh;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2006.03.01.16.21.28;	author gresh;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2006.02.24.17.42.18;	author dpc;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2006.02.23.18.56.09;	author gresh;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2006.02.23.15.23.52;	author gresh;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2006.02.23.14.54.39;	author gresh;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2006.02.23.13.50.38;	author gresh;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2006.02.22.15.41.58;	author fasano;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2006.02.22.15.41.58;	author fasano;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.30
+log
+@*** empty log message ***
+@
+text
+@#if defined(_MSC_VER)
+#pragma warning(disable:4786)
+#pragma warning(disable:4503)
+#pragma warning(disable:4290)
+#endif
+
+
+#include "wit.h"
+#include "CoinFinite.h"
+#include "CoinFloatEqual.h"
+#include "globalAttrFile.h"
+#include "gnrlTypicalSolutionFile.h"
+
+#include <map>
+#include <vector>
+#include <set>
+
+#include <assert.h>
+#include <iostream>
+#include <float.h>
+#include <math.h>
+#include <cstdio>
+#include <sstream>
+
+
+#include "demandPlanningProblem.h"
+#include "demandPlanning.h"
+#include "gnrlDemandFileUncertainStart.h"
+#include "gnrlDemandFile.h"
+#include "dpException.h"
+#include "dpIntException.h"
+#include "scoFile.h"
+#include "populateDP.h"
+#include "time.h"
+
+bool witOK = true;
+
+demandPlanningProblem * atpDpProb=NULL;
+std::map<std::vector<std::string>,std::vector<float> > resourceRequirements;
+std::map<std::vector<std::string>,std::vector<std::vector<float> > > resourceRequirementsDistribution;
+
+//demandShipped is a map from the pair (demand, solution) to a vector of booleans of whether or not it shipped
+std::map< std::pair<std::string, std::string> , std::vector<bool> > opportunityDemandShipped;
+std::map< std::pair<std::string, std::string> , std::vector<bool> > wedgeDemandShipped;
+std::map< std::pair<std::string, std::string> , std::vector<bool> > ongoingDemandShipped;
+
+//for each opportunity demand, when was it supposed to ship?
+std::map<std::pair<std::string, std::string>, int > opportunityDemandRequestedShip;
+
+//for each opportunity demand, how late did it ship?
+std::map< std::pair<std::string, std::string>, std::vector<int> > opportunityDemandShipLateAmount;
+
+//for each wedge demand, was any resource-constrained?
+std::map< std::pair<std::string, std::string>, std:: vector<float> > wedgeDemandQuantityLimited;
+
+std::map<std::vector<std::string>,std::vector<float> > resourceMeanVec;
+std::vector<std::vector<float> > demandPeriodOddsVec;
+std::vector<float> demandOdds;
+std::vector<float> demandQuantity;
+std::vector<int> demandLateAllowance;
+std::vector<std::pair<std::string, std::string> > demandSolutions;
+
+std::string getSolutionName(std::string solution) {
+	int index1= solution.find(":");
+	std::string tail = solution.substr(index1+1,solution.length());
+	int index2= tail.find(":");
+	std::string result = tail.substr(0,index2);
+	return result;
+}
+void initializeRandomNumber() {
+		/*
+	Declare variable to hold seconds on clock.
+	*/
+	time_t seconds;
+	/*
+	Get value from system clock and
+	place in seconds variable.
+	*/
+	time(&seconds);
+	/*
+	Convert seconds to a unsigned
+	integer.
+	*/
+
+	srand((unsigned int) seconds);
+
+	//srand(1149870532);
+	printf("%d\n",seconds);	
+}
+float getRandomNumber() {
+	float retVal;
+
+	/*
+	get random values.
+	*/
+	float randVal = (float)rand();
+	float randMax = (float)RAND_MAX;
+
+	retVal = randVal/randMax;
+
+
+	return retVal;
+}
+
+//this accumulates simulation results for the MRP problem (resource usage for each iteration)
+void collectMRPResults(demandPlanningProblem & dpProb) 
+{
+    //get the table of values
+	std::vector<std::vector<std::string> > names;
+    
+    //get the vector of resource ID names
+    dpProb.getResourceNames(names);
+
+    // loop once for each resource
+    unsigned int r;
+    for ( r=0; r<names.size(); ++r ) {
+	  const std::vector<std::string> & resourceIdValues = names[r];
+      std::vector<float> reqQty = dpProb.getResourceReqQuantity(resourceIdValues);
+      if (resourceRequirements.find(names[r]) == resourceRequirements.end()) {
+		  //make an entry
+		  resourceRequirements[names[r]] = reqQty;
+		  std::vector<std::vector<float> > reqQtyIterations;
+		  reqQtyIterations.push_back(reqQty);
+		  resourceRequirementsDistribution[names[r]] = reqQtyIterations;
+	  }
+	  else {
+		std::vector<float> currentRequirements = resourceRequirements[names[r]];
+		for (unsigned int cR=0; cR<reqQty.size(); cR++) {
+			float newVal = currentRequirements[cR]+reqQty[cR];
+			currentRequirements[cR] = newVal;
+		}
+		std::vector<std::vector<float> > reqQtyIterations = resourceRequirementsDistribution[names[r]];
+		reqQtyIterations.push_back(reqQty);
+
+		resourceRequirements[names[r]] = currentRequirements;
+		resourceRequirementsDistribution[names[r]] = reqQtyIterations;
+	  }
+    } // end of r loop
+    
+    
+  } 
+int getAtpResult(demandPlanningProblem * dpProb, const std::string & demandName, const std::string &solutionName) {
+	  bool shipped = dpProb->getDemandShipped(demandName,solutionName);
+	  if (!shipped)
+		  return -1;
+	  int whenShipped = dpProb->getDemandPeriodShipped(demandName, solutionName);
+	  return whenShipped;
+}
+//this accumulates results for each simulation iteration (whether or not a demand shipped)
+void collectImplosionResults(demandPlanningProblem & dpProb) 
+{
+    //get the table of values of demands
+	std::vector<std::pair< std::string, std::string > > demandNames;
+
+
+	demandNames = dpProb.getOpportunityDemandList();
+    // loop once for each demand
+    unsigned int d;
+    for ( d=0; d<demandNames.size(); ++d) {
+	  std::string & demandName = (demandNames[d]).first;
+	  std::string & solutionName = (demandNames[d]).second;
+	  //did it ship
+	  bool shipped = dpProb.getDemandShipped(demandName,solutionName);
+	 
+	  if (opportunityDemandShipped.find(demandNames[d]) == opportunityDemandShipped.end()) {
+		//make an entry in the map
+		  std::vector<bool> demandShippedFlags;
+		  demandShippedFlags.push_back(shipped);
+		  opportunityDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+	  else {
+		  std::vector<bool> demandShippedFlags = opportunityDemandShipped[demandNames[d]];
+		  demandShippedFlags.push_back(shipped);
+		  opportunityDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+	  int late;
+	  int whenRequestedShip = opportunityDemandRequestedShip[demandNames[d]];
+	  if ((!shipped)&&(whenRequestedShip!=-1))
+		  int foo=1;
+	  if (whenRequestedShip==-1)  //it actually wasn't requested
+		  late = -2; //-2 is a marker for "it wasn't asked to be shipped"
+	  else {
+		  int whenShipped = dpProb.getDemandPeriodShipped(demandName, solutionName);
+		  if (shipped)
+			  late = whenShipped-whenRequestedShip;
+		  else
+			  late = -1; //didn't ship at all, so this is just a marker for that
+	  }
+	  if (opportunityDemandShipLateAmount.find(demandNames[d]) == opportunityDemandShipLateAmount.end()) {
+		//make an entry in the map
+		  std::vector<int> demandShipLateAmounts;
+		  demandShipLateAmounts.push_back(late);
+		  opportunityDemandShipLateAmount[demandNames[d]] = demandShipLateAmounts;
+	  }
+	  else {
+		  std::vector<int> demandShipLateAmounts = opportunityDemandShipLateAmount[demandNames[d]];
+		  demandShipLateAmounts.push_back(late);
+		  opportunityDemandShipLateAmount[demandNames[d]] = demandShipLateAmounts;
+	  }	  
+    } // end of d loop
+
+
+	demandNames = dpProb.getWedgeDemandList();
+    // loop once for each demand
+    for ( d=0; d<demandNames.size(); ++d) {
+	  std::string & demandName = (demandNames[d]).first;
+	  std::string & solutionName = (demandNames[d]).second;
+	  //did it ship
+	  bool shipped = dpProb.getDemandShipped(demandName,solutionName);
+	  if (wedgeDemandShipped.find(demandNames[d]) == wedgeDemandShipped.end()) {
+		//make an entry in the map
+		  std::vector<bool> demandShippedFlags;
+		  demandShippedFlags.push_back(shipped);
+		  wedgeDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+	  else {
+		  std::vector<bool> demandShippedFlags = wedgeDemandShipped[demandNames[d]];
+		  demandShippedFlags.push_back(shipped);
+		  wedgeDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+    } // end of d loop
+
+	demandNames = dpProb.getOngoingDemandList();
+    // loop once for each demand
+    for ( d=0; d<demandNames.size(); ++d) {
+	  std::string & demandName = (demandNames[d]).first;
+	  std::string & solutionName = (demandNames[d]).second;
+	  //did it ship
+	  bool shipped = dpProb.getDemandShipped(demandName,solutionName);
+	  if (ongoingDemandShipped.find(demandNames[d]) == ongoingDemandShipped.end()) {
+		//make an entry in the map
+		  std::vector<bool> demandShippedFlags;
+		  demandShippedFlags.push_back(shipped);
+		  ongoingDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+	  else {
+		  std::vector<bool> demandShippedFlags = ongoingDemandShipped[demandNames[d]];
+		  demandShippedFlags.push_back(shipped);
+		  ongoingDemandShipped[demandNames[d]] = demandShippedFlags;
+	  }
+    } // end of d loop
+  } 
+
+
+//this writes out the simulation results for the MRP problem
+void writeSimulatedMRPResultsMeanVariance(std::string outputDirectory, demandPlanningProblem & dpProb, int numSimulations) 
+{
+    // Open file
+
+    std::string mrpPlanFileName = outputDirectory+"/resourceReqOut.csv";
+    FILE * mrpPlanFilePtr = fopen(mrpPlanFileName.c_str(),"w");
+        
+    int nPeriods = dpProb.getNPeriods();
+    //get the table of values
+	std::vector<std::vector<std::string> > names;
+    
+    //get the vector of resource ID names
+    dpProb.getResourceNames(names);
+
+    for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+      std::string heading;
+      heading = heading+"\"" + dpProb.getResourceIdentifierNames()[i]+"\""+",";
+      fprintf(mrpPlanFilePtr,"%s",heading.c_str());
+    }
+    fprintf(mrpPlanFilePtr,"\"period\",\"meanReqQty\",\"stdevReqQty\"\n");
+
+
+
+    // loop once for each resource, computing the mean
+    unsigned int r;
+
+    for ( r=0; r<names.size(); ++r ) {
+	  std::vector<float> meanVec;
+	  meanVec.clear();
+	  const std::vector<std::string> & resourceIdValues = names[r];
+	  std::vector<std::vector<float> > reqQtyIterations = resourceRequirementsDistribution[names[r]];
+	  for (int i=0;i<nPeriods; i++)
+		  meanVec.push_back(0);
+
+	  for (unsigned int iterations = 0; iterations < reqQtyIterations.size(); iterations++) {
+		  std::vector<float> periodVec = reqQtyIterations[iterations];
+		  for (int i=0; i<nPeriods; i++) {
+			  float a = meanVec[i];
+			  float b = periodVec[i];
+			  meanVec[i] += periodVec[i];
+		  }
+	  }
+	  for (int i=0; i<nPeriods; i++) {
+		  float a = meanVec[i];
+		  meanVec[i]=meanVec[i]/reqQtyIterations.size();
+		  float b = meanVec[i];
+		  int foo = 0;
+	  }
+	  resourceMeanVec[resourceIdValues] = meanVec;
+	}
+
+	//now the moments
+	std::vector<float> adevVec,varVec,skewVec,curtVec,sdevVec, epVec;
+
+    for ( r=0; r<names.size(); ++r ) {
+	  adevVec.clear();
+	  varVec.clear();
+	  epVec.clear();
+	  //skewVec.clear();
+	  //curtVec.clear();
+	  sdevVec.clear();
+	  const std::vector<std::string> & resourceIdValues = names[r];
+	  std::vector<std::vector<float> > reqQtyIterations = resourceRequirementsDistribution[names[r]];
+	  int numIter = reqQtyIterations.size();
+	  for (int i=0; i<nPeriods; i++) {
+		  adevVec.push_back(0);
+		  sdevVec.push_back(0);
+		  varVec.push_back(0);
+		  epVec.push_back(0);
+		  //skewVec.push_back(0);
+		  //curtVec.push_back(0);
+	  }
+
+	  float s, p;
+	  for (unsigned int t=0; t<reqQtyIterations.size(); t++ ) {
+		  for (int j =0; j<nPeriods; j++) {
+			  float a = resourceMeanVec[resourceIdValues][j];
+			  float b = reqQtyIterations[t][j];
+              s = reqQtyIterations[t][j]-resourceMeanVec[resourceIdValues][j];
+			  adevVec[j]+=fabs(s);
+			  epVec[j] += s;
+			  p = s*s;
+			  varVec[j]+=p;
+			  p *= s;
+			  //skewVec[j] += (p);
+			  //p *= s;
+			  //curtVec[j]+=p;
+		  }
+	  }
+	  //adjust
+	  for (int j=0; j<nPeriods; j++) {
+		  adevVec[j] = adevVec[j]/numIter;
+		  varVec[j] = (varVec[j]-epVec[j]*epVec[j]/numIter)/(numIter-1);
+		  sdevVec[j] = sqrt(varVec[j]);
+		  
+	      for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+			fprintf(mrpPlanFilePtr,"\"%s\",", names[r].at(i).c_str());
+	      }
+	      fprintf(mrpPlanFilePtr,
+				"%d,%f,%f\n",
+				j, 
+				resourceMeanVec[resourceIdValues][j],
+				sdevVec[j]);
+	  } // finished t loop
+	      
+    } // end of r loop
+    
+    fclose(mrpPlanFilePtr);
+    
+  } // end of write mrp plan block
+
+
+//this writes out the simulation results for the Implosion problem
+void writeSimulatedImplosionResults(std::string outputDirectory, demandPlanningProblem & dpProb, int numSimulations) 
+{
+    // Open file
+    std::string implosionFileName = outputDirectory+"/demandShipOut.csv";
+	std::string solutionImplosionFileName = outputDirectory+"/solutionShipOut.csv";
+    FILE * implosionFilePtr = fopen(implosionFileName.c_str(),"w");
+	FILE *solutionImplosionFilePtr = fopen(solutionImplosionFileName.c_str(),"w");
+    std::map<std::string,std::pair<int,int> > solutionResults;    
+	std::map<std::string,int> solutionLateResults;
+	std::vector<std::string> solutionNames;
+	int nPeriods = dpProb.getNPeriods();
+	std::vector<std::pair< std::string, std::string > > demandNames;
+	demandNames = dpProb.getOpportunityDemandList();    
+
+	std::string heading;
+	heading = "\"demand\",\"solution\",\"odds\",\"simulatedOdds\",\"fraction(Shipped/Req)\",\"fraction(ShippedLate/Shipped)\"\n";
+	fprintf(implosionFilePtr,"%s",heading.c_str());
+
+
+    // loop once for each demand, computing the average of actualy shipped, and the average ship 
+	// late amount (will 
+	// skip those that didn't ship at all because the demand didn't actually come in
+    unsigned int r;
+
+    for ( r=0; r<demandNames.size(); ++r ) {
+	  int numThatShipped = 0;
+	  int numRequested=0;
+	  fprintf(implosionFilePtr,"%s,%s,",demandNames[r].first.c_str(), demandNames[r].second.c_str());
+	  fprintf(implosionFilePtr,"%f,",demandOdds[r]);
+
+	  float sumShipped = 0;
+	  float sumLates = 0;
+
+		  
+	  std::vector<bool> shippedVec = opportunityDemandShipped[demandNames[r]];
+	  std::vector<int> shippedLateVec = opportunityDemandShipLateAmount[demandNames[r]];
+	  for (int i=0; i<numSimulations; i++) {
+		sumShipped = sumShipped+shippedVec.at(i);
+		int late = shippedLateVec.at(i);
+		if (late>-2) { //late==-2 means it wasn't asked to be shipped
+			numRequested++;
+		}
+		if (late>0) { //if it never shipped (and was supposed to) late is -1
+			sumLates = sumLates++;
+		}
+	  }
+	  fprintf(implosionFilePtr,"%f,%f,%f\n",numRequested/(float)numSimulations,sumShipped/numRequested, sumLates/(float)sumShipped);
+	  std::string solutionName = getSolutionName(demandNames[r].second);
+      if (solutionResults.find(solutionName) == solutionResults.end()) {
+		  //make an entry
+		  std::pair<int,int> result(sumShipped,numRequested); 
+
+		  solutionResults[solutionName] = result;
+		  solutionNames.push_back(solutionName);
+		  solutionLateResults[solutionName] = sumLates;
+	  }	  
+	  else {
+		  std::pair<int,int> newResult;
+		  std::pair<int,int> oldResult = solutionResults[solutionName];
+		  int oldLateSum = solutionLateResults[solutionName];
+		  newResult.first = oldResult.first+sumShipped;
+		  newResult.second = oldResult.second+numRequested;
+		  solutionResults[solutionName]=newResult;
+		  int newLateSum = oldLateSum+sumLates;
+		  solutionLateResults[solutionName]=newLateSum;
+	  }
+	  //printf("%f\n",sumShipped/numRequested);
+	}
+    fclose(implosionFilePtr);
+
+	//now write the solution results
+	heading = "\"solution\",\"fraction(Shipped/Req)\",\"fraction(ShippedLate/Shipped)\"\n";
+	fprintf(solutionImplosionFilePtr,"%s",heading.c_str());
+
+	for (int i=0; i<solutionNames.size(); i++) {
+		std::string solutionName = solutionNames.at(i);
+		float val = (float)solutionResults[solutionName].first/(float)solutionResults[solutionName].second;
+		float val2 = (float)solutionLateResults[solutionName]/(float)solutionResults[solutionName].first;
+		fprintf(solutionImplosionFilePtr,"%s,%f,%f\n",solutionNames.at(i).c_str(),val,val2);
+	}
+	fclose(solutionImplosionFilePtr);
+
+
+    
+  } // end 
+
+
+
+//this writes the "single run" mrp results (not a simulation)
+void writeMRPResults(std::string outputDirectory, demandPlanningProblem & dpProb) 
+{
+    // Open file
+
+
+    std::string mrpPlanFileName = outputDirectory+"/resourceReqOut.csv";
+    FILE * mrpPlanFilePtr = fopen(mrpPlanFileName.c_str(),"w");
+        
+        
+    //get the table of values
+	std::vector<std::vector<std::string> > names;
+    
+    //get the vector of resource ID names
+    dpProb.getResourceNames(names);
+
+    for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+      std::string heading;
+      heading = heading+"\"" + dpProb.getResourceIdentifierNames()[i]+"\""+",";
+      fprintf(mrpPlanFilePtr,"%s",heading.c_str());
+    }
+    fprintf(mrpPlanFilePtr,"\"period\",\"reqQty\"\n");
+
+
+
+    // loop once for each resource
+    unsigned int r;
+    for ( r=0; r<names.size(); ++r ) {
+	  const std::vector<std::string> & resourceIdValues = names[r];
+      std::vector<float> reqQty = dpProb.getResourceReqQuantity(resourceIdValues);
+	  //get the "user" horizon
+	  int horizon = dpProb.getUserNPeriods();
+	  for (int t=0; t<horizon; t++ ) {
+	  //for (unsigned int t=0; t<reqQty.size(); t++ ) {
+
+		for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+			fprintf(mrpPlanFilePtr,"\"%s\",", names[r].at(i).c_str());
+		}
+		fprintf(mrpPlanFilePtr,
+				"%d,%f\n",
+				t, 
+				reqQty[t]);
+	  } // finished t loop
+	      
+    } // end of r loop
+    
+    fclose(mrpPlanFilePtr);
+    
+  } // end of write mrp plan block
+
+
+
+//this writes the "single run" implosion results (not a simulation)
+void writeImplosionResults(std::string outputDirectory, demandPlanningProblem & dpProb) 
+{
+    // Open file
+
+
+    std::string resultsFileName;
+	FILE * resultsFilePtr;
+
+	//first do the opportunity demand
+	resultsFileName = outputDirectory+"/demandOut.csv";
+    resultsFilePtr = fopen(resultsFileName.c_str(),"w");
+	if (dpProb.isDivisibleDemand()) {
+		fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\",\"totalQuantityShipped\",");
+		for (int i=0; i<dpProb.getUserNPeriods()-1; i++) {
+			fprintf(resultsFilePtr,"\"shipppedP%d\",",i);
+		}
+		fprintf(resultsFilePtr,"\"shippedP%d\"\n",dpProb.getUserNPeriods()-1);
+	}
+	else
+		fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\",\"periodShipped\"\n");
+
+    //get the list of demands
+	std::vector<std::pair<std::string, std::string> > demands;
+	demands = dpProb.getOpportunityDemandList();
+    
+	for (unsigned int i=0; i<demands.size(); i++) {
+		std::pair<std::string, std::string> p = demands[i];
+		std::string demandName = p.first;
+		std::string solutionName = p.second;
+        bool shipped = dpProb.getDemandShipped(demandName, solutionName);
+		float quantShipped;
+		int periodShipped;
+		if (dpProb.isDivisibleDemand())
+			quantShipped = dpProb.getDemandTotalQuantityShipped(demandName,solutionName);
+		else
+			periodShipped = dpProb.getDemandPeriodShipped(demandName, solutionName);
+
+		int didShip;
+		if (shipped) 
+			didShip = 1;
+		else
+			didShip=0;
+		if (!dpProb.isDivisibleDemand())
+			fprintf(resultsFilePtr,"%s,%s,%d,%d\n",demandName.c_str(),solutionName.c_str(), didShip, periodShipped);
+		else {
+			fprintf(resultsFilePtr,"%s,%s,%d,%f,",demandName.c_str(),solutionName.c_str(), didShip, quantShipped);
+			for (int j=0; j<dpProb.getUserNPeriods()-1; j++) {
+				float q = dpProb.getDemandQuantityShipped(demandName,solutionName,j);
+				fprintf(resultsFilePtr,"%f,",q);
+			}
+			float q = dpProb.getDemandQuantityShipped(demandName,solutionName,dpProb.getUserNPeriods()-1);
+			fprintf(resultsFilePtr,"%f\n",q);
+		}
+	}
+	fclose(resultsFilePtr);
+
+
+	//now do the wedge demand
+	resultsFileName = outputDirectory+"/wedgeDemandOut.csv";
+    resultsFilePtr = fopen(resultsFileName.c_str(),"w");
+	fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\",\"period\",\"quantityShipped\"\n");
+
+    //get the list of demands
+	demands = dpProb.getWedgeDemandList();
+    
+	for (unsigned int i=0; i<demands.size(); i++) {
+		std::pair<std::string, std::string> p = demands[i];
+		std::string demandName = p.first;
+		std::string solutionName = p.second;
+        bool shipped = dpProb.getDemandShipped(demandName, solutionName);
+		int didShip;
+		if (shipped) 
+			didShip = 1;
+		else
+			didShip=0;
+		for (int j=0; j<dpProb.getUserNPeriods(); j++) {
+			float quantityShipped = dpProb.getDemandQuantityShipped(demandName, solutionName, j);
+
+			fprintf(resultsFilePtr,"%s,%s, %d, %d, %f\n",demandName.c_str(),solutionName.c_str(), didShip, j, quantityShipped);
+		}
+	}
+	fclose(resultsFilePtr);
+
+
+	//first do the ongoing demand
+	resultsFileName = outputDirectory+"/ongoingDemandOut.csv";
+    resultsFilePtr = fopen(resultsFileName.c_str(),"w");
+	fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\"\n");
+
+    //get the list of demands
+	demands = dpProb.getOngoingDemandList();
+    
+	for (unsigned int i=0; i<demands.size(); i++) {
+		std::pair<std::string, std::string> p = demands[i];
+		std::string demandName = p.first;
+		std::string solutionName = p.second;
+        bool shipped = dpProb.getDemandShipped(demandName, solutionName);
+		int didShip;
+		if (shipped) 
+			didShip = 1;
+		else
+			didShip=0;
+		fprintf(resultsFilePtr,"%s,%s, %d\n",demandName.c_str(),solutionName.c_str(),didShip);
+	}
+	fclose(resultsFilePtr);
+
+   
+  } // end of write mrp plan block
+
+//creates the base witRun, loads the base files
+//int DP_DECLSPEC startATP(const std::string & dirname) {
+//	if (atpDpProb)
+//		delete atpDpProb;
+//	atpDpProb = new demandPlanningProblem;
+//    loadATP(dirname);
+//	return 1;
+//}
+
+int atpSetSupply(std::vector<resourceGlut> resourceSupply) {
+	int vecSize = resourceSupply.size();
+	resourceGlut rg;
+	for (int i=0; i<vecSize; i++) {
+		rg = resourceSupply.at(i);
+		std::vector<std::string> resourceAttributeValues(1);
+		resourceAttributeValues[0]=rg.JRSS;
+		if (!atpDpProb->resourceExists(resourceAttributeValues) ) {
+			atpDpProb->addResource(resourceAttributeValues);
+		}
+		float supply = rg.quantity;
+		int period = rg.period;
+		if (period>atpDpProb->getNPeriods()) {
+            DpException dpe("supply period greater than horizon");
+			throw dpe;
+		}
+		atpDpProb->setResourceSupplyQuantityByPeriod(resourceAttributeValues, supply, period);
+	}
+	return 0;
+}
+int  atpSetSolutionBom(std::vector<solutionBomEntry> solutionBoms) {
+	 int numBoms = solutionBoms.size();
+	 for (int i=0; i<numBoms; i++) {
+		 solutionBomEntry solutionBom = solutionBoms.at(i);
+		 std::string solution = solutionBom.solName;
+		 if (!(atpDpProb->solutionExists(solution)) )
+			 atpDpProb->addSolution(solution);
+		 std::vector<std::string> resourceAttributeValues(1);
+		 resourceAttributeValues[0]=solutionBom.JRSS;
+		 float quantity = solutionBom.quantity;
+
+		 //check whether the resource exists. Should this be an error?
+		 //for now, just add it
+		 if (!atpDpProb->resourceExists(resourceAttributeValues))
+			atpDpProb->addResource(resourceAttributeValues);
+
+
+		 //check the quantity
+         if (quantity<0) {
+            return -1;
+		  }
+		  //add it
+		  atpDpProb->addResourceRequirement(solution,resourceAttributeValues,quantity);
+		}
+	
+
+
+	return 0;
+}
+
+int  resetATP(int horizon) {
+	if (atpDpProb)
+		delete atpDpProb;
+	//set up the problem
+	try {
+	atpDpProb = new demandPlanningProblem;
+	atpDpProb->setNPeriods(horizon);
+	atpDpProb->setIsMrpProblem(false);
+	atpDpProb->setDivisibleDemand(false);
+	atpDpProb->setUserNPeriods(horizon);
+	atpDpProb->addResourceIdentifierName("JobRoleSkillSet");
+	return 0;
+	}
+	catch (exception e) {
+		return -1;
+	}
+}
+void  stopATP() {
+	delete atpDpProb;
+	atpDpProb = NULL;
+}
+void writeATPModel(std::string name) {
+	atpDpProb->writeModel(name.c_str());
+}
+void loadATP(const std::string & dirname) {
+	try {
+		bool simulation = false;
+		const std::string & inputDirectory=dirname;
+
+		populateWithDuration(atpDpProb, inputDirectory, simulation, true);
+
+		bool mrpProblem = atpDpProb->isMrpProblem();
+		if (mrpProblem) {
+           DpException rcpEx("ATP must be an implosion problem");
+           throw rcpEx;	
+		}
+		//do the netting then purge the demands
+		atpDpProb->netSupply();
+		//atpDpProb->writeModel("foobar");
+	}
+  catch ( SCOexception e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DPIntException e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DpException e) {
+    throw e;
+  }
+}
+void DP_DECLSPEC runATS(const std::string & dirname) {
+	//load the base case (committed)
+	if (atpDpProb) delete atpDpProb;
+	atpDpProb = new demandPlanningProblem;
+	loadATP(dirname);
+
+    std::string atsFileName = dirname+"/atsOut.csv";
+    FILE * atsFilePtr = fopen(atsFileName.c_str(),"w");
+	fprintf(atsFilePtr,"\"solution\",\"firstFeasiblePeriod\"\n");
+
+	//for each solution...
+	std::string typicalSolutionFileName = dirname + "/typicalSolution.csv";
+	DPgnrlTypicalSolutionFile typSolFile(typicalSolutionFileName);
+	DPgnrlTypicalSolutionFileIterator typSolFileIter(typSolFile);
+	  
+	// loop once for each record in solution file
+	for ( ; typSolFileIter()!=NULL; ) {
+			std::string solName = typSolFileIter.fieldOnRecord("solution");
+			int duration = typSolFileIter.fieldOnRecordAsInt("duration");
+			float quantity = typSolFileIter.fieldOnRecordAsFloat("quantity");
+	  	    //do an ATP on it with infinite slack
+			int result = atpSingleRequest(solName, duration, quantity, 0, atpDpProb->getUserNPeriods());
+		    fprintf(atsFilePtr,"%s,%d\n",solName.c_str(),result);
+	}
+	fclose(atsFilePtr);
+
+
+
+	delete atpDpProb;
+	atpDpProb=NULL;
+
+}
+
+//compute Ability to Promise
+int DP_DECLSPEC atpRequest(const std::string solutionId, int durationInWeeks,
+            float quantityInHours, int requestedPeriod,
+            int lateAllowanceInWeeks, int planningHorizonInWeeks,
+			float** supplyGlut, float** resourceBomRatio) {
+
+				resetATP(planningHorizonInWeeks);
+				std::vector<solutionBomEntry> solutionBomVec;
+				int retval = atpSetSolutionBom(solutionBomVec);
+				if (retval!=0) {
+					stopATP();
+					return retval;
+				}
+				std::vector<resourceGlut> resourceSupplyVec;
+				retval = atpSetSupply(resourceSupplyVec);
+				if (retval!=0) {
+					stopATP();
+					return retval;
+				}
+				retval = atpSingleRequest(solutionId,durationInWeeks,quantityInHours,requestedPeriod, lateAllowanceInWeeks);
+				if (retval != 0) {
+					stopATP();
+					return retval;
+				}
+				stopATP();
+				return retval;
+			 
+
+}
+
+int atpSingleRequest(const std::string & solutionName, int duration, float quantity, int requestedPeriod, int lateAllowance) {
+  
+  if (!witOK){
+    //DpException rcpEx("Demand Planner is not available due to previous error.  Contact developers");
+    //throw rcpEx;
+	printf("Demand Planner is not available due to previous error.  Contact developers");
+	return -9999;
+  }
+  try {
+	std::string demandName = "atp";
+  
+	//shiplate must be less than or equal to the horizon-1
+	if (lateAllowance >= atpDpProb->getUserNPeriods()) {
+		printf("Late allowance must be less than or equal to NPeriods");
+		return -1000;
+	}
+	if (lateAllowance < 0)
+		return -1000;
+
+	//chop off duration past nPeriods-requestedPerid
+	if (duration>(atpDpProb->getUserNPeriods()-requestedPeriod))
+		duration = atpDpProb->getUserNPeriods()-requestedPeriod;
+	//this still doesn't handle the "lateAllowance"; that is handled when the boms are added
+
+	std::string specificSolutionName = addATPelement(atpDpProb,demandName,solutionName, duration, quantity, requestedPeriod, lateAllowance);
+	atpDpProb->doImplosionProblem();
+	int result = getAtpResult(atpDpProb,demandName, specificSolutionName);
+	//writeATPModel("new");
+	//purge the request
+	atpDpProb->purge();
+	if (result==-1) {
+		stopATP();
+		return result;
+		
+	}
+	else {
+		stopATP();
+		return (result-requestedPeriod);
+	}
+  }
+  
+  
+  catch ( SCOexception e ) {
+    //DpException rcpEx(e.what());
+    //throw rcpEx;
+	  printf(e.what());
+	  stopATP();
+	  return -1000;
+  }
+  catch ( DPIntException e ) {
+    //DpException rcpEx(e.what());
+    //throw rcpEx;
+	  printf(e.what());
+	  return -9999;
+  }
+  catch ( DpException e) {
+    //throw e;
+	  printf(e.what());
+	  return -1000;
+  }
+  
+  
+
+}
+
+int DP_DECLSPEC demandPlanning(const std::string & dirname)
+//int DP_DECLSPEC demandPlanning()
+{
+
+  if (!witOK){
+    DpException rcpEx("Demand Planner is not available due to previous error.  Contact developers");
+    throw rcpEx;
+  }
+    
+
+  try {
+    std::cout <<"demandPlanner Build date: " <<__DATE__ <<std::endl;
+  
+    const std::string & outputDirectory=dirname;
+    const std::string & inputDirectory=dirname;
+  
+    demandPlanningProblem dpProb;
+    //populate(dpProb, inputDirectory, outputDirectory, false);
+
+
+	bool simulation = false;
+    populateWithDuration(&dpProb, inputDirectory,  simulation, false);
+
+	bool mrpProblem = dpProb.isMrpProblem();
+
+	//run MRP on the problem
+	if (mrpProblem) {
+		dpProb.doMrp();
+		writeMRPResults(outputDirectory,dpProb);
+		//writeSolutionResults(outputDirectory,dpProb);
+	}
+	else {
+		dpProb.doImplosionProblem();
+		writeImplosionResults(outputDirectory,dpProb);
+	}
+   }
+  
+  
+  catch ( SCOexception e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DPIntException e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DpException e) {
+    throw e;
+  }
+  std::cout <<"demand planning application is finished." <<std::endl;
+
+  return 0;
+
+}
+
+int DP_DECLSPEC demandPlanningSimulation(const std::string & dirname)
+//int DP_DECLSPEC demandPlanning()
+{
+
+  if (!witOK){
+    DpException rcpEx("Demand Planner is not available due to previous error.  Contact developers");
+    throw rcpEx;
+  }
+    
+
+  try {
+    std::cout <<"demandPlanner Build date: " <<__DATE__ <<std::endl;
+  
+    const std::string & outputDirectory=dirname;
+    const std::string & inputDirectory=dirname;
+
+    CoinRelFltEq eq(.1);
+
+    demandPlanningProblem dpProb;
+
+
+	//first populate the model with everything but the probablistic demand
+	bool simulation = true;
+    populateWithDuration(&dpProb, inputDirectory,  simulation, false);
+	bool mrpProblem = dpProb.isMrpProblem();
+
+	//get the "user" nPeriods (shorter than the "safety" nPeriods which
+	//will be stored in dpProb)
+
+
+	//read the demand file once through for data integrity
+	//and store away the info in it
+	int numDemandSolutions=0;
+
+	{
+	    int numAttributes = dpProb.getResourceIdentifierNames().size();
+		int nPeriods = dpProb.getUserNPeriods();
+		std::string demandFileName = inputDirectory + "/demand.csv";
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods,mrpProblem);
+		DPgnrlDemandFileUncertainStartIterator demandFileIter(demandFile);
+	  
+		// loop once for each record in demand file
+		for ( ; demandFileIter()!=NULL; ) {
+		    std::string solutionName = demandFileIter.solution();
+			std::string demandName = demandFileIter.demand();
+			float quantity = demandFileIter.quantityAsFloat();
+			float odds = demandFileIter.oddsAsFloat();
+			float duration = demandFileIter.durationAsFloat();
+			int lateAllowance = demandFileIter.lateAllowanceAsInt();
+			int intDuration = (int)floor(duration+0.5);
+			char dName[100];
+            sprintf(dName,"d%d",intDuration);
+			std::string specificSolutionName = demandName+":"+solutionName+":"+dName;
+
+			std::pair<std::string, std::string> demandSolution(demandName, specificSolutionName);
+			demandOdds.push_back(odds);
+			demandSolutions.push_back(demandSolution);
+			demandLateAllowance.push_back(lateAllowance);
+			numDemandSolutions++;
+		
+
+			//check that the solution already exists
+            if ( !dpProb.solutionExists(solutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: solution does not exist"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			//check that the demand for solution does not already exist
+            if (dpProb.demandExists(demandName,specificSolutionName)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand already exists"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   demandName: " <<demandName.c_str()                    <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+			//check the late allowance
+            if (lateAllowance < 0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"lateAllowance must be 0 or greater"              <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"   solutionName: " <<solutionName.c_str()                    <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+	
+			//check the quantity
+            if (quantity<0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand quantity less than 0"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+			demandQuantity.push_back(quantity);
+
+			//check the odds
+            if (odds<0 || odds>1.0) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: demand odds must be between 0 and 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+            }
+
+			//check sum = 1.0
+			float sumProb=0;
+			std::vector<float> oddsVec;
+
+			//we need to add the specific solution here (solution along with its duration)
+            //first check whether it already exists
+			bool solExists = dpProb.solutionExists(specificSolutionName);
+			if (!solExists) {
+				dpProb.addSolution(specificSolutionName);
+				//connect the atomic solution to the specific solution
+				dpProb.addAtomicSolutionRequirements(specificSolutionName, solutionName,intDuration);
+			}
+			//we will add the demand here; just modify the timing in the simulation
+			dpProb.addDemand(demandName,specificSolutionName,"opportunity");
+			dpProb.setDemandShipLateAllowance(demandName,specificSolutionName,lateAllowance);
+			for (int j=0; j<nPeriods; j++) {
+				//get the probability for the current period
+				char pName[100];
+                sprintf(pName,"P%d",j);
+				std::string pNameStr = pName;
+				float probability =  demandFileIter.fieldOnRecordAsFloat(pNameStr);
+				oddsVec.push_back(probability);
+				sumProb+=probability;
+			}
+			if (!eq(sumProb,1.0f)) {
+                std::ostringstream msgStream;
+                msgStream <<"-------------------------------------------------------"         <<std::endl
+                <<"Error: sum of demand probabilites not equal to 1"                                <<std::endl
+                <<"   demand filename: " <<demandFile.filename().c_str()    <<std::endl
+                <<"   demand file line number: " <<demandFileIter.recNum()  <<std::endl
+                <<"-------------------------------------------------------"                   <<std::endl;
+                throw ( DpException(msgStream.str()) );
+
+			}
+			demandPeriodOddsVec.push_back(oddsVec);
+		}
+	}
+
+
+	//the file checks out
+
+    int numSimulations = 1000;
+	//numSimulations = 1;
+	//initialize the random number generator
+	initializeRandomNumber();
+	for (int i=0; i<numSimulations; i++) {
+		//read the probabilistic demand file
+	    int numAttributes = dpProb.getResourceIdentifierNames().size();
+
+		int nPeriods = dpProb.getUserNPeriods();
+	    opportunityDemandRequestedShip.clear();
+		// loop once for each record in demand file
+		for (int dS = 0; dS<numDemandSolutions; dS++) {
+
+			std::pair<std::string,std::string> demandSolution = demandSolutions.at(dS); 
+			std::string solutionName = demandSolution.second;
+			std::string demandName = demandSolution.first;
+
+			//first reset it all to 0 demand
+			dpProb.resetDemandQuantity(demandName, solutionName);
+			float quantity = demandQuantity.at(dS);
+			float odds = demandOdds.at(dS);
+
+			//does the demand actually happen?
+			float rand1 = getRandomNumber();
+			if (rand1>=odds) {
+                //we don't do it. Just set the quantity (that is, the demand) for all
+				//periods to 0
+				for (int j=0; j<nPeriods; j++) {
+					dpProb.setDemandQuantity(demandName, solutionName, j,0.0);
+				}
+				opportunityDemandRequestedShip[demandSolution] = -1;
+
+			}
+			else {
+				//we do it (with probability 1)
+				//now we have to figure out which period in which we will do it
+				float ran2 = getRandomNumber();
+				float cumProb = 0;
+				bool done = false;
+				for (int j=0; j<nPeriods; j++) {
+					float probability = demandPeriodOddsVec.at(dS)[j];
+					cumProb+=probability;
+					if (!done && (ran2<=cumProb)) {
+						dpProb.setDemandQuantity(demandName, solutionName, j,quantity);
+						dpProb.setSolutionIncLotSize(solutionName,quantity);
+					    done = true;
+						opportunityDemandRequestedShip[demandSolution] = j;
+
+					}
+					else {
+						dpProb.setDemandQuantity(demandName, solutionName, j, 0.0);
+					}
+				}
+
+			}
+
+		} //demand file has been read and the model populated with the current simulation values
+	   
+		
+		bool mrpProblem = dpProb.isMrpProblem();
+		if (mrpProblem) {
+			dpProb.doMrp();
+			collectMRPResults(dpProb);
+		}
+		else {
+			dpProb.doMrp();
+			dpProb.doImplosionProblem();
+			collectMRPResults(dpProb);
+			collectImplosionResults(dpProb);
+		}
+	    
+
+
+	} //end of big simulation loop
+	if (mrpProblem)
+		writeSimulatedMRPResultsMeanVariance(outputDirectory, dpProb, numSimulations);
+	else {
+		writeSimulatedMRPResultsMeanVariance(outputDirectory, dpProb, numSimulations);
+		writeSimulatedImplosionResults(outputDirectory, dpProb, numSimulations);
+	}
+
+
+
+  }//end of try
+
+  
+  
+  catch ( SCOexception e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DPIntException e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DpException e) {
+    throw e;
+  }
+  std::cout <<"demand planning application is finished." <<std::endl;
+
+  return 0;
+
+}
+
+@
+
+
+1.29
+log
+@*** empty log message ***
+@
+text
+@d667 2
+a668 7
+int resetATP(int horizon) {
+	int retval = resetATP();
+	atpDpProb->setNPeriods(horizon);
+	atpDpProb->setUserNPeriods(horizon);
+	return retval;
+}
+int  resetATP() {
+d674 1
+a674 1
+	//atpDpProb->setNPeriods(numperiods);
+d677 1
+a677 1
+	//atpDpProb->setUserNPeriods(numperiods);
+d759 1
+a759 3
+				resetATP();
+				atpDpProb->setNPeriods(planningHorizonInWeeks);
+				atpDpProb->setUserNPeriods(planningHorizonInWeeks);
+@
+
+
+1.28
+log
+@removed a small memory leak
+@
+text
+@d610 64
+a673 1
+int DP_DECLSPEC startATP(const std::string & dirname) {
+d676 2
+d679 10
+a688 2
+    loadATP(dirname);
+	return 1;
+d690 1
+a690 1
+void DP_DECLSPEC stopATP() {
+d694 3
+a696 1
+
+d711 1
+a711 1
+		atpDpProb->writeModel("foobar");
+d746 1
+a746 1
+			int result = atpRequest(solName, duration, quantity, 0, atpDpProb->getUserNPeriods());
+d757 1
+a757 6
+//deletes the witRun and reloads the base witRun
+void DP_DECLSPEC resetATP(const std::string & dirname) {
+	delete atpDpProb;
+	atpDpProb = new demandPlanningProblem;
+	loadATP(dirname);
+}
+d759 38
+a796 4
+int DP_DECLSPEC atpRequest(const std::string & solutionName, int duration, float quantity, int requestedPeriod, int lateAllowance) {
+ if (!witOK){
+    DpException rcpEx("Demand Planner is not available due to previous error.  Contact developers");
+    throw rcpEx;
+d800 13
+d817 1
+d820 2
+a821 1
+	if (result==-1) 
+d823 4
+a826 1
+	else
+d828 1
+a828 1
+	
+d833 5
+a837 2
+    DpException rcpEx(e.what());
+    throw rcpEx;
+d840 4
+a843 2
+    DpException rcpEx(e.what());
+    throw rcpEx;
+d846 3
+a848 1
+    throw e;
+d850 1
+a850 2
+  std::cout <<"demand planning application is finished." <<std::endl;
+
+@
+
+
+1.27
+log
+@changes to support available to promise
+@
+text
+@d12 1
+a12 1
+
+d650 32
+@
+
+
+1.26
+log
+@change tolerance, and add some more models for the future
+@
+text
+@d37 2
+d142 7
+a148 1
+
+d609 19
+d629 35
+a663 4
+#if 0
+void writeSolutionResults(std::string outputDirectory, demandPlanningProblem & dpProb) 
+{
+    // Open file
+d665 25
+a689 18
+    std::string solutionFileName = outputDirectory+"/solutionDemandOutDS1.csv";
+    FILE * solutionFilePtr = fopen(solutionFileName.c_str(),"w");
+        
+        
+    //get the list of solutions
+	std::vector<std::string>  names;
+    dpProb.getSolutionNames(names);
+
+    fprintf(solutionFilePtr,"\"solution\",");
+	int nP = dpProb.getUserNPeriods();
+	for (int i=0; i<nP-1; i++) {
+		char periodName[100];
+		sprintf(periodName,"Quantity(%d)",i);
+		fprintf(solutionFilePtr,"\"%s\",",periodName);
+	}
+	char periodName[100];
+	sprintf(periodName,"Quantity(%d)",nP-1);
+	fprintf(solutionFilePtr,"\"%s\"\n",periodName);
+d691 1
+d693 1
+a694 17
+    // loop once for each solution
+    unsigned int s;
+    for ( s=0; s<names.size(); ++s ) {
+		std::vector<float> reqQty = dpProb.getSolutionReqQuantity(names[s]);
+		fprintf(solutionFilePtr,"\"%s\",", names[s].c_str());
+		for (int i=0; i<nP-1; i++) {
+			fprintf(solutionFilePtr,
+				"%f,",reqQty[i]);
+	    }
+	    fprintf(solutionFilePtr,"%f\n",reqQty[nP-1]);
+	      
+    } // end of s loop
+    
+    fclose(solutionFilePtr);
+    
+  } 
+#endif
+d716 1
+a716 1
+    populateWithDuration(dpProb, inputDirectory, outputDirectory, simulation);
+d773 1
+a773 1
+    populateWithDuration(dpProb, inputDirectory, outputDirectory, simulation);
+@
+
+
+1.25
+log
+@minor adjustments in computing the late fraction correctly. Also wasn't doing the cummulative check exactly right (gave wrong result if the random number came up as exactly 1)
+@
+text
+@d503 9
+a511 1
+	fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\",\"periodShipped\"\n");
+d522 7
+a528 1
+		int periodShipped = dpProb.getDemandPeriodShipped(demandName, solutionName);
+d534 11
+a544 1
+		fprintf(resultsFilePtr,"%s,%s,%d,%d\n",demandName.c_str(),solutionName.c_str(), didShip, periodShipped);
+d716 1
+a716 1
+    CoinRelFltEq eq(.0001);
+@
+
+
+1.24
+log
+@also run an MRP so that we can find out the required resources. Write out those
+results as well. Call witGetMrpConsVol instead of ReqVol to get resource requirements.
+@
+text
+@d84 3
+a86 3
+	printf("%d\n",seconds);
+	//srand(245111);
+	
+d156 1
+d170 2
+d359 1
+d387 1
+a387 2
+	  int num = shippedVec.size();
+	  for (int i=0; i<num; i++) {
+d390 1
+a390 1
+		if (late>-2) {
+d393 2
+a394 3
+		if (late>=0) { //if it never shipped (and was supposed to) late is -1
+			sumLates = sumLates + late;
+			numThatShipped++;
+d397 1
+a397 1
+	  fprintf(implosionFilePtr,"%f,%f,%f\n",numRequested/(float)num,sumShipped/numRequested, sumLates/(float)numThatShipped);
+d405 1
+d410 1
+d414 2
+d422 1
+a422 1
+	heading = "\"solution\",\"fraction(Shipped/Req)\"\n";
+d428 2
+a429 1
+		fprintf(solutionImplosionFilePtr,"%s,%f\n",solutionNames.at(i).c_str(),val);
+d880 1
+a880 1
+					if (!done && (ran2<cumProb)) {
+@
+
+
+1.23
+log
+@compute aggregate solution ship percentage
+@
+text
+@d239 1
+a239 1
+    std::string mrpPlanFileName = outputDirectory+"/resourceReqSimulatedOut.csv";
+d896 1
+d898 1
+d907 2
+a908 1
+	else 
+d910 1
+@
+
+
+1.22
+log
+@minor output changes
+@
+text
+@d61 7
+d82 1
+d84 2
+d352 1
+d354 4
+a357 2
+        
+    int nPeriods = dpProb.getNPeriods();
+d396 16
+d414 13
+@
+
+
+1.21
+log
+@better handling of the simulated opportunity output
+@
+text
+@d349 1
+a349 1
+	heading = "\"demand\",\"solution\",\"odds\",\"simulatedOdds\",\"percentReqShipped\",\"shippedLate\"\n";
+@
+
+
+1.20
+log
+@added output information for the simulation/implosion case
+@
+text
+@d58 1
+d160 1
+a160 1
+		  late = 0;
+d349 1
+a349 1
+	heading = "\"demand\",\"solution\",\"odds\",\"actuallyShipped\",\"shippedLate\"\n";
+d374 3
+d382 1
+a382 1
+	  fprintf(implosionFilePtr,"%f,%f\n",sumShipped/(float)num, sumLates/(float)numThatShipped);
+d386 1
+a386 1
+  } // end of write mrp plan block
+d675 1
+d684 1
+d712 11
+a722 1
+
+d762 1
+@
+
+
+1.19
+log
+@incLotSize for ongoing
+@
+text
+@d41 13
+a53 1
+std::map< std::pair<std::string, std::string> , std::vector<bool> > demandShipped;
+a54 3
+//std::map<std::pair<std::string, std::string>,std::vector<float> > demandPeriodOddsVec;
+//std::map<std::pair<std::string, std::string>,float>  demandOdds;
+//std::map<std::pair<std::string, std::string>,float>  demandQuantity;
+d134 2
+a135 1
+	std::vector<std::pair< std::string, std::string > > demandNames = dpProb.getDemandNames();
+d137 1
+d145 1
+a145 1
+	  if (demandShipped.find(demandNames[d]) == demandShipped.end()) {
+d149 1
+a149 1
+		  demandShipped[demandNames[d]] = demandShippedFlags;
+d152 1
+a152 1
+		  std::vector<bool> demandShippedFlags = demandShipped[demandNames[d]];
+d154 18
+d173 6
+a178 1
+ 
+d180 39
+a219 2
+    
+    
+d336 49
+d781 1
+a781 1
+	  
+d785 1
+a785 1
+			std::pair<std::string,std::string> demandSolution = demandSolutions.at(dS);
+d802 2
+d818 2
+d830 1
+a830 1
+		dpProb.writeModel("foobar");
+d846 2
+a847 2
+	//else 
+		//writeSimulatedImplosionResults(outputDirectory, dpProb, numSimulations);
+@
+
+
+1.18
+log
+@changes to deal properly with durations, incLotSize, simulation/implosion, etc.
+@
+text
+@d370 1
+a370 1
+		for (unsigned int j=0; j<dpProb.getUserNPeriods(); j++) {
+@
+
+
+1.17
+log
+@implosion examples/code
+@
+text
+@d330 1
+a330 1
+	fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\"\n");
+d341 1
+d347 1
+a347 1
+		fprintf(resultsFilePtr,"%s,%s,%d\n",demandName.c_str(),solutionName.c_str(), didShip);
+d355 1
+a355 1
+	fprintf(resultsFilePtr,"\"demandName\",\"solutionName\",\"shipped\"\n");
+d370 5
+a374 1
+		fprintf(resultsFilePtr,"%s,%s, %d\n",demandName.c_str(),solutionName.c_str(), didShip);
+d554 1
+a554 1
+			std::string specificSolutionName = solutionName+dName;
+d574 1
+a574 1
+            if (dpProb.demandExists(demandName,solutionName)) {
+d694 1
+@
+
+
+1.16
+log
+@added support for doing heuristic implosion given resource supply quantity
+@
+text
+@d82 2
+d120 2
+d138 1
+a149 13
+void writeSimulatedMRPResults(std::string outputDirectory, demandPlanningProblem & dpProb, int numSimulations) 
+{
+    // Open file
+
+    std::string mrpPlanFileName = outputDirectory+"/resourceReqSimulatedOut.csv";
+    FILE * mrpPlanFilePtr = fopen(mrpPlanFileName.c_str(),"w");
+        
+        
+    //get the table of values
+	std::vector<std::vector<std::string> > names;
+    
+    //get the vector of resource ID names
+    dpProb.getResourceNames(names);
+a150 15
+    for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+      std::string heading;
+      heading = heading+"\"" + dpProb.getResourceIdentifierNames()[i]+"\""+",";
+      fprintf(mrpPlanFilePtr,"%s",heading.c_str());
+    }
+    fprintf(mrpPlanFilePtr,"\"period\",\"reqQty\"\n");
+
+
+
+    // loop once for each resource
+    unsigned int r;
+    for ( r=0; r<names.size(); ++r ) {
+	  const std::vector<std::string> & resourceIdValues = names[r];
+      std::vector<float> reqQty = resourceRequirements[names[r]];
+	  for (unsigned int t=0; t<reqQty.size(); t++ ) {
+d152 1
+a152 14
+		for (int i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+			fprintf(mrpPlanFilePtr,"\"%s\",", names[r].at(i).c_str());
+		}
+		fprintf(mrpPlanFilePtr,
+				"%d,%f\n",
+				t, 
+				reqQty[t]/(float)numSimulations);
+	  } // finished t loop
+	      
+    } // end of r loop
+    
+    fclose(mrpPlanFilePtr);
+    
+  } // end of write mrp plan block
+d263 4
+d315 85
+d460 1
+a460 2
+    populate(dpProb, inputDirectory, outputDirectory, false);
+    //populateWithDuration(dpProb, inputDirectory, outputDirectory, false);
+a461 19
+	//run MRP on the problem
+	dpProb.doMrp();
+	writeMRPResults(outputDirectory,dpProb);
+	//writeSolutionResults(outputDirectory,dpProb);
+   }
+  
+  
+  catch ( SCOexception e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DPIntException e ) {
+    DpException rcpEx(e.what());
+    throw rcpEx;
+  }
+  catch ( DpException e) {
+    throw e;
+  }
+  std::cout <<"demand planning application is finished." <<std::endl;
+d463 2
+a464 1
+  return 0;
+d466 1
+a466 19
+}
+int DP_DECLSPEC demandPlanningIndependentMeanVariance(const std::string & dirname)
+//int DP_DECLSPEC demandPlanning()
+{
+
+  if (!witOK){
+    DpException rcpEx("Demand Planner is not available due to previous error.  Contact developers");
+    throw rcpEx;
+  }
+    
+
+  try {
+    std::cout <<"demandPlanner Build date: " <<__DATE__ <<std::endl;
+  
+    const std::string & outputDirectory=dirname;
+    const std::string & inputDirectory=dirname;
+  
+    demandPlanningProblem dpProb;
+    populate(dpProb, inputDirectory, outputDirectory, false);
+d469 9
+a477 3
+	dpProb.doMrp();
+	writeMRPResults(outputDirectory,dpProb);
+	//writeSolutionResults(outputDirectory,dpProb);
+d497 1
+a517 22
+	//figure out whether we are doing an implosion or an MRP problem
+    std::string globalAttrFileName = inputDirectory + "/globalAttr.csv";
+	DPglobalAttrFile globalAttrFile(globalAttrFileName);
+	std::string problemType;
+	bool mrpProblem;
+    if ( globalAttrFile.keyExists("problem") ) {
+		problemType =globalAttrFile.fieldAsString("problem","attrValue");
+		if ((problemType != "MRP")&&(problemType != "implosion")) {
+            std::ostringstream msgStream;
+            msgStream <<"-------------------------------------------------------"         <<std::endl
+            <<"Error:  problem type in globalAttr.csv must be MRP or implosion"                         <<std::endl
+            <<"-------------------------------------------------------"                   <<std::endl;
+            throw ( DpException(msgStream.str()) );
+		 }
+		if (problemType=="MRP")
+			mrpProblem=true;
+		else
+			mrpProblem=false;
+	}
+	else {
+		mrpProblem=true;
+	}
+d521 2
+a522 1
+    populateWithDuration(dpProb, inputDirectory, outputDirectory, simulation, mrpProblem);
+d536 1
+a536 1
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods);
+d620 1
+a620 1
+			dpProb.addDemand(demandName,specificSolutionName);
+d701 1
+d714 4
+a717 2
+	//writeSimulatedMRPResults(outputDirectory, dpProb, numSimulations);
+	writeSimulatedMRPResultsMeanVariance(outputDirectory, dpProb, numSimulations);
+@
+
+
+1.15
+log
+@misc
+@
+text
+@d11 2
+d39 3
+d118 27
+d223 1
+a223 1
+	  for (int iterations = 0; iterations < reqQtyIterations.size(); iterations++) {
+d330 1
+a330 1
+	  for (unsigned int t=0; t<horizon; t++ ) {
+d495 23
+d519 2
+a520 1
+    populateWithDuration(dpProb, inputDirectory, outputDirectory, true);
+d544 1
+a544 1
+			int intDuration = floor(duration+0.5);
+d697 10
+a706 2
+	    dpProb.doMrp();
+		collectMRPResults(dpProb);
+@
+
+
+1.14
+log
+@handle non-integer durations (not quite done yet though). need to scale last period's quantity by fractional duration.
+@
+text
+@d271 1
+d296 4
+a299 1
+	  for (unsigned int t=0; t<reqQty.size(); t++ ) {
+d488 1
+d490 1
+a490 1
+            sprintf(dName,"d%d",duration);
+d559 1
+a559 1
+				dpProb.addAtomicSolutionRequirements(specificSolutionName, solutionName,duration);
+@
+
+
+1.13
+log
+@put back in a model which includes durations for projects (for
+avail to promise potential work).
+@
+text
+@d483 1
+a483 1
+			int duration = demandFileIter.durationAsInt();
+a591 2
+
+
+@
+
+
+1.12
+log
+@changed to "one period" solutions to better handle ongoing and wedge demands
+@
+text
+@d372 1
+d460 1
+a460 1
+    populate(dpProb, inputDirectory, outputDirectory, true);
+d473 1
+a473 1
+		std::string demandFileName = inputDirectory + "/demandDS3.csv";
+d483 4
+d488 1
+a488 1
+			std::pair<std::string, std::string> demandSolution(demandName, solutionName);
+d548 8
+d557 1
+a557 1
+			dpProb.addDemand(demandName,solutionName);
+d580 2
+d593 1
+a593 1
+		//std::string demandFileName = inputDirectory + "/demandDS3.csv";
+a594 2
+		//DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods);
+		//DPgnrlDemandFileUncertainStartIterator demandFileIter(demandFile);
+a597 5
+		//for ( ; demandFileIter()!=NULL; ) {
+		    //std::string solutionName = demandFileIter.solution();
+			//std::string demandName = demandFileIter.demand();
+			//float quantity = demandFileIter.quantityAsFloat();
+			//float odds = demandFileIter.oddsAsFloat();
+d602 3
+a623 4
+					//char pName[100];
+					//sprintf(pName,"P%d",j);
+					//std::string pNameStr = pName;
+					//float probability =  demandFileIter.fieldOnRecordAsFloat(pNameStr);
+@
+
+
+1.11
+log
+@store probabilistic demand instead of reading file over and over
+@
+text
+@d311 1
+d353 4
+d358 39
+a396 1
+int DP_DECLSPEC demandPlanning(const std::string & dirname)
+d418 1
+a418 1
+	writeSolutionResults(outputDirectory,dpProb);
+a513 2
+			//check whether the END period is within the horizon
+			int duration = dpProb.getSolutionDuration(solutionName);
+@
+
+
+1.10
+log
+@simulation for variance
+@
+text
+@d14 1
+d38 7
+d112 1
+a112 1
+  } // end of write mrp plan block
+d161 1
+a161 1
+    std::string mrpPlanFileName = outputDirectory+"/resourceReqSimulatedOutMV.csv";
+d423 3
+d440 6
+d485 2
+d500 1
+d510 1
+d523 1
+d535 3
+a537 1
+		std::string demandFileName = inputDirectory + "/demandDS3.csv";
+d539 2
+a540 2
+		DPgnrlDemandFileUncertainStart demandFile(demandFileName,nPeriods);
+		DPgnrlDemandFileUncertainStartIterator demandFileIter(demandFile);
+d543 12
+a554 9
+		for ( ; demandFileIter()!=NULL; ) {
+		    std::string solutionName = demandFileIter.solution();
+			std::string demandName = demandFileIter.demand();
+			float quantity = demandFileIter.quantityAsFloat();
+			float odds = demandFileIter.oddsAsFloat();
+
+			//for (int i=0; i<nPeriods; i++)
+			//	dpProb.resetDemandQuantity(demandName, solutionName, i, 0.0);
+
+d572 5
+a576 4
+					char pName[100];
+					sprintf(pName,"P%d",j);
+					std::string pNameStr = pName;
+					float probability =  demandFileIter.fieldOnRecordAsFloat(pNameStr);
+@
+
+
+1.9
+log
+@changed model to remove intermediate operation/part to do the 1/quantity. Now I just apply the probability directly to the quantity demanded.
+@
+text
+@d35 2
+d85 3
+d91 1
+a91 1
+		for (int cR=0; cR<reqQty.size(); cR++) {
+d95 3
+d99 1
+d149 110
+a505 1
+
+d525 4
+d535 1
+a535 1
+					dpProb.setDemandQuantity(demandName, solutionName, j,1.0);
+d568 2
+a569 1
+	writeSimulatedMRPResults(outputDirectory, dpProb, numSimulations);
+d593 1
+@
+
+
+1.8
+log
+@changed names of input and output files to match Jianying's terminology. Also set it up so that it reads *BOTH* the demand with uncertain start date (DS3) and the demand with definate start date (DS2)
+@
+text
+@d9 2
+d19 2
+d25 2
+d31 1
+d34 1
+d36 104
+d197 1
+a197 1
+	int nP = dpProb.getNPeriods();
+d243 1
+a243 1
+    populate(dpProb, inputDirectory, outputDirectory);
+d268 202
+@
+
+
+1.7
+log
+@changes related to accumulating requirements for each solution over
+time (for Mark S)
+@
+text
+@d32 1
+a32 1
+    std::string mrpPlanFileName = outputDirectory+"/resourceReq.csv";
+d76 1
+a76 1
+    std::string solutionFileName = outputDirectory+"/solutionDemand.csv";
+@
+
+
+1.6
+log
+@Fix some i's
+@
+text
+@d28 1
+a28 1
+void writeResults(std::string outputDirectory, demandPlanningProblem & dpProb) 
+d72 41
+d135 2
+a136 1
+	writeResults(outputDirectory,dpProb);
+@
+
+
+1.5
+log
+@updates
+@
+text
+@d23 1
+a23 1
+#include "scofile.h"
+d58 1
+a58 1
+		for (i=0; i<(int)dpProb.getResourceIdentifierNames().size(); i++) {
+@
+
+
+1.4
+log
+@idemand file
+@
+text
+@d28 21
+d51 23
+a73 1
+int DP_DECLSPEC demandPlanning(std::string dirname)
+d86 2
+a87 2
+    std::string outputDirectory=dirname;
+    std::string inputDirectory=dirname;
+d93 2
+a94 2
+
+
+@
+
+
+1.3
+log
+@added files
+@
+text
+@d49 3
+@
+
+
+1.2
+log
+@new files
+@
+text
+@d33 1
+a33 1
+	#if 0
+d46 2
+a47 2
+    //demandPlanningProblem dpProb;
+    //populate(dpProb, inputDirectory, outputDirectory);
+d53 1
+a53 1
+    RcpOptException rcpEx(e.what());
+d56 2
+a57 2
+  catch ( RCPOptIntException e ) {
+    RcpOptException rcpEx(e.what());
+d60 1
+a60 1
+  catch ( RcpOptException e) {
+d64 1
+a64 1
+ #endif
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d23 2
+d30 2
+a31 1
+int DP_DECLSPEC demandPlanning()
+d33 1
+d39 1
+d41 1
+a41 1
+  std::cout <<"demandPlanner Build date: " <<__DATE__ <<std::endl;
+d43 2
+d46 2
+a47 2
+    demandPlanningProblem dpProb;
+  //populate(rcpProb, inputDirectory, outputDirectory, rcpCal);
+d51 7
+a57 2
+  catch ( DPIntException e ) {
+    DpException rcpEx(e.what());
+d60 1
+a60 1
+  catch ( DpException e) {
+d63 2
+a64 1
+  std::cout <<"rcp application is finished." <<std::endl;
+@
+
+
+1.1.1.1
+log
+@initial import
+@
+text
+@@

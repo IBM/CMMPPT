@@ -1,0 +1,880 @@
+head	1.8;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.8
+date	2007.05.09.22.44.27;	author rjw;	state dead;
+branches;
+next	1.7;
+
+1.7
+date	2007.05.09.16.05.06;	author rjw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.05.09.15.45.10;	author rjw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.05.09.15.27.11;	author rjw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.05.08.23.21.19;	author rjw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.05.08.22.28.53;	author rjw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.05.08.20.53.18;	author rjw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.05.08.20.11.22;	author rjw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.8
+log
+@Stochastic Implosion
+@
+text
+@//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "AttMgmt.C"
+//
+// Contains the implementation of the following classes:
+//
+//    AttMgr
+//    AttRep
+//------------------------------------------------------------------------------
+
+#include <AttMgr.h>
+#include <AttRep.h>
+#include <MsgFac.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class AttMgr.
+//------------------------------------------------------------------------------
+
+WitAttMgr::WitAttMgr (WitProblem * theProblem):
+
+      WitProbAssoc (theProblem),
+
+      myAttRepVec_ (WitAttID::nTags),
+      currentIdx_  (-1)
+   {
+   buildAttReps ();
+
+   checkAttReps ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitAttMgr::~WitAttMgr ()
+   {
+   int theIdx;
+
+   for (theIdx = 0; theIdx < WitAttID::nTags; theIdx ++)
+      {
+      delete myAttRepVec_[theIdx];
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAttMgr::print ()
+   {
+   FILE * theFile;
+   int    theIdx;
+
+   myMsgFac () ("writeAttrData");
+
+   theFile = openFile ("atts.out", "w");
+
+   fprintf (theFile,
+      "Attribute Data\n"
+      "--------------\n"
+      "\n"
+      "Total Number of Attributes by Name: %d\n"
+      "\n"
+      "\n"
+      "Idx   Attribute Name\n"
+      "---   --------------\n"
+      "\n",
+      WitAttID::nTags);
+
+   for (theIdx = 0; theIdx < WitAttID::nTags; theIdx ++)
+      {
+      fprintf (theFile,
+         "%3d   %s\n",
+         theIdx,
+         myAttRepVec_[theIdx]->myAttName     ().myCstring ());
+      }
+
+   fclose (theFile);
+   }
+
+//------------------------------------------------------------------------------
+// Macro makeAttRep (theAttID)
+//
+// Builds an AttRep whose AttID is given by theAttID and whose name is given by
+// theAttID as a string.
+//------------------------------------------------------------------------------
+
+#define makeAttRep(theAttID)                                                   \
+                                                                               \
+   makeNextAttRep (WitAttID::theAttID, # theAttID)                             \
+
+//------------------------------------------------------------------------------
+
+void WitAttMgr::buildAttReps ()
+   {
+   currentIdx_ = -1;
+
+   makeAttRep (accAfterOptImp);
+   makeAttRep (accAfterSoftLB);
+   makeAttRep (accMethod);
+   makeAttRep (appData);
+   makeAttRep (autoPriority);
+   makeAttRep (baSelSplit);
+   makeAttRep (buildAheadUB);
+   makeAttRep (buildAsap);
+   makeAttRep (buildNstn);
+   makeAttRep (capCost);
+   makeAttRep (compPrices);
+   makeAttRep (computeCriticalList);
+   makeAttRep (consRate);
+   makeAttRep (cumShipBounds);
+   makeAttRep (cumShipReward);
+   makeAttRep (cycleTime34);
+   makeAttRep (demandVol);
+   makeAttRep (earliestPeriod);
+   makeAttRep (equitability);
+   makeAttRep (execBounds);
+   makeAttRep (execCost);
+   makeAttRep (execEmptyBom);
+   makeAttRep (execPenalty);
+   makeAttRep (execVol);
+   makeAttRep (expAllowed);
+   makeAttRep (expAversion);
+   makeAttRep (expCutoff);
+   makeAttRep (expNetAversion);
+   makeAttRep (falloutRate);
+   makeAttRep (focusHorizon);
+   makeAttRep (forcedMultiEq);
+   makeAttRep (fssShipVol);
+   makeAttRep (grossRev);
+   makeAttRep (hashTableSize);
+   makeAttRep (highPrecisionWD);
+   makeAttRep (incLotSize);
+   makeAttRep (incLotSize2);
+   makeAttRep (independentOffsets);
+   makeAttRep (intExecVols);
+   makeAttRep (intShipVols);
+   makeAttRep (intSubVols);
+   makeAttRep (invCost);
+   makeAttRep (latestPeriod);
+   makeAttRep (localBuildAhead);
+   makeAttRep (localMultiExec);
+   makeAttRep (lotSize2Thresh);
+   makeAttRep (lotSizeTol);
+   makeAttRep (mandEC);
+   makeAttRep (meSelSplit);
+   makeAttRep (minLotSize);
+   makeAttRep (minLotSize2);
+   makeAttRep (minimalExcess);
+   makeAttRep (mipMode);
+   makeAttRep (mrpNetAllowed);
+   makeAttRep (multiExec);
+   makeAttRep (multiRoute);
+   makeAttRep (nPeriods);
+   makeAttRep (nScenarios);
+   makeAttRep (netAllowed);
+   makeAttRep (newPipPggOrder);
+   makeAttRep (nonMrSelSplit);
+   makeAttRep (nstnResidual);
+   makeAttRep (obj2AuxCost);
+   makeAttRep (obj2SubPenalty);
+   makeAttRep (obj2Winv);
+   makeAttRep (obj2Wrev);
+   makeAttRep (obj2Wserv);
+   makeAttRep (obj2Wsub);
+   makeAttRep (objChoice);
+   makeAttRep (offset);
+   makeAttRep (optInitMethod);
+   makeAttRep (outputPrecision);
+   makeAttRep (penExec);
+   makeAttRep (perfPegging);
+   makeAttRep (periodsPerYear);
+   makeAttRep (pgdCritListMode);
+   makeAttRep (pipSeqFromHeur);
+   makeAttRep (prefBuildAhead);
+   makeAttRep (prefHighStockSLBs);
+   makeAttRep (priority);
+   makeAttRep (probability);
+   makeAttRep (productRate);
+   makeAttRep (propRtg);
+   makeAttRep (respectStockSLBs);
+   makeAttRep (roundReqVols);
+   makeAttRep (routingShare);
+   makeAttRep (scenarioIndex);
+   makeAttRep (scrapAllowed);
+   makeAttRep (scrapCost);
+   makeAttRep (searchInc);
+   makeAttRep (selForDel);
+   makeAttRep (selSplit);
+   makeAttRep (shipLateAllowed);
+   makeAttRep (shipLateUB);
+   makeAttRep (shipReward);
+   makeAttRep (shipVol);
+   makeAttRep (singleSource);
+   makeAttRep (skipFailures);
+   makeAttRep (solverLogFileName);
+   makeAttRep (srSelSplit);
+   makeAttRep (stageByObject);
+   makeAttRep (stochDataMode);
+   makeAttRep (stockBounds);
+   makeAttRep (stockCost);
+   makeAttRep (stockRealloc);
+   makeAttRep (stockReallocation);
+   makeAttRep (subCost);
+   makeAttRep (subVol);
+   makeAttRep (supplyVol);
+   makeAttRep (tieBreakPropRt);
+   makeAttRep (title);
+   makeAttRep (truncOffsets);
+   makeAttRep (twoLevelLotSizes);
+   makeAttRep (twoWayMultiExec);
+   makeAttRep (unitCost);
+   makeAttRep (useFocusHorizons);
+   makeAttRep (userHeurStart);
+   makeAttRep (wbounds);
+   makeAttRep (wit34Compatible);
+   makeAttRep (yieldRate);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAttMgr::makeNextAttRep (
+      WitAttID::Tag theAttID,
+      const char *  theAttName)
+   {
+   currentIdx_ ++;
+
+   stronglyAssert (theAttID == currentIdx_);
+
+   myAttRepVec_[theAttID] = new WitAttRep (theAttName);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitAttMgr::checkAttReps ()
+   {
+   int theIdx;
+
+   for (theIdx = 0; theIdx < WitAttID::nTags; theIdx ++)
+      {
+      stronglyAssert (myAttRepVec_[theIdx] != NULL);
+
+      if (theIdx >= 1)
+         stronglyAssert (
+              myAttRepVec_[theIdx - 1]->myAttName ()
+            <
+              myAttRepVec_[theIdx    ]->myAttName ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+// Implementation of class AttRep.
+//------------------------------------------------------------------------------
+
+WitAttRep::WitAttRep (const char * theAttName):
+
+      myAttName_ (theAttName)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitAttRep::~WitAttRep ()
+   {
+   }
+@
+
+
+1.7
+log
+@Stochastic Implosion
+@
+text
+@@
+
+
+1.6
+log
+@Stochastic Implosion
+@
+text
+@d66 3
+d70 3
+a72 1
+      "---   --------------\n");
+d159 1
+d182 1
+d188 1
+d202 2
+@
+
+
+1.5
+log
+@Stochastic Implosion
+@
+text
+@d31 2
+a32 1
+      myAttRepVec_ (WitAttID::nTags)
+d89 1
+a89 1
+   makeOneAttRep (WitAttID::theAttID, # theAttID)                              \
+d95 2
+d216 1
+a216 1
+void WitAttMgr::makeOneAttRep (
+d220 3
+a222 1
+   stronglyAssert (myAttRepVec_[theAttID] == NULL);
+d239 3
+a241 4
+            not (
+                 myAttRepVec_[theIdx    ]->myAttName ()
+               <
+                 myAttRepVec_[theIdx - 1]->myAttName ()));
+@
+
+
+1.4
+log
+@Stochastic Implosion
+@
+text
+@d65 2
+a66 2
+      "Idx   AttID                              Name\n"
+      "---   -----                              ----\n");
+d71 1
+a71 1
+         "%3d   %-32s  \"%s\"\n",
+a72 1
+         myAttRepVec_[theIdx]->myAttIDString ().myCstring (),
+d80 1
+a80 1
+// Macro makeSimpleAttRep (theAttID)
+d86 1
+a86 1
+#define makeSimpleAttRep(theAttID)                                             \
+d88 1
+a88 18
+   makeAttRep (                                                                \
+      WitAttID::theAttID,                                                      \
+      "WitAttID::" # theAttID,                                                 \
+      # theAttID)                                                              \
+
+//------------------------------------------------------------------------------
+// Macro makeSuffixAttRep (mainAttID, suffix)
+//
+// Builds an AttRep whose AttID is given by mainAttID with _ and suffix
+// appended, and whose name is given by mainAttID as a string.
+//------------------------------------------------------------------------------
+
+#define makeSuffixAttRep(mainAttID, suffix)                                    \
+                                                                               \
+   makeAttRep (                                                                \
+      WitAttID::mainAttID ## _ ## suffix,                                      \
+      "WitAttID::" # mainAttID "_" # suffix,                                   \
+      # mainAttID)                                                             \
+d94 115
+a208 130
+   makeSimpleAttRep (accAfterOptImp);
+   makeSimpleAttRep (accAfterSoftLB);
+   makeSimpleAttRep (accMethod);
+   makeSimpleAttRep (appData);
+   makeSimpleAttRep (autoPriority);
+   makeSimpleAttRep (baSelSplit);
+
+   makeSuffixAttRep (buildAheadUB,       Demand);
+   makeSuffixAttRep (buildAheadUB,       Material);
+
+   makeSimpleAttRep (buildAsap);
+   makeSimpleAttRep (buildNstn);
+   makeSimpleAttRep (capCost);
+   makeSimpleAttRep (compPrices);
+   makeSimpleAttRep (computeCriticalList);
+   makeSimpleAttRep (consRate);
+   makeSimpleAttRep (cumShipBounds);
+   makeSimpleAttRep (cumShipReward);
+   makeSimpleAttRep (cycleTime34);
+   makeSimpleAttRep (demandVol);
+   makeSimpleAttRep (earliestPeriod);
+   makeSimpleAttRep (equitability);
+   makeSimpleAttRep (execBounds);
+   makeSimpleAttRep (execCost);
+   makeSimpleAttRep (execEmptyBom);
+
+   makeSuffixAttRep (execPenalty,        ConsEntry);
+   makeSuffixAttRep (execPenalty,        Operation);
+
+   makeSimpleAttRep (execVol);
+
+   makeSuffixAttRep (expAllowed,         BopEntry);
+   makeSuffixAttRep (expAllowed,         SubEntry);
+
+   makeSimpleAttRep (expAversion);
+   makeSimpleAttRep (expCutoff);
+   makeSimpleAttRep (expNetAversion);
+   makeSimpleAttRep (falloutRate);
+   makeSimpleAttRep (focusHorizon);
+   makeSimpleAttRep (forcedMultiEq);
+   makeSimpleAttRep (fssShipVol);
+   makeSimpleAttRep (grossRev);
+   makeSimpleAttRep (hashTableSize);
+   makeSimpleAttRep (highPrecisionWD);
+   makeSimpleAttRep (incLotSize);
+   makeSimpleAttRep (incLotSize2);
+   makeSimpleAttRep (independentOffsets);
+   makeSimpleAttRep (intExecVols);
+   makeSimpleAttRep (intShipVols);
+   makeSimpleAttRep (intSubVols);
+   makeSimpleAttRep (invCost);
+   makeSimpleAttRep (latestPeriod);
+   makeSimpleAttRep (localBuildAhead);
+   makeSimpleAttRep (localMultiExec);
+   makeSimpleAttRep (lotSize2Thresh);
+   makeSimpleAttRep (lotSizeTol);
+   makeSimpleAttRep (mandEC);
+   makeSimpleAttRep (meSelSplit);
+   makeSimpleAttRep (minLotSize);
+   makeSimpleAttRep (minLotSize2);
+   makeSimpleAttRep (minimalExcess);
+   makeSimpleAttRep (mipMode);
+   makeSimpleAttRep (mrpNetAllowed);
+   makeSimpleAttRep (multiExec);
+   makeSimpleAttRep (multiRoute);
+   makeSimpleAttRep (nPeriods);
+   makeSimpleAttRep (netAllowed);
+   makeSimpleAttRep (newPipPggOrder);
+   makeSimpleAttRep (nonMrSelSplit);
+   makeSimpleAttRep (nstnResidual);
+   makeSimpleAttRep (obj2AuxCost);
+   makeSimpleAttRep (obj2SubPenalty);
+   makeSimpleAttRep (obj2Winv);
+   makeSimpleAttRep (obj2Wrev);
+   makeSimpleAttRep (obj2Wserv);
+   makeSimpleAttRep (obj2Wsub);
+   makeSimpleAttRep (objChoice);
+   makeSimpleAttRep (offset);
+   makeSimpleAttRep (optInitMethod);
+   makeSimpleAttRep (outputPrecision);
+   makeSimpleAttRep (penExec);
+   makeSimpleAttRep (perfPegging);
+   makeSimpleAttRep (periodsPerYear);
+   makeSimpleAttRep (pgdCritListMode);
+   makeSimpleAttRep (pipSeqFromHeur);
+   makeSimpleAttRep (prefBuildAhead);
+   makeSimpleAttRep (prefHighStockSLBs);
+   makeSimpleAttRep (priority);
+   makeSimpleAttRep (productRate);
+
+   makeSuffixAttRep (propRtg,            BomEntry);
+   makeSuffixAttRep (propRtg,            Part);
+
+   makeSimpleAttRep (respectStockSLBs);
+   makeSimpleAttRep (roundReqVols);
+   makeSimpleAttRep (routingShare);
+   makeSimpleAttRep (scrapAllowed);
+   makeSimpleAttRep (scrapCost);
+   makeSimpleAttRep (searchInc);
+   makeSimpleAttRep (selForDel);
+   makeSimpleAttRep (selSplit);
+   makeSimpleAttRep (shipLateAllowed);
+   makeSimpleAttRep (shipLateUB);
+   makeSimpleAttRep (shipReward);
+   makeSimpleAttRep (shipVol);
+
+   makeSuffixAttRep (singleSource,       BomEntry);
+   makeSuffixAttRep (singleSource,       Part);
+ 
+   makeSimpleAttRep (skipFailures);
+   makeSimpleAttRep (solverLogFileName);
+   makeSimpleAttRep (srSelSplit);
+   makeSimpleAttRep (stockBounds);
+   makeSimpleAttRep (stockCost);
+   makeSimpleAttRep (stockRealloc);
+   makeSimpleAttRep (stockReallocation);
+   makeSimpleAttRep (subCost);
+   makeSimpleAttRep (subVol);
+   makeSimpleAttRep (supplyVol);
+   makeSimpleAttRep (tieBreakPropRt);
+   makeSimpleAttRep (title);
+   makeSimpleAttRep (truncOffsets);
+   makeSimpleAttRep (twoLevelLotSizes);
+   makeSimpleAttRep (twoWayMultiExec);
+   makeSimpleAttRep (unitCost);
+   makeSimpleAttRep (useFocusHorizons);
+   makeSimpleAttRep (userHeurStart);
+   makeSimpleAttRep (wbounds);
+   makeSimpleAttRep (wit34Compatible);
+   makeSimpleAttRep (yieldRate);
+d213 1
+a213 1
+void WitAttMgr::makeAttRep (
+a214 1
+      const char *  theAttIDCstring,
+d219 1
+a219 1
+   myAttRepVec_[theAttID] = new WitAttRep (theAttIDCstring, theAttName);
+d245 1
+a245 3
+WitAttRep::WitAttRep (
+         const char * theAttIDCstring,
+         const char * theAttName):
+d247 1
+a247 2
+      myAttIDString_ (theAttIDCstring),
+      myAttName_     (theAttName)
+@
+
+
+1.3
+log
+@Stochastic Implosion
+@
+text
+@d21 1
+d33 1
+a33 1
+   buildAllAttReps ();
+d51 30
+d110 1
+a110 1
+void WitAttMgr::buildAllAttReps ()
+@
+
+
+1.2
+log
+@Stochastic Implosion
+@
+text
+@d32 1
+a32 1
+   buildAttReps ();
+d50 161
+a210 123
+
+void WitAttMgr::buildAttReps ()
+   {
+   makeAttRep (WitAttID::appData,              "appData");
+   makeAttRep (WitAttID::accAfterOptImp,       "accAfterOptImp");
+   makeAttRep (WitAttID::accAfterSoftLB,       "accAfterSoftLB");
+   makeAttRep (WitAttID::accMethod,            "accMethod");
+   makeAttRep (WitAttID::autoPriority,         "autoPriority");
+   makeAttRep (WitAttID::baSelSplit,           "baSelSplit");
+   makeAttRep (WitAttID::buildAheadUBDemand,   "buildAheadUB");
+   makeAttRep (WitAttID::buildAheadUBMaterial, "buildAheadUB");
+   makeAttRep (WitAttID::buildAsap,            "buildAsap");
+   makeAttRep (WitAttID::buildNstn,            "buildNstn");
+   makeAttRep (WitAttID::capCost,              "capCost");
+   makeAttRep (WitAttID::compPrices,           "compPrices");
+   makeAttRep (WitAttID::computeCriticalList,  "computeCriticalList");
+   makeAttRep (WitAttID::consRate,             "consRate");
+   makeAttRep (WitAttID::cumShipBounds,        "cumShipBounds");
+   makeAttRep (WitAttID::cumShipReward,        "cumShipReward");
+   makeAttRep (WitAttID::cycleTime34,          "cycleTime34");
+   makeAttRep (WitAttID::demandVol,            "demandVol");
+   makeAttRep (WitAttID::earliestPeriod,       "earliestPeriod");
+   makeAttRep (WitAttID::equitability,         "equitability");
+   makeAttRep (WitAttID::execBounds,           "execBounds");
+   makeAttRep (WitAttID::execCost,             "execCost");
+   makeAttRep (WitAttID::execEmptyBom,         "execEmptyBom");
+   makeAttRep (WitAttID::execPenaltyConsEntry, "execPenalty");
+   makeAttRep (WitAttID::execPenaltyOperation, "execPenalty");
+   makeAttRep (WitAttID::execVol,              "execVol");
+   makeAttRep (WitAttID::expAllowedBopEntry,   "expAllowed");
+   makeAttRep (WitAttID::expAllowedSubEntry,   "expAllowed");
+   makeAttRep (WitAttID::expAversion,          "expAversion");
+   makeAttRep (WitAttID::expCutoff,            "expCutoff");
+   makeAttRep (WitAttID::expNetAversion,       "expNetAversion");
+   makeAttRep (WitAttID::falloutRate,          "falloutRate");
+   makeAttRep (WitAttID::focusHorizon,         "focusHorizon");
+   makeAttRep (WitAttID::forcedMultiEq,        "forcedMultiEq");
+   makeAttRep (WitAttID::fssShipVol,           "fssShipVol");
+   makeAttRep (WitAttID::grossRev,             "grossRev");
+   makeAttRep (WitAttID::hashTableSize,        "hashTableSize");
+   makeAttRep (WitAttID::highPrecisionWD,      "highPrecisionWD");
+   makeAttRep (WitAttID::incLotSize,           "incLotSize");
+   makeAttRep (WitAttID::incLotSize2,          "incLotSize2");
+   makeAttRep (WitAttID::independentOffsets,   "independentOffsets");
+   makeAttRep (WitAttID::intExecVols,          "intExecVols");
+   makeAttRep (WitAttID::intShipVols,          "intShipVols");
+   makeAttRep (WitAttID::intSubVols,           "intSubVols");
+   makeAttRep (WitAttID::invCost,              "invCost");
+   makeAttRep (WitAttID::latestPeriod,         "latestPeriod");
+   makeAttRep (WitAttID::localBuildAhead,      "localBuildAhead");
+   makeAttRep (WitAttID::localMultiExec,       "localMultiExec");
+   makeAttRep (WitAttID::lotSize2Thresh,       "lotSize2Thresh");
+   makeAttRep (WitAttID::lotSizeTol,           "lotSizeTol");
+   makeAttRep (WitAttID::mandEC,               "mandEC");
+   makeAttRep (WitAttID::meSelSplit,           "meSelSplit");
+   makeAttRep (WitAttID::minLotSize,           "minLotSize");
+   makeAttRep (WitAttID::minLotSize2,          "minLotSize2");
+   makeAttRep (WitAttID::minimalExcess,        "minimalExcess");
+   makeAttRep (WitAttID::mipMode,              "mipMode");
+   makeAttRep (WitAttID::mrpNetAllowed,        "mrpNetAllowed");
+   makeAttRep (WitAttID::multiExec,            "multiExec");
+   makeAttRep (WitAttID::multiRoute,           "multiRoute");
+   makeAttRep (WitAttID::nPeriods,             "nPeriods");
+   makeAttRep (WitAttID::netAllowed,           "netAllowed");
+   makeAttRep (WitAttID::newPipPggOrder,       "newPipPggOrder");
+   makeAttRep (WitAttID::nonMrSelSplit,        "nonMrSelSplit");
+   makeAttRep (WitAttID::nstnResidual,         "nstnResidual");
+   makeAttRep (WitAttID::obj2AuxCost,          "obj2AuxCost");
+   makeAttRep (WitAttID::obj2SubPenalty,       "obj2SubPenalty");
+   makeAttRep (WitAttID::obj2Winv,             "obj2Winv");
+   makeAttRep (WitAttID::obj2Wrev,             "obj2Wrev");
+   makeAttRep (WitAttID::obj2Wserv,            "obj2Wserv");
+   makeAttRep (WitAttID::obj2Wsub,             "obj2Wsub");
+   makeAttRep (WitAttID::objChoice,            "objChoice");
+   makeAttRep (WitAttID::offset,               "offset");
+   makeAttRep (WitAttID::optInitMethod,        "optInitMethod");
+   makeAttRep (WitAttID::outputPrecision,      "outputPrecision");
+   makeAttRep (WitAttID::penExec,              "penExec");
+   makeAttRep (WitAttID::perfPegging,          "perfPegging");
+   makeAttRep (WitAttID::periodsPerYear,       "periodsPerYear");
+   makeAttRep (WitAttID::pgdCritListMode,      "pgdCritListMode");
+   makeAttRep (WitAttID::pipSeqFromHeur,       "pipSeqFromHeur");
+   makeAttRep (WitAttID::prefBuildAhead,       "prefBuildAhead");
+   makeAttRep (WitAttID::prefHighStockSLBs,    "prefHighStockSLBs");
+   makeAttRep (WitAttID::priority,             "priority");
+   makeAttRep (WitAttID::productRate,          "productRate");
+   makeAttRep (WitAttID::propRtgBomEntry,      "propRtg");
+   makeAttRep (WitAttID::propRtgPart,          "propRtg");
+   makeAttRep (WitAttID::respectStockSLBs,     "respectStockSLBs");
+   makeAttRep (WitAttID::roundReqVols,         "roundReqVols");
+   makeAttRep (WitAttID::routingShare,         "routingShare");
+   makeAttRep (WitAttID::scrapAllowed,         "scrapAllowed");
+   makeAttRep (WitAttID::scrapCost,            "scrapCost");
+   makeAttRep (WitAttID::searchInc,            "searchInc");
+   makeAttRep (WitAttID::selForDel,            "selForDel");
+   makeAttRep (WitAttID::selSplit,             "selSplit");
+   makeAttRep (WitAttID::shipLateAllowed,      "shipLateAllowed");
+   makeAttRep (WitAttID::shipLateUB,           "shipLateUB");
+   makeAttRep (WitAttID::shipReward,           "shipReward");
+   makeAttRep (WitAttID::shipVol,              "shipVol");
+   makeAttRep (WitAttID::singleSourceBomEntry, "singleSource");
+   makeAttRep (WitAttID::singleSourcePart,     "singleSource");
+   makeAttRep (WitAttID::skipFailures,         "skipFailures");
+   makeAttRep (WitAttID::solverLogFileName,    "solverLogFileName");
+   makeAttRep (WitAttID::srSelSplit,           "srSelSplit");
+   makeAttRep (WitAttID::stockBounds,          "stockBounds");
+   makeAttRep (WitAttID::stockCost,            "stockCost");
+   makeAttRep (WitAttID::stockRealloc,         "stockRealloc");
+   makeAttRep (WitAttID::stockReallocation,    "stockReallocation");
+   makeAttRep (WitAttID::subCost,              "subCost");
+   makeAttRep (WitAttID::subVol,               "subVol");
+   makeAttRep (WitAttID::supplyVol,            "supplyVol");
+   makeAttRep (WitAttID::tieBreakPropRt,       "tieBreakPropRt");
+   makeAttRep (WitAttID::title,                "title");
+   makeAttRep (WitAttID::truncOffsets,         "truncOffsets");
+   makeAttRep (WitAttID::twoLevelLotSizes,     "twoLevelLotSizes");
+   makeAttRep (WitAttID::twoWayMultiExec,      "twoWayMultiExec");
+   makeAttRep (WitAttID::unitCost,             "unitCost");
+   makeAttRep (WitAttID::useFocusHorizons,     "useFocusHorizons");
+   makeAttRep (WitAttID::userHeurStart,        "userHeurStart");
+   makeAttRep (WitAttID::wbounds,              "wbounds");
+   makeAttRep (WitAttID::wit34Compatible,      "wit34Compatible");
+   makeAttRep (WitAttID::yieldRate,            "yieldRate");
+d217 1
+d222 1
+a222 1
+   myAttRepVec_[theAttID] = new WitAttRep (theAttName);
+d248 3
+a250 1
+WitAttRep::WitAttRep (const char * theAttName):
+d252 2
+a253 1
+      myAttName_ (theAttName)
+@
+
+
+1.1
+log
+@Stochastic Implosion
+@
+text
+@a31 2
+   int theIdx;
+
+d34 1
+a34 4
+   for (theIdx = 0; theIdx < WitAttID::nTags; theIdx ++)
+      {
+      stronglyAssert (myAttRepVec_[theIdx] != NULL);
+      }
+a53 41
+   makeAttRep (WitAttID::selForDel,            "selForDel");
+   makeAttRep (WitAttID::title,                "title");
+   makeAttRep (WitAttID::nPeriods,             "nPeriods");
+   makeAttRep (WitAttID::independentOffsets,   "independentOffsets");
+   makeAttRep (WitAttID::execEmptyBom,         "execEmptyBom");
+   makeAttRep (WitAttID::hashTableSize,        "hashTableSize");
+   makeAttRep (WitAttID::roundReqVols,         "roundReqVols");
+   makeAttRep (WitAttID::outputPrecision,      "outputPrecision");
+   makeAttRep (WitAttID::computeCriticalList,  "computeCriticalList");
+   makeAttRep (WitAttID::pgdCritListMode,      "pgdCritListMode");
+   makeAttRep (WitAttID::wit34Compatible,      "wit34Compatible");
+   makeAttRep (WitAttID::useFocusHorizons,     "useFocusHorizons");
+   makeAttRep (WitAttID::localBuildAhead,      "localBuildAhead");
+   makeAttRep (WitAttID::multiExec,            "multiExec");
+   makeAttRep (WitAttID::twoWayMultiExec,      "twoWayMultiExec");
+   makeAttRep (WitAttID::localMultiExec,       "localMultiExec");
+   makeAttRep (WitAttID::equitability,         "equitability");
+   makeAttRep (WitAttID::forcedMultiEq,        "forcedMultiEq");
+   makeAttRep (WitAttID::autoPriority,         "autoPriority");
+   makeAttRep (WitAttID::skipFailures,         "skipFailures");
+   makeAttRep (WitAttID::multiRoute,           "multiRoute");
+   makeAttRep (WitAttID::truncOffsets,         "truncOffsets");
+   makeAttRep (WitAttID::lotSizeTol,           "lotSizeTol");
+   makeAttRep (WitAttID::expCutoff,            "expCutoff");
+   makeAttRep (WitAttID::penExec,              "penExec");
+   makeAttRep (WitAttID::tieBreakPropRt,       "tieBreakPropRt");
+   makeAttRep (WitAttID::stockRealloc,         "stockRealloc");
+   makeAttRep (WitAttID::stockReallocation,    "stockReallocation");
+   makeAttRep (WitAttID::srSelSplit,           "srSelSplit");
+   makeAttRep (WitAttID::respectStockSLBs,     "respectStockSLBs");
+   makeAttRep (WitAttID::prefHighStockSLBs,    "prefHighStockSLBs");
+   makeAttRep (WitAttID::perfPegging,          "perfPegging");
+   makeAttRep (WitAttID::selSplit,             "selSplit");
+   makeAttRep (WitAttID::nonMrSelSplit,        "nonMrSelSplit");
+   makeAttRep (WitAttID::userHeurStart,        "userHeurStart");
+   makeAttRep (WitAttID::pipSeqFromHeur,       "pipSeqFromHeur");
+   makeAttRep (WitAttID::newPipPggOrder,       "newPipPggOrder");
+   makeAttRep (WitAttID::highPrecisionWD,      "highPrecisionWD");
+   makeAttRep (WitAttID::nstnResidual,         "nstnResidual");
+   makeAttRep (WitAttID::minimalExcess,        "minimalExcess");
+   makeAttRep (WitAttID::compPrices,           "compPrices");
+d56 2
+a57 23
+   makeAttRep (WitAttID::mipMode,              "mipMode");
+   makeAttRep (WitAttID::objChoice,            "objChoice");
+   makeAttRep (WitAttID::wbounds,              "obj2Wrev");
+   makeAttRep (WitAttID::obj2Wrev,             "obj2Winv");
+   makeAttRep (WitAttID::obj2Winv,             "obj2Wserv");
+   makeAttRep (WitAttID::obj2Wserv,            "obj2Wsub");
+   makeAttRep (WitAttID::obj2Wsub,             "periodsPerYear");
+   makeAttRep (WitAttID::periodsPerYear,       "capCost");
+   makeAttRep (WitAttID::capCost,              "invCost");
+   makeAttRep (WitAttID::invCost,              "optInitMethod");
+   makeAttRep (WitAttID::optInitMethod,        "solverLogFileName");
+   makeAttRep (WitAttID::solverLogFileName,    "accMethod");
+   makeAttRep (WitAttID::accMethod,            "supplyVol");
+   makeAttRep (WitAttID::supplyVol,            "singleSource");
+   makeAttRep (WitAttID::singleSourcePart,     "propRtg");
+   makeAttRep (WitAttID::propRtgPart,          "unitCost");
+   makeAttRep (WitAttID::unitCost,             "scrapAllowed");
+   makeAttRep (WitAttID::scrapAllowed,         "scrapCost");
+   makeAttRep (WitAttID::scrapCost,            "stockCost");
+   makeAttRep (WitAttID::stockCost,            "stockBounds");
+   makeAttRep (WitAttID::stockBounds,          "stockBounds");
+   makeAttRep (WitAttID::myBaDir,              "myBaDir");
+   makeAttRep (WitAttID::buildAheadUBMaterial, "buildAheadUB");
+a58 3
+   makeAttRep (WitAttID::demandVol,            "demandVol");
+   makeAttRep (WitAttID::priority,             "priority");
+   makeAttRep (WitAttID::searchInc,            "searchInc");
+d60 7
+a66 4
+   makeAttRep (WitAttID::shipLateUB,           "shipLateUB");
+   makeAttRep (WitAttID::shipLateAllowed,      "shipLateAllowed");
+   makeAttRep (WitAttID::prefBuildAhead,       "prefBuildAhead");
+   makeAttRep (WitAttID::intShipVols,          "intShipVols");
+a67 2
+   makeAttRep (WitAttID::grossRev,             "grossRev");
+   makeAttRep (WitAttID::shipReward,           "shipReward");
+d69 16
+a84 1
+   makeAttRep (WitAttID::shipVol,              "shipVol");
+d86 1
+d88 3
+a90 2
+   makeAttRep (WitAttID::yieldRate,            "yieldRate");
+   makeAttRep (WitAttID::minLotSize,           "minLotSize");
+d92 9
+a100 1
+   makeAttRep (WitAttID::twoLevelLotSizes,     "twoLevelLotSizes");
+d102 4
+d107 10
+a116 2
+   makeAttRep (WitAttID::incLotSize2,          "incLotSize2");
+   makeAttRep (WitAttID::execPenaltyOperation, "execPenalty");
+d118 6
+a123 5
+   makeAttRep (WitAttID::execCost,             "execCost");
+   makeAttRep (WitAttID::intExecVols,          "intExecVols");
+   makeAttRep (WitAttID::cycleTime34,          "cycleTime34");
+   makeAttRep (WitAttID::execVol,              "execVol");
+   makeAttRep (WitAttID::execBounds,           "execBounds");
+d125 15
+a139 2
+   makeAttRep (WitAttID::earliestPeriod,       "earliestPeriod");
+   makeAttRep (WitAttID::latestPeriod,         "latestPeriod");
+d141 9
+a149 4
+   makeAttRep (WitAttID::consRate,             "consRate");
+   makeAttRep (WitAttID::falloutRate,          "falloutRate");
+   makeAttRep (WitAttID::execPenaltyConsEntry, "execPenalty");
+   makeAttRep (WitAttID::mandEC,               "mandEC");
+d151 8
+a158 2
+   makeAttRep (WitAttID::propRtgBomEntry,      "propRtg");
+   makeAttRep (WitAttID::obj2SubPenalty,       "obj2SubPenalty");
+a159 5
+   makeAttRep (WitAttID::intSubVols,           "intSubVols");
+   makeAttRep (WitAttID::expAllowedSubEntry,   "expAllowed");
+   makeAttRep (WitAttID::netAllowed,           "netAllowed");
+   makeAttRep (WitAttID::mrpNetAllowed,        "mrpNetAllowed");
+   makeAttRep (WitAttID::expNetAversion,       "expNetAversion");
+d161 12
+a172 4
+   makeAttRep (WitAttID::productRate,          "productRate");
+   makeAttRep (WitAttID::expAllowedBopEntry,   "expAllowed");
+   makeAttRep (WitAttID::expAversion,          "expAversion");
+   makeAttRep (WitAttID::meSelSplit,           "meSelSplit");
+d187 19
+@
+

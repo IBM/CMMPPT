@@ -1,0 +1,281 @@
+head	1.5;
+access;
+symbols
+	sce_5_01_20080919:1.5
+	latest_sce_4_20_20060523:1.4.0.4
+	sce_4_20_20060523:1.4
+	latest_sce4_20_OSL:1.4.0.2
+	sce_4_20_OSL:1.4
+	sce_4_20_20051222:1.4
+	sce_4_10_30050426:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.3
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.2
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2008.03.20.14.52.48;	author ervolina;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.03.04.20.28.12;	author fasano;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.57;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.26.14.25.32;	author fasano;	state Exp;
+branches
+	1.2.2.1;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.2.1
+date	2003.01.08.17.43.17;	author rwToStl;	state Exp;
+branches;
+next	1.2.2.2;
+
+1.2.2.2
+date	2003.01.09.13.14.31;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@Dated demands and multiAttributeDemand for indep DemandsVol and commits,
+also for partDB
+@
+text
+@#include <mcl/src/mdsPragma.h>
+// RW2STL - inserted:
+#include <ostream>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+#include <mcl/src/mcl.h>
+#include <scenario/src/calendar.h>
+#include <scenario/src/dif.h>
+
+#include <sce/src/fctySce.h>
+#include <sce/src/scBdSce.h>
+#include <sce/src/scenSce.h>
+#include <sce/src/difSceF.h>
+
+LgFrScenarioBuilderForSce::LgFrScenarioBuilderForSce()
+: LgFrScenarioBuilder(new LgFrSceFactory)
+{
+}
+
+LgFrScenarioBuilderForSce::~LgFrScenarioBuilderForSce()
+{
+}
+
+
+void
+LgFrScenarioBuilderForSce::buildScenario(const LgFrDataInterfaceAbstract& dif,
+					 const LgFrCalendar& calendar)
+{
+  scenarioPtr_ = 
+     LgFrScenarioForSceSmartPointer(
+                                   new LgFrScenarioForSce(dif, calendar)
+                                   );
+  // initializes the error msg facility -- pass the name of the output file
+  scenarioPtr_->initErrFacility("sceERROR.log");
+  scenarioPtr_->initMsgFacility("sceMESSAGE.log");
+
+  // this is to share the scenario's error facility with other classes
+  //  that need to be able to create error messages
+  scenarioPtr_->flatFileMgr().setErrFacility(scenarioPtr_->getErrFacility());
+  scenarioPtr_->multiPlantHelper().setErrFacility(scenarioPtr_->getErrFacility());
+  scenarioPtr_->setOfParameters().setErrFacility(scenarioPtr_->getErrFacility());
+
+  LgFrSceScrubber * myScrubber = scenarioPtr_ -> scrubber();
+  LgFrDataInterfaceImplementation * difSceFImpPtr =
+    ((LgFrDataInterface*)&dif) -> dataInterfaceImplementation();
+  (*myScrubber) = ((LgFrDataInterfaceImplementationFromSceFiles*)
+                   difSceFImpPtr) -> scrubber();
+  
+  this->finishBuildingScenario(scenarioPtr_);
+}
+
+LgFrScenarioForSceSmartPointer
+LgFrScenarioBuilderForSce::getScenario()
+{
+    if (scenarioPtr_.null())  {
+      std::cerr << "No scenario pointer here" << std::endl;
+      assert(0);
+    }
+    return scenarioPtr_;
+}
+
+void
+LgFrScenarioBuilderForSce::factoryType() const
+{
+  factoryPtr_->factoryType();
+}
+
+LgFrInitialProblemAndParameters*
+LgFrScenarioBuilderForSce::createIPP(LgFrScenarioSmartPointer scenario) const
+{
+  return factoryPtr_->createIPP(scenario);
+}
+
+LgFrScheduleFactory*
+LgFrScenarioBuilderForSce::createScheduleFactory(LgFrScenarioSmartPointer scenario) const
+{
+  return factoryPtr_->createScheduleFactory(scenario);
+}
+
+
+#if 0
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+void
+LgFrScenarioBuilderForSce::test()
+{
+  LgFrCalendar calendar;
+  LgFrTestDataInterface dif;
+  LgFrScenarioBuilderForATP factory;
+  factory.factoryType();
+  factory.buildScenario(dif, calendar);
+  
+  delete factory.getScenario();
+  cout << std::endl;
+}
+#endif
+@
+
+
+1.4
+log
+@Modified to reduce microsoft compiler warning messages
+@
+text
+@d27 1
+a27 1
+					  const LgFrCalendar& calendar)
+d49 1
+a49 1
+  this->finishBuildingScenario (scenarioPtr_);
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d1 1
+a1 1
+
+@
+
+
+1.2
+log
+@Added include of mcl/src/mcl.h near top of include list to avoid
+compile time problems on AIX which did not occur on Windows.
+
+added
+  implement(RWGVector, float)
+  implement(RWGVector, int)
+to ipSce.C to avoid unresolved symbols at link time
+@
+text
+@d1 5
+d56 1
+a56 1
+      cerr << "No scenario pointer here" << endl;
+d96 1
+a96 1
+  cout << endl;
+@
+
+
+1.2.2.1
+log
+@Roguewave is gone
+@
+text
+@a0 5
+
+// RW2STL - inserted:
+#include <ostream.h>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+@
+
+
+1.2.2.2
+log
+@Went all the way to std::cout
+@
+text
+@d3 1
+a3 1
+#include <ostream>
+d56 1
+a56 1
+      std::cerr << "No scenario pointer here" << std::endl;
+d96 1
+a96 1
+  cout << std::endl;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 1
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@

@@ -1,0 +1,591 @@
+head	1.10;
+access;
+symbols
+	EndRw-branch:1.9.0.8
+	Root-of-EndRw:1.9
+	rwToStl:1.9.0.6
+	latest_sce_3_10_20010924:1.9.0.4
+	sce_3_10_20010924:1.9
+	latest_sce_3_00_20010601:1.9.0.2
+	sce_3_00_20010601:1.9
+	latest_sce_2_31_20010308:1.6.0.2
+	sce_2_31_20010308:1.6
+	latest_sce_2_31_20001003:1.3.0.2
+	sce_2_31_20001003:1.3
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.10
+date	2003.03.03.23.26.50;	author rjw;	state dead;
+branches;
+next	1.9;
+
+1.9
+date	2001.05.10.17.58.18;	author bobw;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2001.05.08.21.35.44;	author bobw;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2001.04.30.21.29.41;	author bobw;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2001.01.27.00.24.38;	author bobw;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2001.01.15.19.01.50;	author bobw;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2000.12.28.22.13.37;	author bobw;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2000.07.14.20.27.31;	author bobw;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2000.03.07.16.56.10;	author fasano;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2000.02.24.13.53.24;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.24.13.53.24;	author wit;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.10
+log
+@Removed all empty files from WIT (64 of them).
+@
+text
+@@
+
+
+1.9
+log
+@Removed class MePrinter.
+@
+text
+@@
+
+
+1.8
+log
+@Removed class MeAltPt.
+Changed name of class MeSelPt to MeAltPt.
+Implemented de-selection of colliding MeAltPts.
+@
+text
+@a0 114
+//------------------------------------------------------------------------------
+//
+//     (c) Copyright IBM Corp. 1993,1994,1996,2000.
+//     (Unpublished)
+//     OCO Source Modules
+//     IBM Confidential 
+// 
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Source file: "MePtr.C"
+//
+// Contains the implementation of class MePrinter.
+//------------------------------------------------------------------------------
+
+#include <MePtr.h>
+#include <MeMgr.h>
+#include <MeDir.h>
+#include <MeAltPt.h>
+
+//------------------------------------------------------------------------------
+// Implementation of class MePrinter.
+//------------------------------------------------------------------------------
+
+WitMePrinter::WitMePrinter (WitMeMgr * theMeMgr):
+      WitProbAssoc (theMeMgr),
+
+      myMeMgr_     (theMeMgr)
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+WitMePrinter::~WitMePrinter ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::print ()
+   {
+   WitBopEntry *  theBopEnt;
+   WitPeriod      expPer;
+   WitMeCoordPt * theMeCoordPt;
+
+   fprintf (msgFile (),
+      "\n"
+      "Multi-Exec Alteration Points:\n");
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      if (myMeMgr_->hasMeCoordPts (theBopEnt))
+         {
+         expPer = -1;
+
+         while (myMeMgr_->findNextMeCoordPt (theBopEnt, expPer, theMeCoordPt))
+            {
+            print (theMeCoordPt->myMeAltPtForNstn ());
+
+            if (myGlobalComp ()->twoWayMultiExec ())
+               print (theMeCoordPt->myMeAltPtForAsap ());
+            }
+         }
+
+   fprintf (msgFile (), "\n");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::print (WitMeAltPt * theMeAltPt)
+   {
+   WitMeCoordPt * theMeCoordPt;
+   WitBopEntry *  theBopEnt; 
+
+   theMeCoordPt = theMeAltPt  ->myMeCoordPt ();
+   theBopEnt    = theMeCoordPt->myBopEntry ();
+ 
+   fprintf (msgFile (),
+      "\n"
+      "Multi-Exec Alteration Point:\n"
+      "   Operation %s, BopEntry #%d, Exp Per %d, %s\n",
+      theBopEnt->myOperationName ().myCstring (),
+      theBopEnt->localIndex (),
+      theMeCoordPt->expPeriod (),
+      theMeAltPt->myMeDir ()->myName ());
+
+   if (theMeAltPt->hasSelExecPer ())
+      fprintf (msgFile (), 
+         "      Selected Exec Per: %d\n", 
+         theMeAltPt->selExecPer ());
+   else
+      fprintf (msgFile (), "      Selected Exec Per: None\n");
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitMePrinter::findExecMeCoordPt (
+      WitBopEntry *    theBopEnt, 
+      WitPeriod        execPer,
+      WitMeCoordPt * & theMeCoordPt)
+   {
+   WitPeriod expPer;
+
+   if (! myMeMgr_->hasMeCoordPts (theBopEnt))
+      return witFALSE;
+
+   expPer = theBopEnt->impactPeriod ()[execPer];
+
+   if (expPer < 0)
+      return witFALSE;
+
+   theMeCoordPt = myMeMgr_->myMeCoordPt (theBopEnt, expPer);
+
+   return (theMeCoordPt != NULL);
+   }
+@
+
+
+1.7
+log
+@Fixed uninitialized memory bugs.
+Refactoring for selection splitting.
+@
+text
+@a18 1
+#include <MeSelPt.h>
+d26 1
+a26 1
+      WitProbAssoc   (theMeMgr),
+d28 1
+a28 2
+      myMeMgr_       (theMeMgr),
+      toAltMeSelPts_ (myProblem ())
+a41 21
+   printMeAltPts ();
+   printMeSelPts ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::printSelMeAltPt (
+      WitBopEntry * theBopEnt, 
+      WitMeDir *    theMeDir)
+   {
+   if (myGlobalComp ()->twoWayMultiExec ())
+      fprintf (msgFile (),
+         "Selecting multi-exec alt point for operation %s on an %s basis\n",
+         theBopEnt->myOperationName ().myCstring (), 
+         theMeDir->myName ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::preprintAlts ()
+   {
+d46 3
+a48 1
+   witAssert (toAltMeSelPts_.isEmpty ());
+d57 1
+a57 1
+            listIfPending (theMeCoordPt->myMeSelPtForNstn ());
+d60 1
+a60 1
+               listIfPending (theMeCoordPt->myMeSelPtForAsap ());
+d64 1
+a64 1
+   toAltMeSelPts_.reverse ();
+d69 1
+a69 1
+void WitMePrinter::printAlts ()
+a70 21
+   WitMeSelPt * theMeSelPt;
+
+   if (toAltMeSelPts_.isEmpty ())
+      return;
+
+   fprintf (msgFile (),
+      "\n"
+      "Multi-Exec Selection Points Altered:\n\n");
+
+   while (toAltMeSelPts_.pop (theMeSelPt))
+      print (theMeSelPt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::printMeAltPts ()
+   {
+   WitOperation * theOpn;
+   WitPeriod      execPer;
+   WitBoolean     foundMeAltPt;
+   WitBopEntry *  theBopEnt;
+d72 1
+a72 2
+   int            theIdx;
+   WitMeAltPt *   theMeAltPt;
+d74 3
+d79 6
+a84 51
+      "Multi-Exec Alteration Points:\n\n");
+
+   forEachOperation (theOpn, myProblem ())
+      forEachPeriod (execPer, myProblem ())
+         {
+         foundMeAltPt = witFALSE;
+
+         forEachEl (theBopEnt, theOpn->bop ())
+            if (findExecMeCoordPt (theBopEnt, execPer, theMeCoordPt))
+               {
+               theIdx = -1;
+
+               while (findNextMeAltPt (theMeCoordPt, theIdx, theMeAltPt))
+                  if (theMeAltPt->execPeriod () == execPer)
+                     foundMeAltPt = witTRUE;
+               }
+
+         if (foundMeAltPt)
+            fprintf (msgFile (),
+               "   Operation %s, Exec Per %d\n",
+               theOpn->operationName ().myCstring (),
+               execPer);
+         }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::printMeSelPts ()
+   {
+   WitBopEntry *  theBopEnt;
+   WitPeriod      expPer;
+   WitMeCoordPt * theMeCoordPt;
+
+   fprintf (msgFile (),
+      "\n"
+      "Multi-Exec Selection Points:\n\n");
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      if (myMeMgr_->hasMeCoordPts (theBopEnt))
+         {
+         expPer = -1;
+
+         while (myMeMgr_->findNextMeCoordPt (theBopEnt, expPer, theMeCoordPt))
+            {
+            print (theMeCoordPt->myMeSelPtForNstn ());
+
+            if (myGlobalComp ()->twoWayMultiExec ())
+               print (theMeCoordPt->myMeSelPtForAsap ());
+            }
+         }
+   }
+d86 6
+a91 11
+//------------------------------------------------------------------------------
+
+void WitMePrinter::listIfPending (WitMeSelPt * theMeSelPt)
+   {
+   WitMeAltPt * theMeAltPt;
+
+   theMeAltPt = theMeSelPt->selMeAltPt ();
+   
+   if (theMeAltPt != NULL)
+      if (theMeAltPt->hasaPendingChooser ())
+         toAltMeSelPts_.push (theMeSelPt);
+a113 48
+   }
+
+//------------------------------------------------------------------------------
+
+WitBoolean WitMePrinter::findNextMeAltPt (
+      WitMeCoordPt * theMeCoordPt,
+      int &          theIdx, 
+      WitMeAltPt * & theMeAltPt)
+   {
+   WitMeDir * theMeDir;
+
+   theMeDir = myMeMgr_->myMeDirForAsap ();
+
+   return theMeCoordPt->findNextMeAltPt (theMeDir, theIdx, theMeAltPt);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::print (WitMeSelPt * theMeSelPt)
+   {
+   WitMeCoordPt * theMeCoordPt;
+   WitBopEntry *  theBopEnt; 
+   WitPeriod      expPer;
+   int            theIdx;
+   WitMeAltPt *   theMeAltPt;
+
+   theMeCoordPt = theMeSelPt->myMeCoordPt ();
+
+   theBopEnt    = theMeCoordPt->myBopEntry ();
+   expPer       = theMeCoordPt->expPeriod ();
+ 
+   fprintf (msgFile (),
+      "   Operation %s, BopEntry #%d, Exp Per %d: %s\n\n"
+      "      Exec Per  Sel?\n",
+      theBopEnt->myOperationName ().myCstring (),
+      theBopEnt->localIndex (),
+      expPer,
+      theMeSelPt->myMeDir ()->myName ());
+
+   theIdx = -1;
+
+   while (findNextMeAltPt (theMeCoordPt, theIdx, theMeAltPt))
+      fprintf (msgFile (),
+         "      %8d   %3s\n",
+         theMeAltPt->execPeriod (),
+         (theMeAltPt == theMeSelPt->selMeAltPt ())? "*": "");
+      
+   fprintf (msgFile (), "\n");
+@
+
+
+1.6
+log
+@Further implementation of coarse selection splitting.
+@
+text
+@a62 33
+void WitMePrinter::print (WitMeAltPt * theMeAltPt)
+   {
+   WitPeriod      execPer;
+   WitOperation * theOpn;
+   WitBopEntry *  theBopEnt;
+   WitMeCoordPt * theMeCoordPt;
+   int            theIdx;
+   WitMeAltPt *   otherMeAltPt;
+
+   execPer = theMeAltPt->execPeriod ();
+   theOpn  = NULL;
+
+   forEachBopEntry (theBopEnt, myProblem ())
+      if (findExecMeCoordPt (theBopEnt, execPer, theMeCoordPt))
+         {
+         theIdx = -1;
+
+         while (findNextMeAltPt (theMeCoordPt, theIdx, otherMeAltPt))
+            if (otherMeAltPt == theMeAltPt)
+               theOpn = theBopEnt->myOperation ();
+         }
+
+   witAssert (theOpn != NULL);
+
+   fprintf (msgFile (),
+      "\n"
+      "Discarded Multi-Exec Alt Point: Operation %s, Exec Per %d\n\n",
+      theOpn->operationName ().myCstring (),
+      execPer);
+   }
+
+//------------------------------------------------------------------------------
+
+d98 1
+d180 1
+a180 1
+      if (theMeAltPt->pending ())
+@
+
+
+1.5
+log
+@Fixed some bugs in coarse selection splitting.
+@
+text
+@d264 2
+a265 1
+   findCoords (theMeCoordPt, theBopEnt, expPer);
+a283 16
+   }
+
+//------------------------------------------------------------------------------
+
+void WitMePrinter::findCoords (
+      WitMeCoordPt *  theMeCoordPt, 
+      WitBopEntry * & theBopEnt, 
+      WitPeriod     & expPer)
+   {
+   forEachBopEntry (theBopEnt, myProblem ())
+      if (myMeMgr_->hasMeCoordPts (theBopEnt))
+         forEachPeriod (expPer, myProblem ())
+            if (myMeMgr_->myMeCoordPt (theBopEnt, expPer) == theMeCoordPt)
+               return;
+
+   myMsgFac () ("internalErrorFmsg", "WitMePrinter::findCoords");
+@
+
+
+1.4
+log
+@Completed a limited implementation of coarse selection splitting for BOP
+entries.
+@
+text
+@d133 1
+a133 1
+   while (toAltMeSelPts_.get (theMeSelPt))
+d213 1
+a213 1
+         toAltMeSelPts_.put (theMeSelPt);
+@
+
+
+1.3
+log
+@Outer API: Merged all no-longer-documented functions into one section.
+Outer API: Moved build-ahead by demand functions into the no-longer-documented
+   section.
+Simplified the rules for two-way multiple execution periods.
+@
+text
+@d133 1
+a133 1
+   while (toAltMeSelPts_.pop (theMeSelPt))
+d213 1
+a213 1
+         toAltMeSelPts_.push (theMeSelPt);
+@
+
+
+1.2
+log
+@Updating wit/src in /u/wit/devbase to be in synch with /u/implode/devbase
+@
+text
+@a17 1
+#include <MeDirMgr.h>
+a138 35
+void WitMePrinter::printMeDirMgr ()
+   {
+   WitMeDirMgr *          theMeDirMgr;
+   WitDynPerItr (WitPart) theItr;
+   WitPart *              fillPart;
+   WitPeriod              fillPer;
+
+   theMeDirMgr = myMeMgr_->myMeDirMgr ();
+
+   fprintf (msgFile (),
+      "\n"
+      "Multi-Exec Directions:\n\n"
+      "   Part  Per  Dir\n");
+
+   for (theItr = theMeDirMgr->dirPartPers (); theItr (fillPart, fillPer);)
+      fprintf (msgFile (),
+         "   %-4s  %3d  %s\n",
+         fillPart->partName ().myCstring (),
+         fillPer,
+         theMeDirMgr->curMeDir (fillPart, fillPer)->myName ());
+
+   fprintf (msgFile (),
+      "\n"
+      "JIT  Direction:  %s\n"
+      "BABD Direction:  %s\n"
+      "Ext Demand Part: %s\n"
+      "Inc Period:      %d\n",
+      theMeDirMgr->jitExtMeDir ()->myName (),
+      theMeDirMgr-> baExtMeDir ()->myName (),
+      theMeDirMgr->extPart ()->partName ().myCstring (),
+      theMeDirMgr->incPer ());
+   }
+
+//------------------------------------------------------------------------------
+
+d247 1
+a247 1
+   theMeDir = myMeMgr_->myMeDirMgr ()->myMeDirForAsap ();
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d3 1
+a3 1
+//     (c) Copyright IBM Corp. 1993,1994,1996.
+@
+
+
+1.1.1.1
+log
+@Import wit
+@
+text
+@@

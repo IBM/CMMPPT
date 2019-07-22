@@ -1,0 +1,1577 @@
+head	1.5;
+access;
+symbols
+	sce_5_01_20080919:1.4
+	latest_sce_4_20_20060523:1.4.0.4
+	sce_4_20_20060523:1.4
+	latest_sce4_20_OSL:1.4.0.2
+	sce_4_20_OSL:1.4
+	sce_4_20_20051222:1.4
+	sce_4_10_30050426:1.4
+	sce_4_05_20040511:1.4
+	sce_4_00_20040201:1.4
+	nextGenBranch:1.3.0.2
+	nextGenRoot:1.3
+	sce_3_30_20030627:1.3
+	EndRw-branch:1.2.0.2
+	Root-of-EndRw:1.2
+	EndWitRw-branch:1.1.1.1.0.12
+	Root-of-EndWitRw:1.1.1.1
+	RwToStl-branch:1.1.1.1.0.10
+	Root-of-RwToStl:1.1.1.1
+	latest_sce_3_10_20010924:1.1.1.1.0.8
+	sce_3_10_20010924:1.1.1.1
+	latest_sce_3_00_20010601:1.1.1.1.0.6
+	sce_3_00_20010601:1.1.1.1
+	latest_sce_2_31_20010308:1.1.1.1.0.4
+	sce_2_31_20010308:1.1.1.1
+	latest_sce_2_31_20001003:1.1.1.1.0.2
+	sce_2_31_20001003:1.1.1.1
+	start:1.1.1.1
+	IBM:1.1.1;
+locks; strict;
+comment	@ * @;
+
+
+1.5
+date	2010.04.15.17.46.41;	author ervolina;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2004.01.29.05.08.05;	author ervolina;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2003.01.15.19.36.57;	author rwToStl;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2002.11.26.14.25.33;	author fasano;	state Exp;
+branches
+	1.2.2.1;
+next	1.1;
+
+1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches
+	1.1.1.1;
+next	;
+
+1.1.1.1
+date	2000.02.25.18.36.53;	author wit;	state Exp;
+branches;
+next	;
+
+1.2.2.1
+date	2003.01.08.17.43.18;	author rwToStl;	state Exp;
+branches;
+next	1.2.2.2;
+
+1.2.2.2
+date	2003.01.09.13.14.31;	author rwToStl;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@only print non-zero values in partDB
+@
+text
+@
+// RW2STL - inserted:
+#include <string>
+#include <ostream>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+#include <mcl/src/mcl.h>
+#include <sce/src/sceIOLog.h>
+
+//-----------------------------------------------------------------------------
+// contains method definitions for LgFrSceIOLogMgr class
+//
+// *** SEE END OF FILE FOR MORE INFO ABOUT THE IO LOGS ***
+//-----------------------------------------------------------------------------
+
+//--------constructor/destructor
+
+// Default Constructor
+LgFrSceIOLogMgr::LgFrSceIOLogMgr()
+  : InputLogName_("sceInput.log"), 
+    OutputLogName_("sceOutput.log"),
+    setOfParameters_(),
+    inFileHead_(0),
+    outFileHead_(0),
+    numBadRecords_(0)
+{
+  // note: the names that we initialize these arrays with are NOT the names
+  // we will use later...they are the names of the parameters corresponding
+  // to the fileNames we want in each entry of these arrays
+  // the actual names of files are put into these arrays during the 
+  // 'copySetOfParams' method below.
+  int i=0;
+  while (!inFileArray_[i].empty()) {
+    addNode(inFileArray_[i],IN_FILE);
+    i++;
+  }
+
+  i=0;
+  while (!outFileArray_[i].empty()) {
+    addNode(outFileArray_[i],OUT_FILE);
+    i++;
+  }
+}
+
+// Constructor with log file names
+LgFrSceIOLogMgr::LgFrSceIOLogMgr(const std::string inputLogName,
+				 const std::string outputLogName)
+  : InputLogName_(inputLogName), 
+    OutputLogName_(outputLogName),
+    setOfParameters_(),
+    inFileHead_(0),
+    outFileHead_(0),
+    numBadRecords_(0)
+{
+  // note: the names that we initialize these arrays with are NOT the names
+  // we will use later...they are the names of the parameters corresponding
+  // to the fileNames we want in each entry of these arrays
+  // the actual names of files are put into these arrays during the 
+  // 'copySetOfParams' method below.
+  int i=0;
+  while (!inFileArray_[i].empty()) {
+    addNode(inFileArray_[i],IN_FILE);
+    i++;
+  }
+
+  i=0;
+  while (!outFileArray_[i].empty()) {
+    addNode(outFileArray_[i],OUT_FILE);
+    i++;
+  }
+}
+
+// Destructor
+LgFrSceIOLogMgr::~LgFrSceIOLogMgr()
+{
+  clearAll();
+
+  // just indicate at the end of the input log file whether or not there were
+  // any rejected input records
+  std::ofstream outLog(InputLogName_.c_str(), std::ofstream::app);
+
+//  if (numBadRecords_ > 0)
+    outLog << "There were " << numBadRecords_ << " input records rejected by SCE\n";
+//  else
+//    outLog << "There were no rejected input records.\n";
+}
+
+//**Note: this has never actually been tested, it should work though
+// Assignment operator
+LgFrSceIOLogMgr&
+LgFrSceIOLogMgr::operator=(const LgFrSceIOLogMgr& rhs)
+{
+  if (this != &rhs) { // check for assignment to self
+
+    InputLogName_ = rhs.InputLogName_;
+    OutputLogName_ = rhs.OutputLogName_;
+    setOfParameters_ = LgFrSceSetOfParameters(setOfParameters_);
+    // use copy constructor
+    
+    // now must get all the fileNodes to have same data
+    clearAll();
+    fileNode * currNode = rhs.inFileHead_;
+    // copy all of the input file nodes
+    while (currNode != 0) {
+      // create corresponding node
+      addNode(currNode->fileName,IN_FILE);
+      // just get a handle on new node so we can update other fields
+      fileNode * temp = getNode(currNode->fileName,IN_FILE);
+
+      if (temp != 0) { // just in case, make sure not null
+	// give this new node all the same fields
+	temp->parameterName = currNode->parameterName;
+	temp->count = currNode->count;
+	temp->good = currNode->good;
+	temp->bad = currNode->bad;
+	temp->comm = currNode->comm;
+	temp->tot = currNode->tot;
+	temp->next = 0;
+      }
+
+      // step to next fileNode
+      currNode = currNode->next;
+    }
+    
+    // copy all of the output file nodes
+    currNode = rhs.outFileHead_;
+    while (currNode != 0) {
+      // create corresponding node
+      addNode(currNode->fileName,OUT_FILE);
+      // just get a handle on new node so we can update other fields
+      fileNode * temp = getNode(currNode->fileName,OUT_FILE);
+
+      if (temp != 0) {
+	// give this new node all the same fields
+	temp->parameterName = currNode->parameterName;
+	temp->count = currNode->count;
+	temp->good = currNode->good;
+	temp->bad = currNode->bad;
+	temp->comm = currNode->comm;
+	temp->tot = currNode->tot;
+	temp->next = 0;
+      }      
+
+      // step to next fileNode
+      currNode = currNode->next;
+    }
+  }
+
+  // after done, return self
+  return *this;
+}
+
+
+//-------------------------------------------------------------------------
+// The following methods are for maintaining the list of input and output
+// files that we need to keep track of. They are currently being stored
+// in a singly linked list, but this may later be changed to just about
+// anything else, most likely a vector.
+//-------------------------------------------------------------------------
+
+void
+LgFrSceIOLogMgr::addNode(const std::string theName, whichName typeName)
+{
+  fileNode * newNode = new fileNode;
+  if (newNode == 0) {// out of memory
+    exit(1);
+  }
+
+  // don't make any fileNodes with no name
+  if (theName.empty())
+    return;
+
+  if ((typeName == IN_FILE) || (typeName == OUT_FILE)) {
+    newNode->fileName = theName;
+    newNode->parameterName = "";
+  }
+  else {
+    newNode->fileName = "";
+    newNode->parameterName = theName;
+  }
+
+  // this will always be the values for any new node
+  newNode->count = 0;
+  newNode->good = 0;
+  newNode->bad = 0;
+  newNode->comm = 0;
+  newNode->tot = 0;
+  newNode->next = 0;
+
+  if ((typeName == IN_FILE) || (typeName == IN_PARAM)) {
+    if (inFileHead_ == 0) {
+      inFileHead_ = newNode;
+    }
+    else {
+      newNode->next = inFileHead_;
+      inFileHead_ = newNode;
+    }
+  }
+  else {
+    if (outFileHead_ == 0) {
+      outFileHead_ = newNode;
+    }
+    else {
+      newNode->next = outFileHead_; 
+      outFileHead_ = newNode;
+    }
+  }
+}
+
+
+fileNode*
+LgFrSceIOLogMgr::getNode(const std::string theName, 
+			 whichName typeName)
+const
+{
+  fileNode* start;
+
+  // can't get a node with no name 
+  if (theName.empty())
+    return 0;
+
+  if ((typeName == IN_FILE) || (typeName == IN_PARAM))
+    start = inFileHead_;
+  else
+    start = outFileHead_;
+
+  if ((typeName == IN_FILE) || (typeName == OUT_FILE)) {
+    while (start != 0) {
+      if (start->fileName == theName)
+	return start;
+      else
+	start = start->next;
+    }
+    return 0;
+  }
+  else {
+    while (start != 0) {
+      if (start->parameterName == theName)
+	return start;
+      else
+	start = start->next;
+    }
+    return 0;
+  }
+}
+
+
+void
+LgFrSceIOLogMgr::updateNode(const std::string fileName, 
+			    long checkRec,
+			    long goodRec,
+			    long badRec,
+			    long commRec,
+			    long totRec,
+			    whichName typeName)
+{
+  // get the node we are looking for
+  fileNode * temp1 = getNode(fileName,typeName);
+
+  // update the node's count
+  if (temp1 != 0) {
+    temp1->count += checkRec;
+    temp1->good += goodRec;
+    temp1->bad += badRec;
+    temp1->comm += commRec;
+    temp1->tot += totRec;
+  }
+}
+
+
+void
+LgFrSceIOLogMgr::clearAll()
+{
+  // this method deletes all nodes ... will probably only be used by
+  // destructor
+  while(inFileHead_ != 0) {
+    fileNode * temp = inFileHead_->next;
+    delete inFileHead_;
+    inFileHead_ = temp;
+  }
+
+  while(outFileHead_ != 0) {
+    fileNode * temp = outFileHead_->next;
+    delete outFileHead_;
+    outFileHead_ = temp;
+  }
+}
+
+
+//--------other public methods
+
+// --- Note.
+// a quick note on the printInputLog(..) and printOutputLog(..) methods...
+// the last argument in both is called 'checkRec', and the importance of
+// this argument is that this is the number that is checked against the
+// corresponding input/output file's checkRec for all pairs or sets of
+// files that have such a correspondence. all the logic/pairing is taken
+// care of in an ugly set of if-else statements in the totalInCount(..)
+// method below.
+// the reason the checkRec may not be the same as the goodRec argument is
+// that the number of printed lines is not always going to be a valid
+// measure of correctness .. for example, many of the flat file processing
+// methods do not print zero vector records, so this would lead to an error
+// when in fact there may be none.
+// 
+// when looking in the output log file, the format will be:
+//     In file: <output fileName> ...
+//           <#> records written.
+//           <#> good records read from file: <input fileName>.
+//            .
+//            .
+//           etc if multiple input files are reflected by this output file.
+//
+// it is important to note that the fact that the numbers do not add up here
+// does NOT mean there is an error. if there may be an error, there will be
+// a message in the sce error log file that says: 'there may have been an
+// error ... blah blah'.
+//
+// in addition, not all the output files have corresponding input files, and
+// if that is the case, then you will only see the number of records written
+// by into the output file.
+// --- 7.14.97
+
+
+//method called after processing flat file, for writing a summary log;
+//returns 1 if no errors in writing summary
+//   "    0 if some error
+int
+LgFrSceIOLogMgr::printInputLog(
+		    const std::string filein,    //records FROM "filein"
+		    long totRec,      //total number of records
+		    long goodRec,     //number of "good" records
+		    long badRec,      //number of "bad" records
+		    long commRec,     //number of comment/blank records
+		    long checkRec)    //used for checking against output log
+{
+    // open file to write to; appends to end of file
+    std::ofstream tout(InputLogName_.c_str());//, ios::out | ios::app);
+
+    // write contents of log
+    tout << "In input file: " << filein << " ...\n";
+    tout << "\t" << totRec << " records read.\n";
+    tout << "\t" << goodRec << " records accepted.\n";
+    tout << "\t" << badRec << " records rejected.\n";       
+    tout << "\t" << commRec << " lines commented or blank.\n"; 
+
+    updateNode(filein,checkRec,goodRec,badRec,commRec,totRec,IN_FILE);
+
+    // were there any badRecords?
+    numBadRecords_ += badRec;
+
+    // was there an error in counting records?
+    if ((goodRec + badRec + commRec) == totRec) {
+      tout.close();
+      return 1;
+    }
+    else
+    {
+      tout << "There may have be an error here.\n";
+      tout.close();
+      return 0;
+    }
+}
+
+int
+LgFrSceIOLogMgr::printOutputLog(const std::string fileout,
+				long totRec,
+				long zeroRec,
+				long checkRec)
+{
+    std::ofstream tout(OutputLogName_.c_str(),std::ofstream::app);
+
+  // name of file?
+  tout << "In file: " << fileout << "\n";
+
+  long inCount = totalInCount(fileout, tout);
+  // only print out stuff if the return value is >= 0
+  // for now, return value = -1 means we don't want to print any message
+  if (inCount >= 0) {
+    // print out the number of zero vectors NOT printed in the output file...
+    // we only care for this to be printed if non-zero
+    // and if something else is being printed out.
+    if (zeroRec != 0) {
+      tout << "\t - " << zeroRec << " records with zeroVectors ommitted.\n";
+    }
+
+    tout << "\t  ----------------\n";
+
+    if (inCount != checkRec)  { // this would be a miscount
+      // just going to use the setOfParameters_'s error facility
+      (*(setOfParameters_.getErrFacility()))("MiscountWarning",MclArgList() << fileout);
+
+      tout << "There may have be an error here.\n";
+    }
+  }
+
+  // make sure to clarify what is being written out.
+  // if totRec+zeroRec != checkRec then this make sure to explain that this
+  //  is because of the number of blocks printed != number of lines
+  //  ie. the printed blocks are greater than a single line in some cases
+  tout << "\t   " << checkRec-zeroRec << " data sets written.\n";
+
+  // how many file written out?
+  tout << "\t  (" << totRec << " total lines written)\n";
+
+  tout.close();
+  return 1;
+}
+
+
+void
+LgFrSceIOLogMgr::resetInputLog()
+{
+  // this will clear any file with same name or create one if none exists
+  std::ofstream temp(InputLogName_.c_str());
+  temp.close();
+}
+
+void
+LgFrSceIOLogMgr::resetOutputLog()
+{
+  // this will clear any file with same name or create one if none exists
+  std::ofstream temp(OutputLogName_.c_str());
+  temp.close();
+}
+
+// should return the number of good input records read by sce
+// corresponding to the output file of the given name
+// ...also takes the open std::ofstream buffer (output log file) which should
+// be open, and prints relevant info into it
+long 
+LgFrSceIOLogMgr::totalInCount(const std::string fileOut, std::ofstream& outBuffer)
+{
+  // for now i can't think of a better way than just a lookup type
+  // implementation...
+
+  // this is to get the parameter name corresponding to this fileName
+  // but we also need to check that there is a node corresponding to this file
+  fileNode * temp = getNode(fileOut,OUT_FILE);
+  if (temp == 0) // this means no node for this name
+    return -1; 
+  // we will check this later on, because we don't want to make this
+  // produce a 'miscount' error message, because it is not. we'll just
+  // let a miscount slide if the return value is -1.
+
+  // if there is a node with fileName.c_str() == fileOut.c_str() then get the parameter name
+  std::string outParamName = temp->parameterName;
+
+  // there are bound to be some of these that are null strings ... if so,
+  // just return a zero count
+  if (outParamName.empty())
+    return 0;
+
+  // Note: for future reference, the below is just a large set of 'if-else'
+  //       statements.
+  //       what we are trying to check is if the 'fileOut' passed as an arg
+  //       matches one of the output file names which have a corresponding
+  //       input file(s) against which it can be checked.
+  //       the way we check is by seeing if the number of output lines
+  //       printed are valid with respect to the input files on which it
+  //       should depend.
+  //       to add another such correspondence, add the name of the parameter
+  //       that refers to the output file you want, by appending another
+  //       'else if ...' statement at the end here and just follow the 
+  //       pattern that the rest follow. in addition, you will want to
+  //       add the relevant file names to the list of input and output file
+  //       names that is a static data member of this class (see end of file).
+  if (outParamName == "supplyResponseFileName") {
+    fileNode * tempNode = getNode("demandVolFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: " 
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "backlogResponseFileName") {
+    fileNode * tempNode = getNode("demandVolFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "subUsageFileName") {
+    fileNode * tempNode = getNode("subBomFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "interplantOrdersFileName") {
+    fileNode * tempNode = getNode("interPlantFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "totalDemandReportFileName") 
+    {
+      fileNode * tempNode1 = getNode("partFile",IN_PARAM);
+      fileNode * tempNode2 = getNode("capFile",IN_PARAM);
+      long tempCount1 = 0;
+      long tempCount2 = 0;
+      
+      if (tempNode1 != 0) {
+	tempCount1 = tempNode1->count;
+	outBuffer << "\t   " << tempCount1 << " good records from input file: "
+		  << tempNode1->fileName << "\n";
+      }
+      
+      if (tempNode2 != 0) {
+	tempCount2 = tempNode2->count;
+	outBuffer << "\t + " << tempCount2 << " good records from input file: "
+		  << tempNode2->fileName << "\n";
+      }
+
+      return tempCount1+tempCount2;
+    }    
+  else if ((outParamName == "partDBFileName") &&
+	   (setOfParameters_.getBool("printPartDBFile")))
+    {
+      fileNode * tempNode1 = getNode("partFile",IN_PARAM);
+      fileNode * tempNode2 = getNode("capFile",IN_PARAM);
+      long tempCount1 = 0;
+      long tempCount2 = 0;
+      
+      if (tempNode1 != 0) {
+	tempCount1 = tempNode1->count;
+	outBuffer << "\t   " << tempCount1 << " good records from input file: "
+		  << tempNode1->fileName << "\n";
+      }
+
+      if  (setOfParameters_.getBool("combineCapacityIntoPartDB")) {
+	if (tempNode2 != 0) {
+	  tempCount2 = tempNode2->count;
+	  outBuffer << "\t + " << tempCount2 << " good records from input file: "
+		    << tempNode2->fileName << "\n";
+	}
+      }
+
+      return tempCount1+tempCount2;
+    }    
+
+  else if ((outParamName == "capacityDBFileName") &&
+	   (setOfParameters_.getBool("printCapacityDBFile")))
+  {
+    fileNode * tempNode = getNode ("capFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "opExecutionVolumeFileName") {
+    fileNode * tempNode1 = getNode("opFile",IN_PARAM);
+    fileNode * tempNode2 = getNode("partFile",IN_PARAM);
+    long tempCount1 = 0;
+    long tempCount2 = 0;
+
+    if (tempNode1 != 0) {
+      tempCount1 = tempNode1->count;
+      outBuffer << "\t   " << tempCount1 << " good records from input file: "
+		<< tempNode1->fileName << "\n";
+    }
+
+    if (tempNode2 != 0) {
+      tempCount2 = tempNode2->count;
+      outBuffer << "\t + " << tempCount2 << " good records from input file: "
+		<< tempNode2->fileName << "\n";
+    }
+
+    return tempCount1+tempCount2;
+  }
+  else if ((outParamName == "FSSGenReportFileName") ||
+	   (outParamName == "FSSSingReportFileName")) {	   
+    // we need these parameters to know what to print...if anything
+    std::string theScheme = setOfParameters_.getString("FSSScheme");
+    bool printFlag = setOfParameters_.getBool("FSSFlag");
+
+    if (!printFlag) // this means we shouldn't produce either report
+      return -1; // we return -1 so this doesn't produce an error message
+
+    long totalCount = 0;
+
+    if ((theScheme == "B" || theScheme == "b" || 
+	 theScheme == "s" || theScheme == "S") &&
+	(outParamName == "FSSSingReportFileName"))
+      {
+	fileNode * tempNode = getNode("demandVolFile",IN_PARAM);
+	if (tempNode != 0) {
+	  long tempCount = tempNode->count;
+	  outBuffer << "\t   " << tempCount << " good records from file: "
+		    << tempNode->fileName << "\n";
+	  totalCount += tempCount;
+
+	  // this is particular to FSS Singleton reports, some output skipped
+	  //	  if (tempNode->bad != 0) {
+	  //  outBuffer << "\t - " << tempNode->bad << " records ommitted. (See error log for explanation)\n";
+	    // there are some records for which fss is not run.
+	    
+	    // this should be decremented in order for count to work out right
+	  //  totalCount -= (tempNode->bad);
+	  //}
+	}
+      }
+
+    if ((theScheme == "B" || theScheme == "b" ||
+	 theScheme == "g" || theScheme == "G")  &&
+	(outParamName == "FSSGenReportFileName"))
+      // these are the only three cases where we want to return theCount.
+      {
+	fileNode * tempNode = getNode("FSSFile",IN_PARAM);
+	if (tempNode != 0) {
+	  long tempCount = tempNode->count;
+	  outBuffer << "\t   " << tempCount << " good records from file: "
+		    << tempNode->fileName << "\n";
+	  totalCount += tempCount;
+	}
+      }
+    
+    return totalCount;
+  }
+  else if (outParamName == "optionalFeatRatioFileName") {
+    fileNode * tempNode = getNode("topLevelToOptionFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "selFeatBBratioFileName") {
+    fileNode * tempNode = getNode("topLevelToBBratioFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else if (outParamName == "geoSupplyByPdfFileName") {
+    fileNode * tempNode = getNode("geoSourceFile",IN_PARAM);
+    if (tempNode == 0) return 0;
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+  else 
+   return 0;
+}
+
+
+// Note of Caution:
+// don't use this as a general method of copying SOP ... that's not what
+// this method is for.
+// the problem is that this method also tries to initialize the fileNodes
+// with the correct fields, and it is only valid to do this if this has
+// not yet been done.
+void
+LgFrSceIOLogMgr::copySetOfParams(LgFrSceSetOfParameters & theSetOfParams)
+{
+  // use copy constructor -- just in case...we don't want to change it
+  setOfParameters_ = LgFrSceSetOfParameters(theSetOfParams);
+
+  // update log file names... get names from SOP
+  InputLogName_ = setOfParameters_.getString("inputLogFileName");
+  OutputLogName_ = setOfParameters_.getString("outputLogFileName");
+
+  // this is to replace the parameter names for these files with the
+  // actual names ... we need to do this because, we don't know what
+  // the actual names will be for any given run of sce, but the param
+  // names will always be the same for these files
+  // however, we will keep both the filename and the parameter name
+  // around because the parameter names establish the correspondences
+  // but we need the file names to update the nodes
+  fileNode* temp;
+  int i=0;
+  while(!inFileArray_[i].empty()) {
+    temp = getNode(inFileArray_[i],IN_FILE);
+    if (temp != 0) {
+      //      if (!(temp->fileName).empty())
+	temp->parameterName = temp->fileName;
+	//else
+	//temp->parameterName = "NO_NAME";
+
+      std::string currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.empty())
+	temp->fileName = currFileName;
+	//      else
+	//temp->fileName = "NO_NAME";
+    }
+    i++;
+  }
+
+  i=0;
+  while(!outFileArray_[i].empty()) {
+    temp = getNode(outFileArray_[i],OUT_FILE);
+    if (temp != 0) {
+      //      if (!(temp->fileName).empty())
+	temp->parameterName = temp->fileName;
+	//      else
+	//temp->parameterName = "NO_NAME";
+
+      std::string currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.empty())
+	temp->fileName = currFileName;
+	//else
+	//temp->parameterName = "NO_NAME";
+    }
+    i++;
+  }
+}
+
+
+std::string
+LgFrSceIOLogMgr::inFileArray_[] = {
+  "demandVolFile",
+  "subBomFile",
+  "partFile",
+  "capFile",
+  "interPlantFile",
+  "opFile",
+  "FSSFile",
+  "topLevelToBBratioFile",
+  "topLevelToOptionFile",
+  "geoSourceFile",
+  "partCondFile", 
+  "" // null string to signify end of array
+};
+
+std::string
+LgFrSceIOLogMgr::outFileArray_[] = {
+  "supplyResponseFileName",
+  "subUsageFileName",
+  "interplantOrdersFileName",
+  "totalDemandReportFileName",
+  "partDBFileName",
+  "capacityDBFileName",
+  "optionalFeatRatioFileName",
+  "selFeatBBratioFileName",
+  "" // remember to keep this null string as last element of array
+};
+
+//------------------------------   README   -----------------------------------
+
+//I.	INPUT FILE LOG ENTRIES
+//
+//	If a problem should arise in reconciling the number of input file
+//	records (ie. # read in = # rejected + # accepted + # comment/blank),
+//	the problem will most likely be found in the file ipSce.C.
+//
+//	In ipSce.C are most of the flat file processing methods. Most likely
+//	when you look at one of these methods which produce an input file log
+//	entry, you will see several counters like: goodRec,badRec,commentRec,
+//	or some other pretty self explanatory (type=long) variable. In
+//	addition, usually, if there is a variable 'lineCount' or something
+//	else that indicates that the number of lines processed is being kept
+//	track of, this is often the number used when we need to indicate the
+//	total line count in reconciliation.
+//
+//	If there is some problem, which hopefully there will not be, with
+//	making the count come out right, then go find the method in ipSce.C
+//	that corresponds to the file for which the count isn't coming out.
+//	Then look for any points in the code where there are 'continue's
+//	or other places where a counter should have been incremented but was
+//	not. Basically, every time one of these methods reads a line from a
+//	file, there should be two counters incremented...the totalRec counter
+//	and one of the other ones. Other problems may occur if any of the 
+//	methods of the flat file manager are changed because the file
+//	processing methods often rely on their return codes to determine
+//	which kind of line was read in. Lastly, there may be some error in
+//	the values passed to the sceIOLogMgr method 'printInputLog(..)'. Make
+//	sure the values passed to that method are in the correct order. The
+//	syntax can be found in sceIOLog.h.
+//
+//	The only exceptions to all of the above should be the input file log
+//	entries for the FSS input file (if one exists) ... this file is
+//	processed differently and this occurs in the file sceFssMg.C. Similar
+//	counters will be found there. The other exception is the parameter
+//	file log entry, and this file is processed by the parameter manager
+//	in file paramMgr.C. Note, this file only produced at the very end of
+//	an SCE run, this is because it was the only predictable place to 
+//	print this information. If SCE halts execution in mid-run, this log
+//	entry will not be available, nor will the parameter log file which
+//	gives information about the values of each parameter.
+//
+//	* If you're planning on adding another input file that needs to have
+//	  an entry in the input file log...
+//
+//	- Well, obviously there should already be a method somewhere that
+//	  'processes' this input file, however it does so. The first step is
+//	  just to add the relevant counters to that method to keep track of
+//	  the total number of records as well as the number that are accepted,
+//	  rejected, and commented/blank. In addition, if you later will be 
+//	  reconciling an output file log entry using this input file, you will
+//	  want to pass the number that should be used in this checking later.
+//	  (you may want to read the below section before going on, if you have
+//	   not already done so)
+//
+//	- Make sure the counters work the way you expect and that the count
+//	  works out.
+//
+//	- Make sure to add the parameter name corresponding to the input file's
+//	  filename, in the statically defined array in sceIOLog.C, that lists
+//	  the input files of interest (these are the ones for which we will be
+//	  producing input log entries).
+//
+//	- Also make sure that whatever class owns this method that processes
+//	  the file has access to the IO log manager. If not, then find some
+//	  way to give this class access to it. Note: if it has access to the
+//	  scenario or the flat file manager, it will have access to the IO log
+//	  manager as well... it should be accessible by using 'get()' methods.
+//
+//	- After the file has been processed, call the 'printInputLog(..)' of
+//	  the IO log manager following the prescribed syntax.
+//
+//
+//II.	OUTPUT FILE LOG ENTRIES
+//
+//	These are a bit more complicated because they require a check between
+//	the number of records outputted (written to an output file) and the
+//	number of 'good' or accepted records read in by one or multiple input
+//	files. Therefore, there are a lot of places to check if this count is
+//	found to be incorrect at some point.
+//
+//	A brief explanation of how this reconciliation is currently done:
+//
+//	At the beginning of SCE, when all the scenario is created, a flat file
+//	manager is intantiated and also as a data member, the IO log manager
+//	is instantiated as well.
+//	
+//	In the constructor of the log manager, we create a linked list of 
+//	structures* that hold a name of a file (actually the Parameter Name --
+//	not the actual file name), and have room to store information about 
+//	the records of that file, namely the number of records. There are two 
+//	singly linked list structures, one for the input files, and one for 
+//	the output files. (*NOTE: these structures are only created for files 
+//	specified by parameter name in two static arrays of the sceIOLogMgr) 
+//
+//	As soon as the set of parameters object is accessible to the log
+//	manager, it looks up the 'real' names of the files corresponding to
+//	the parameters that are given to it initially. It keeps track of both
+//	the parameter name and the actual name of each file.
+//
+//	When any input file is processed for which an input log entry is 
+//	produced, the log manager checks if this is one of the files that we
+//	are interested in (ie. among those name in the static array mentioned
+//	above). If so, then it stores, in the corresponding node of the input
+//	file linked list, the number of good,bad,comment,and total records as
+//	well as the number that should be used to check against later. This
+//	is often the number of good/accepted records, but may be different
+//	because sometimes that is not the number we want (eg. we may only want
+//	the number of unique sets of input data instead of all).
+//
+//	Similarly, when we get to a method (most are members of the class
+//	LgFrScenarioForSce - defined in scenSce.C) that produces an output
+//	file, we keep track of the number of records printed out, and
+//	the number of zero-vectors (which are sometimes not printed out) if
+//	relevant, and also the count that we want to check against the input
+//	files or whatever we wanted to check against. Again, this is often
+//	going to be the number of total lines printed out but may be something
+//	like the number of unique sets of data printed out. 
+//
+//	Note: there is also one exception among the output files. the output 
+//	log entry for the FSS run is produced by the FSS manager in sceFssMg.C.
+//
+//	The final checking is done by the sceIOLogMgr in the 'totalIn(..)'
+//	method. This method takes several arguments including an output file
+//	name and searches for that name by means of a long and ugly 
+//	'if-else if'-structure. If it is one of the files of interest (again,
+//	this just implies it has a node in the output file linked list), then
+//	a value is returned that should be the same as the number that is
+//	given to the 'printOutputLog(..)' method used for checking.
+//
+//	So where should you check if there is some reconciliation problem for
+//	the output files? Step through all of the above mentioned steps and
+//	make sure everything happens as expected. It may help to use the
+//	xldb (debugger) for keeping track of counters as you go through.
+//
+//
+//	* If you're planning on adding another output file that needs to be
+//	  reconciled with input files....
+//
+//	- First, make sure it is feasible to reconcile it. And then determine
+//	  which input files it must be checked against.
+//
+//	- If it is feasible and you know which input files to check, then 
+//	  make sure these input files are producing (or capable of producing)
+//	  input log entries.. ie. make sure SCE is counting the number of
+//	  records (good,bad,etc) of these input files, and that this input file
+//	  has an entry in the log manager's input file linked list.
+//	  (see the section on INPUT FILE LOGs above for more detail)
+//
+//	- Make sure to add the parameter name corresponding to this output
+//	  file's filename in the statically defined array in sceIOLog.C, so
+//	  that a node in the output file linked list is created for it.
+//
+//	- Go and add another 'else if (...)' block to the list of them in
+//	  the definition for the log manager method 'totalIn(..)' -- just 
+//	  try to follow the same sort of format as the others. Note: a return
+//	  value of -1 means that nothing should be printed by the output log
+//	  manager about the input files; otherwise a non-negative return value
+//	  translates to what the log manager will check against the number of
+//	  records(or whatever else it may be) that are written to the output
+//	  file.
+//
+//	- Finally, make sure that whatever class owns the method that produces
+//	  this output file has access to the IO log manager. If not, find some
+//	  way to give it access to it, otherwise this file will be unable to
+//	  conform with the others. Note: if the class has access to either the
+//	  scenario object or the flat file manager, then it will also have 
+//	  access to the IO log manager through means of the 'get()' methods.
+//
+//	- Call the 'printOutputLog(..)' method of the IO log manager following
+//	  the prescribed syntax.
+@
+
+
+1.4
+log
+@mand/opt capacity, new selective sets
+@
+text
+@a522 11
+#if 0
+  {
+    fileNode * tempNode = getNode ("partFile",IN_PARAM)
+    if (tempNode == 0) return 0;
+
+    long tempCount = tempNode->count;
+    outBuffer << "\t   " << tempCount << " good records from input file: "
+	      << tempNode->fileName << "\n";
+    return tempCount;
+  }
+#else
+d545 1
+a545 1
+#endif
+a648 20
+  else if (outParamName == "buildSchedFileName") {
+    fileNode * tempNode1 = getNode("partFile",IN_PARAM);
+    fileNode * tempNode2 = getNode("partCondFile",IN_PARAM);
+    long tempCount1 = 0;
+    long tempCount2 = 0;
+
+    if (tempNode1 != 0) {
+      tempCount1 = tempNode1->count;
+      outBuffer << "\t   " << tempCount1 << " good records from file: "
+		<< tempNode1->fileName << "\n";
+    }
+
+    if (tempNode2 != 0) {
+      tempCount2 = tempNode2->count;
+      outBuffer << "\t - " << tempCount2 << " good records from file: "
+		<< tempNode2->fileName << "\n";
+    }
+
+    return tempCount1-tempCount2;
+  }
+a734 1
+  "backlogResponseFileName",
+a737 3
+  "opExecutionVolumeFileName",
+  "FSSGenReportFileName",
+  "FSSSingReportFileName",
+a741 2
+  "geoSupplyByPdfFileName",
+  "buildSchedFileName", 
+@
+
+
+1.3
+log
+@commiting to main branch witutil, scenario, and sce code which removes RW
+@
+text
+@d500 18
+a517 5
+  else if (outParamName == "totalDemandReportFileName") {
+    fileNode * tempNode1 = getNode("partFile",IN_PARAM);
+    fileNode * tempNode2 = getNode("capFile",IN_PARAM);
+    long tempCount1 = 0;
+    long tempCount2 = 0;
+d519 2
+a520 14
+    if (tempNode1 != 0) {
+      tempCount1 = tempNode1->count;
+      outBuffer << "\t   " << tempCount1 << " good records from input file: "
+		<< tempNode1->fileName << "\n";
+    }
+
+    if (tempNode2 != 0) {
+      tempCount2 = tempNode2->count;
+      outBuffer << "\t + " << tempCount2 << " good records from input file: "
+		<< tempNode2->fileName << "\n";
+    }
+
+    return tempCount1+tempCount2;
+  }    
+d523 1
+d525 1
+a525 1
+    fileNode * tempNode = getNode ("partFile",IN_PARAM);
+d527 1
+d533 24
+@
+
+
+1.2
+log
+@Added include of mcl/src/mcl.h near top of include list to avoid
+compile time problems on AIX which did not occur on Windows.
+
+added
+  implement(RWGVector, float)
+  implement(RWGVector, int)
+to ipSce.C to avoid unresolved symbols at link time
+@
+text
+@d1 6
+d23 2
+a24 2
+    inFileHead_(NULL),
+    outFileHead_(NULL),
+d33 1
+a33 1
+  while (!inFileArray_[i].isNull()) {
+d39 1
+a39 1
+  while (!outFileArray_[i].isNull()) {
+d46 2
+a47 2
+LgFrSceIOLogMgr::LgFrSceIOLogMgr(const RWCString inputLogName,
+				 const RWCString outputLogName)
+d51 2
+a52 2
+    inFileHead_(NULL),
+    outFileHead_(NULL),
+d61 1
+a61 1
+  while (!inFileArray_[i].isNull()) {
+d67 1
+a67 1
+  while (!outFileArray_[i].isNull()) {
+d80 1
+a80 1
+  ofstream outLog(InputLogName_, ios::out | ios::app);
+d104 1
+a104 1
+    while (currNode != NULL) {
+d110 1
+a110 1
+      if (temp != NULL) { // just in case, make sure not null
+d118 1
+a118 1
+	temp->next = NULL;
+d127 1
+a127 1
+    while (currNode != NULL) {
+d133 1
+a133 1
+      if (temp != NULL) {
+d141 1
+a141 1
+	temp->next = NULL;
+d162 1
+a162 1
+LgFrSceIOLogMgr::addNode(const RWCString theName, whichName typeName)
+d165 1
+a165 1
+  if (newNode == NULL) {// out of memory
+d170 1
+a170 1
+  if (theName.isNull())
+d188 1
+a188 1
+  newNode->next = NULL;
+d191 1
+a191 1
+    if (inFileHead_ == NULL) {
+d200 1
+a200 1
+    if (outFileHead_ == NULL) {
+d212 1
+a212 1
+LgFrSceIOLogMgr::getNode(const RWCString theName, 
+d219 2
+a220 2
+  if (theName.isNull())
+    return NULL;
+d228 1
+a228 1
+    while (start != NULL) {
+d234 1
+a234 1
+    return NULL;
+d237 1
+a237 1
+    while (start != NULL) {
+d243 1
+a243 1
+    return NULL;
+d249 1
+a249 1
+LgFrSceIOLogMgr::updateNode(const RWCString fileName, 
+d261 1
+a261 1
+  if (temp1 != NULL) {
+d276 1
+a276 1
+  while(inFileHead_ != NULL) {
+d282 1
+a282 1
+  while(outFileHead_ != NULL) {
+d330 1
+a330 1
+		    const RWCString filein,    //records FROM "filein"
+d338 1
+a338 1
+    ofstream tout(InputLogName_, ios::out | ios::app);
+d366 1
+a366 1
+LgFrSceIOLogMgr::printOutputLog(const RWCString fileout,
+d371 1
+a371 1
+  ofstream tout(OutputLogName_,ios::out | ios::app);
+d415 1
+a415 1
+  ofstream temp(InputLogName_);
+d423 1
+a423 1
+  ofstream temp(OutputLogName_);
+d429 1
+a429 1
+// ...also takes the open ofstream buffer (output log file) which should
+d432 1
+a432 1
+LgFrSceIOLogMgr::totalInCount(const RWCString fileOut, ofstream& outBuffer)
+d440 1
+a440 1
+  if (temp == NULL) // this means no node for this name
+d446 2
+a447 2
+  // if there is a node with fileName == fileOut then get the parameter name
+  RWCString outParamName = temp->parameterName;
+d451 1
+a451 1
+  if (outParamName.isNull())
+d470 1
+a470 1
+    if (tempNode == NULL) return 0;
+d478 1
+a478 1
+    if (tempNode == NULL) return 0;
+d486 1
+a486 1
+    if (tempNode == NULL) return 0;
+d494 1
+a494 1
+    if (tempNode == NULL) return 0;
+d506 1
+a506 1
+    if (tempNode1 != NULL) {
+d512 1
+a512 1
+    if (tempNode2 != NULL) {
+d524 1
+a524 1
+    if (tempNode == NULL) return 0;
+d534 1
+a534 1
+    if (tempNode == NULL) return 0;
+d546 1
+a546 1
+    if (tempNode1 != NULL) {
+d552 1
+a552 1
+    if (tempNode2 != NULL) {
+d563 2
+a564 2
+    RWCString theScheme = setOfParameters_.getString("FSSScheme");
+    RWBoolean printFlag = setOfParameters_.getBool("FSSFlag");
+d576 1
+a576 1
+	if (tempNode != NULL) {
+d599 1
+a599 1
+	if (tempNode != NULL) {
+d611 1
+a611 1
+    if (tempNode == NULL) return 0;
+d619 1
+a619 1
+    if (tempNode == NULL) return 0;
+d627 1
+a627 1
+    if (tempNode == NULL) return 0;
+d639 1
+a639 1
+    if (tempNode1 != NULL) {
+d645 1
+a645 1
+    if (tempNode2 != NULL) {
+d683 1
+a683 1
+  while(!inFileArray_[i].isNull()) {
+d685 2
+a686 2
+    if (temp != NULL) {
+      //      if (!(temp->fileName).isNull())
+d691 2
+a692 2
+      RWCString currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.isNull())
+d701 1
+a701 1
+  while(!outFileArray_[i].isNull()) {
+d703 2
+a704 2
+    if (temp != NULL) {
+      //      if (!(temp->fileName).isNull())
+d709 2
+a710 2
+      RWCString currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.isNull())
+d720 1
+a720 1
+RWCString
+d736 1
+a736 1
+RWCString
+@
+
+
+1.2.2.1
+log
+@Roguewave is gone
+@
+text
+@a0 6
+
+// RW2STL - inserted:
+#include <string>
+#include <ostream.h>
+#include <scenario/src/RWToSTLHelpers.h>
+// End of RW2STL - inserted includes.
+d17 2
+a18 2
+    inFileHead_(0),
+    outFileHead_(0),
+d27 1
+a27 1
+  while (!inFileArray_[i].empty()) {
+d33 1
+a33 1
+  while (!outFileArray_[i].empty()) {
+d40 2
+a41 2
+LgFrSceIOLogMgr::LgFrSceIOLogMgr(const std::string inputLogName,
+				 const std::string outputLogName)
+d45 2
+a46 2
+    inFileHead_(0),
+    outFileHead_(0),
+d55 1
+a55 1
+  while (!inFileArray_[i].empty()) {
+d61 1
+a61 1
+  while (!outFileArray_[i].empty()) {
+d74 1
+a74 1
+  std::ofstream outLog(InputLogName_.c_str(), std::ofstream::app);
+d98 1
+a98 1
+    while (currNode != 0) {
+d104 1
+a104 1
+      if (temp != 0) { // just in case, make sure not null
+d112 1
+a112 1
+	temp->next = 0;
+d121 1
+a121 1
+    while (currNode != 0) {
+d127 1
+a127 1
+      if (temp != 0) {
+d135 1
+a135 1
+	temp->next = 0;
+d156 1
+a156 1
+LgFrSceIOLogMgr::addNode(const std::string theName, whichName typeName)
+d159 1
+a159 1
+  if (newNode == 0) {// out of memory
+d164 1
+a164 1
+  if (theName.empty())
+d182 1
+a182 1
+  newNode->next = 0;
+d185 1
+a185 1
+    if (inFileHead_ == 0) {
+d194 1
+a194 1
+    if (outFileHead_ == 0) {
+d206 1
+a206 1
+LgFrSceIOLogMgr::getNode(const std::string theName, 
+d213 2
+a214 2
+  if (theName.empty())
+    return 0;
+d222 1
+a222 1
+    while (start != 0) {
+d228 1
+a228 1
+    return 0;
+d231 1
+a231 1
+    while (start != 0) {
+d237 1
+a237 1
+    return 0;
+d243 1
+a243 1
+LgFrSceIOLogMgr::updateNode(const std::string fileName, 
+d255 1
+a255 1
+  if (temp1 != 0) {
+d270 1
+a270 1
+  while(inFileHead_ != 0) {
+d276 1
+a276 1
+  while(outFileHead_ != 0) {
+d324 1
+a324 1
+		    const std::string filein,    //records FROM "filein"
+d332 1
+a332 1
+    std::ofstream tout(InputLogName_.c_str(), ios::out | ios::app);
+d360 1
+a360 1
+LgFrSceIOLogMgr::printOutputLog(const std::string fileout,
+d365 1
+a365 1
+    std::ofstream tout(OutputLogName_.c_str(),std::ofstream::app);
+d409 1
+a409 1
+  std::ofstream temp(InputLogName_.c_str());
+d417 1
+a417 1
+  std::ofstream temp(OutputLogName_.c_str());
+d423 1
+a423 1
+// ...also takes the open std::ofstream buffer (output log file) which should
+d426 1
+a426 1
+LgFrSceIOLogMgr::totalInCount(const std::string fileOut, std::ofstream& outBuffer)
+d434 1
+a434 1
+  if (temp == 0) // this means no node for this name
+d440 2
+a441 2
+  // if there is a node with fileName.c_str() == fileOut.c_str() then get the parameter name
+  std::string outParamName = temp->parameterName;
+d445 1
+a445 1
+  if (outParamName.empty())
+d464 1
+a464 1
+    if (tempNode == 0) return 0;
+d472 1
+a472 1
+    if (tempNode == 0) return 0;
+d480 1
+a480 1
+    if (tempNode == 0) return 0;
+d488 1
+a488 1
+    if (tempNode == 0) return 0;
+d500 1
+a500 1
+    if (tempNode1 != 0) {
+d506 1
+a506 1
+    if (tempNode2 != 0) {
+d518 1
+a518 1
+    if (tempNode == 0) return 0;
+d528 1
+a528 1
+    if (tempNode == 0) return 0;
+d540 1
+a540 1
+    if (tempNode1 != 0) {
+d546 1
+a546 1
+    if (tempNode2 != 0) {
+d557 2
+a558 2
+    std::string theScheme = setOfParameters_.getString("FSSScheme");
+    bool printFlag = setOfParameters_.getBool("FSSFlag");
+d570 1
+a570 1
+	if (tempNode != 0) {
+d593 1
+a593 1
+	if (tempNode != 0) {
+d605 1
+a605 1
+    if (tempNode == 0) return 0;
+d613 1
+a613 1
+    if (tempNode == 0) return 0;
+d621 1
+a621 1
+    if (tempNode == 0) return 0;
+d633 1
+a633 1
+    if (tempNode1 != 0) {
+d639 1
+a639 1
+    if (tempNode2 != 0) {
+d677 1
+a677 1
+  while(!inFileArray_[i].empty()) {
+d679 2
+a680 2
+    if (temp != 0) {
+      //      if (!(temp->fileName).empty())
+d685 2
+a686 2
+      std::string currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.empty())
+d695 1
+a695 1
+  while(!outFileArray_[i].empty()) {
+d697 2
+a698 2
+    if (temp != 0) {
+      //      if (!(temp->fileName).empty())
+d703 2
+a704 2
+      std::string currFileName = setOfParameters_.getString(temp->fileName);
+      //if (!currFileName.empty())
+d714 1
+a714 1
+std::string
+d730 1
+a730 1
+std::string
+@
+
+
+1.2.2.2
+log
+@Went all the way to std::cout
+@
+text
+@d4 1
+a4 1
+#include <ostream>
+d338 1
+a338 1
+    std::ofstream tout(InputLogName_.c_str());//, ios::out | ios::app);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 1
+@
+
+
+1.1.1.1
+log
+@Import sce
+@
+text
+@@
