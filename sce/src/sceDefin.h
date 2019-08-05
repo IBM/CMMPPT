@@ -4,7 +4,7 @@
 #define LGFRSCEDEFINE_H
 #include <stdlib.h>
 
-#include <mcl/src/mdsPragma.h>
+//#include <mcl/src/mdsPragma.h>
 
 // USE THIS FOR MEMORY DEBUGGING
 // #ifndef ELIMINATE_OLD_MAIN

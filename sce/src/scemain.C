@@ -1,4 +1,4 @@
-#include <mcl/src/mdsPragma.h>
+//#include <mcl/src/mdsPragma.h>
 // RW2STL - inserted:
 #include <string>
 #include <ostream>
