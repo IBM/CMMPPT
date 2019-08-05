@@ -248,7 +248,7 @@ template <typename Elem>
       // Copy constructor function.
       //------------------------------------------------------------------------
 
-      inline WitPtrVecCompFtor (WitPtrVecCompFtor & theFtor):
+      inline WitPtrVecCompFtor (const WitPtrVecCompFtor & theFtor):
 
             myCompFunc_ (theFtor.myCompFunc_)
          {
