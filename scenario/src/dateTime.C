@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 const unsigned int secsPerDay = 86400; // quit saying "sex per day", it's "secs per day"
 // This is used to interpret the 2-digit values passed-in for years as being before or after 2000

@@ -11,6 +11,7 @@
 #endif
 
 #include <wit/src/wit.h>
+#include <string.h>
 
 // forward declarations
 class LgFrMultiPlantHelper;
