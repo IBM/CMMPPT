@@ -63,6 +63,9 @@ odbc_compiler_flag	= -DSCE_ODBC
 PTRPATHOPTS     = -ptr./ptrepository -ptr../../wit/$(platform)/ptrepository
 
 vpath %.$(cxx_suffix) $(src_dir)
+vpath %.h             $(src_dir)
+vpath %.y             $(src_dir)
+vpath %.l             $(src_dir)
 
 libsce.a:      $(lib_objects)
 	$(AR) $(ds_ar_update_flags) $@ $^
@@ -76,8 +79,8 @@ libsce.a:      $(lib_objects)
 #	$(WIT_ROOT_DIR)/$(platform)/libwitnl.a 
 
 typical_scenario_libraries = \
-	$(SCENARIO_ROOT_DIR)/$(platform)/libscen.a \
-	$(WIT_ROOT_DIR)/$(platform)/libwit.a \
+	$(WIT_ROOT_DIR)/../scenario/$(platform)/libscen.a \
+	$(WIT_ROOT_DIR)/../wit/$(platform)/libwit.a \
 	$(WIT_ROOT_DIR)/../mcl/$(platform)/libmcl.a
 
 
