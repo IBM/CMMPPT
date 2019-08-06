@@ -9,6 +9,7 @@
 #include <iosfwd>
 #include <ostream>
 #include <assert.h>
+#include <string.h>
 
 // General std::string functions previously done in RWCString
 // Note that these may not work for wide-character strings
