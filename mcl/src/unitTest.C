@@ -794,11 +794,7 @@ const char * finalTextList[] =
    "TST0544I Has Substitute Bom Entries In Effect?\n"
    "         FALSE TRUE  FALSE\n",
    "TST0098I Number of Capacity Parts:                   412\n",
-#if defined(THREE_DIGIT_EXPONENT)
-   "TST0073S Float Value was 3.46e+003. "
-#else
    "TST0073S Float Value was  3.46e+03. "
-#endif
             "Attribute FloatAttribute is out of range.\n",
      "TST0012S Value specified was 123. "
      "Attribute This is a test       is out of"
