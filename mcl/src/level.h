@@ -1,15 +1,7 @@
 //==============================================================================
-// IBM Confidential
-//
-// OCO Source Materials
-//
 // Message Class Library
 //
 // (C) Copyright IBM Corp. 1997, 2005  All Rights Reserved
-//
-// The Source code for this program is not published or otherwise divested of
-// its trade secrets, irrespective of what has been deposited with the U. S.
-// Copyright office.
 //==============================================================================
 
 #ifndef mcl_level_h

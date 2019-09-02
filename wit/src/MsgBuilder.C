@@ -1,15 +1,7 @@
 //==============================================================================
-// IBM Confidential
-//
-// OCO Source Materials
-//
-// Watson Implosion Technology
+// Constrained Materials Management and Production Planning Tool
 //
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
-//
-// The Source code for this program is not published or otherwise divested of
-// its trade secrets, irrespective of what has been deposited with the U. S.
-// Copyright office.
 //==============================================================================
 
 //------------------------------------------------------------------------------
@@ -406,7 +398,7 @@ void WitMsgBuilder::buildMsgs ()
       97,
       info_,
       "%1$s\n"
-      "Watson Implosion Technology\n"
+      "Constrained Materials Management and Production Planning Tool\n"
       "Release         %2$s\n"
       "Build Date:     %3$s\n"
       "Build Type:     %4$s\n"
