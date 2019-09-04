@@ -1,15 +1,7 @@
 //==============================================================================
-// IBM Confidential
-//
-// OCO Source Materials
-//
-// Watson Implosion Technology
+// Constrained Materials Management and Production Planning Tool
 //
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
-//
-// The Source code for this program is not published or otherwise divested of
-// its trade secrets, irrespective of what has been deposited with the U. S.
-// Copyright office.
 //==============================================================================
 
 //------------------------------------------------------------------------------
@@ -100,17 +92,17 @@
 
 const char * const WitSession::proprietaryStmt_ =
    "\n"
-   "=======================================================\n"
+   "=============================================================\n"
    "Licensed Materials - Property of IBM\n"
    "\n"
-   "Watson Implosion Technology\n"
+   "Constrained Materials Management and Production Planning Tool\n"
    "\n"
    "(C) Copyright IBM Corp. 1993, 2012  All Rights Reserved\n"
    "\n"
    "US Government Users Restricted Rights -\n"
    "Use, duplication or disclosure restricted by\n"
    "GSA ADP Schedule Contract with IBM Corp.\n"
-   "=======================================================\n";
+   "=============================================================\n";
 
 //------------------------------------------------------------------------------
 
@@ -146,7 +138,7 @@ void WitSession::writeHeading (FILE * outFile)
    {
    fprintf (outFile,
       "%s\n"
-      "Watson Implosion Technology\n"
+      "Constrained Materials Management and Production Planning Tool\n"
       "Release         %s\n"
       "Build Date:     %s\n"
       "Build Type:     %s\n"
