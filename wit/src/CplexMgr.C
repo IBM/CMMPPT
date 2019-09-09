@@ -189,22 +189,12 @@ void WitCplexMgr::setUpCplex ()
 void WitCplexMgr::setUpLogFile ()
    {
    const char * theFileName;
-   CPXFILEptr   theCpxFile;
 
    theFileName = myOptComp ()->solverLogFileName ().myCstring ();
 
-   theCpxFile  = CPXfopen (theFileName, "w");
+   myErrCode_  = CPXsetlogfilename (myCpxEnv_, theFileName, "w");
 
-   if (theCpxFile == NULL)
-      {
-      myMsgFac () ("cpxfopenSmsg", theFileName, "w");
-      }
-
-   //...........................................................................
-
-   myErrCode_ = CPXsetlogfile (myCpxEnv_, theCpxFile);
-
-   checkErrCode ("CPXsetlogfile");
+   checkErrCode ("CPXsetlogfilename");
    }
 
 //------------------------------------------------------------------------------
@@ -230,23 +220,9 @@ void WitCplexMgr::shutDownCplex ()
 
 void WitCplexMgr::shutDownLogFile ()
    {
-   CPXFILEptr theCpxFile;
+   myErrCode_  = CPXsetlogfilename (myCpxEnv_, NULL, "");
 
-   myErrCode_ = CPXgetlogfile (myCpxEnv_, & theCpxFile);
-
-   checkErrCode ("CPXgetlogfile");
-
-   //...........................................................................
-
-   myErrCode_ = CPXsetlogfile (myCpxEnv_, NULL);
-
-   checkErrCode ("CPXsetlogfile");
-
-   //...........................................................................
-
-   myErrCode_ = CPXfclose (theCpxFile);
-
-   checkErrCode ("CPXfclose");
+   checkErrCode ("CPXsetlogfilename");
    }
 
 //------------------------------------------------------------------------------
