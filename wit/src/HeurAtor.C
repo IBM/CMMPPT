@@ -169,7 +169,7 @@ WitHeurAtor::WitHeurAtor (
 
 //------------------------------------------------------------------------------
 
-WitHeurAtor::~WitHeurAtor ()
+WitHeurAtor::~WitHeurAtor () noexcept (false)
    {
    if (myGlobalComp ()->modHeurAlloc ())
       myHeurModifier ()->checkFeasibility ();
