@@ -140,7 +140,7 @@ void WitHeurAllMgr::reset ()
    if (not active ())
       return;
 
-   delete myHeurAtor_;
+   WitHeurAtor::deleteInstance (myHeurAtor_);
 
    myHeurAtor_ = NULL;
 

@@ -39,11 +39,17 @@ class WitHeurAtor: public WitProbAssoc
          // forOpt == true indicates heur allocation is for opt implosion.
 
       //------------------------------------------------------------------------
-      // Destructor function.
+      // Static public member functions.
       //------------------------------------------------------------------------
 
-      ~WitHeurAtor () noexcept (false);
-
+      static void deleteInstance (WitHeurAtor * theHeurAtor);
+         //
+         // Shuts down theHeurAtor and then deletes it.
+         // This function is needed in order to avoid shutting down from within the destructor.
+         // Shutting down can potentially trigger a severe error, which causes the message
+         // facility to throw an exception. Throwing an exception during the execution of a
+         // destructor is considered dangerous.
+      
       //------------------------------------------------------------------------
       // Other public member functions.
       //------------------------------------------------------------------------
@@ -139,7 +145,15 @@ class WitHeurAtor: public WitProbAssoc
    private:
 
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Private destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitHeurAtor ();
+         //
+         // Declared private: deleteInstance is to be called instead.
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitHeurAtor);
@@ -501,6 +515,11 @@ class WitHeurAtor: public WitProbAssoc
          // Returns the execution period to be used when exploding through 
          // theBopEnt in expPer.
 
+      void shutDown ();
+         //
+         // Shuts down this Heurator.
+         // To be called just before calling the destructor.
+      
       //------------------------------------------------------------------------
 
       accessNonNull (WitHeurCritList *, myHeurCritList)

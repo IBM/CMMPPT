@@ -169,37 +169,11 @@ WitHeurAtor::WitHeurAtor (
 
 //------------------------------------------------------------------------------
 
-WitHeurAtor::~WitHeurAtor () noexcept (false)
+void WitHeurAtor::deleteInstance (WitHeurAtor * theHeurAtor)
    {
-   if (myGlobalComp ()->modHeurAlloc ())
-      myHeurModifier ()->checkFeasibility ();
-
-   if (devMode ())
-      {
-      myMsgFac ()    ("nMaxCommitsMsg", nMaxCommits_);
+   theHeurAtor->shutDown ();
       
-      if (multiSel ())
-         myMsgFac () ("nSelCommitsMsg", nSelCommits_);
-
-      myMsgFac () ("nCommsMsg",
-         nBsearches_,
-         nTempComms_,
-         nPermComms_,
-         nComms_);
-      }
-
-   if (perfPegging_)
-      myPegger_->shutDownPeggedHeurAlloc ();
-
-   delete tempCommRepos_;
-   delete mySelector_;
-   delete myReqSched_;
-   delete myHeurModifier_;
-   delete myPclBldr_;
-   delete myHeurCritList_;
-   delete myAvailSched_;
-
-   myMsgFac () ("heurAllInactiveMsg");
+   delete theHeurAtor;
    }
 
 //------------------------------------------------------------------------------
@@ -394,6 +368,12 @@ void WitHeurAtor::saveSubVol (WitSubEntry * theSub, WitPeriod thePer)
 void WitHeurAtor::printAvailSched ()
    {
    myAvailSched_->print ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitHeurAtor::~WitHeurAtor ()
+   {
    }
 
 //------------------------------------------------------------------------------
@@ -1943,4 +1923,39 @@ WitPeriod WitHeurAtor::execPerFor (WitBopEntry * theBopEnt, WitPeriod expPer)
       multiExec_?
          myMeMgr ()->selExecPer (theBopEnt, expPer):
          theBopEnt ->expExecPeriod ()[expPer];
+   }
+
+//------------------------------------------------------------------------------
+
+void WitHeurAtor::shutDown ()
+   {
+   if (myGlobalComp ()->modHeurAlloc ())
+      myHeurModifier ()->checkFeasibility ();
+
+   if (devMode ())
+      {
+      myMsgFac ()    ("nMaxCommitsMsg", nMaxCommits_);
+      
+      if (multiSel ())
+         myMsgFac () ("nSelCommitsMsg", nSelCommits_);
+
+      myMsgFac () ("nCommsMsg",
+         nBsearches_,
+         nTempComms_,
+         nPermComms_,
+         nComms_);
+      }
+
+   if (perfPegging_)
+      myPegger_->shutDownPeggedHeurAlloc ();
+
+   delete tempCommRepos_;
+   delete mySelector_;
+   delete myReqSched_;
+   delete myHeurModifier_;
+   delete myPclBldr_;
+   delete myHeurCritList_;
+   delete myAvailSched_;
+
+   myMsgFac () ("heurAllInactiveMsg");
    }
