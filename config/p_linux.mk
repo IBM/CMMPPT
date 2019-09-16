@@ -91,4 +91,4 @@ ds_link_std_flags       =
 # executable.
 #-------------------------------------------------------------------------------
 
-ds_posix_threads_flag   = -pthread
+ds_posix_threads_flag   = -pthread -ldl

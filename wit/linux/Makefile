@@ -24,7 +24,7 @@ OUTPUT_OPTION =
 # See the comment in appl.mk for the meaning of this macro.
 #------------------------------------------------------------------------------
 
-cplex_lib_subdir = x86_sles10_4.1/static_pic
+cplex_lib_subdir = x86-64_linux/static_pic
 
 #------------------------------------------------------------------------------
 

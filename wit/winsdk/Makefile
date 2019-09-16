@@ -16,7 +16,7 @@ include ../../config/p_$(platform).mk
 # See the comment in appl.mk for the meaning of this macro.
 #------------------------------------------------------------------------------
 
-cplex_lib_subdir = x86_windows_vs2010/stat_mta
+cplex_lib_subdir = x64_windows_vs2017/stat_mda
 
 #------------------------------------------------------------------------------
 
@@ -54,7 +54,7 @@ BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexMgr.obj wit.obj
 
 ifneq ($(WIT_CPLEX_HOME),)
 
-   cplex_lib = $(cplex_lib_dir)/cplex124.lib
+   cplex_lib = $(cplex_lib_dir)/cplex1290.lib
 
 else
 

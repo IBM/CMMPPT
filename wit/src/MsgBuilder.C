@@ -7570,20 +7570,6 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "cpxfopenSmsg",
-      1032,
-      severe_,
-      "An error was encountered by the CPLEX function \"CPXfopen\" when "
-      "attempting to open a file.\n\n"
-      "File name:         \"%1$s\"\n"
-      "File opening mode: \"%2$s\"");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "unexpCpxStatSmsg",
       1033,
       severe_,

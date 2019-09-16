@@ -25,7 +25,7 @@
 //   Throw a WitException, or
 //   Return execution to the application program.
 //
-// Implemented in ApiMgr.C.
+// Implemented in MsgFac.C.
 //------------------------------------------------------------------------------
 
 class WitAbortApiExc

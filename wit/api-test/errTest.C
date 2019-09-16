@@ -819,8 +819,8 @@ void testCase15 ()
    WitRun * theWitRunB;
    char *   argv[2];
 
-   argv[0] = "";
-   argv[1] = "";
+   argv[0] = const_cast <char *> ("");
+   argv[1] = const_cast <char *> ("");
 
    std::cout
       << "Test of WIT's behavior when witExecStandAlone is called"
@@ -1897,10 +1897,10 @@ void testCase58 ()
 void testCase59 ()
    {
    WitRun * theWitRun;
-   char *   thePartNames  [] = {"A"};
-   char *   theDemandNames[] = {"C"};
-   int      shipPers      [] = {1};
-   float    desIncVols    [] = {7};
+   const char * thePartNames  [] = {"A"};
+   const char * theDemandNames[] = {"C"};
+   int      shipPers          [] = {1};
+   float    desIncVols        [] = {7};
    float *  incVols;
 
    std::cout
