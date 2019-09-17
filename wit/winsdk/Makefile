@@ -30,6 +30,19 @@ include ../src/appl.mk
 exes = wit.exe
 
 #-------------------------------------------------------------------------------
+# Special rule to compile witLexer.C:
+#
+# Macro:
+#    comp_witlexer_flags:
+#       The special compilation flags for compiling witLexer.C.
+#-------------------------------------------------------------------------------
+
+comp_witlexer_flags = -DYY_NO_UNISTD_H -wd4005
+
+witLexer.obj:	witLexer.C
+			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_witlexer_flags)
+
+#-------------------------------------------------------------------------------
 # BuildDate.C contains the implementation of a function that returns the date
 # on which the WIT library was built. Consequently, it must be recompiled
 # whenever any aspect of WIT has been modified, and so its object file is

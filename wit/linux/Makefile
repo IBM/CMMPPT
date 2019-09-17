@@ -74,10 +74,11 @@ endif
 ifeq ($(WIT_GEN_PARSER),YES)
 
 ../src/witLexer.C: ../src/witLexer.l ../src/ytab.h
-	flex ../src/witLexer.l
-	sed -e /daffy/d -e /#include\ \<unistd\.h\>/d  <lex.yy.c >witLexer.C
-	mv -f witLexer.C ../src/witLexer.C
-	rm lex.yy.c
+#	flex ../src/witLexer.l
+	flex -o ../src/witLexer.C ../src/witLexer.l
+#	sed -e /daffy/d -e /#include\ \<unistd\.h\>/d  <lex.yy.c >witLexer.C
+#	mv -f witLexer.C ../src/witLexer.C
+#	rm lex.yy.c
 
 endif
 

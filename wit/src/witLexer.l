@@ -42,6 +42,12 @@
 #include <WitRun.h>
 #include <MsgFac.h>
 
+#if _WIN32
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#endif
+
 //------------------------------------------------------------------------------
 // The following code permits input lines of length <= 1000.
 //------------------------------------------------------------------------------

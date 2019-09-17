@@ -16,7 +16,7 @@
 
 #include <string>
 
-extern "C" int yyparse();
+//extern "C" int yyparse();
 
 //------------------------------------------------------------------------------
 // class Parser
