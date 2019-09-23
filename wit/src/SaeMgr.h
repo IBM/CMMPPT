@@ -31,11 +31,9 @@ class WitSaeMgr
       // Public member functions.
       //------------------------------------------------------------------------
 
-      static void execute (WitRun * theWitRun, int argc, char * argv[]);
+      static void execute (WitRun * theWitRun, const char * theFileName);
          //
-         // Uses theWitRun to perform the main actions of the WIT stand-alone
-         // executable.
-         // argc and argv are to be passed in from the main program.
+         // theFileName is the parameter file name, if any.
 
       inline static bool standAloneMode ()
          {
@@ -52,9 +50,9 @@ class WitSaeMgr
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitSaeMgr (WitRun *, int argc, char * argv[]);
+      WitSaeMgr (WitRun *, const char * theFileName);
          //
-         // argc and argv are to be passed in from the main program.
+         // theFileName is the parameter file name, if any.
 
       //------------------------------------------------------------------------
       // Destructor function.

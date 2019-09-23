@@ -79,13 +79,13 @@ inline bool WitSaeMgr::boolParamVal (const char * paramName)
 
 //------------------------------------------------------------------------------
 
-void WitSaeMgr::execute (WitRun * theWitRun, int argc, char * argv[])
+void WitSaeMgr::execute (WitRun * theWitRun, const char * theFileName)
    {
    stronglyAssert (not standAloneMode_);
 
    standAloneMode_ = true;
 
-   WitSaeMgr theSaeMgr (theWitRun, argc, argv);
+   WitSaeMgr theSaeMgr (theWitRun, theFileName);
 
    theSaeMgr.execute ();
 
@@ -96,7 +96,7 @@ void WitSaeMgr::execute (WitRun * theWitRun, int argc, char * argv[])
 
 //------------------------------------------------------------------------------
 
-WitSaeMgr::WitSaeMgr (WitRun * theWitRun, int argc, char * argv[]):
+WitSaeMgr::WitSaeMgr (WitRun * theWitRun, const char * theFileName):
 
       myWitRun_   (theWitRun),
       mySession_  (theWitRun->mySession ()),
@@ -107,8 +107,9 @@ WitSaeMgr::WitSaeMgr (WitRun * theWitRun, int argc, char * argv[]):
    {
    myTimer_    = new WitTimer (myMsgFac_);
 
-   myParamMgr_ = new WitParamMgr (myWitRun_, argc, argv);
+   myParamMgr_ = new WitParamMgr (myWitRun_, theFileName);
    }
+
 
 //------------------------------------------------------------------------------
 

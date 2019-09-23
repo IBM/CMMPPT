@@ -754,7 +754,7 @@ void WitRun::witExhaustMemory ()
 
 //------------------------------------------------------------------------------
 
-void WitRun::witExecStandAlone (int argc, char * argv[])
+void WitRun::witExecStandAlone (const char * theFileName)
    {
    myApiMgr_->skipCallMsg       ();
    myApiMgr_->allowPreInit      ();
@@ -767,7 +767,9 @@ void WitRun::witExecStandAlone (int argc, char * argv[])
    if (mySession_->active ())
       forbidStochMode ();
 
-   WitSaeMgr::execute (this, argc, argv);
+   forbidNullArg (theFileName, "theFileName");
+
+   WitSaeMgr::execute (this, theFileName);
    }
 
 //------------------------------------------------------------------------------

@@ -21,13 +21,17 @@
 
 int main (int argc, char * argv[])
    {
-   WitRun * theWitRun;
+   WitRun *     theWitRun;
+   const char * theFileName;
+
+   theFileName = (argc > 1)? argv[1]: "";
 
    witNewRun       (& theWitRun);
 
-   witExecStandAlone (theWitRun, argc, argv);
+   witExecStandAlone (theWitRun, theFileName);
 
    witDeleteRun      (theWitRun);
 
    exit (0);
    }
+

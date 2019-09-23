@@ -171,11 +171,10 @@ class WitRun
 
       void witExhaustMemory ();
 
-      void witExecStandAlone (int argc, char * argv[]);
+      void witExecStandAlone (const char * theFileName);
          //
          // Performs main actions of the WIT stand-alone executable.
-         // argc and argv are to be the same as the arguments passed to the main
-         // program.
+         // theFileName is the parameter file name, if any.
 
       void witInterpretDevCmd (const char * theDevCmd);
          //

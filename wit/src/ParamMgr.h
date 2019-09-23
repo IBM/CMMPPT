@@ -30,9 +30,9 @@ class WitParamMgr
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitParamMgr (WitRun * theWitRun, int argc, char * argv[]);
+      WitParamMgr (WitRun * theWitRun, const char * theFileName);
          //
-         // argc and argv give the command line arguments from main program.
+         // theFileName is the parameter file name, if any.
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -76,11 +76,10 @@ class WitParamMgr
 
       noCopyCtorAssign (WitParamMgr);
 
-      const char * compParamIFName (int argc, char * argv[]);
+      const char * compParamIFName (const char * theFileName);
          //
          // Computes and returns the input file name.
-         // argc and argv give the command line arguments from the main
-         // program.
+         // theFileName is the parameter file name, if any.
 
       void buildNonDevParams ();
          //

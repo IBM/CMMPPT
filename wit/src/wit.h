@@ -3812,9 +3812,8 @@ witReturnCode witWriteProdSched (
 /*----------------------------------------------------------------------------*/
 
 witReturnCode witExecStandAlone (
-   WitRun * const theWitRun,
-   int            argc,
-   char *         argv[]);
+   WitRun * const     theWitRun,
+   const char * const theFileName);
 
 witReturnCode witExhaustMemory (
    WitRun * const theWitRun);

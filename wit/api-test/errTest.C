@@ -817,10 +817,6 @@ void testCase15 ()
    {
    WitRun * theWitRunA;
    WitRun * theWitRunB;
-   char *   argv[2];
-
-   argv[0] = const_cast <char *> ("");
-   argv[1] = const_cast <char *> ("");
 
    std::cout
       << "Test of WIT's behavior when witExecStandAlone is called"
@@ -833,7 +829,7 @@ void testCase15 ()
    witDeleteRun          (theWitRunA);
 
    makeNewWitRun         (theWitRunB);
-   witExecStandAlone     (theWitRunB, 2, argv);
+   witExecStandAlone     (theWitRunB, "");
 
    terminationExpected ("witExecStandAlone");
    }

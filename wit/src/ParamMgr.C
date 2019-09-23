@@ -48,12 +48,12 @@ inline WitProblem * WitParamMgr::myProblem ()
 
 //------------------------------------------------------------------------------
 
-WitParamMgr::WitParamMgr (WitRun * theWitRun, int argc, char * argv[]):
+WitParamMgr::WitParamMgr (WitRun * theWitRun, const char * theFileName):
 
       myWitRun_         (theWitRun),
       myMsgFac_         (theWitRun->myMsgFac ()),
 
-      fileName_         (compParamIFName (argc, argv)),
+      fileName_         (compParamIFName (theFileName)),
 
              allParams_ (),
        allNonDevParams_ (),
@@ -183,12 +183,12 @@ bool WitParamMgr::boolParamVal (const char * paramName)
 
 //------------------------------------------------------------------------------
 
-const char * WitParamMgr::compParamIFName (int argc, char * argv[])
+const char * WitParamMgr::compParamIFName (const char * theFileName)
    {
-   if (argc > 1)
-      return argv[1];
-   else
-      return "run.params";
+   return
+      isNullCstring (theFileName)?
+         "run.params":
+         theFileName;
    }
 
 //------------------------------------------------------------------------------

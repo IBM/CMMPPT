@@ -2527,14 +2527,10 @@ int main ()
 
 void testStandAlone ()
    {
-   char *   argv[2];
    WitRun * theWitRun;
 
-   argv[0] = "";
-   argv[1] = "diner.params";
-
    witNewRun       (& theWitRun);
-   witExecStandAlone (theWitRun, 2, argv);
+   witExecStandAlone (theWitRun, "diner.params");
    witDeleteRun      (theWitRun);
    }
 
