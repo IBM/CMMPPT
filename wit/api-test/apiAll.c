@@ -1723,7 +1723,7 @@ int main ()
       assert (! accelerated);
       assert (! accAfterOptImp);
 
-      prtRemove ("solver-alt.log");
+      remove ("solver-alt.log");
       }
    }
 
@@ -2394,7 +2394,7 @@ int main ()
       {
       witOptImplode (theObj1Run);
 
-      prtRemove ("solver.log");
+      remove ("solver.log");
       }
    else
       witHeurImplode (theObj1Run);
@@ -2438,7 +2438,7 @@ int main ()
       assert (fabs (cplexMipRelGap)    < 1.0e-6);
       assert (fabs (cplexMipRelGapDbl) < 1.0e-6);
 
-      prtRemove                       ("solver.log");
+      remove ("solver.log");
 
       witWriteExecSched   (theObj1Run, WitSTDOUT,   WitBSV);
       witWriteShipSched   (theObj1Run, WitSTDOUT,   WitBSV);
@@ -3973,7 +3973,7 @@ void testDeletion ()
       {
       witOptImplode (theWitRun);
 
-      prtRemove ("solver.log");
+      remove ("solver.log");
       }
 
    witWriteExecSched (theWitRun, WitSTDOUT, WitBSV);
@@ -6049,14 +6049,14 @@ void optImpB2 (WitRun * theWitRunB)
 void prtFiles ()
    {
    prtRemove ("wit-a.log");
-   prtRemove ("solver-a.log");
    prtRemove ("exec-a1.out");
    prtRemove ("exec-a2.out");
+   remove    ("solver-a.log");
 
    prtRemove ("wit-b.log");
-   prtRemove ("solver-b.log");
    prtRemove ("exec-b1.out");
    prtRemove ("exec-b2.out");
+   remove    ("solver-b.log");
    }
 
 /*----------------------------------------------------------------------------*/

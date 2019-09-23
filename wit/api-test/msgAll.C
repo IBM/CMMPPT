@@ -32,7 +32,6 @@ float *        vector            (float);
 float *        vector            (float, float, float, float);
 int *          vector            (int, int, int, int);
 const char * * vector            (const char *);
-void           prtRemove         (const char *);
 
 //------------------------------------------------------------------------------
 
@@ -254,7 +253,7 @@ void testMainMsgs (WitRun * theWitRun)
 
    witOptImplode             (theWitRun);
 
-   prtRemove                 ("solver.log");
+   remove                    ("solver.log");
 
    witMrp                    (theWitRun);
 
@@ -283,7 +282,7 @@ void testMainMsgs (WitRun * theWitRun)
 
    witSetAccAfterOptImp      (theWitRun, WitFALSE);
 
-   prtRemove                 ("solver.log");
+   remove                    ("solver.log");
 
    witSetAccAfterOptImp      (theWitRun, WitTRUE);
 
@@ -296,7 +295,7 @@ void testMainMsgs (WitRun * theWitRun)
    witEvalObjectives         (theWitRun);
 
    witSetAccAfterOptImp      (theWitRun, WitFALSE);
-   prtRemove                 ("solver.log");
+   remove                    ("solver.log");
 
    witSetComputeCriticalList (theWitRun,        WitFALSE);
    witSetMipMode             (theWitRun,        WitTRUE);
@@ -673,29 +672,4 @@ const char * * vector (const char * theString)
    theStrVec[3] = theString;
 
    return theStrVec;
-   }
-
-//------------------------------------------------------------------------------
-// prtRemove
-//------------------------------------------------------------------------------
-
-void prtRemove (const char * filename)
-   {
-   char cmd[100];
-
-   printf (
-      "\n"
-      "File \"%s\":\n"
-      "\n",
-      filename);
-
-   fflush (stdout);
-
-   strcpy (cmd, "cat ");
-
-   strcat (cmd, filename);
-
-   system (cmd);
-
-   remove (filename);
    }
