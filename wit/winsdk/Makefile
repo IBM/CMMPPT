@@ -1908,10 +1908,12 @@ subApi.obj: ../../config/dummy_headers/stdlib.h
 wit.obj: ../src/wit.h ../../config/dummy_headers/stdio.h
 wit.obj: ../../config/dummy_headers/limits.h
 wit.obj: ../../config/dummy_headers/stdlib.h
-witLexer.obj: ../../config/dummy_headers/stdio.h ../src/ytab.h
+witLexer.obj: ../../config/dummy_headers/stdio.h
+witLexer.obj: ../../config/dummy_headers/string.h
+witLexer.obj: ../../config/dummy_headers/errno.h
+witLexer.obj: ../../config/dummy_headers/stdlib.h ../src/ytab.h
 witLexer.obj: ../src/Parlex.h ../src/Str.h ../src/Vector.h ../src/Util.h
 witLexer.obj: ../src/typedefs.h ../src/macs.h
-witLexer.obj: ../../config/dummy_headers/string.h
 witLexer.obj: ../../config/dummy_headers/math.h ../src/SymTable.h
 witLexer.obj: ../../config/dummy_headers/string
 witLexer.obj: ../../config/dummy_headers/map ../src/VecBS.h
@@ -1921,7 +1923,8 @@ witLexer.obj: ../src/TVec.h ../src/Parser.h
 witLexer.obj: ../../config/dummy_headers/iostream ../src/ApiMgr.h
 witLexer.obj: ../src/wit.h ../../config/dummy_headers/limits.h
 witLexer.obj: ../src/WitRun.h ../src/Session.h ../src/MsgFac.h
-witLexer.obj: ../src/MsgArg.h
+witLexer.obj: ../src/MsgArg.h ../../config/dummy_headers/io.h
+witLexer.obj: ../../config/dummy_headers/unistd.h
 witParse.obj: ../src/Parser.h ../src/Parlex.h ../src/Str.h ../src/Vector.h
 witParse.obj: ../src/Util.h ../src/typedefs.h ../src/macs.h
 witParse.obj: ../../config/dummy_headers/stdio.h
@@ -1935,3 +1938,4 @@ witParse.obj: ../src/InputID.h ../src/VecBS.h
 witParse.obj: ../../config/dummy_headers/vector ../src/Entity.h
 witParse.obj: ../src/MsgFac.h ../src/MsgArg.h
 witParse.obj: ../../config/dummy_headers/errno.h
+witParse.obj: ../../config/dummy_headers/stddef.h
