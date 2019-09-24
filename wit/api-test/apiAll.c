@@ -1650,8 +1650,8 @@ int main ()
 
    if (cplexEmbedded)
       witOptImplode (theWitRun);
-   else
-      witHeurImplode (theWitRun);
+
+   witHeurImplode (theWitRun);
 
    witWriteProdSched( theWitRun, WitSTDOUT, WitBSV );
    witWriteShipSched( theWitRun, WitSTDOUT, WitCSV );
