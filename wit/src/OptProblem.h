@@ -12,7 +12,7 @@
 //
 // Contains the declaration of class OptProblem.
 // Contains the declaration of NonClass functions for working with class
-//                             CplexMgr.
+//                             CplexIf.
 //------------------------------------------------------------------------------
 
 #include <List.h>
@@ -288,9 +288,9 @@ class WitOptProblem: public WitProbAssoc
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitCplexMgr * myCplexMgr_;
+      WitCplexIf * myCplexIf_;
          //
-         // The CplexMgr owned by this OptProblem, when there is one;
+         // The CplexIf owned by this OptProblem, when there is one;
          // otherwise, NULL.
          // Always NULL, if CPLEX is not embedded.
 

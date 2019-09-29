@@ -49,7 +49,7 @@ witLexer.obj:	witLexer.C
 # considered to be dependent on all other aspects of WIT:
 #-------------------------------------------------------------------------------
 
-BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexMgr.obj wit.obj
+BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexIf.obj wit.obj
 
 #------------------------------------------------------------------------------
 # cplex_lib
@@ -79,7 +79,7 @@ endif
 # Rule for building the WIT static library:
 #------------------------------------------------------------------------------
 
-special_wit_objects = $(mcl_client_objects) CplexMgr.obj BuildDate.obj
+special_wit_objects = $(mcl_client_objects) CplexIf.obj BuildDate.obj
 
 mcl_lib             = ../../mcl/winsdk/mcl.lib
 
@@ -294,15 +294,15 @@ Component.obj: ../src/Schedule.h ../src/CompMgr.h ../src/BoundSet.h
 Component.obj: ../src/OrigMrp.h ../src/MrpExp.h ../src/StochImpMgr.h
 Component.obj: ../src/IVRealArg.h ../src/RealArg.h ../src/MsgFrag.h
 Component.obj: ../src/MsgFac.h ../src/MsgArg.h
-CplexMgr.obj: ../src/CplexMgrNC.h ../src/Util.h ../src/typedefs.h
-CplexMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
-CplexMgr.obj: ../../config/dummy_headers/string.h
-CplexMgr.obj: ../../config/dummy_headers/math.h ../src/CplexMgr.h
-CplexMgr.obj: ../src/OptProblem.h ../src/List.h
-CplexMgr.obj: ../../config/dummy_headers/list ../src/ObjStack.h
-CplexMgr.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h ../src/Vector.h
-CplexMgr.obj: ../../config/dummy_headers/algorithm ../src/Assoc.h
-CplexMgr.obj: ../src/Problem.h ../src/TVec.h
+CplexIf.obj: ../src/CplexIfNC.h ../src/Util.h ../src/typedefs.h ../src/macs.h
+CplexIf.obj: ../../config/dummy_headers/stdio.h
+CplexIf.obj: ../../config/dummy_headers/string.h
+CplexIf.obj: ../../config/dummy_headers/math.h ../src/CplexIf.h
+CplexIf.obj: ../src/OptProblem.h ../src/List.h
+CplexIf.obj: ../../config/dummy_headers/list ../src/ObjStack.h ../src/Stack.h
+CplexIf.obj: ../src/Link.h ../src/PtrVec.h ../src/Vector.h
+CplexIf.obj: ../../config/dummy_headers/algorithm ../src/Assoc.h
+CplexIf.obj: ../src/Problem.h ../src/TVec.h
 CpxParSpec.obj: ../src/CpxParSpecMgr.h ../src/Assoc.h ../src/Problem.h
 CpxParSpec.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 CpxParSpec.obj: ../../config/dummy_headers/stdio.h
@@ -870,7 +870,7 @@ OptComp.obj: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 OptComp.obj: ../src/PairStack.h ../src/Stack.h ../src/StochImpMgr.h
 OptComp.obj: ../src/Material.h ../src/Operation.h ../src/SubEntry.h
 OptComp.obj: ../src/BomEntry.h ../src/ConsEntry.h ../src/BillEntry.h
-OptComp.obj: ../src/CplexMgrNC.h ../../wit/src/Variant.h ../src/wit.h
+OptComp.obj: ../src/CplexIfNC.h ../../wit/src/Variant.h ../src/wit.h
 OptComp.obj: ../../config/dummy_headers/limits.h ../src/MsgFac.h
 OptComp.obj: ../src/MsgArg.h ../src/MsgFrag.h
 OptMisc.obj: ../src/Coeff.h ../src/Util.h ../src/typedefs.h ../src/macs.h
@@ -894,7 +894,7 @@ OptProblem.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h ../src/Vector.h
 OptProblem.obj: ../../config/dummy_headers/algorithm ../src/Assoc.h
 OptProblem.obj: ../src/Problem.h ../src/TVec.h ../src/OptVar.h ../src/OptVC.h
 OptProblem.obj: ../src/BoundPair.h ../src/OptCon.h ../src/Coeff.h
-OptProblem.obj: ../src/CplexMgrNC.h ../src/OptComp.h ../src/Component.h
+OptProblem.obj: ../src/CplexIfNC.h ../src/OptComp.h ../src/Component.h
 OptProblem.obj: ../src/Str.h ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
 OptProblem.obj: ../src/MsgArg.h ../src/Session.h
 OptProblem.obj: ../../config/dummy_headers/float.h
@@ -1428,7 +1428,7 @@ Session.obj: ../src/Session.h ../src/Str.h ../src/Vector.h ../src/Util.h
 Session.obj: ../src/typedefs.h ../src/macs.h
 Session.obj: ../../config/dummy_headers/stdio.h
 Session.obj: ../../config/dummy_headers/string.h
-Session.obj: ../../config/dummy_headers/math.h ../src/CplexMgrNC.h
+Session.obj: ../../config/dummy_headers/math.h ../src/CplexIfNC.h
 Session.obj: ../src/ApiMgr.h ../src/TVec.h ../src/wit.h
 Session.obj: ../../config/dummy_headers/limits.h ../src/WitRun.h
 Session.obj: ../src/Problem.h ../src/List.h ../../config/dummy_headers/list
@@ -1847,7 +1847,7 @@ optApi.obj: ../src/ApiCall.h ../src/Assoc.h ../src/OptComp.h
 optApi.obj: ../src/Component.h ../src/DetOptImpMgr.h ../src/Schedule.h
 optApi.obj: ../src/CompMgr.h ../src/PtrVec.h
 optApi.obj: ../../config/dummy_headers/algorithm ../src/PairStack.h
-optApi.obj: ../src/Stack.h ../src/OptStarter.h ../src/CplexMgrNC.h
+optApi.obj: ../src/Stack.h ../src/OptStarter.h ../src/CplexIfNC.h
 optApi.obj: ../src/CpxParSpecMgr.h ../src/CpxParSpec.h ../src/MultiObjMgr.h
 optApi.obj: ../src/Objective.h ../src/ISRealArg.h ../src/RealArg.h
 optApi.obj: ../src/OSRealArg.h ../src/MsgFac.h ../src/MsgArg.h

@@ -74,7 +74,7 @@ class WitCoeff;
 class WitCompMgr;
 class WitComponent;
 class WitConsEntry;
-class WitCplexMgr;
+class WitCplexIf;
 class WitCpxParSpec;
 class WitCpxParSpecMgr;
 class WitCumShipVar;

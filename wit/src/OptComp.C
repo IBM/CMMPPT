@@ -23,7 +23,7 @@
 #include <Material.h>
 #include <Operation.h>
 #include <SubEntry.h>
-#include <CplexMgrNC.h>
+#include <CplexIfNC.h>
 #include <wit/src/Variant.h>
 #include <wit.h>
 #include <CompMgr.h>

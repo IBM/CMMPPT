@@ -58,14 +58,14 @@ endif
 # Rule to build the CplexModule library object file.
 #
 # In CPLEX-embedded mode, this file contains:
-#    CplexMgr.o
+#    CplexIf.o
 #    The relevent contents of the CPLEX library
 #
 # In CPLEX-not-embedded mode, this file contains:
-#    CplexMgr.o
+#    CplexIf.o
 #-------------------------------------------------------------------------------
 
-CplexModule: CplexMgr.o
+CplexModule: CplexIf.o
 	$(reloc_ld) -o $@ $(ds_link_reloc_flags) $^ $(cplex_lib_flags)
 
 #-------------------------------------------------------------------------------

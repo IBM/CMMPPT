@@ -106,7 +106,7 @@ class WitOptVar: public WitOptVC
          // If this OptVar represents an element of a lexicographic objective
          // function, this function does any special error reporting for an
          // unbounded solution for the element, prior to the reporting that will
-         // be done by the CplexMgr;
+         // be done by the CplexIf;
          // otherwise issues a fatal error.
 
       //------------------------------------------------------------------------

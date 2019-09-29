@@ -4,20 +4,20 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef CplexMgrH
-#define CplexMgrH
+#ifndef CplexIfH
+#define CplexIfH
 
 //------------------------------------------------------------------------------
-// Header file: "CplexMgr.h"
+// Header file: "CplexIf.h"
 //
-// Contains the declaration of class CplexMgr.
+// Contains the declaration of class CplexIf.
 //    The declaration compiled only if CPLEX_EMBEDDED is defined.
 //
 // NOTE:
-//    This head file should be #included only by CplexMgr.C
+//    This head file should be #included only by CplexIf.C
 //    This is because the Makefiles apply the proper compiler flags for the
 //    CPLEX_EMBEDDED macro and the #include <cplex.h> statement only when
-//    compiling CplexMgr.C
+//    compiling CplexIf.C
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
@@ -27,12 +27,13 @@
 #include <cplex.h>
 
 //------------------------------------------------------------------------------
-// class CplexMgr
+// class CplexIf
 //
+// "CPLEX Interface"
 // Responsible for all interactions with CPLEX.
 //------------------------------------------------------------------------------
 
-class WitCplexMgr: public WitProbAssoc
+class WitCplexIf: public WitProbAssoc
    {
    public:
 
@@ -40,13 +41,13 @@ class WitCplexMgr: public WitProbAssoc
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitCplexMgr (WitOptProblem *);
+      WitCplexIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------
 
-      virtual ~WitCplexMgr ();
+      virtual ~WitCplexIf ();
 
       //------------------------------------------------------------------------
       // Other public member functions.
@@ -285,7 +286,7 @@ class WitCplexMgr: public WitProbAssoc
          //
          // Returns true, iff myOptProblem is a MIP.
 
-      noCopyCtorAssign (WitCplexMgr);
+      noCopyCtorAssign (WitCplexIf);
 
       //-----------------------------------------------------------------------
       // Private member data.
@@ -293,15 +294,15 @@ class WitCplexMgr: public WitProbAssoc
 
       WitOptProblem * const myOptProblem_;
          //
-         // The OptProblem that owns this CplexMgr.
+         // The OptProblem that owns this CplexIf.
 
       CPXENVptr myCpxEnv_;
          //
-         // The CPLEX environment for this CplexMgr.
+         // The CPLEX environment for this CplexIf.
 
       CPXLPptr myCpxLp_;
          //
-         // The CPLEX LP problem for this CplexMgr.
+         // The CPLEX LP problem for this CplexIf.
 
       int myErrCode_;
          //

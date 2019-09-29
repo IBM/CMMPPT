@@ -16,7 +16,7 @@
 #include <OptComp.h>
 #include <DetOptImpMgr.h>
 #include <OptStarter.h>
-#include <CplexMgrNC.h>
+#include <CplexIfNC.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
 #include <MultiObjMgr.h>

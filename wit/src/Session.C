@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------
 
 #include <Session.h>
-#include <CplexMgrNC.h>
+#include <CplexIfNC.h>
 #include <ApiMgr.h>
 #include <WitRun.h>
 #include <FSS.h>

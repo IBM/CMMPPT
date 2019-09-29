@@ -5,23 +5,23 @@
 //==============================================================================
 
 //------------------------------------------------------------------------------
-// Source file: "CplexMgr.C"
+// Source file: "CplexIf.C"
 //
 // Contains the implementations of NonClass functions for working with class
-//    CplexMgr. The implementation is conditional on whether or not
+//    CplexIf. The implementation is conditional on whether or not
 //    CPLEX_EMBEDDED is defined.
 //
-// Contains the implementation of class CplexMgr.
-//    The implementation of class CplexMgr is compiled only if CPLEX_EMBEDDED is
+// Contains the implementation of class CplexIf.
+//    The implementation of class CplexIf is compiled only if CPLEX_EMBEDDED is
 //    defined.
 //------------------------------------------------------------------------------
 
-#include <CplexMgrNC.h>
-#include <CplexMgr.h>
+#include <CplexIfNC.h>
+#include <CplexIf.h>
 #include <OptProblem.h>
 
 //------------------------------------------------------------------------------
-// CPLEX-embedded Implementation of NonClass CplexMgr functions.
+// CPLEX-embedded Implementation of NonClass CplexIf functions.
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
@@ -33,29 +33,29 @@ bool WitNonClass::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexMgr * WitNonClass::newCplexMgr (WitOptProblem * theOptProblem)
+WitCplexIf * WitNonClass::newCplexIf (WitOptProblem * theOptProblem)
    {
-   return new WitCplexMgr (theOptProblem);
+   return new WitCplexIf (theOptProblem);
    }
 
 //------------------------------------------------------------------------------
 
-void WitNonClass::deleteCplexMgr (WitCplexMgr * theCplexMgr)
+void WitNonClass::deleteCplexIf (WitCplexIf * theCplexIf)
    {
-   delete theCplexMgr;
+   delete theCplexIf;
    }
 
 //------------------------------------------------------------------------------
 
-void WitNonClass::solveOptProb (WitCplexMgr * theCplexMgr)
+void WitNonClass::solveOptProb (WitCplexIf * theCplexIf)
    {
-   theCplexMgr->solveOptProb ();
+   theCplexIf->solveOptProb ();
    }
 
 #endif // CPLEX_EMBEDDED
 
 //------------------------------------------------------------------------------
-// Non-CPLEX-embedded Implementation of NonClass CplexMgr functions.
+// Non-CPLEX-embedded Implementation of NonClass CplexIf functions.
 //------------------------------------------------------------------------------
 
 #ifndef CPLEX_EMBEDDED
@@ -67,7 +67,7 @@ bool WitNonClass::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexMgr * WitNonClass::newCplexMgr (WitOptProblem *)
+WitCplexIf * WitNonClass::newCplexIf (WitOptProblem *)
    {
    stronglyAssert (false);
 
@@ -76,14 +76,14 @@ WitCplexMgr * WitNonClass::newCplexMgr (WitOptProblem *)
 
 //------------------------------------------------------------------------------
 
-void WitNonClass::deleteCplexMgr (WitCplexMgr *)
+void WitNonClass::deleteCplexIf (WitCplexIf *)
    {
    stronglyAssert (false);
    }
 
 //------------------------------------------------------------------------------
 
-void WitNonClass::solveOptProb (WitCplexMgr *)
+void WitNonClass::solveOptProb (WitCplexIf *)
    {
    stronglyAssert (false);
    }
@@ -91,7 +91,7 @@ void WitNonClass::solveOptProb (WitCplexMgr *)
 #endif // not CPLEX_EMBEDDED
 
 //------------------------------------------------------------------------------
-// Implementation of class CplexMgr.
+// Implementation of class CplexIf.
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
@@ -114,7 +114,7 @@ void WitNonClass::solveOptProb (WitCplexMgr *)
 
 //------------------------------------------------------------------------------
 
-WitCplexMgr::WitCplexMgr (WitOptProblem * theOptProblem):
+WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
 
       WitProbAssoc  (theOptProblem),
       myOptProblem_ (theOptProblem),
@@ -127,14 +127,14 @@ WitCplexMgr::WitCplexMgr (WitOptProblem * theOptProblem):
 
 //------------------------------------------------------------------------------
 
-WitCplexMgr::~WitCplexMgr ()
+WitCplexIf::~WitCplexIf ()
    {
    shutDownCplex ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveOptProb ()
+void WitCplexIf::solveOptProb ()
    {
    WitTimer::enterSection ("cplex");
 
@@ -160,7 +160,7 @@ void WitCplexMgr::solveOptProb ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setUpCplex ()
+void WitCplexIf::setUpCplex ()
    {
    int theErrCode;
 
@@ -186,7 +186,7 @@ void WitCplexMgr::setUpCplex ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setUpLogFile ()
+void WitCplexIf::setUpLogFile ()
    {
    const char * theFileName;
 
@@ -199,7 +199,7 @@ void WitCplexMgr::setUpLogFile ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::shutDownCplex ()
+void WitCplexIf::shutDownCplex ()
    {
    myErrCode_ = CPXfreeprob (myCpxEnv_, & myCpxLp_);
 
@@ -218,7 +218,7 @@ void WitCplexMgr::shutDownCplex ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::shutDownLogFile ()
+void WitCplexIf::shutDownLogFile ()
    {
    myErrCode_  = CPXsetlogfilename (myCpxEnv_, NULL, "");
 
@@ -227,7 +227,7 @@ void WitCplexMgr::shutDownLogFile ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveOptProbAsLp ()
+void WitCplexIf::solveOptProbAsLp ()
    {
    issueSolveMsg ();
 
@@ -249,7 +249,7 @@ void WitCplexMgr::solveOptProbAsLp ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::reSolveOptProbAsLp ()
+void WitCplexIf::reSolveOptProbAsLp ()
    {
    myMsgFac () ("reSolveLpMsg");
 
@@ -269,7 +269,7 @@ void WitCplexMgr::reSolveOptProbAsLp ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveOptProbAsMip ()
+void WitCplexIf::solveOptProbAsMip ()
    {
    issueSolveMsg ();
 
@@ -286,7 +286,7 @@ void WitCplexMgr::solveOptProbAsMip ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveOptProbAsLexOpt ()
+void WitCplexIf::solveOptProbAsLexOpt ()
    {
    issueSolveMsg ();
 
@@ -306,7 +306,7 @@ void WitCplexMgr::solveOptProbAsLexOpt ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::issueSolveMsg ()
+void WitCplexIf::issueSolveMsg ()
    {
    CPXCCHARptr theVersionID;
 
@@ -322,7 +322,7 @@ void WitCplexMgr::issueSolveMsg ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::loadLp ()
+void WitCplexIf::loadLp ()
    {
    WitVector <double> objective;
    WitVector <double> rhs;
@@ -360,7 +360,7 @@ void WitCplexMgr::loadLp ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::getRowData (
+void WitCplexIf::getRowData (
       WitVector <double> & rhs,
       WitVector <char> &   sense)
    {
@@ -384,7 +384,7 @@ void WitCplexMgr::getRowData (
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::getColumnData (
+void WitCplexIf::getColumnData (
       WitVector <double> & objective,
       WitVector <int> &    matbeg,
       WitVector <int> &    matcnt,
@@ -425,7 +425,7 @@ void WitCplexMgr::getColumnData (
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::reviseLp ()
+void WitCplexIf::reviseLp ()
    {
    reviseBounds    ();
    reviseRHS       ();
@@ -434,7 +434,7 @@ void WitCplexMgr::reviseLp ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::reviseBounds ()
+void WitCplexIf::reviseBounds ()
    {
    int                cnt;
    WitVector <int>    indices;
@@ -501,7 +501,7 @@ void WitCplexMgr::reviseBounds ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::reviseRHS ()
+void WitCplexIf::reviseRHS ()
    {
    int                cnt;
    WitVector <int>    indices;
@@ -545,7 +545,7 @@ void WitCplexMgr::reviseRHS ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
+void WitCplexIf::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
    {
    double theLB;
    double theUB;
@@ -576,7 +576,7 @@ void WitCplexMgr::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::reviseObjCoeffs ()
+void WitCplexIf::reviseObjCoeffs ()
    {
    int                cnt;
    WitVector <int>    indices;
@@ -618,7 +618,7 @@ void WitCplexMgr::reviseObjCoeffs ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::loadIntData ()
+void WitCplexIf::loadIntData ()
    {
    int              nIntVars;
    WitVector <int>  theIndices;
@@ -660,7 +660,7 @@ void WitCplexMgr::loadIntData ()
 
 //------------------------------------------------------------------------------
 
-int WitCplexMgr::countIntVars ()
+int WitCplexIf::countIntVars ()
    {
    int         nIntVars;
    WitOptVar * theOptVar;
@@ -682,7 +682,7 @@ int WitCplexMgr::countIntVars ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::writeMps ()
+void WitCplexIf::writeMps ()
    {
    if (myOptComp ()->printMps ())
       {
@@ -701,7 +701,7 @@ void WitCplexMgr::writeMps ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveLexOpt ()
+void WitCplexIf::solveLexOpt ()
    {
    WitOptVar *              prevOptVar;
    WitPtrVecItr <WitOptVar> theOptVarItr;
@@ -755,7 +755,7 @@ void WitCplexMgr::solveLexOpt ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setObjCoef (WitOptVar * theOptVar, double theVal)
+void WitCplexIf::setObjCoef (WitOptVar * theOptVar, double theVal)
    {
    int    indices[1];
    double values [1];
@@ -776,7 +776,7 @@ void WitCplexMgr::setObjCoef (WitOptVar * theOptVar, double theVal)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::lockLexObjElemVal (WitOptVar * theOptVar)
+void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
    {
    int    theColIdx;
    double primalSoln[1];
@@ -822,7 +822,7 @@ void WitCplexMgr::lockLexObjElemVal (WitOptVar * theOptVar)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setLpMethodByOptStarter ()
+void WitCplexIf::setLpMethodByOptStarter ()
    {
    if (myOptComp ()->crashOptStarter ()->isChosen ())
       {
@@ -836,7 +836,7 @@ void WitCplexMgr::setLpMethodByOptStarter ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveLp (bool optNeeded)
+void WitCplexIf::solveLp (bool optNeeded)
    {
    setSpecCpxPars ();
 
@@ -852,7 +852,7 @@ void WitCplexMgr::solveLp (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::loadInitSoln ()
+void WitCplexIf::loadInitSoln ()
    {
    WitVector <double> initSoln;
    WitOptVar *        theVar;
@@ -885,7 +885,7 @@ void WitCplexMgr::loadInitSoln ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::printLpSolveInfo ()
+void WitCplexIf::printLpSolveInfo ()
    {
    int nSimpItns;
    int nPh1Itns;
@@ -898,7 +898,7 @@ void WitCplexMgr::printLpSolveInfo ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::checkLpSolnStatus (bool optNeeded)
+void WitCplexIf::checkLpSolnStatus (bool optNeeded)
    {
    storeCplexStatus ();
 
@@ -936,7 +936,7 @@ void WitCplexMgr::checkLpSolnStatus (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::repEarlyTermLpSolnStatus (bool optNeeded)
+void WitCplexIf::repEarlyTermLpSolnStatus (bool optNeeded)
    {
    int primalFeas;
 
@@ -963,7 +963,7 @@ void WitCplexMgr::repEarlyTermLpSolnStatus (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::solveMip (bool optNeeded)
+void WitCplexIf::solveMip (bool optNeeded)
    {
    if (countIntVars () == 0)
       myMsgFac () ("mipModeNoIntVarsSmsg");
@@ -984,7 +984,7 @@ void WitCplexMgr::solveMip (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::printMipSolveInfo ()
+void WitCplexIf::printMipSolveInfo ()
    {
    int    nSimpItns;
    int    nNodes;
@@ -1004,7 +1004,7 @@ void WitCplexMgr::printMipSolveInfo ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::checkMipSolnStatus (bool optNeeded)
+void WitCplexIf::checkMipSolnStatus (bool optNeeded)
    {
    storeCplexStatus ();
 
@@ -1057,7 +1057,7 @@ void WitCplexMgr::checkMipSolnStatus (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::issueStatusMsg (WitMsgID theMsgID)
+void WitCplexIf::issueStatusMsg (WitMsgID theMsgID)
    {
    myMsgFac () (theMsgID,
       myOptComp ()->cplexStatusCode (),
@@ -1066,7 +1066,7 @@ void WitCplexMgr::issueStatusMsg (WitMsgID theMsgID)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::storePrimalSoln ()
+void WitCplexIf::storePrimalSoln ()
    {
    WitVector <double> primalSoln;
    WitOptVar *        theVar;
@@ -1098,7 +1098,7 @@ void WitCplexMgr::storePrimalSoln ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::storeDualSoln ()
+void WitCplexIf::storeDualSoln ()
    {
    WitVector <double> dualSoln;
    WitOptCon *        theCon;
@@ -1130,7 +1130,7 @@ void WitCplexMgr::storeDualSoln ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setSpecCpxPars ()
+void WitCplexIf::setSpecCpxPars ()
    {
    WitCpxParSpec * theCpxParSpec;
 
@@ -1145,7 +1145,7 @@ void WitCplexMgr::setSpecCpxPars ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setSpecIntCpxPar (WitCpxParSpec * theCpxParSpec)
+void WitCplexIf::setSpecIntCpxPar (WitCpxParSpec * theCpxParSpec)
    {
    int theParamNum;
 
@@ -1168,7 +1168,7 @@ void WitCplexMgr::setSpecIntCpxPar (WitCpxParSpec * theCpxParSpec)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setSpecDblCpxPar (WitCpxParSpec * theCpxParSpec)
+void WitCplexIf::setSpecDblCpxPar (WitCpxParSpec * theCpxParSpec)
    {
    int theParamNum;
 
@@ -1191,7 +1191,7 @@ void WitCplexMgr::setSpecDblCpxPar (WitCpxParSpec * theCpxParSpec)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::checkCpxParamType (WitCpxParSpec * theCpxParSpec)
+void WitCplexIf::checkCpxParamType (WitCpxParSpec * theCpxParSpec)
    {
    int theParamNum;
    int theParamType;
@@ -1224,7 +1224,7 @@ void WitCplexMgr::checkCpxParamType (WitCpxParSpec * theCpxParSpec)
 
 //------------------------------------------------------------------------------
 
-int WitCplexMgr::findCpxParamNum (WitCpxParSpec * theCpxParSpec)
+int WitCplexIf::findCpxParamNum (WitCpxParSpec * theCpxParSpec)
    {
    int       theParamNameLen;
    WitString theParamName;
@@ -1255,7 +1255,7 @@ int WitCplexMgr::findCpxParamNum (WitCpxParSpec * theCpxParSpec)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::setIntParam (int theCpxParam, int theValue)
+void WitCplexIf::setIntParam (int theCpxParam, int theValue)
    {
    myErrCode_ =
       CPXsetintparam (myCpxEnv_, theCpxParam, theValue);
@@ -1265,7 +1265,7 @@ void WitCplexMgr::setIntParam (int theCpxParam, int theValue)
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::storeCplexStatus ()
+void WitCplexIf::storeCplexStatus ()
    {
    int  theStatCode;
    char theStatText[57];
@@ -1280,7 +1280,7 @@ void WitCplexMgr::storeCplexStatus ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::storeObjBoundInfo ()
+void WitCplexIf::storeObjBoundInfo ()
    {
    double theMipBound;
    double theMipRelGap;
@@ -1301,7 +1301,7 @@ void WitCplexMgr::storeObjBoundInfo ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexMgr::checkErrCode (const char * theFuncName)
+void WitCplexIf::checkErrCode (const char * theFuncName)
    {
    if (myErrCode_ == 0)
       return;
@@ -1315,7 +1315,7 @@ void WitCplexMgr::checkErrCode (const char * theFuncName)
 
 //------------------------------------------------------------------------------
 
-bool WitCplexMgr::mipMode ()
+bool WitCplexIf::mipMode ()
    {
    return myOptComp ()->mipMode ();
    }

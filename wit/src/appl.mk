@@ -33,7 +33,7 @@ mcl_client_objects =        \
 cxx_objects =              \
    $(lib_objects)          \
    $(mcl_client_objects)   \
-   CplexMgr.$(obj_suffix)  \
+   CplexIf.$(obj_suffix)   \
    BuildDate.$(obj_suffix) \
    wit.$(obj_suffix)       \
 
@@ -156,21 +156,21 @@ else
 endif
 
 #-------------------------------------------------------------------------------
-# Special rule to compile CplexMgr.C:
+# Special rule to compile CplexIf.C:
 #
 # Only applies when WIT is to embed CPLEX.
 #
 # Macro:
 #
 #    comp_cplex_flags
-#       The special compilation flags for compiling CplexMgr.C.
+#       The special compilation flags for compiling CplexIf.C.
 #-------------------------------------------------------------------------------
 
 ifneq ($(WIT_CPLEX_HOME),)
 
 comp_cplex_flags = -DCPLEX_EMBEDDED -I$(WIT_CPLEX_HOME)/include/ilcplex
 
-CplexMgr.$(obj_suffix):	CplexMgr.$(cxx_suffix)
+CplexIf.$(obj_suffix):	CplexIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_cplex_flags)
 
 endif

@@ -4,22 +4,22 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef CplexMgrNCH
-#define CplexMgrNCH
+#ifndef CplexIfNCH
+#define CplexIfNCH
 
 //------------------------------------------------------------------------------
-// Header file: "CplexMgrNC.h"
+// Header file: "CplexIfNC.h"
 //
 // Contains the declaration of NonClass functions for working with class
-// CplexMgr.
+// CplexIf.
 //------------------------------------------------------------------------------
 
 #include <Util.h>
 
 //------------------------------------------------------------------------------
-// NonClass functions for working with class CplexMgr.
+// NonClass functions for working with class CplexIf.
 //
-// Implemented in CplexMgr.C.
+// Implemented in CplexIf.C.
 //------------------------------------------------------------------------------
 
 namespace WitNonClass
@@ -28,24 +28,24 @@ namespace WitNonClass
       //
       // Returns true, iff CPLEX was embedded into the current build of WIT.
 
-   WitCplexMgr * newCplexMgr (WitOptProblem * theOptProblem);
+   WitCplexIf * newCplexIf (WitOptProblem * theOptProblem);
       //
       // If CPLEX is embedded,
-      //    creates and returns a new CplexMgr for theOptProblem
+      //    creates and returns a new CplexIf for theOptProblem
       // If CPLEX is not embedded,
       //    issues a fatal error.
 
-   void deleteCplexMgr (WitCplexMgr * theCplexMgr);
+   void deleteCplexIf (WitCplexIf * theCplexIf);
       //
       // If CPLEX is embedded,
-      //    deletes theCplexMgr.
+      //    deletes theCplexIf.
       // If CPLEX is not embedded,
       //    issues a fatal error.
 
-   void solveOptProb (WitCplexMgr * theCplexMgr);
+   void solveOptProb (WitCplexIf * theCplexIf);
       //
       // If CPLEX is embedded,
-      //    solves the optimization problem for theCplexMgr by invoking CPLEX.
+      //    solves the optimization problem for theCplexIf by invoking CPLEX.
       // If CPLEX is not embedded,
       //    issues a fatal error.
    };
