@@ -152,6 +152,7 @@ class WitObjLinkMgr;
 class WitObjStageMgr;
 class WitObjVec;
 class WitObjective;
+class WitOpSolverIf;
 class WitOperation;
 class WitOptComp;
 class WitOptCon;

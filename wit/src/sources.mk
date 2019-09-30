@@ -40,6 +40,7 @@ lib_objects = \
         ObjVec.$(obj_suffix) \
         OffsetProc.$(obj_suffix) \
         Operation.$(obj_suffix) \
+        OpSolverIf.$(obj_suffix) \
         OptComp.$(obj_suffix) \
         OptMisc.$(obj_suffix) \
         OptProblem.$(obj_suffix) \
@@ -104,6 +105,6 @@ lib_objects = \
         partApi.$(obj_suffix) \
         stochApi.$(obj_suffix) \
         subApi.$(obj_suffix) \
-	witLexer.$(obj_suffix) \
-	witParse.$(obj_suffix) \
+        witLexer.$(obj_suffix) \
+        witParse.$(obj_suffix) \
 

@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------
 
 #include <Session.h>
-#include <CplexIfNC.h>
+#include <OpSolverIf.h>
 #include <ApiMgr.h>
 #include <WitRun.h>
 #include <FSS.h>
@@ -150,7 +150,7 @@ void WitSession::writeHeading (FILE * outFile)
       buildDate (),
       EXE_TYPE_STRING,
       PLATFORM_STRING,
-      cplexEmbedded ()? "Yes": "No",
+      WitOpSolverIf::cplexEmbedded ()? "Yes": "No",
       startTime_.myCstring ());
    }
 
@@ -160,7 +160,7 @@ void WitSession::printHeading ()
    {
    const char * embFragID;
 
-   embFragID = cplexEmbedded ()? "yesFrag": "noFrag";
+   embFragID = WitOpSolverIf::cplexEmbedded ()? "yesFrag": "noFrag";
 
    myMsgFac () ("headingMsg",
       proprietaryStmt_,

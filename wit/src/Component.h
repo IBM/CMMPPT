@@ -10,11 +10,7 @@
 //------------------------------------------------------------------------------
 // Header file: "Component.h"
 //
-// Contains the declaration of the following classes:
-//
-//    Component
-//    DelComp
-//    Node
+// Contains the declaration of class Component.
 //------------------------------------------------------------------------------
 
 #include <Assoc.h>

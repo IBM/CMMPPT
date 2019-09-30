@@ -11,8 +11,6 @@
 // Header file: "OptProblem.h"
 //
 // Contains the declaration of class OptProblem.
-// Contains the declaration of NonClass functions for working with class
-//                             CplexIf.
 //------------------------------------------------------------------------------
 
 #include <List.h>
@@ -288,9 +286,9 @@ class WitOptProblem: public WitProbAssoc
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitCplexIf * myCplexIf_;
+      WitOpSolverIf * myOpSolverIf_;
          //
-         // The CplexIf owned by this OptProblem, when there is one;
+         // The OpSolverIf owned by this OptProblem, when there is one;
          // otherwise, NULL.
          // Always NULL, if CPLEX is not embedded.
 

@@ -14,7 +14,7 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <Coeff.h>
-#include <CplexIfNC.h>
+#include <OpSolverIf.h>
 #include <OptComp.h>
 #include <Timing.h>
 #include <MsgFrag.h>
@@ -263,7 +263,7 @@ WitOptProblem::WitOptProblem (WitProblem * theProblem):
 
       WitProbAssoc    (theProblem),
 
-      myCplexIf_      (NULL),
+      myOpSolverIf_   (NULL),
       nCoeffs_        (0),
       curCon_         (NULL),
       curConCoeffs_   (myProblem ()),
@@ -278,8 +278,7 @@ WitOptProblem::~WitOptProblem ()
    {
    int idx;
 
-   if (cplexEmbedded ())
-      deleteCplexIf (myCplexIf_);
+   delete myOpSolverIf_;
 
    while (not myOptCons_.isEmpty ())
       delete myOptCons_.get ();
@@ -311,10 +310,10 @@ void WitOptProblem::solve ()
    if (myOptComp ()->printOptProblem ())
       print ();
 
-   if (myCplexIf_ == NULL)
-       myCplexIf_ =  newCplexIf (this);
+   if (myOpSolverIf_ == NULL)
+       myOpSolverIf_ = WitOpSolverIf::newInstanceForCplex (this);
 
-   solveOptProb (myCplexIf_);
+   myOpSolverIf_->solveOptProb ();
 
    if (needDual ())
       reconstructDual ();

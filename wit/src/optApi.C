@@ -16,7 +16,7 @@
 #include <OptComp.h>
 #include <DetOptImpMgr.h>
 #include <OptStarter.h>
-#include <CplexIfNC.h>
+#include <OpSolverIf.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
 #include <MultiObjMgr.h>
@@ -129,7 +129,7 @@ void WitRun::witGetCplexEmbedded (WitBoolean * cplexEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   apiGet (cplexEmbedded, "cplexEmbedded", WitNonClass::cplexEmbedded ());
+   apiGet (cplexEmbedded, "cplexEmbedded", WitOpSolverIf::cplexEmbedded ());
    }
 
 //------------------------------------------------------------------------------

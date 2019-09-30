@@ -14,7 +14,7 @@
 //    The declaration compiled only if CPLEX_EMBEDDED is defined.
 //
 // NOTE:
-//    This head file should be #included only by CplexIf.C
+//    This header file should be #included only by CplexIf.C
 //    This is because the Makefiles apply the proper compiler flags for the
 //    CPLEX_EMBEDDED macro and the #include <cplex.h> statement only when
 //    compiling CplexIf.C
@@ -22,7 +22,7 @@
 
 #ifdef CPLEX_EMBEDDED
 
-#include <Assoc.h>
+#include <OpSolverIf.h>
 
 #include <cplex.h>
 
@@ -31,9 +31,15 @@
 //
 // "CPLEX Interface"
 // Responsible for all interactions with CPLEX.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    OpSolverIf
+//       CplexIf
 //------------------------------------------------------------------------------
 
-class WitCplexIf: public WitProbAssoc
+class WitCplexIf: public WitOpSolverIf
    {
    public:
 
@@ -291,10 +297,6 @@ class WitCplexIf: public WitProbAssoc
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
-
-      WitOptProblem * const myOptProblem_;
-         //
-         // The OptProblem that owns this CplexIf.
 
       CPXENVptr myCpxEnv_;
          //

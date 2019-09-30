@@ -23,7 +23,7 @@
 #include <Material.h>
 #include <Operation.h>
 #include <SubEntry.h>
-#include <CplexIfNC.h>
+#include <OpSolverIf.h>
 #include <wit/src/Variant.h>
 #include <wit.h>
 #include <CompMgr.h>
@@ -313,7 +313,7 @@ void WitOptComp::storeStochBoundsValue (double theValue)
 
 void WitOptComp::storeCplexStatusCode (int theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitOpSolverIf::cplexEmbedded ());
 
    cplexStatusCode_ = theValue;
    }
@@ -322,7 +322,7 @@ void WitOptComp::storeCplexStatusCode (int theValue)
 
 void WitOptComp::storeCplexStatusText (const char * theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitOpSolverIf::cplexEmbedded ());
 
    cplexStatusText_ = theValue;
    }
@@ -331,7 +331,7 @@ void WitOptComp::storeCplexStatusText (const char * theValue)
 
 void WitOptComp::storeCplexMipBound (double theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitOpSolverIf::cplexEmbedded ());
 
    cplexMipBound_ = theValue;
    }
@@ -340,7 +340,7 @@ void WitOptComp::storeCplexMipBound (double theValue)
 
 void WitOptComp::storeCplexMipRelGap (double theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitOpSolverIf::cplexEmbedded ());
    
    cplexMipRelGap_ = theValue;
    }
@@ -399,7 +399,7 @@ void WitOptComp::unpostprocess ()
 void WitOptComp::display ()
    {
    myMsgFac () ("optAttDdMsg",
-      cplexEmbedded (),
+      WitOpSolverIf::cplexEmbedded (),
       compPrices_,
       accAfterOptImp_,
       accAfterSoftLB_,
@@ -467,7 +467,7 @@ bool WitOptComp::negativeCostsExist ()
 
 void WitOptComp::requireCplex ()
    {
-   if (not cplexEmbedded ())
+   if (not WitOpSolverIf::cplexEmbedded ())
       myMsgFac () ("cplexNeededSmsg");
    }
 

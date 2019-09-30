@@ -7,85 +7,56 @@
 //------------------------------------------------------------------------------
 // Source file: "CplexIf.C"
 //
-// Contains the implementations of NonClass functions for working with class
-//    CplexIf. The implementation is conditional on whether or not
-//    CPLEX_EMBEDDED is defined.
+// Contains the implementations of member functions of class OpSolverIf whose
+//    implementation depends on whether or not CPLEX_EMBEDDED is defined.
 //
 // Contains the implementation of class CplexIf.
 //    The implementation of class CplexIf is compiled only if CPLEX_EMBEDDED is
 //    defined.
 //------------------------------------------------------------------------------
 
-#include <CplexIfNC.h>
 #include <CplexIf.h>
 #include <OptProblem.h>
 
 //------------------------------------------------------------------------------
-// CPLEX-embedded Implementation of NonClass CplexIf functions.
+// CPLEX-embedded Implementation of OpSolverIf functions.
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
 
-bool WitNonClass::cplexEmbedded ()
+bool WitOpSolverIf::cplexEmbedded ()
    {
-   return true;
+ return true;
    }
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitNonClass::newCplexIf (WitOptProblem * theOptProblem)
+WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (
+      WitOptProblem * theOptProblem)
    {
    return new WitCplexIf (theOptProblem);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitNonClass::deleteCplexIf (WitCplexIf * theCplexIf)
-   {
-   delete theCplexIf;
-   }
-
-//------------------------------------------------------------------------------
-
-void WitNonClass::solveOptProb (WitCplexIf * theCplexIf)
-   {
-   theCplexIf->solveOptProb ();
    }
 
 #endif // CPLEX_EMBEDDED
 
 //------------------------------------------------------------------------------
-// Non-CPLEX-embedded Implementation of NonClass CplexIf functions.
+// CPLEX-embedded Implementation of OpSolverIf functions.
 //------------------------------------------------------------------------------
 
 #ifndef CPLEX_EMBEDDED
 
-bool WitNonClass::cplexEmbedded ()
+bool WitOpSolverIf::cplexEmbedded ()
    {
    return false;
    }
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitNonClass::newCplexIf (WitOptProblem *)
+WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (WitOptProblem *)
    {
    stronglyAssert (false);
 
    return NULL;
-   }
-
-//------------------------------------------------------------------------------
-
-void WitNonClass::deleteCplexIf (WitCplexIf *)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitNonClass::solveOptProb (WitCplexIf *)
-   {
-   stronglyAssert (false);
    }
 
 #endif // not CPLEX_EMBEDDED
@@ -95,8 +66,6 @@ void WitNonClass::solveOptProb (WitCplexIf *)
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
-
-//------------------------------------------------------------------------------
 
 #include <OptComp.h>
 #include <CpxParSpecMgr.h>
@@ -116,8 +85,7 @@ void WitNonClass::solveOptProb (WitCplexIf *)
 
 WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
 
-      WitProbAssoc  (theOptProblem),
-      myOptProblem_ (theOptProblem),
+      WitOpSolverIf (theOptProblem),
       myCpxEnv_     (NULL),
       myCpxLp_      (NULL),
       myErrCode_    (0)
@@ -142,7 +110,7 @@ void WitCplexIf::solveOptProb ()
       {
       solveOptProbAsLexOpt ();
       }
-   else if (myOptProblem_->reSolveMode ())
+   else if (myOptProblem ()->reSolveMode ())
       {
       reSolveOptProbAsLp ();
       }
@@ -239,11 +207,11 @@ void WitCplexIf::solveOptProbAsLp ()
 
    loadInitSoln ();
 
-   solveLp (myOptProblem_->needDual ());
+   solveLp (myOptProblem ()->needDual ());
 
    storePrimalSoln ();
 
-   if (myOptProblem_->needDual ())
+   if (myOptProblem ()->needDual ())
       storeDualSoln ();
    }
 
@@ -259,11 +227,11 @@ void WitCplexIf::reSolveOptProbAsLp ()
 
    setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_DUAL);
 
-   solveLp (myOptProblem_->needDual ());
+   solveLp (myOptProblem ()->needDual ());
 
    storePrimalSoln ();
 
-   if (myOptProblem_->needDual ())
+   if (myOptProblem ()->needDual ())
       storeDualSoln ();
    }
 
@@ -341,8 +309,8 @@ void WitCplexIf::loadLp ()
       CPXcopylp (
          myCpxEnv_,
          myCpxLp_,
-         myOptProblem_->nOptVars (),
-         myOptProblem_->nOptCons (),
+         myOptProblem ()->nOptVars (),
+         myOptProblem ()->nOptCons (),
          -1,
          objective.myCVec (),
          rhs      .myCVec (),
@@ -369,10 +337,10 @@ void WitCplexIf::getRowData (
 
    WitTimer::enterSection ("opt-prob");
 
-   rhs  .resize (myOptProblem_->nOptCons ());
-   sense.resize (myOptProblem_->nOptCons ());
+   rhs  .resize (myOptProblem ()->nOptCons ());
+   sense.resize (myOptProblem ()->nOptCons ());
 
-   forEachEl (theOptCon, myOptProblem_->myOptCons ())
+   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
       {
       theIdx = theOptCon->index ();
 
@@ -399,16 +367,16 @@ void WitCplexIf::getColumnData (
 
    WitTimer::enterSection ("opt-prob");
 
-   ncols = myOptProblem_->nOptVars ();
+   ncols = myOptProblem ()->nOptVars ();
 
    objective.resize (ncols);
    matcnt   .resize (ncols);
    lb       .resize (ncols);
    ub       .resize (ncols);
 
-   myOptProblem_->getMatrixByCols (matbeg, matind, matval);
+   myOptProblem ()->getMatrixByCols (matbeg, matind, matval);
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       theIdx            = theOptVar->index ();
 
@@ -445,7 +413,7 @@ void WitCplexIf::reviseBounds ()
 
    WitTimer::enterSection ("opt-prob");
 
-   cnt = myOptProblem_->nOptVars ();
+   cnt = myOptProblem ()->nOptVars ();
 
    indices.resize (cnt);
    lu     .resize (cnt);
@@ -453,7 +421,7 @@ void WitCplexIf::reviseBounds ()
 
    theColIdx = -1;
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       theColIdx ++;
 
@@ -477,7 +445,7 @@ void WitCplexIf::reviseBounds ()
 
    theColIdx = -1;
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       theColIdx ++;
 
@@ -512,14 +480,14 @@ void WitCplexIf::reviseRHS ()
 
    WitTimer::enterSection ("opt-prob");
 
-   cnt = myOptProblem_->nOptCons ();
+   cnt = myOptProblem ()->nOptCons ();
 
    indices.resize (cnt);
    values .resize (cnt);
 
    theRowIdx = -1;
 
-   forEachEl (theOptCon, myOptProblem_->myOptCons ())
+   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
       {
       theRowIdx ++;
 
@@ -586,14 +554,14 @@ void WitCplexIf::reviseObjCoeffs ()
 
    WitTimer::enterSection ("opt-prob");
 
-   cnt = myOptProblem_->nOptVars ();
+   cnt = myOptProblem ()->nOptVars ();
 
    indices.resize (cnt);
    values .resize (cnt);
 
    theColIdx = -1;
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       theColIdx ++;
 
@@ -635,7 +603,7 @@ void WitCplexIf::loadIntData ()
 
    theIdx = -1;
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       if (theOptVar->isAnIntVar ())
          {
@@ -669,7 +637,7 @@ int WitCplexIf::countIntVars ()
 
    nIntVars = 0;
 
-   forEachEl (theOptVar, myOptProblem_->myOptVars ())
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
       if (theOptVar->isAnIntVar ())
          nIntVars ++;
@@ -715,7 +683,7 @@ void WitCplexIf::solveLexOpt ()
 
    prevOptVar = NULL;
 
-   myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
+   myOptProblem ()->myLexOptVarSeq ().attachItr (theOptVarItr);
 
    while (theOptVarItr.advance (theOptVar))
       {
@@ -862,9 +830,9 @@ void WitCplexIf::loadInitSoln ()
 
    WitTimer::enterSection ("opt-prob");
 
-   initSoln.resize (myOptProblem_->nOptVars (), 0.0);
+   initSoln.resize (myOptProblem ()->nOptVars (), 0.0);
 
-   forEachEl (theVar, myOptProblem_->myOptVars ())
+   forEachEl (theVar, myOptProblem ()->myOptVars ())
       initSoln[theVar->index ()] = theVar->primalValue ();
 
    WitTimer::leaveSection ("opt-prob");
@@ -1072,7 +1040,7 @@ void WitCplexIf::storePrimalSoln ()
    WitOptVar *        theVar;
    int                theIdx;
 
-   primalSoln.resize (myOptProblem_->nOptVars ());
+   primalSoln.resize (myOptProblem ()->nOptVars ());
 
    myErrCode_ =
       CPXgetx (
@@ -1080,13 +1048,13 @@ void WitCplexIf::storePrimalSoln ()
          myCpxLp_,
          primalSoln.myCVecForUpdate (),
          0,
-         myOptProblem_->nOptVars () - 1);
+         myOptProblem ()->nOptVars () - 1);
 
    checkErrCode ("CPXgetx");
 
    WitTimer::enterSection ("opt-prob");
 
-   forEachEl (theVar, myOptProblem_->myOptVars ())
+   forEachEl (theVar, myOptProblem ()->myOptVars ())
       {
       theIdx = theVar->index ();
 
@@ -1104,7 +1072,7 @@ void WitCplexIf::storeDualSoln ()
    WitOptCon *        theCon;
    int                theIdx;
 
-   dualSoln.resize (myOptProblem_->nOptCons ());
+   dualSoln.resize (myOptProblem ()->nOptCons ());
 
    myErrCode_ =
       CPXgetpi (
@@ -1112,13 +1080,13 @@ void WitCplexIf::storeDualSoln ()
          myCpxLp_,
          dualSoln.myCVecForUpdate (),
          0,
-         myOptProblem_->nOptCons () - 1);
+         myOptProblem ()->nOptCons () - 1);
 
    checkErrCode ("CPXgetpi");
 
    WitTimer::enterSection ("opt-prob");
 
-   forEachEl (theCon, myOptProblem_->myOptCons ())
+   forEachEl (theCon, myOptProblem ()->myOptCons ())
       {
       theIdx = theCon->index ();
 
