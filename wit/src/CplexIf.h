@@ -20,9 +20,9 @@
 //    compiling CplexIf.C
 //------------------------------------------------------------------------------
 
-#ifdef CPLEX_EMBEDDED
-
 #include <OpSolverIf.h>
+
+#ifdef CPLEX_EMBEDDED
 
 #include <cplex.h>
 
