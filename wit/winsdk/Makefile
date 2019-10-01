@@ -254,6 +254,12 @@ BuildDate.obj: ../src/typedefs.h ../src/macs.h
 BuildDate.obj: ../../config/dummy_headers/stdio.h
 BuildDate.obj: ../../config/dummy_headers/string.h
 BuildDate.obj: ../../config/dummy_headers/math.h
+ClpCbcIf.obj: ../src/ClpCbcIf.h ../src/OpSolverIf.h ../src/Assoc.h
+ClpCbcIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
+ClpCbcIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
+ClpCbcIf.obj: ../../config/dummy_headers/string.h
+ClpCbcIf.obj: ../../config/dummy_headers/math.h
+ClpCbcIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
 CompMgr.obj: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CompMgr.obj: ../../config/dummy_headers/string.h
