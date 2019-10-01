@@ -294,15 +294,15 @@ Component.obj: ../src/Schedule.h ../src/CompMgr.h ../src/BoundSet.h
 Component.obj: ../src/OrigMrp.h ../src/MrpExp.h ../src/StochImpMgr.h
 Component.obj: ../src/IVRealArg.h ../src/RealArg.h ../src/MsgFrag.h
 Component.obj: ../src/MsgFac.h ../src/MsgArg.h
-CplexIf.obj: ../src/CplexIf.h ../src/OptProblem.h ../src/List.h ../src/Util.h
-CplexIf.obj: ../src/typedefs.h ../src/macs.h
-CplexIf.obj: ../../config/dummy_headers/stdio.h
+CplexIf.obj: ../src/CplexIf.h ../src/OpSolverIf.h ../src/Assoc.h
+CplexIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
+CplexIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CplexIf.obj: ../../config/dummy_headers/string.h
 CplexIf.obj: ../../config/dummy_headers/math.h
-CplexIf.obj: ../../config/dummy_headers/list ../src/ObjStack.h ../src/Stack.h
-CplexIf.obj: ../src/Link.h ../src/PtrVec.h ../src/Vector.h
-CplexIf.obj: ../../config/dummy_headers/algorithm ../src/Assoc.h
-CplexIf.obj: ../src/Problem.h ../src/TVec.h
+CplexIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CplexIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CplexIf.obj: ../src/Link.h ../src/PtrVec.h
+CplexIf.obj: ../../config/dummy_headers/algorithm
 CpxParSpec.obj: ../src/CpxParSpecMgr.h ../src/Assoc.h ../src/Problem.h
 CpxParSpec.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 CpxParSpec.obj: ../../config/dummy_headers/stdio.h

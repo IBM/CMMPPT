@@ -15,6 +15,13 @@
 // Implementation of class OpSolverIf.
 //------------------------------------------------------------------------------
 
+WitOpSolverIf * WitOpSolverIf::newInstance (WitOptProblem * theOptProblem)
+   {
+   return newInstanceForCplex (theOptProblem);
+   }
+
+//------------------------------------------------------------------------------
+
 WitOpSolverIf::~WitOpSolverIf ()
    {
    }

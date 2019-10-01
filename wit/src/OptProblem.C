@@ -311,7 +311,7 @@ void WitOptProblem::solve ()
       print ();
 
    if (myOpSolverIf_ == NULL)
-       myOpSolverIf_ = WitOpSolverIf::newInstanceForCplex (this);
+       myOpSolverIf_ = WitOpSolverIf::newInstance (this);
 
    myOpSolverIf_->solveOptProb ();
 

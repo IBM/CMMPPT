@@ -37,13 +37,10 @@ class WitOpSolverIf: public WitProbAssoc
          // Returns true, iff CPLEX was embedded into the current build of WIT.
          // Implemented in CplexIf.C.
 
-      static WitOpSolverIf * newInstanceForCplex (WitOptProblem * theOptProblem);
+      static WitOpSolverIf * newInstance (WitOptProblem * theOptProblem);
          //
-         // If CPLEX is embedded,
-         //    creates and returns a new OpSolverIf for CPLEX and theOptProblem.
-         // If CPLEX is not embedded,
-         //    issues a fatal error.
-         // Implemented in CplexIf.C.
+         // Creates and returns a new OpSolverIf for theOptProblem.
+         // Issues a fatal error, if CPLEX is not embedded.
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -84,6 +81,14 @@ class WitOpSolverIf: public WitProbAssoc
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitOpSolverIf);
+
+      static WitOpSolverIf * newInstanceForCplex (WitOptProblem * theOptProblem);
+         //
+         // If CPLEX is embedded,
+         //    creates and returns a new OpSolverIf for CPLEX and theOptProblem.
+         // If CPLEX is not embedded,
+         //    issues a fatal error.
+         // Implemented in CplexIf.C.
 
       //-----------------------------------------------------------------------
       // Private member data.
