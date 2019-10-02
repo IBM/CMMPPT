@@ -4,31 +4,31 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef ClpCbcIfH
-#define ClpCbcIfH
+#ifndef CoinIfH
+#define CoinIfH
 
 //------------------------------------------------------------------------------
-// Header file: "ClpCbcIf.h"
+// Header file: "CoinIf.h"
 //
-// Contains the declaration of class ClpCbcIf.
+// Contains the declaration of class CoinIf.
 //------------------------------------------------------------------------------
 
 #include <OpSolverIf.h>
 
 //------------------------------------------------------------------------------
-// class ClpCbcIf
+// class CoinIf
 //
-// "CLP/CBC Interface"
-// Responsible for all interactions with COIN CLP & CBC.
+// "COIN Interface"
+// Responsible for all interactions with COIN.
 //
 // Class Hierarchy:
 //
 // ProbAssoc
 //    OpSolverIf
-//       ClpCbcIf
+//       CoinIf
 //------------------------------------------------------------------------------
 
-class WitClpCbcIf: public WitOpSolverIf
+class WitCoinIf: public WitOpSolverIf
    {
    public:
 
@@ -36,13 +36,13 @@ class WitClpCbcIf: public WitOpSolverIf
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitClpCbcIf (WitOptProblem *);
+      WitCoinIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------
 
-      virtual ~WitClpCbcIf ();
+      virtual ~WitCoinIf ();
 
       //------------------------------------------------------------------------
       // Other public member functions.
@@ -58,7 +58,7 @@ class WitClpCbcIf: public WitOpSolverIf
       // Private member functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitClpCbcIf);
+      noCopyCtorAssign (WitCoinIf);
 
       //-----------------------------------------------------------------------
       // Private member data.
