@@ -158,6 +158,7 @@ void          printDblVec       (const char *,   const double *, int);
 const int    nPeriods        = 5;
 const double dblEps          = .00001;
 
+witBoolean   coinEmbedded    = WitFALSE;
 witBoolean   cplexEmbedded   = WitFALSE;
 
 /*----------------------------------------------------------------------------*/
@@ -210,6 +211,17 @@ int main ()
    witInitialize ( theWitRun );
 
    witSetWit34Compatible( theWitRun, WitTRUE );
+
+   witGetCoinEmbedded (theWitRun, & coinEmbedded);
+
+   if (coinEmbedded)
+      printf (
+         "\n"
+         "This is a COIN-embedded build of WIT.\n");
+   else
+      printf (
+         "\n"
+         "This is a COIN-non-embedded build of WIT.\n");
 
    witGetCplexEmbedded (theWitRun, & cplexEmbedded);
 

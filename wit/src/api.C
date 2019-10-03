@@ -1342,6 +1342,18 @@ witReturnCode witGetBoundsValueDbl (
 
 //------------------------------------------------------------------------------
 
+witReturnCode witGetCoinEmbedded (
+      WitRun * const theWitRun,
+      witBoolean *   coinEmbedded)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witGetCoinEmbedded, (
+         coinEmbedded))
+   }
+
+//------------------------------------------------------------------------------
+
 witReturnCode witGetCompPrices (
       WitRun * const theWitRun,
       witBoolean * compPrices)

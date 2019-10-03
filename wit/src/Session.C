@@ -143,6 +143,7 @@ void WitSession::writeHeading (FILE * outFile)
       "Build Date:     %s\n"
       "Build Type:     %s\n"
       "Platform:       %s\n"
+      "COIN Embedded?  %s\n"
       "CPLEX Embedded? %s\n"
       "Run Started At: %s\n",
       proprietaryStmt_,
@@ -150,6 +151,7 @@ void WitSession::writeHeading (FILE * outFile)
       buildDate (),
       EXE_TYPE_STRING,
       PLATFORM_STRING,
+      WitOpSolverIf::coinEmbedded  ()? "Yes": "No",
       WitOpSolverIf::cplexEmbedded ()? "Yes": "No",
       startTime_.myCstring ());
    }
@@ -158,9 +160,11 @@ void WitSession::writeHeading (FILE * outFile)
 
 void WitSession::printHeading ()
    {
-   const char * embFragID;
+   const char * coinFragID;
+   const char * cplexFragID;
 
-   embFragID = WitOpSolverIf::cplexEmbedded ()? "yesFrag": "noFrag";
+   coinFragID  = WitOpSolverIf::coinEmbedded  ()? "yesFrag": "noFrag";
+   cplexFragID = WitOpSolverIf::cplexEmbedded ()? "yesFrag": "noFrag";
 
    myMsgFac () ("headingMsg",
       proprietaryStmt_,
@@ -168,7 +172,8 @@ void WitSession::printHeading ()
       buildDate (),
       EXE_TYPE_STRING,
       PLATFORM_STRING,
-      myMsgFac ().myFrag (embFragID),
+      myMsgFac ().myFrag (coinFragID),
+      myMsgFac ().myFrag (cplexFragID),
       startTime_);
    }
 

@@ -494,6 +494,10 @@ witReturnCode witGetBoundsValueDbl (
    WitRun * const theWitRun,
    double *       boundsValue);
 
+witReturnCode witGetCoinEmbedded (
+   WitRun * const theWitRun,
+   witBoolean *   coinEmbedded);
+
 witReturnCode witGetCompPrices (
    WitRun * const theWitRun,
    witBoolean * compPrices);

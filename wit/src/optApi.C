@@ -57,6 +57,15 @@ void WitRun::witAddIntCplexParSpec (const char * theName, int theValue)
 
 //------------------------------------------------------------------------------
 
+void WitRun::witClearCplexParSpecs ()
+   {
+   WitOptCompApiCall theCall (this);
+
+   theCall.myCpxParSpecMgr ()->clearCpxParSpecs ();
+   }
+
+//------------------------------------------------------------------------------
+
 void WitRun::witGetAccAfterOptImp (WitBoolean * accAfterOptImp)
    {
    WitOptCompApiCall theCall (this);
@@ -105,11 +114,11 @@ void WitRun::witGetBoundsValue (const WitOSRealArg & boundsValue)
 
 //------------------------------------------------------------------------------
 
-void WitRun::witClearCplexParSpecs ()
+void WitRun::witGetCoinEmbedded (WitBoolean * coinEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   theCall.myCpxParSpecMgr ()->clearCpxParSpecs ();
+   apiGet (coinEmbedded, "coinEmbedded", WitOpSolverIf::coinEmbedded ());
    }
 
 //------------------------------------------------------------------------------

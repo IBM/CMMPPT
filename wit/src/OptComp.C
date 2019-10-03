@@ -399,6 +399,7 @@ void WitOptComp::unpostprocess ()
 void WitOptComp::display ()
    {
    myMsgFac () ("optAttDdMsg",
+      WitOpSolverIf::coinEmbedded  (),
       WitOpSolverIf::cplexEmbedded (),
       compPrices_,
       accAfterOptImp_,

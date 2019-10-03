@@ -33,6 +33,11 @@ class WitOpSolverIf: public WitProbAssoc
    {
    public:
 
+      static bool coinEmbedded ();
+         //
+         // Returns true, iff COIN embedded into the current build of WIT.
+         // Implemented in CoinIf.C.
+
       static bool cplexEmbedded ();
          //
          // Returns true, iff CPLEX was embedded into the current build of WIT.

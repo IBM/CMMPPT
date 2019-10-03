@@ -403,8 +403,9 @@ void WitMsgBuilder::buildMsgs ()
       "Build Date:     %3$s\n"
       "Build Type:     %4$s\n"
       "Platform:       %5$s\n"
-      "CPLEX Embedded? %6$m\n"
-      "Run Started At: %7$s");
+      "COIN  Embedded? %6$m\n"
+      "CPLEX Embedded? %7$m\n"
+      "Run Started At: %8$s");
 
    currentMsg_->preceedingLineFeeds   (0);
 
@@ -4125,14 +4126,15 @@ void WitMsgBuilder::buildMsgs ()
       "optAttDdMsg",
       692,
       info_,
-      "CPLEX  Embedded?                             %1$5b\n"
-      "Compute shadow prices?                       %2$5b\n"
-      "Stay accelerated after opt implosion?        %3$5b\n"
-      "Stay accelerated after an LB is softened?    %4$5b\n"
-      "Opt implosion in MIP mode?                   %5$5b\n"
-      "Multiple objectives mode?                    %6$5b\n"
-      "Bounds objective weight:                 %7$9.1f\n"
-      "Solver Log File Name:                   %8$10s");
+      "COIN   Embedded?                             %1$5b\n"
+      "CPLEX  Embedded?                             %2$5b\n"
+      "Compute shadow prices?                       %3$5b\n"
+      "Stay accelerated after opt implosion?        %4$5b\n"
+      "Stay accelerated after an LB is softened?    %5$5b\n"
+      "Opt implosion in MIP mode?                   %6$5b\n"
+      "Multiple objectives mode?                    %7$5b\n"
+      "Bounds objective weight:                 %8$9.1f\n"
+      "Solver Log File Name:                   %9$10s");
 
    //---------------------------------------------------------------------------
 

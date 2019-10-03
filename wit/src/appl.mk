@@ -94,6 +94,40 @@ session_macro_flags = -DEXE_TYPE=$(exe_type) -DPLATFORM=$(platform)
 Session.$(obj_suffix):	Session.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(session_macro_flags)
 
+
+#-------------------------------------------------------------------------------
+# Macros to facilitate building WIT, when COIN is to be embedded.
+#
+# Prereqisite macros:
+#
+#    WIT_COIN_HOME:
+#       This is an environment variable.
+#       If COIN is to be embedded into WIT, WIT_COIN_HOME should be defined as
+#       the path where COIN files are found.
+#       If COIN is not to be embedded into WIT, WIT_COIN_HOME should be left
+#       undefined, or defined as the null string.
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# Special rule to compile CoinIf.C:
+#
+# Only applies when WIT is to embed COIN.
+#
+# Macro:
+#    comp_coin_flags
+#       The special compilation flags for compiling CoinIf.C.
+#-------------------------------------------------------------------------------
+
+ifneq ($(WIT_COIN_HOME),)
+
+comp_coin_flags = -DCOIN_EMBEDDED
+
+CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
+			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
+
+endif
+
+
 #-------------------------------------------------------------------------------
 # Macros to facilitate building WIT, when CPLEX is to be embedded.
 #
@@ -161,7 +195,6 @@ endif
 # Only applies when WIT is to embed CPLEX.
 #
 # Macro:
-#
 #    comp_cplex_flags
 #       The special compilation flags for compiling CplexIf.C.
 #-------------------------------------------------------------------------------

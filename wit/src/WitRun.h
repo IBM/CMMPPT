@@ -495,6 +495,8 @@ class WitRun
          const char * theName,
          int          theValue);
 
+      void witClearCplexParSpecs ();
+
       void witGetAccAfterOptImp (
          WitBoolean * value);
 
@@ -507,7 +509,7 @@ class WitRun
       void witGetBoundsValue (
          const WitOSRealArg & boundsValue);
 
-      void witClearCplexParSpecs ();
+      void witGetCoinEmbedded (WitBoolean * coinEmbedded);
 
       void witGetCompPrices (
          WitBoolean * value);
