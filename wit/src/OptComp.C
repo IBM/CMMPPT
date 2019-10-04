@@ -466,10 +466,11 @@ bool WitOptComp::negativeCostsExist ()
 
 //------------------------------------------------------------------------------
 
-void WitOptComp::requireCplex ()
+void WitOptComp::requireCoinOrCplex ()
    {
-   if (not WitOpSolverIf::cplexEmbedded ())
-      myMsgFac () ("cplexNeededSmsg");
+   if (not WitOpSolverIf::coinEmbedded ())
+      if (not WitOpSolverIf::cplexEmbedded ())
+         myMsgFac () ("coinOrCplexNeededSmsg");
    }
 
 //------------------------------------------------------------------------------

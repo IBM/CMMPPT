@@ -58,7 +58,7 @@ class WitOpSolverIf: public WitProbAssoc
       // Other public member functions.
       //------------------------------------------------------------------------
 
-      virtual void solveOptProb () = 0;
+      void solveOptProb ();
          //
          // Solves the optimization problem.
 
@@ -75,6 +75,30 @@ class WitOpSolverIf: public WitProbAssoc
       WitOpSolverIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
+      // Other protected member functions.
+      //------------------------------------------------------------------------
+
+      virtual void solveOptProbAsLp () = 0;
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as an LP for a first solve.
+
+      virtual void reSolveOptProbAsLp () = 0;
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as an LP for a re-solve.
+
+      virtual void solveOptProbAsMip () = 0;
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as a MIP.
+
+      virtual void solveOptProbAsLexOpt () = 0;
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as a lexicographic optimization.
+
+      //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
@@ -87,6 +111,14 @@ class WitOpSolverIf: public WitProbAssoc
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitOpSolverIf);
+
+      static WitOpSolverIf * newInstanceForCoin (WitOptProblem * theOptProblem);
+         //
+         // If COIN is embedded,
+         //    creates and returns a new OpSolverIf for COIN and theOptProblem.
+         // If COIN is not embedded,
+         //    issues a fatal error.
+         // Implemented in CoinIf.C.
 
       static WitOpSolverIf * newInstanceForCplex (WitOptProblem * theOptProblem);
          //

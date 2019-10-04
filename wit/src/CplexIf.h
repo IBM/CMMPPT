@@ -55,14 +55,6 @@ class WitCplexIf: public WitOpSolverIf
 
       virtual ~WitCplexIf ();
 
-      //------------------------------------------------------------------------
-      // Other public member functions.
-      //------------------------------------------------------------------------
-
-      virtual void solveOptProb ();
-         //
-         // Solves the optimization problem by invoking CPLEX.
-
    private:
 
       //------------------------------------------------------------------------
@@ -85,25 +77,12 @@ class WitCplexIf: public WitOpSolverIf
          //
          // Shuts down the CPLEX log file.
 
-      void solveOptProbAsLp ();
+      virtual void solveOptProbAsLp     ();
+      virtual void reSolveOptProbAsLp   ();
+      virtual void solveOptProbAsMip    ();
+      virtual void solveOptProbAsLexOpt ();
          //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a first solve.
-
-      void reSolveOptProbAsLp ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a re-solve.
-
-      void solveOptProbAsMip ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a MIP.
-
-      void solveOptProbAsLexOpt ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a lexicographic optimization.
+         // Overrides from class OpSolverIf.
 
       void issueSolveMsg ();
          //

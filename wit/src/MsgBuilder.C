@@ -7598,11 +7598,11 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "cplexNeededSmsg",
+      "coinOrCplexNeededSmsg",
       1035,
       severe_,
       "Optimizing implosion and stochastic implosion cannot be invoked, "
-      "because CPLEX was not embedded into this build of WIT.");
+      "because neither COIN nor CPLEX were embedded into this build of WIT.");
 
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
@@ -7930,6 +7930,17 @@ void WitMsgBuilder::buildMsgs ()
       "CPLEX Version: \"%1$s\".");
 
    currentMsg_->dupToStdout           (true);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "coinNYISmsg",
+      1062,
+      severe_,
+      "%1$s with COIN is not yet implemented.");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
    }

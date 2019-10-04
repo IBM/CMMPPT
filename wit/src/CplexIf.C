@@ -16,7 +16,6 @@
 //------------------------------------------------------------------------------
 
 #include <CplexIf.h>
-#include <OptProblem.h>
 
 //------------------------------------------------------------------------------
 // CPLEX-embedded Implementation of OpSolverIf functions.
@@ -68,6 +67,7 @@ WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (WitOptProblem *)
 #ifdef CPLEX_EMBEDDED
 
 #include <OptComp.h>
+#include <OptProblem.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
 #include <MultiObjMgr.h>
@@ -98,32 +98,6 @@ WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
 WitCplexIf::~WitCplexIf ()
    {
    shutDownCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::solveOptProb ()
-   {
-   WitTimer::enterSection ("cplex");
-
-   if      (myOptComp ()->multiObjMode ())
-      {
-      solveOptProbAsLexOpt ();
-      }
-   else if (myOptProblem ()->reSolveMode ())
-      {
-      reSolveOptProbAsLp ();
-      }
-   else if (mipMode ())
-      {
-      solveOptProbAsMip ();
-      }
-   else
-      {
-      solveOptProbAsLp ();
-      }
-
-   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
@@ -197,6 +171,8 @@ void WitCplexIf::shutDownLogFile ()
 
 void WitCplexIf::solveOptProbAsLp ()
    {
+   WitTimer::enterSection ("cplex");
+
    issueSolveMsg ();
 
    loadLp ();
@@ -213,12 +189,16 @@ void WitCplexIf::solveOptProbAsLp ()
 
    if (myOptProblem ()->needDual ())
       storeDualSoln ();
+
+   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::reSolveOptProbAsLp ()
    {
+   WitTimer::enterSection ("cplex");
+
    myMsgFac () ("reSolveLpMsg");
 
    reviseLp ();
@@ -233,12 +213,16 @@ void WitCplexIf::reSolveOptProbAsLp ()
 
    if (myOptProblem ()->needDual ())
       storeDualSoln ();
+
+   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::solveOptProbAsMip ()
    {
+   WitTimer::enterSection ("cplex");
+
    issueSolveMsg ();
 
    loadLp ();
@@ -250,12 +234,16 @@ void WitCplexIf::solveOptProbAsMip ()
    solveMip (false);
 
    storePrimalSoln ();
+
+   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::solveOptProbAsLexOpt ()
    {
+   WitTimer::enterSection ("cplex");
+
    issueSolveMsg ();
 
    myMsgFac () ("lexOptMsg");
@@ -270,6 +258,8 @@ void WitCplexIf::solveOptProbAsLexOpt ()
    solveLexOpt ();
 
    storePrimalSoln ();
+
+   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------

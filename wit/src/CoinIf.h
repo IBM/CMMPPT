@@ -44,14 +44,6 @@ class WitCoinIf: public WitOpSolverIf
 
       virtual ~WitCoinIf ();
 
-      //------------------------------------------------------------------------
-      // Other public member functions.
-      //------------------------------------------------------------------------
-
-      virtual void solveOptProb ();
-         //
-         // Solves the optimization problem by invoking CPLEX.
-
    private:
 
       //------------------------------------------------------------------------
@@ -59,6 +51,13 @@ class WitCoinIf: public WitOpSolverIf
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitCoinIf);
+
+      virtual void solveOptProbAsLp     ();
+      virtual void reSolveOptProbAsLp   ();
+      virtual void solveOptProbAsMip    ();
+      virtual void solveOptProbAsLexOpt ();
+         //
+         // Overrides from class OpSolverIf.
 
       //-----------------------------------------------------------------------
       // Private member data.

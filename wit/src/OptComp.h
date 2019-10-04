@@ -187,9 +187,9 @@ class WitOptComp: public WitComponent
          //
          // Returns true, iff there is at least one cost coefficient < 0.
 
-      void requireCplex ();
+      void requireCoinOrCplex ();
          //
-         // Verifies that CPLEX was embedded.
+         // Verifies that COIN or CPLEX were embedded.
 
       void writeObjValue ();
          //

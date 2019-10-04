@@ -259,7 +259,10 @@ CoinIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CoinIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CoinIf.obj: ../../config/dummy_headers/string.h
 CoinIf.obj: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
-CoinIf.obj: ../src/TVec.h ../src/Vector.h
+CoinIf.obj: ../src/TVec.h ../src/Vector.h ../src/OptProblem.h
+CoinIf.obj: ../src/ObjStack.h ../src/Stack.h ../src/Link.h ../src/PtrVec.h
+CoinIf.obj: ../../config/dummy_headers/algorithm ../src/MsgFac.h
+CoinIf.obj: ../src/MsgArg.h ../src/Timing.h ../src/Str.h
 CompMgr.obj: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CompMgr.obj: ../../config/dummy_headers/string.h
@@ -306,9 +309,6 @@ CplexIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CplexIf.obj: ../../config/dummy_headers/string.h
 CplexIf.obj: ../../config/dummy_headers/math.h
 CplexIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
-CplexIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-CplexIf.obj: ../src/Link.h ../src/PtrVec.h
-CplexIf.obj: ../../config/dummy_headers/algorithm
 CpxParSpec.obj: ../src/CpxParSpecMgr.h ../src/Assoc.h ../src/Problem.h
 CpxParSpec.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 CpxParSpec.obj: ../../config/dummy_headers/stdio.h
@@ -844,9 +844,11 @@ OpSolverIf.obj: ../../config/dummy_headers/stdio.h
 OpSolverIf.obj: ../../config/dummy_headers/string.h
 OpSolverIf.obj: ../../config/dummy_headers/math.h
 OpSolverIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+OpSolverIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
 OpSolverIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
 OpSolverIf.obj: ../src/Link.h ../src/PtrVec.h
-OpSolverIf.obj: ../../config/dummy_headers/algorithm
+OpSolverIf.obj: ../../config/dummy_headers/algorithm ../src/GlobalComp.h
+OpSolverIf.obj: ../src/PairStack.h
 Operation.obj: ../src/Operation.h ../src/Node.h ../src/DelComp.h
 Operation.obj: ../src/Component.h ../src/Assoc.h ../src/Problem.h
 Operation.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
