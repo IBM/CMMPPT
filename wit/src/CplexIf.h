@@ -77,20 +77,14 @@ class WitCplexIf: public WitOpSolverIf
          //
          // Shuts down the CPLEX log file.
 
-      virtual void solveOptProbAsLp     ();
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
+      virtual void reSolveOptProbAsLp     ();
+      virtual void solveOptProbAsMip      ();
+      virtual void solveOptProbAsLexOpt   ();
+      virtual void finishSolveOptProbAsLp ();
+      virtual void issueSolveMsg          ();
+      virtual void loadLp                 ();
          //
          // Overrides from class OpSolverIf.
-
-      void issueSolveMsg ();
-         //
-         // Issues a msg for the solve.
-
-      void loadLp ();
-         //
-         // Loads the optimization problem into CPLEX as an LP.
 
       void getRowData (
             WitVector <double> & rhs,
@@ -99,17 +93,11 @@ class WitCplexIf: public WitOpSolverIf
          // Retrieves the row portion of the LP aspect of the problem in the
          // representation required for CPXcopylp.
 
-      void getColumnData (
-            WitVector <double> & objective,
-            WitVector <int> &    matbeg,
-            WitVector <int> &    matcnt,
-            WitVector <int> &    matind,
-            WitVector <double> & matval,
-            WitVector <double> & lb,
-            WitVector <double> & ub);
+      void getMatcnt (
+                  WitVector <int> & matcnt,
+            const WitVector <int> & matbeg);
          //
-         // Retrieves the column portion of the LP aspect of the problem in the
-         // representation required for CPXcopylp.
+         // Computes matcnt from matbeg as required for CPXcopylp.
 
       void reviseLp ();
          //
@@ -266,10 +254,6 @@ class WitCplexIf: public WitOpSolverIf
          // If myErrCode_ is not 0, issues a severe message indicating
          // theErrCode as a CPLEX error code and theFuncName as the name of the
          // CPLEX function that returned the error code.
-
-      bool mipMode ();
-         //
-         // Returns true, iff myOptProblem is a MIP.
 
       noCopyCtorAssign (WitCplexIf);
 

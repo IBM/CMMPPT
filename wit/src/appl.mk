@@ -120,7 +120,7 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 
 ifneq ($(WIT_COIN_HOME),)
 
-comp_coin_flags = -DCOIN_EMBEDDED
+comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
 
 CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)

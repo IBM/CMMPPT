@@ -15,6 +15,8 @@
 
 #include <OpSolverIf.h>
 
+class ClpSimplex;
+
 //------------------------------------------------------------------------------
 // class CoinIf
 //
@@ -52,16 +54,29 @@ class WitCoinIf: public WitOpSolverIf
 
       noCopyCtorAssign (WitCoinIf);
 
-      virtual void solveOptProbAsLp     ();
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
+      virtual void reSolveOptProbAsLp     ();
+      virtual void solveOptProbAsMip      ();
+      virtual void solveOptProbAsLexOpt   ();
+      virtual void finishSolveOptProbAsLp ();
+      virtual void issueSolveMsg          ();
+      virtual void loadLp                 ();
          //
          // Overrides from class OpSolverIf.
+
+      void getRowData (
+            WitVector <double> & rowlb,
+            WitVector <double> & rowub);
+         //
+         // Retrieves the row portion of the LP aspect of the problem in the
+         // representation required for loadProblem.
 
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
+
+      ClpSimplex * myClpSimplex_;
+         //
+         // The ClpSimplex owmned by this CoinIf.
    };
 
 #endif

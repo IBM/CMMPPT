@@ -737,7 +737,7 @@ void WitMsgBuilder::buildMsgs ()
       "solveOptProblemMsg",
       157,
       info_,
-      "Solving the %1$m problem with CPLEX.");
+      "Solving the %1$m problem with %2$s.");
 
    currentMsg_->dupToStdout           (true);
 

@@ -11,14 +11,18 @@
 //    implementation depends on whether or not COIN_EMBEDDED is defined.
 //
 // Contains the implementation of class CoinIf.
-//    The implementation of class CoinIf is compiled only if COIN_EMBEDDED is
-//    defined.
+//
+// Class CoinIf is implemented only if COIN_EMBEDDED is defined.
+//------------------------------------------------------------------------------
+
+#define CALL_COIN 0
+   //
+   // 1, if Calls to COIN are to be compiled.
+   // 0, if Calls to COIN are to be skipped.
+
 //------------------------------------------------------------------------------
 
 #include <CoinIf.h>
-#include <OptProblem.h>
-#include <MsgFac.h>
-#include <Timing.h>
 
 //------------------------------------------------------------------------------
 // COIN-embedded Implementation of OpSolverIf functions.
@@ -42,7 +46,7 @@ WitOpSolverIf * WitOpSolverIf::newInstanceForCoin (
 #endif // COIN_EMBEDDED
 
 //------------------------------------------------------------------------------
-// COIN-embedded Implementation of OpSolverIf functions.
+// Non-COIN-embedded Implementation of OpSolverIf functions.
 //------------------------------------------------------------------------------
 
 #ifndef COIN_EMBEDDED
@@ -64,28 +68,49 @@ WitOpSolverIf * WitOpSolverIf::newInstanceForCoin (WitOptProblem *)
 #endif // not COIN_EMBEDDED
 
 //------------------------------------------------------------------------------
+// Implementation of class CoinIf.
+//------------------------------------------------------------------------------
 
 #ifdef COIN_EMBEDDED
 
+#include <OptProblem.h>
+#include <OptCon.h>
+#include <OptVar.h>
+#include <MsgFrag.h>
+#include <MsgFac.h>
+#include <Timing.h>
+
+#include <ClpSimplex.hpp>
+
+//------------------------------------------------------------------------------
+
 WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
 
-      WitOpSolverIf (theOptProblem)
+      WitOpSolverIf (theOptProblem),
+      myClpSimplex_ (NULL)
    {
+   WitTimer::enterSection ("coin");
+
+#if CALL_COIN
+
+   myClpSimplex_ = new ClpSimplex;
+
+#endif // CALL_COIN
+
+   WitTimer::leaveSection ("coin");
    }
 
 //------------------------------------------------------------------------------
 
 WitCoinIf::~WitCoinIf ()
    {
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinIf::solveOptProbAsLp ()
-   {
    WitTimer::enterSection ("coin");
 
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion and Stochastic Implosion");
+#if CALL_COIN
+
+   delete myClpSimplex_;
+
+#endif // CALL_COIN
 
    WitTimer::leaveSection ("coin");
    }
@@ -94,33 +119,99 @@ void WitCoinIf::solveOptProbAsLp ()
 
 void WitCoinIf::reSolveOptProbAsLp ()
    {
-   WitTimer::enterSection ("coin");
-
    myMsgFac () ("coinNYISmsg", "Accelarted Optimizing Implosion");
-
-   WitTimer::leaveSection ("coin");
    }
 
 //------------------------------------------------------------------------------
 
 void WitCoinIf::solveOptProbAsMip ()
    {
-   WitTimer::enterSection ("coin");
-
    myMsgFac () ("coinNYISmsg", "Optimizing Implosion in MIP mode");
-
-   WitTimer::leaveSection ("coin");
    }
 
 //------------------------------------------------------------------------------
 
 void WitCoinIf::solveOptProbAsLexOpt ()
    {
+   myMsgFac () ("coinNYISmsg", "Optimizing Implosion with Multiple Objectives");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::finishSolveOptProbAsLp ()
+   {
+   myMsgFac () ("coinNYISmsg", "Optimizing Implosion and Stochastic Implosion");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::issueSolveMsg ()
+   {
+   myMsgFac () ("solveOptProblemMsg",
+      myMsgFac ().myFrag (mipMode ()? "mipFrag": "lpFrag"),
+                          mipMode ()? "CBC":     "CLP");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::loadLp ()
+   {
+   WitVector <int>    start;
+   WitVector <int>    index;
+   WitVector <double> value;
+   WitVector <double> collb;
+   WitVector <double> colub;
+   WitVector <double> obj;
+   WitVector <double> rowlb;
+   WitVector <double> rowub;
+
+   myOptProblem ()->getMatrixByCols (start, index, value);
+
+   getColumnData (collb, colub, obj);
+
+   getRowData (rowlb, rowub);
+
    WitTimer::enterSection ("coin");
 
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion with Multiple Objectives");
+#if CALL_COIN
+
+   myClpSimplex_->
+      loadProblem (
+         myOptProblem ()->nOptVars (),
+         myOptProblem ()->nOptCons (),
+         start.myCVec (),
+         index.myCVec (),
+         value.myCVec (),
+         collb.myCVec (),
+         colub.myCVec (),
+         obj  .myCVec (),
+         rowlb.myCVec (),
+         rowub.myCVec ());
+
+#endif // CALL_COIN
 
    WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::getRowData (
+      WitVector <double> & rowlb,
+      WitVector <double> & rowub)
+   {
+   WitOptCon * theOptCon;
+   int         theIdx;
+
+   rowlb.resize (myOptProblem ()->nOptCons ());
+   rowub.resize (myOptProblem ()->nOptCons ());
+
+   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
+      {
+      theIdx = theOptCon->index ();
+
+      rowlb[theIdx] = theOptCon->bounds ().lower ();
+      rowub[theIdx] = theOptCon->bounds ().upper ();
+      }
    }
 
 #endif // COIN_EMBEDDED

@@ -78,7 +78,7 @@ class WitOpSolverIf: public WitProbAssoc
       // Other protected member functions.
       //------------------------------------------------------------------------
 
-      virtual void solveOptProbAsLp () = 0;
+      void solveOptProbAsLp ();
          //
          // Loads, solves and retrieves the solution to the optimization problem
          // as an LP for a first solve.
@@ -97,6 +97,31 @@ class WitOpSolverIf: public WitProbAssoc
          //
          // Loads, solves and retrieves the solution to the optimization problem
          // as a lexicographic optimization.
+
+      virtual void finishSolveOptProbAsLp () = 0;
+         //
+         // Does all aspects of solveOptProbAsLp () that have not been moved
+         // to more specific functions.
+
+      virtual void issueSolveMsg () = 0;
+         //
+         // Issues a msg for the solve.
+
+      virtual void loadLp () = 0;
+         //
+         // Loads the optimization problem into CPLEX as an LP.
+
+      void getColumnData (
+            WitVector <double> & lb,
+            WitVector <double> & ub,
+            WitVector <double> & obj);
+         //
+         // Retrieves the column portion of the LP aspect of the problem in a
+         // standard format.
+
+      bool mipMode ();
+         //
+         // Returns true, iff myOptProblem is a MIP.
 
       //------------------------------------------------------------------------
       // Data access functions.

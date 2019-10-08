@@ -9,6 +9,7 @@
 //------------------------------------------------------------------------------
 
 #include <OpSolverIf.h>
+#include <OptVar.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <GlobalComp.h>
@@ -52,7 +53,7 @@ void WitOpSolverIf::solveOptProb ()
       {
       reSolveOptProbAsLp ();
       }
-   else if (myOptComp ()->mipMode ())
+   else if (mipMode ())
       {
       solveOptProbAsMip ();
       }
@@ -69,4 +70,50 @@ WitOpSolverIf::WitOpSolverIf (WitOptProblem * theOptProblem):
       WitProbAssoc  (theOptProblem->myProblem ()),
       myOptProblem_ (theOptProblem)
    {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpSolverIf::solveOptProbAsLp ()
+   {
+   issueSolveMsg ();
+
+   loadLp ();
+
+   finishSolveOptProbAsLp ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOpSolverIf::getColumnData (
+      WitVector <double> & lb,
+      WitVector <double> & ub,
+      WitVector <double> & obj)
+   {
+   int         ncols;
+   WitOptVar * theOptVar;
+   int         theIdx;
+
+   ncols = myOptProblem ()->nOptVars ();
+
+   lb .resize (ncols);
+   ub .resize (ncols);
+   obj.resize (ncols);
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      theIdx      = theOptVar->index ();
+
+      lb [theIdx] = theOptVar->bounds ().lower ();
+      ub [theIdx] = theOptVar->bounds ().upper ();
+
+      obj[theIdx] = theOptVar->objCoeff ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOpSolverIf::mipMode ()
+   {
+   return myOptComp ()->mipMode ();
    }
