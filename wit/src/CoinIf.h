@@ -35,6 +35,21 @@ class WitCoinIf: public WitOpSolverIf
    public:
 
       //------------------------------------------------------------------------
+      // Static public member functions.
+      //------------------------------------------------------------------------
+
+      static bool coinEmbedded ();
+         //
+         // Returns true, iff COIN embedded into the current build of WIT.
+
+      static WitCoinIf * newInstanceIfAllowed (WitOptProblem * theOptProblem);
+         //
+         // If COIN is embedded,
+         //    creates and returns a new CoinIf for theOptProblem.
+         // If COIN is not embedded,
+         //    issues a fatal error.
+
+      //------------------------------------------------------------------------
       // Constructor functions.
       //------------------------------------------------------------------------
 

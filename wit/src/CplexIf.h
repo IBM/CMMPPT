@@ -11,20 +11,19 @@
 // Header file: "CplexIf.h"
 //
 // Contains the declaration of class CplexIf.
-//    The declaration compiled only if CPLEX_EMBEDDED is defined.
-//
-// NOTE:
-//    This header file should be #included only by CplexIf.C
-//    This is because the Makefiles apply the proper compiler flags for the
-//    CPLEX_EMBEDDED macro and the #include <cplex.h> statement only when
-//    compiling CplexIf.C
 //------------------------------------------------------------------------------
 
 #include <OpSolverIf.h>
 
-#ifdef CPLEX_EMBEDDED
+//------------------------------------------------------------------------------
+// The following typedefs are defined in the CPLEX header file cpxconst.h.
+// They are being duplicated here so as to avoid the need to #include CPLEX
+// header files from this header file, in order to allow this header file to be
+// #included by files that aren't set up to imbed CPLEX code. 
+//------------------------------------------------------------------------------
 
-#include <cplex.h>
+typedef struct cpxenv * CPXENVptr;
+typedef struct cpxlp  * CPXLPptr;
 
 //------------------------------------------------------------------------------
 // class CplexIf
@@ -42,6 +41,21 @@
 class WitCplexIf: public WitOpSolverIf
    {
    public:
+
+      //------------------------------------------------------------------------
+      // Static public member functions.
+      //------------------------------------------------------------------------
+
+      static bool cplexEmbedded ();
+         //
+         // Returns true, iff CPLEX embedded into the current build of WIT.
+
+      static WitCplexIf * newInstanceIfAllowed (WitOptProblem * theOptProblem);
+         //
+         // If CPLEX is embedded,
+         //    creates and returns a new CplexIf for theOptProblem.
+         // If CPLEX is not embedded,
+         //    issues a fatal error.
 
       //------------------------------------------------------------------------
       // Constructor functions.
@@ -273,7 +287,5 @@ class WitCplexIf: public WitOpSolverIf
          //
          // The error code from the most recent call to CPLEX, if any.
    };
-
-#endif // CPLEX_EMBEDDED
 
 #endif

@@ -7,61 +7,14 @@
 //------------------------------------------------------------------------------
 // Source file: "CplexIf.C"
 //
-// Contains the implementations of member functions of class OpSolverIf whose
-//    implementation depends on whether or not CPLEX_EMBEDDED is defined.
-//
 // Contains the implementation of class CplexIf.
-//    The implementation of class CplexIf is compiled only if CPLEX_EMBEDDED is
-//    defined.
+// If CPLEX_EMBEDDED is not defined, then only static functions are implemented.
 //------------------------------------------------------------------------------
 
 #include <CplexIf.h>
 
 //------------------------------------------------------------------------------
-// CPLEX-embedded Implementation of OpSolverIf functions.
-//------------------------------------------------------------------------------
-
-#ifdef CPLEX_EMBEDDED
-
-bool WitOpSolverIf::cplexEmbedded ()
-   {
-   return true;
-   }
-
-//------------------------------------------------------------------------------
-
-WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (
-      WitOptProblem * theOptProblem)
-   {
-   return new WitCplexIf (theOptProblem);
-   }
-
-#endif // CPLEX_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Non-CPLEX-embedded Implementation of OpSolverIf functions.
-//------------------------------------------------------------------------------
-
-#ifndef CPLEX_EMBEDDED
-
-bool WitOpSolverIf::cplexEmbedded ()
-   {
-   return false;
-   }
-
-//------------------------------------------------------------------------------
-
-WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (WitOptProblem *)
-   {
-   stronglyAssert (false);
-
-   return NULL;
-   }
-
-#endif // not CPLEX_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Implementation of class CplexIf.
+// CPLEX-embedded implementation of class CplexIf.
 //------------------------------------------------------------------------------
 
 #ifdef CPLEX_EMBEDDED
@@ -79,7 +32,22 @@ WitOpSolverIf * WitOpSolverIf::newInstanceForCplex (WitOptProblem *)
 #include <MsgFac.h>
 #include <Timing.h>
 
+#include <cplex.h>
 #include <float.h>
+
+//------------------------------------------------------------------------------
+
+bool WitCplexIf::cplexEmbedded ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCplexIf * WitCplexIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
+   {
+   return new WitCplexIf (theOptProblem);
+   }
 
 //------------------------------------------------------------------------------
 
@@ -1274,3 +1242,28 @@ void WitCplexIf::checkErrCode (const char * theFuncName)
 //------------------------------------------------------------------------------
 
 #endif // CPLEX_EMBEDDED
+
+//------------------------------------------------------------------------------
+// Non-CPLEX-embedded implementation of class CplexIf.
+//------------------------------------------------------------------------------
+
+#ifndef CPLEX_EMBEDDED
+
+//------------------------------------------------------------------------------
+
+bool WitCplexIf::cplexEmbedded ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCplexIf * WitCplexIf::newInstanceIfAllowed (WitOptProblem *)
+   {
+   stronglyAssert (false);
+
+   return NULL;
+   }
+
+#endif // not CPLEX_EMBEDDED
+

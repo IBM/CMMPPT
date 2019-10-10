@@ -6,34 +6,14 @@
 
 //------------------------------------------------------------------------------
 // Source file: "OpSolverIf.C"
+//
+// Contains the implementation of class OpSolverIf.
 //------------------------------------------------------------------------------
 
 #include <OpSolverIf.h>
 #include <OptVar.h>
 #include <OptComp.h>
 #include <OptProblem.h>
-#include <GlobalComp.h>
-
-//------------------------------------------------------------------------------
-// Implementation of class OpSolverIf.
-//------------------------------------------------------------------------------
-
-WitOpSolverIf * WitOpSolverIf::newInstance (WitOptProblem * theOptProblem)
-   {
-   if (theOptProblem->myGlobalComp ()->tempPar (1) == "coin")
-      if (coinEmbedded ())
-         return newInstanceForCoin  (theOptProblem);
-
-   if (cplexEmbedded ())
-      return newInstanceForCplex (theOptProblem);
-
-   if (coinEmbedded ())
-      return newInstanceForCoin  (theOptProblem);
-
-   stronglyAssert (false);
-
-   return NULL;
-   }
 
 //------------------------------------------------------------------------------
 

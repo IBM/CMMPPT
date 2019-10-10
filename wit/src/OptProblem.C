@@ -14,12 +14,17 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <Coeff.h>
-#include <OpSolverIf.h>
+#include <CoinIf.h>
+#include <CplexIf.h>
 #include <OptComp.h>
 #include <Timing.h>
 #include <MsgFrag.h>
 #include <MsgFac.h>
 #include <Session.h>
+
+#include <GlobalComp.h>
+   //
+   // Temporary, for devpar1
 
 #include <float.h>
 
@@ -311,7 +316,7 @@ void WitOptProblem::solve ()
       print ();
 
    if (myOpSolverIf_ == NULL)
-       myOpSolverIf_ = WitOpSolverIf::newInstance (this);
+       myOpSolverIf_ = newOpSolverIf ();
 
    myOpSolverIf_->solveOptProb ();
 
@@ -652,6 +657,31 @@ void WitOptProblem::prtMatrixByCols ()
          theIdx,
          rowIdx  [theIdx],
          coeffVal[theIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+WitOpSolverIf * WitOptProblem::newOpSolverIf ()
+   {
+   if (myGlobalComp ()->tempPar (1) == "coin")
+      {
+      if (WitCoinIf::coinEmbedded ())
+         return WitCoinIf::newInstanceIfAllowed  (this);
+      else
+         myMsgFac () ("genericSmsg",
+            "tempPar1 was set to \"coin\", but COIN is not embedded in this "
+            "build of WIT.");
+      }
+
+   if (WitCplexIf::cplexEmbedded ())
+      return WitCplexIf::newInstanceIfAllowed  (this);
+
+   if (WitCoinIf::coinEmbedded ())
+      return WitCoinIf::newInstanceIfAllowed  (this);
+
+   stronglyAssert (false);
+
+   return NULL;
    }
 
 //------------------------------------------------------------------------------

@@ -273,6 +273,11 @@ class WitOptProblem: public WitProbAssoc
          //
          // Performs screening of constraints and variables.
 
+      WitOpSolverIf * newOpSolverIf ();
+         //
+         // Creates and returns a new OpSolverIf for this OptProblem.
+         // Issues a fatal error, if neither COIN nor CPLEX is embedded.
+
       void reconstructDual ();
          //
          // Assuming the optimization problem was screened and an optimal dual

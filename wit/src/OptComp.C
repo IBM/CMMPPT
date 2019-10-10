@@ -23,7 +23,8 @@
 #include <Material.h>
 #include <Operation.h>
 #include <SubEntry.h>
-#include <OpSolverIf.h>
+#include <CoinIf.h>
+#include <CplexIf.h>
 #include <wit/src/Variant.h>
 #include <wit.h>
 #include <CompMgr.h>
@@ -313,7 +314,7 @@ void WitOptComp::storeStochBoundsValue (double theValue)
 
 void WitOptComp::storeCplexStatusCode (int theValue)
    {
-   witAssert (WitOpSolverIf::cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexStatusCode_ = theValue;
    }
@@ -322,7 +323,7 @@ void WitOptComp::storeCplexStatusCode (int theValue)
 
 void WitOptComp::storeCplexStatusText (const char * theValue)
    {
-   witAssert (WitOpSolverIf::cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexStatusText_ = theValue;
    }
@@ -331,7 +332,7 @@ void WitOptComp::storeCplexStatusText (const char * theValue)
 
 void WitOptComp::storeCplexMipBound (double theValue)
    {
-   witAssert (WitOpSolverIf::cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexMipBound_ = theValue;
    }
@@ -340,7 +341,7 @@ void WitOptComp::storeCplexMipBound (double theValue)
 
 void WitOptComp::storeCplexMipRelGap (double theValue)
    {
-   witAssert (WitOpSolverIf::cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
    
    cplexMipRelGap_ = theValue;
    }
@@ -399,8 +400,8 @@ void WitOptComp::unpostprocess ()
 void WitOptComp::display ()
    {
    myMsgFac () ("optAttDdMsg",
-      WitOpSolverIf::coinEmbedded  (),
-      WitOpSolverIf::cplexEmbedded (),
+      WitCoinIf::coinEmbedded   (),
+      WitCplexIf::cplexEmbedded (),
       compPrices_,
       accAfterOptImp_,
       accAfterSoftLB_,
@@ -468,8 +469,8 @@ bool WitOptComp::negativeCostsExist ()
 
 void WitOptComp::requireCoinOrCplex ()
    {
-   if (not WitOpSolverIf::coinEmbedded ())
-      if (not WitOpSolverIf::cplexEmbedded ())
+   if (not WitCoinIf::coinEmbedded ())
+      if (not WitCplexIf::cplexEmbedded ())
          myMsgFac () ("coinOrCplexNeededSmsg");
    }
 

@@ -7,71 +7,22 @@
 //------------------------------------------------------------------------------
 // Source file: "CoinIf.C"
 //
-// Contains the implementations of member functions of class OpSolverIf whose
-//    implementation depends on whether or not COIN_EMBEDDED is defined.
-//
 // Contains the implementation of class CoinIf.
-//
-// Class CoinIf is implemented only if COIN_EMBEDDED is defined.
-//------------------------------------------------------------------------------
-
-#define CALL_COIN 0
-   //
-   // 1, if Calls to COIN are to be compiled.
-   // 0, if Calls to COIN are to be skipped.
-
+// If COIN_EMBEDDED is not defined, then only static functions are implemented.
 //------------------------------------------------------------------------------
 
 #include <CoinIf.h>
 
 //------------------------------------------------------------------------------
-// COIN-embedded Implementation of OpSolverIf functions.
+// COIN-embedded Implementation of class CoinIf.
 //------------------------------------------------------------------------------
 
 #ifdef COIN_EMBEDDED
 
-bool WitOpSolverIf::coinEmbedded ()
-   {
-   return true;
-   }
-
-//------------------------------------------------------------------------------
-
-WitOpSolverIf * WitOpSolverIf::newInstanceForCoin (
-      WitOptProblem * theOptProblem)
-   {
-   return new WitCoinIf (theOptProblem);
-   }
-
-#endif // COIN_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Non-COIN-embedded Implementation of OpSolverIf functions.
-//------------------------------------------------------------------------------
-
-#ifndef COIN_EMBEDDED
-
-bool WitOpSolverIf::coinEmbedded ()
-   {
-   return false;
-   }
-
-//------------------------------------------------------------------------------
-
-WitOpSolverIf * WitOpSolverIf::newInstanceForCoin (WitOptProblem *)
-   {
-   stronglyAssert (false);
-
-   return NULL;
-   }
-
-#endif // not COIN_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Implementation of class CoinIf.
-//------------------------------------------------------------------------------
-
-#ifdef COIN_EMBEDDED
+#define CALL_COIN 0
+   //
+   // 1, if Calls to COIN are to be compiled.
+   // 0, if Calls to COIN are to be skipped.
 
 #include <OptProblem.h>
 #include <OptCon.h>
@@ -81,6 +32,20 @@ WitOpSolverIf * WitOpSolverIf::newInstanceForCoin (WitOptProblem *)
 #include <Timing.h>
 
 #include <ClpSimplex.hpp>
+
+//------------------------------------------------------------------------------
+
+bool WitCoinIf::coinEmbedded ()
+   {
+   return true;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinIf * WitCoinIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
+   {
+   return new WitCoinIf (theOptProblem);
+   }
 
 //------------------------------------------------------------------------------
 
@@ -215,3 +180,25 @@ void WitCoinIf::getRowData (
    }
 
 #endif // COIN_EMBEDDED
+
+//------------------------------------------------------------------------------
+// Non-COIN-embedded Implementation of class CoinIf.
+//------------------------------------------------------------------------------
+
+#ifndef COIN_EMBEDDED
+
+bool WitCoinIf::coinEmbedded ()
+   {
+   return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinIf * WitCoinIf::newInstanceIfAllowed (WitOptProblem *)
+   {
+   stronglyAssert (false);
+
+   return NULL;
+   }
+
+#endif // Not COIN_EMBEDDED
