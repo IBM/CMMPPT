@@ -19,11 +19,6 @@
 
 #ifdef COIN_EMBEDDED
 
-#define CALL_COIN 0
-   //
-   // 1, if Calls to COIN are to be compiled.
-   // 0, if Calls to COIN are to be skipped.
-
 #include <OptProblem.h>
 #include <OptCon.h>
 #include <OptVar.h>
@@ -56,11 +51,7 @@ WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
    {
    WitTimer::enterSection ("coin");
 
-#if CALL_COIN
-
    myClpSimplex_ = new ClpSimplex;
-
-#endif // CALL_COIN
 
    WitTimer::leaveSection ("coin");
    }
@@ -71,11 +62,7 @@ WitCoinIf::~WitCoinIf ()
    {
    WitTimer::enterSection ("coin");
 
-#if CALL_COIN
-
    delete myClpSimplex_;
-
-#endif // CALL_COIN
 
    WitTimer::leaveSection ("coin");
    }
@@ -138,8 +125,6 @@ void WitCoinIf::loadLp ()
 
    WitTimer::enterSection ("coin");
 
-#if CALL_COIN
-
    myClpSimplex_->
       loadProblem (
          myOptProblem ()->nOptVars (),
@@ -152,8 +137,6 @@ void WitCoinIf::loadLp ()
          obj  .myCVec (),
          rowlb.myCVec (),
          rowub.myCVec ());
-
-#endif // CALL_COIN
 
    WitTimer::leaveSection ("coin");
    }

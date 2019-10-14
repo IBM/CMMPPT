@@ -52,6 +52,39 @@ witLexer.obj:	witLexer.C
 BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexIf.obj wit.obj
 
 #------------------------------------------------------------------------------
+# coin_libs
+#
+#    When WIT is to embed COIN,
+#       this is the list of COIN libraries needed by WIT.
+#    Otherwise,
+#       this is the null string.
+#
+# Prereqisite macro:
+#
+#    WIT_CPLEX_HOME
+#       For the meaning of this macro, see the comment in appl.mk.
+#------------------------------------------------------------------------------
+
+ifneq ($(WIT_COIN_HOME),)
+
+   coin_libs =                              \
+      $(WIT_COIN_HOME)/lib/libClp.lib       \
+      $(WIT_COIN_HOME)/lib/libCoinUtils.lib \
+
+#     $(WIT_COIN_HOME)/lib/libCbc.lib       \
+      $(WIT_COIN_HOME)/lib/libCgl.lib       \
+      $(WIT_COIN_HOME)/lib/libOsiClp.lib    \
+      $(WIT_COIN_HOME)/lib/libOsi.lib       \
+   #
+   # These libraries will be needed when WIT's invocation of CBC is implemented.
+
+else
+
+   coin_libs =
+
+endif
+
+#------------------------------------------------------------------------------
 # cplex_lib
 #
 #    When WIT is to embed CPLEX, this is the CPLEX library.
@@ -84,7 +117,7 @@ special_wit_objects = $(mcl_client_objects) CplexIf.obj BuildDate.obj
 mcl_lib             = ../../mcl/winsdk/mcl.lib
 
 wit.lib:	$(lib_objects) $(special_wit_objects) $(mcl_lib)
-		lib -nologo $^ $(cplex_lib) -out:wit.lib
+		lib -nologo $^ $(coin_libs) $(cplex_lib) -out:wit.lib
 
 #------------------------------------------------------------------------------
 # Rule for building the WIT stand-alone executable:
