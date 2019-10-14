@@ -41,7 +41,6 @@ lib_objects = \
         ObjVec.$(obj_suffix) \
         OffsetProc.$(obj_suffix) \
         Operation.$(obj_suffix) \
-        OpSolverIf.$(obj_suffix) \
         OptComp.$(obj_suffix) \
         OptMisc.$(obj_suffix) \
         OptProblem.$(obj_suffix) \
@@ -81,6 +80,7 @@ lib_objects = \
         SglSrcMgr.$(obj_suffix) \
         SglSrcSite.$(obj_suffix) \
         SolnWrit.$(obj_suffix) \
+        SolverIf.$(obj_suffix) \
         StCons.$(obj_suffix) \
         StVars.$(obj_suffix) \
         Stack.$(obj_suffix) \

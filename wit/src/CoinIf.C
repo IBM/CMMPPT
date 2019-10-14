@@ -46,7 +46,7 @@ WitCoinIf * WitCoinIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
 
 WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
 
-      WitOpSolverIf (theOptProblem),
+      WitSolverIf   (theOptProblem),
       myClpSimplex_ (NULL)
    {
    WitTimer::enterSection ("coin");

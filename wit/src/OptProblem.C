@@ -268,7 +268,7 @@ WitOptProblem::WitOptProblem (WitProblem * theProblem):
 
       WitProbAssoc    (theProblem),
 
-      myOpSolverIf_   (NULL),
+      mySolverIf_     (NULL),
       nCoeffs_        (0),
       curCon_         (NULL),
       curConCoeffs_   (myProblem ()),
@@ -283,7 +283,7 @@ WitOptProblem::~WitOptProblem ()
    {
    int idx;
 
-   delete myOpSolverIf_;
+   delete mySolverIf_;
 
    while (not myOptCons_.isEmpty ())
       delete myOptCons_.get ();
@@ -315,10 +315,10 @@ void WitOptProblem::solve ()
    if (myOptComp ()->printOptProblem ())
       print ();
 
-   if (myOpSolverIf_ == NULL)
-       myOpSolverIf_ = newOpSolverIf ();
+   if (mySolverIf_ == NULL)
+       mySolverIf_ = newSolverIf ();
 
-   myOpSolverIf_->solveOptProb ();
+   mySolverIf_->solveOptProb ();
 
    if (needDual ())
       reconstructDual ();
@@ -661,7 +661,7 @@ void WitOptProblem::prtMatrixByCols ()
 
 //------------------------------------------------------------------------------
 
-WitOpSolverIf * WitOptProblem::newOpSolverIf ()
+WitSolverIf * WitOptProblem::newSolverIf ()
    {
    if (myGlobalComp ()->tempPar (1) == "coin")
       {

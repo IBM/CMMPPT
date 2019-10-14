@@ -13,7 +13,7 @@
 // Contains the declaration of class CoinIf.
 //------------------------------------------------------------------------------
 
-#include <OpSolverIf.h>
+#include <SolverIf.h>
 
 class ClpSimplex;
 
@@ -26,11 +26,11 @@ class ClpSimplex;
 // Class Hierarchy:
 //
 // ProbAssoc
-//    OpSolverIf
+//    SolverIf
 //       CoinIf
 //------------------------------------------------------------------------------
 
-class WitCoinIf: public WitOpSolverIf
+class WitCoinIf: public WitSolverIf
    {
    public:
 
@@ -76,7 +76,7 @@ class WitCoinIf: public WitOpSolverIf
       virtual void issueSolveMsg          ();
       virtual void loadLp                 ();
          //
-         // Overrides from class OpSolverIf.
+         // Overrides from class SolverIf.
 
       void getRowData (
             WitVector <double> & rowlb,

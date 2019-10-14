@@ -287,9 +287,9 @@ BuildDate.obj: ../src/typedefs.h ../src/macs.h
 BuildDate.obj: ../../config/dummy_headers/stdio.h
 BuildDate.obj: ../../config/dummy_headers/string.h
 BuildDate.obj: ../../config/dummy_headers/math.h
-CoinIf.obj: ../src/CoinIf.h ../src/OpSolverIf.h ../src/Assoc.h
-CoinIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
-CoinIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
+CoinIf.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h
+CoinIf.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
+CoinIf.obj: ../../config/dummy_headers/stdio.h
 CoinIf.obj: ../../config/dummy_headers/string.h
 CoinIf.obj: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
 CoinIf.obj: ../src/TVec.h ../src/Vector.h
@@ -333,7 +333,7 @@ Component.obj: ../src/Schedule.h ../src/CompMgr.h ../src/BoundSet.h
 Component.obj: ../src/OrigMrp.h ../src/MrpExp.h ../src/StochImpMgr.h
 Component.obj: ../src/IVRealArg.h ../src/RealArg.h ../src/MsgFrag.h
 Component.obj: ../src/MsgFac.h ../src/MsgArg.h
-CplexIf.obj: ../src/CplexIf.h ../src/OpSolverIf.h ../src/Assoc.h
+CplexIf.obj: ../src/CplexIf.h ../src/SolverIf.h ../src/Assoc.h
 CplexIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CplexIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CplexIf.obj: ../../config/dummy_headers/string.h
@@ -868,17 +868,6 @@ OffsetProc.obj: ../src/BomEntry.h ../src/ConsEntry.h ../src/ObjVec.h
 OffsetProc.obj: ../src/ObjVecIR.h ../src/GlobalComp.h ../src/Str.h
 OffsetProc.obj: ../src/PairStack.h ../src/Stack.h ../src/Part.h ../src/Node.h
 OffsetProc.obj: ../src/PtrTVec.h ../src/Operation.h
-OpSolverIf.obj: ../src/OpSolverIf.h ../src/Assoc.h ../src/Problem.h
-OpSolverIf.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
-OpSolverIf.obj: ../../config/dummy_headers/stdio.h
-OpSolverIf.obj: ../../config/dummy_headers/string.h
-OpSolverIf.obj: ../../config/dummy_headers/math.h
-OpSolverIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
-OpSolverIf.obj: ../src/OptVar.h ../src/OptVC.h ../src/BoundPair.h
-OpSolverIf.obj: ../src/PtrVec.h ../../config/dummy_headers/algorithm
-OpSolverIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
-OpSolverIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-OpSolverIf.obj: ../src/Link.h
 Operation.obj: ../src/Operation.h ../src/Node.h ../src/DelComp.h
 Operation.obj: ../src/Component.h ../src/Assoc.h ../src/Problem.h
 Operation.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
@@ -917,7 +906,7 @@ OptComp.obj: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 OptComp.obj: ../src/PairStack.h ../src/Stack.h ../src/StochImpMgr.h
 OptComp.obj: ../src/Material.h ../src/Operation.h ../src/SubEntry.h
 OptComp.obj: ../src/BomEntry.h ../src/ConsEntry.h ../src/BillEntry.h
-OptComp.obj: ../src/CoinIf.h ../src/OpSolverIf.h ../src/CplexIf.h
+OptComp.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
 OptComp.obj: ../../wit/src/Variant.h ../src/wit.h
 OptComp.obj: ../../config/dummy_headers/limits.h ../src/MsgFac.h
 OptComp.obj: ../src/MsgArg.h ../src/MsgFrag.h
@@ -942,7 +931,7 @@ OptProblem.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h ../src/Vector.h
 OptProblem.obj: ../../config/dummy_headers/algorithm ../src/Assoc.h
 OptProblem.obj: ../src/Problem.h ../src/TVec.h ../src/OptVar.h ../src/OptVC.h
 OptProblem.obj: ../src/BoundPair.h ../src/OptCon.h ../src/Coeff.h
-OptProblem.obj: ../src/CoinIf.h ../src/OpSolverIf.h ../src/CplexIf.h
+OptProblem.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
 OptProblem.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
 OptProblem.obj: ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
 OptProblem.obj: ../src/MsgArg.h ../src/Session.h ../src/GlobalComp.h
@@ -1478,13 +1467,12 @@ Session.obj: ../src/typedefs.h ../src/macs.h
 Session.obj: ../../config/dummy_headers/stdio.h
 Session.obj: ../../config/dummy_headers/string.h
 Session.obj: ../../config/dummy_headers/math.h ../src/CoinIf.h
-Session.obj: ../src/OpSolverIf.h ../src/Assoc.h ../src/Problem.h
-Session.obj: ../src/List.h ../../config/dummy_headers/list ../src/TVec.h
-Session.obj: ../src/CplexIf.h ../src/ApiMgr.h ../src/wit.h
-Session.obj: ../../config/dummy_headers/limits.h ../src/WitRun.h ../src/FSS.h
-Session.obj: ../src/Schedule.h ../src/CompMgr.h ../src/PtrVec.h
-Session.obj: ../../config/dummy_headers/algorithm ../src/MsgFac.h
-Session.obj: ../src/MsgArg.h ../src/MsgFrag.h
+Session.obj: ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h ../src/List.h
+Session.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/CplexIf.h
+Session.obj: ../src/ApiMgr.h ../src/wit.h ../../config/dummy_headers/limits.h
+Session.obj: ../src/WitRun.h ../src/FSS.h ../src/Schedule.h ../src/CompMgr.h
+Session.obj: ../src/PtrVec.h ../../config/dummy_headers/algorithm
+Session.obj: ../src/MsgFac.h ../src/MsgArg.h ../src/MsgFrag.h
 Session.obj: ../../config/dummy_headers/time.h
 Session.obj: ../../config/dummy_headers/errno.h
 SglSrcMgr.obj: ../src/SglSrcMgr.h ../src/PtrMap.h ../src/PtrVec.h
@@ -1541,6 +1529,17 @@ SolnWrit.obj: ../src/SubEntry.h ../src/Demand.h ../src/ApiMgr.h ../src/wit.h
 SolnWrit.obj: ../../config/dummy_headers/limits.h ../src/Timing.h
 SolnWrit.obj: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 SolnWrit.obj: ../src/TempMsgFile.h ../src/MsgFac.h ../src/MsgArg.h
+SolverIf.obj: ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h ../src/List.h
+SolverIf.obj: ../src/Util.h ../src/typedefs.h ../src/macs.h
+SolverIf.obj: ../../config/dummy_headers/stdio.h
+SolverIf.obj: ../../config/dummy_headers/string.h
+SolverIf.obj: ../../config/dummy_headers/math.h
+SolverIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+SolverIf.obj: ../src/OptVar.h ../src/OptVC.h ../src/BoundPair.h
+SolverIf.obj: ../src/PtrVec.h ../../config/dummy_headers/algorithm
+SolverIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
+SolverIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+SolverIf.obj: ../src/Link.h
 StCons.obj: ../src/StCons.h ../src/StochCon.h ../src/OptCon.h ../src/OptVC.h
 StCons.obj: ../src/BoundPair.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 StCons.obj: ../../config/dummy_headers/stdio.h
@@ -1898,7 +1897,7 @@ optApi.obj: ../src/Component.h ../src/DetOptImpMgr.h ../src/Schedule.h
 optApi.obj: ../src/CompMgr.h ../src/PtrVec.h
 optApi.obj: ../../config/dummy_headers/algorithm ../src/PairStack.h
 optApi.obj: ../src/Stack.h ../src/OptStarter.h ../src/CoinIf.h
-optApi.obj: ../src/OpSolverIf.h ../src/CplexIf.h ../src/CpxParSpecMgr.h
+optApi.obj: ../src/SolverIf.h ../src/CplexIf.h ../src/CpxParSpecMgr.h
 optApi.obj: ../src/CpxParSpec.h ../src/MultiObjMgr.h ../src/Objective.h
 optApi.obj: ../src/ISRealArg.h ../src/RealArg.h ../src/OSRealArg.h
 optApi.obj: ../src/MsgFac.h ../src/MsgArg.h

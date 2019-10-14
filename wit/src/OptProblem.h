@@ -273,9 +273,9 @@ class WitOptProblem: public WitProbAssoc
          //
          // Performs screening of constraints and variables.
 
-      WitOpSolverIf * newOpSolverIf ();
+      WitSolverIf * newSolverIf ();
          //
-         // Creates and returns a new OpSolverIf for this OptProblem.
+         // Creates and returns a new SolverIf for this OptProblem.
          // Issues a fatal error, if neither COIN nor CPLEX is embedded.
 
       void reconstructDual ();
@@ -291,9 +291,9 @@ class WitOptProblem: public WitProbAssoc
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitOpSolverIf * myOpSolverIf_;
+      WitSolverIf * mySolverIf_;
          //
-         // The OpSolverIf owned by this OptProblem, when there is one;
+         // The SolverIf owned by this OptProblem, when there is one;
          // otherwise, NULL.
          // Always NULL, if CPLEX is not embedded.
 

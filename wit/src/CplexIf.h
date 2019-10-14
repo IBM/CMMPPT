@@ -13,7 +13,7 @@
 // Contains the declaration of class CplexIf.
 //------------------------------------------------------------------------------
 
-#include <OpSolverIf.h>
+#include <SolverIf.h>
 
 //------------------------------------------------------------------------------
 // The following typedefs are defined in the CPLEX header file cpxconst.h.
@@ -34,11 +34,11 @@ typedef struct cpxlp  * CPXLPptr;
 // Class Hierarchy:
 //
 // ProbAssoc
-//    OpSolverIf
+//    SolverIf
 //       CplexIf
 //------------------------------------------------------------------------------
 
-class WitCplexIf: public WitOpSolverIf
+class WitCplexIf: public WitSolverIf
    {
    public:
 
@@ -98,7 +98,7 @@ class WitCplexIf: public WitOpSolverIf
       virtual void issueSolveMsg          ();
       virtual void loadLp                 ();
          //
-         // Overrides from class OpSolverIf.
+         // Overrides from class SolverIf.
 
       void getRowData (
             WitVector <double> & rhs,

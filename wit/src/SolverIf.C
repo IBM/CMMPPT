@@ -5,25 +5,25 @@
 //==============================================================================
 
 //------------------------------------------------------------------------------
-// Source file: "OpSolverIf.C"
+// Source file: "SolverIf.C"
 //
-// Contains the implementation of class OpSolverIf.
+// Contains the implementation of class SolverIf.
 //------------------------------------------------------------------------------
 
-#include <OpSolverIf.h>
+#include <SolverIf.h>
 #include <OptVar.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 
 //------------------------------------------------------------------------------
 
-WitOpSolverIf::~WitOpSolverIf ()
+WitSolverIf::~WitSolverIf ()
    {
    }
 
 //------------------------------------------------------------------------------
 
-void WitOpSolverIf::solveOptProb ()
+void WitSolverIf::solveOptProb ()
    {
    if      (myOptComp ()->multiObjMode ())
       {
@@ -45,7 +45,7 @@ void WitOpSolverIf::solveOptProb ()
 
 //------------------------------------------------------------------------------
 
-WitOpSolverIf::WitOpSolverIf (WitOptProblem * theOptProblem):
+WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
       WitProbAssoc  (theOptProblem->myProblem ()),
       myOptProblem_ (theOptProblem)
@@ -54,7 +54,7 @@ WitOpSolverIf::WitOpSolverIf (WitOptProblem * theOptProblem):
 
 //------------------------------------------------------------------------------
 
-void WitOpSolverIf::solveOptProbAsLp ()
+void WitSolverIf::solveOptProbAsLp ()
    {
    issueSolveMsg ();
 
@@ -65,7 +65,7 @@ void WitOpSolverIf::solveOptProbAsLp ()
 
 //------------------------------------------------------------------------------
 
-void WitOpSolverIf::getColumnData (
+void WitSolverIf::getColumnData (
       WitVector <double> & lb,
       WitVector <double> & ub,
       WitVector <double> & obj)
@@ -93,7 +93,7 @@ void WitOpSolverIf::getColumnData (
 
 //------------------------------------------------------------------------------
 
-bool WitOpSolverIf::mipMode ()
+bool WitSolverIf::mipMode ()
    {
    return myOptComp ()->mipMode ();
    }

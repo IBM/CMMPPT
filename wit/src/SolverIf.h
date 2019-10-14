@@ -4,32 +4,32 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef OpSolverIfH
-#define OpSolverIfH
+#ifndef SolverIfH
+#define SolverIfH
 
 //------------------------------------------------------------------------------
-// Header file: "OpSolverIf.h"
+// Header file: "SolverIf.h"
 //
-// Contains the declaration of class OpSolverIf
+// Contains the declaration of class SolverIf
 //------------------------------------------------------------------------------
 
 #include <Assoc.h>
 
 //------------------------------------------------------------------------------
-// class OpSolverIf.
-// "Optimzation Problem Solver Interface"
-// Responsible for all interactions with WIT's optimization problem solver.
+// class SolverIf.
+// "Solver Interface"
+// Responsible for all interactions with WIT's solver of optimization problems.
 // The interactions are implemented polymorphically.
 //
 // Class Hierarchy:
 //
 // ProbAssoc
-//    OpSolverIf
+//    SolverIf
 //       CoinIf
 //       CplexIf
 //------------------------------------------------------------------------------
 
-class WitOpSolverIf: public WitProbAssoc
+class WitSolverIf: public WitProbAssoc
    {
    public:
 
@@ -37,7 +37,7 @@ class WitOpSolverIf: public WitProbAssoc
       // Destructor function.
       //------------------------------------------------------------------------
 
-      virtual ~WitOpSolverIf ();
+      virtual ~WitSolverIf ();
 
       //------------------------------------------------------------------------
       // Other public member functions.
@@ -57,7 +57,7 @@ class WitOpSolverIf: public WitProbAssoc
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitOpSolverIf (WitOptProblem *);
+      WitSolverIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Other protected member functions.
@@ -120,7 +120,7 @@ class WitOpSolverIf: public WitProbAssoc
       // Private member functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitOpSolverIf);
+      noCopyCtorAssign (WitSolverIf);
 
       //-----------------------------------------------------------------------
       // Private member data.
@@ -128,7 +128,7 @@ class WitOpSolverIf: public WitProbAssoc
 
       WitOptProblem * const myOptProblem_;
          //
-         // The OptProblem that owns this OpSolverIf.
+         // The OptProblem that owns this SolverIf.
    };
 
 #endif

@@ -53,10 +53,10 @@ WitCplexIf * WitCplexIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
 
 WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
 
-      WitOpSolverIf (theOptProblem),
-      myCpxEnv_     (NULL),
-      myCpxLp_      (NULL),
-      myErrCode_    (0)
+      WitSolverIf (theOptProblem),
+      myCpxEnv_   (NULL),
+      myCpxLp_    (NULL),
+      myErrCode_  (0)
    {
    setUpCplex ();
    }
