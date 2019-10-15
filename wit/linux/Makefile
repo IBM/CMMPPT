@@ -228,6 +228,12 @@ BuildDate.o: ../src/typedefs.h ../src/macs.h
 BuildDate.o: ../../config/dummy_headers/stdio.h
 BuildDate.o: ../../config/dummy_headers/string.h
 BuildDate.o: ../../config/dummy_headers/math.h
+CoinIf.o: ../src/CoinIf.h ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h
+CoinIf.o: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
+CoinIf.o: ../../config/dummy_headers/stdio.h
+CoinIf.o: ../../config/dummy_headers/string.h
+CoinIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
+CoinIf.o: ../src/TVec.h ../src/Vector.h
 CompMgr.o: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.o: ../src/macs.h ../../config/dummy_headers/stdio.h
 CompMgr.o: ../../config/dummy_headers/string.h
@@ -266,14 +272,12 @@ Component.o: ../src/CompMgr.h ../src/BoundSet.h ../src/OrigMrp.h
 Component.o: ../src/MrpExp.h ../src/StochImpMgr.h ../src/IVRealArg.h
 Component.o: ../src/RealArg.h ../src/MsgFrag.h ../src/MsgFac.h
 Component.o: ../src/MsgArg.h
-CplexMgr.o: ../src/CplexMgrNC.h ../src/Util.h ../src/typedefs.h ../src/macs.h
-CplexMgr.o: ../../config/dummy_headers/stdio.h
-CplexMgr.o: ../../config/dummy_headers/string.h
-CplexMgr.o: ../../config/dummy_headers/math.h ../src/CplexMgr.h
-CplexMgr.o: ../src/OptProblem.h ../src/List.h ../../config/dummy_headers/list
-CplexMgr.o: ../src/ObjStack.h ../src/Stack.h ../src/Link.h ../src/PtrVec.h
-CplexMgr.o: ../src/Vector.h ../../config/dummy_headers/algorithm
-CplexMgr.o: ../src/Assoc.h ../src/Problem.h ../src/TVec.h
+CplexIf.o: ../src/CplexIf.h ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h
+CplexIf.o: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
+CplexIf.o: ../../config/dummy_headers/stdio.h
+CplexIf.o: ../../config/dummy_headers/string.h
+CplexIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
+CplexIf.o: ../src/TVec.h ../src/Vector.h
 CpxParSpec.o: ../src/CpxParSpecMgr.h ../src/Assoc.h ../src/Problem.h
 CpxParSpec.o: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 CpxParSpec.o: ../../config/dummy_headers/stdio.h
@@ -813,7 +817,8 @@ OptComp.o: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 OptComp.o: ../src/PairStack.h ../src/Stack.h ../src/StochImpMgr.h
 OptComp.o: ../src/Material.h ../src/Operation.h ../src/SubEntry.h
 OptComp.o: ../src/BomEntry.h ../src/ConsEntry.h ../src/BillEntry.h
-OptComp.o: ../src/CplexMgrNC.h ../../wit/src/Variant.h ../src/wit.h
+OptComp.o: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
+OptComp.o: ../../wit/src/Variant.h ../src/wit.h
 OptComp.o: ../../config/dummy_headers/limits.h ../src/MsgFac.h
 OptComp.o: ../src/MsgArg.h ../src/MsgFrag.h
 OptMisc.o: ../src/Coeff.h ../src/Util.h ../src/typedefs.h ../src/macs.h
@@ -836,10 +841,11 @@ OptProblem.o: ../src/Stack.h ../src/Link.h ../src/PtrVec.h ../src/Vector.h
 OptProblem.o: ../../config/dummy_headers/algorithm ../src/Assoc.h
 OptProblem.o: ../src/Problem.h ../src/TVec.h ../src/OptVar.h ../src/OptVC.h
 OptProblem.o: ../src/BoundPair.h ../src/OptCon.h ../src/Coeff.h
-OptProblem.o: ../src/CplexMgrNC.h ../src/OptComp.h ../src/Component.h
-OptProblem.o: ../src/Str.h ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
-OptProblem.o: ../src/MsgArg.h ../src/Session.h
-OptProblem.o: ../../config/dummy_headers/float.h
+OptProblem.o: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
+OptProblem.o: ../src/OptComp.h ../src/Component.h ../src/Str.h
+OptProblem.o: ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
+OptProblem.o: ../src/MsgArg.h ../src/Session.h ../src/GlobalComp.h
+OptProblem.o: ../src/PairStack.h ../../config/dummy_headers/float.h
 Param.o: ../src/Param.h ../src/Str.h ../src/Vector.h ../src/Util.h
 Param.o: ../src/typedefs.h ../src/macs.h ../../config/dummy_headers/stdio.h
 Param.o: ../../config/dummy_headers/string.h
@@ -1342,11 +1348,11 @@ Selector.o: ../src/MsgFac.h ../src/MsgArg.h
 Session.o: ../src/Session.h ../src/Str.h ../src/Vector.h ../src/Util.h
 Session.o: ../src/typedefs.h ../src/macs.h ../../config/dummy_headers/stdio.h
 Session.o: ../../config/dummy_headers/string.h
-Session.o: ../../config/dummy_headers/math.h ../src/CplexMgrNC.h
-Session.o: ../src/ApiMgr.h ../src/TVec.h ../src/wit.h
-Session.o: ../../config/dummy_headers/limits.h ../src/WitRun.h
-Session.o: ../src/Problem.h ../src/List.h ../../config/dummy_headers/list
-Session.o: ../src/FSS.h ../src/Assoc.h ../src/Schedule.h ../src/CompMgr.h
+Session.o: ../../config/dummy_headers/math.h ../src/CoinIf.h
+Session.o: ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h ../src/List.h
+Session.o: ../../config/dummy_headers/list ../src/TVec.h ../src/CplexIf.h
+Session.o: ../src/ApiMgr.h ../src/wit.h ../../config/dummy_headers/limits.h
+Session.o: ../src/WitRun.h ../src/FSS.h ../src/Schedule.h ../src/CompMgr.h
 Session.o: ../src/PtrVec.h ../../config/dummy_headers/algorithm
 Session.o: ../src/MsgFac.h ../src/MsgArg.h ../src/MsgFrag.h
 Session.o: ../../config/dummy_headers/time.h
@@ -1402,6 +1408,16 @@ SolnWrit.o: ../src/SubEntry.h ../src/Demand.h ../src/ApiMgr.h ../src/wit.h
 SolnWrit.o: ../../config/dummy_headers/limits.h ../src/Timing.h
 SolnWrit.o: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 SolnWrit.o: ../src/TempMsgFile.h ../src/MsgFac.h ../src/MsgArg.h
+SolverIf.o: ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h ../src/List.h
+SolverIf.o: ../src/Util.h ../src/typedefs.h ../src/macs.h
+SolverIf.o: ../../config/dummy_headers/stdio.h
+SolverIf.o: ../../config/dummy_headers/string.h
+SolverIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
+SolverIf.o: ../src/TVec.h ../src/Vector.h ../src/OptVar.h ../src/OptVC.h
+SolverIf.o: ../src/BoundPair.h ../src/PtrVec.h
+SolverIf.o: ../../config/dummy_headers/algorithm ../src/OptComp.h
+SolverIf.o: ../src/Component.h ../src/Str.h ../src/OptProblem.h
+SolverIf.o: ../src/ObjStack.h ../src/Stack.h ../src/Link.h
 StCons.o: ../src/StCons.h ../src/StochCon.h ../src/OptCon.h ../src/OptVC.h
 StCons.o: ../src/BoundPair.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 StCons.o: ../../config/dummy_headers/stdio.h
@@ -1735,9 +1751,10 @@ optApi.o: ../src/ApiCall.h ../src/Assoc.h ../src/OptComp.h ../src/Component.h
 optApi.o: ../src/DetOptImpMgr.h ../src/Schedule.h ../src/CompMgr.h
 optApi.o: ../src/PtrVec.h ../../config/dummy_headers/algorithm
 optApi.o: ../src/PairStack.h ../src/Stack.h ../src/OptStarter.h
-optApi.o: ../src/CplexMgrNC.h ../src/CpxParSpecMgr.h ../src/CpxParSpec.h
-optApi.o: ../src/MultiObjMgr.h ../src/Objective.h ../src/ISRealArg.h
-optApi.o: ../src/RealArg.h ../src/OSRealArg.h ../src/MsgFac.h ../src/MsgArg.h
+optApi.o: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
+optApi.o: ../src/CpxParSpecMgr.h ../src/CpxParSpec.h ../src/MultiObjMgr.h
+optApi.o: ../src/Objective.h ../src/ISRealArg.h ../src/RealArg.h
+optApi.o: ../src/OSRealArg.h ../src/MsgFac.h ../src/MsgArg.h
 partApi.o: ../src/WitRun.h ../src/Problem.h ../src/List.h ../src/Util.h
 partApi.o: ../src/typedefs.h ../src/macs.h ../../config/dummy_headers/stdio.h
 partApi.o: ../../config/dummy_headers/string.h
@@ -1791,17 +1808,19 @@ subApi.o: ../../config/dummy_headers/stdlib.h
 wit.o: ../src/wit.h ../../config/dummy_headers/stdio.h
 wit.o: ../../config/dummy_headers/limits.h
 wit.o: ../../config/dummy_headers/stdlib.h
-witLexer.o: ../../config/dummy_headers/stdio.h ../src/ytab.h ../src/Parlex.h
+witLexer.o: ../../config/dummy_headers/stdio.h
+witLexer.o: ../../config/dummy_headers/string.h
+witLexer.o: ../../config/dummy_headers/errno.h
+witLexer.o: ../../config/dummy_headers/stdlib.h ../src/ytab.h ../src/Parlex.h
 witLexer.o: ../src/Str.h ../src/Vector.h ../src/Util.h ../src/typedefs.h
-witLexer.o: ../src/macs.h ../../config/dummy_headers/string.h
-witLexer.o: ../../config/dummy_headers/math.h ../src/SymTable.h
+witLexer.o: ../src/macs.h ../../config/dummy_headers/math.h ../src/SymTable.h
 witLexer.o: ../../config/dummy_headers/string ../../config/dummy_headers/map
 witLexer.o: ../src/VecBS.h ../../config/dummy_headers/vector ../src/Entity.h
 witLexer.o: ../src/Problem.h ../src/List.h ../../config/dummy_headers/list
 witLexer.o: ../src/TVec.h ../src/Parser.h ../../config/dummy_headers/iostream
 witLexer.o: ../src/ApiMgr.h ../src/wit.h ../../config/dummy_headers/limits.h
 witLexer.o: ../src/WitRun.h ../src/Session.h ../src/MsgFac.h ../src/MsgArg.h
-witLexer.o: ../../config/dummy_headers/stdlib.h
+witLexer.o: ../../config/dummy_headers/unistd.h
 witParse.o: ../src/Parser.h ../src/Parlex.h ../src/Str.h ../src/Vector.h
 witParse.o: ../src/Util.h ../src/typedefs.h ../src/macs.h
 witParse.o: ../../config/dummy_headers/stdio.h
