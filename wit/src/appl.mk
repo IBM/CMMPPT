@@ -33,6 +33,7 @@ mcl_client_objects =        \
 cxx_objects =              \
    $(lib_objects)          \
    $(mcl_client_objects)   \
+   CoinIf.$(obj_suffix)    \
    CplexIf.$(obj_suffix)   \
    BuildDate.$(obj_suffix) \
    wit.$(obj_suffix)       \
@@ -94,20 +95,6 @@ session_macro_flags = -DEXE_TYPE=$(exe_type) -DPLATFORM=$(platform)
 Session.$(obj_suffix):	Session.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(session_macro_flags)
 
-
-#-------------------------------------------------------------------------------
-# Macros to facilitate building WIT, when COIN is to be embedded.
-#
-# Prereqisite macros:
-#
-#    WIT_COIN_HOME:
-#       This is an environment variable.
-#       If COIN is to be embedded into WIT, WIT_COIN_HOME should be defined as
-#       the path where COIN files are found.
-#       If COIN is not to be embedded into WIT, WIT_COIN_HOME should be left
-#       undefined, or defined as the null string.
-#-------------------------------------------------------------------------------
-
 #-------------------------------------------------------------------------------
 # Special rule to compile CoinIf.C:
 #
@@ -116,17 +103,24 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 # Macro:
 #    comp_coin_flags
 #       The special compilation flags for compiling CoinIf.C.
+#
+# Prereqisite macro:
+#    WIT_COIN_HOME:
+#       This is an environment variable.
+#       If COIN is to be embedded into WIT, WIT_COIN_HOME should be defined as
+#       the path where COIN files are found.
+#       If COIN is not to be embedded into WIT, WIT_COIN_HOME should be left
+#       undefined, or defined as the null string.
 #-------------------------------------------------------------------------------
 
 ifneq ($(WIT_COIN_HOME),)
 
-comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
+   comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
 
-CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
+   CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
 
 endif
-
 
 #-------------------------------------------------------------------------------
 # Macros to facilitate building WIT, when CPLEX is to be embedded.
@@ -146,7 +140,7 @@ endif
 #       undefined, or defined as the null string.
 #
 #    cplex_lib_subdir:
-#       This is defined in the p_{platform}.mk files.
+#       This is defined in the {platform}/Makefile files.
 #       This is the default subdirectory in which the CPLEX library can be found
 #       on the current platform (when CPLEX is installed).
 #       It only includes the part of the directory path after /lib/.
@@ -201,9 +195,9 @@ endif
 
 ifneq ($(WIT_CPLEX_HOME),)
 
-comp_cplex_flags = -DCPLEX_EMBEDDED -I$(WIT_CPLEX_HOME)/include/ilcplex
+   comp_cplex_flags = -DCPLEX_EMBEDDED -I$(WIT_CPLEX_HOME)/include/ilcplex
 
-CplexIf.$(obj_suffix):	CplexIf.$(cxx_suffix)
+   CplexIf.$(obj_suffix):	CplexIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_cplex_flags)
 
 endif

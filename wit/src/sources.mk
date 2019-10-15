@@ -9,7 +9,6 @@ lib_objects = \
         BuildAhd.$(obj_suffix) \
         CompMgr.$(obj_suffix) \
         Component.$(obj_suffix) \
-        CoinIf.$(obj_suffix) \
         CpxParSpec.$(obj_suffix) \
         DataRead.$(obj_suffix) \
         DataWrit.$(obj_suffix) \

@@ -11,6 +11,7 @@
 exes =                      \
            wit$(exe_ending) \
      MclModule$(exe_ending) \
+    CoinModule$(exe_ending) \
    CplexModule$(exe_ending) \
 
 #-------------------------------------------------------------------------------
@@ -29,6 +30,41 @@ mcl_mod_input = $(mcl_client_objects) -L$(mcl_lib_dir) -lmcl
 
 MclModule: $(mcl_client_objects) $(mcl_lib)
 	$(reloc_ld) -o $@ $(ds_link_reloc_flags) $(mcl_mod_input)
+
+#-------------------------------------------------------------------------------
+# coin_lib_flags:
+#    When WIT is to embed COIN, this is the set of flags for linking COIN into
+#       a static library.
+#    Otherwise this is the null string.
+#
+# Prereqisite macro:
+#    WIT_COIN_HOME
+#       For the meaning of this macro, see the comment in appl.mk.
+#-------------------------------------------------------------------------------
+
+ifneq ($(WIT_COIN_HOME),)
+
+   coin_lib_flags = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
+
+else
+
+   coin_lib_flags =
+
+endif
+
+#-------------------------------------------------------------------------------
+# Rule to build the CoinModule library object file.
+#
+# In COIN-embedded mode, this file contains:
+#    CoinIf.o
+#    The relevent contents of the COIN libraries
+#
+# In COIN-not-embedded mode, this file contains:
+#    CoinIf.o
+#-------------------------------------------------------------------------------
+
+CoinModule: CoinIf.o
+	$(reloc_ld) -o $@ $(ds_link_reloc_flags) $^ $(coin_lib_flags)
 
 #-------------------------------------------------------------------------------
 # cplex_lib_flags:
@@ -81,7 +117,7 @@ BuildDate.o:	$(lib_objects) MclModule CplexModule wit.o
 # Rule to build the WIT static library:
 #-------------------------------------------------------------------------------
 
-libwit.a:	$(lib_objects) MclModule CplexModule BuildDate.o
+libwit.a:	$(lib_objects) MclModule CoinModule CplexModule BuildDate.o
 	$(AR) $(ds_ar_update_flags) $@ $^
 	$(RANLIB) $@
 

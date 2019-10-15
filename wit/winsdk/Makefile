@@ -60,7 +60,6 @@ BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexIf.obj wit.obj
 #       this is the null string.
 #
 # Prereqisite macro:
-#
 #    WIT_CPLEX_HOME
 #       For the meaning of this macro, see the comment in appl.mk.
 #------------------------------------------------------------------------------
@@ -70,13 +69,6 @@ ifneq ($(WIT_COIN_HOME),)
    coin_libs =                              \
       $(WIT_COIN_HOME)/lib/libClp.lib       \
       $(WIT_COIN_HOME)/lib/libCoinUtils.lib \
-
-#     $(WIT_COIN_HOME)/lib/libCbc.lib       \
-      $(WIT_COIN_HOME)/lib/libCgl.lib       \
-      $(WIT_COIN_HOME)/lib/libOsiClp.lib    \
-      $(WIT_COIN_HOME)/lib/libOsi.lib       \
-   #
-   # These libraries will be needed when WIT's invocation of CBC is implemented.
 
 else
 
@@ -112,7 +104,7 @@ endif
 # Rule for building the WIT static library:
 #------------------------------------------------------------------------------
 
-special_wit_objects = $(mcl_client_objects) CplexIf.obj BuildDate.obj
+special_wit_objects = $(mcl_client_objects) CoinIf.obj CplexIf.obj BuildDate.obj
 
 mcl_lib             = ../../mcl/winsdk/mcl.lib
 
