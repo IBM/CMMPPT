@@ -97,6 +97,7 @@ class WitCplexIf: public WitSolverIf
       virtual void finishSolveOptProbAsLp ();
       virtual void issueSolveMsg          ();
       virtual void loadLp                 ();
+      virtual void writeMpsSS             ();
          //
          // Overrides from class SolverIf.
 
@@ -145,11 +146,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Counts and returns the number of integer variables in the
          // optimization problem.
-
-      void writeMps ();
-         //
-         // Writes an MPS file of the opt problem entered into CPLEX, if
-         // appropriate.
 
       void solveLexOpt ();
          //

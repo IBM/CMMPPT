@@ -143,6 +143,17 @@ void WitCoinIf::loadLp ()
 
 //------------------------------------------------------------------------------
 
+void WitCoinIf::writeMpsSS ()
+   {
+   WitTimer::enterSection ("coin");
+
+   myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinIf::getRowData (
       WitVector <double> & rowlb,
       WitVector <double> & rowub)

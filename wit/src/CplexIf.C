@@ -204,8 +204,6 @@ void WitCplexIf::solveOptProbAsLexOpt ()
 
 void WitCplexIf::finishSolveOptProbAsLp ()
    {
-   writeMps ();
-
    setLpMethodByOptStarter ();
 
    loadInitSoln ();
@@ -278,6 +276,19 @@ void WitCplexIf::loadLp ()
          NULL);
 
    checkErrCode ("CPXcopylp");
+
+   WitTimer::leaveSection ("cplex");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::writeMpsSS ()
+   {
+   WitTimer::enterSection ("cplex");
+
+   myErrCode_ = CPXwriteprob (myCpxEnv_, myCpxLp_, "opt-prob.mps", NULL);
+
+   checkErrCode ("CPXwriteprob");
 
    WitTimer::leaveSection ("cplex");
    }
@@ -576,29 +587,6 @@ int WitCplexIf::countIntVars ()
       }
 
    return nIntVars;
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::writeMps ()
-   {
-   if (myOptComp ()->printMps ())
-      {
-      myMsgFac () ("mpsFileMsg");
-
-      WitTimer::enterSection ("cplex");
-
-      myErrCode_ =
-         CPXwriteprob (
-            myCpxEnv_,
-            myCpxLp_,
-            "opt-prob.mps",
-            NULL);
-
-      checkErrCode ("CPXwriteprob");
-
-      WitTimer::leaveSection ("cplex");
-      }
    }
 
 //------------------------------------------------------------------------------

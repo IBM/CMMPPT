@@ -14,6 +14,7 @@
 #include <OptVar.h>
 #include <OptComp.h>
 #include <OptProblem.h>
+#include <MsgFac.h>
 
 //------------------------------------------------------------------------------
 
@@ -54,13 +55,14 @@ WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
 //------------------------------------------------------------------------------
 
-void WitSolverIf::solveOptProbAsLp ()
+void WitSolverIf::writeMps ()
    {
-   issueSolveMsg ();
+   if (myOptComp ()->printMps ())
+      {
+      myMsgFac () ("mpsFileMsg");
 
-   loadLp ();
-
-   finishSolveOptProbAsLp ();
+      writeMpsSS ();
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -96,4 +98,17 @@ void WitSolverIf::getColumnData (
 bool WitSolverIf::mipMode ()
    {
    return myOptComp ()->mipMode ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::solveOptProbAsLp ()
+   {
+   issueSolveMsg ();
+
+   loadLp ();
+
+   writeMps ();
+
+   finishSolveOptProbAsLp ();
    }

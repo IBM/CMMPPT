@@ -63,11 +63,6 @@ class WitSolverIf: public WitProbAssoc
       // Other protected member functions.
       //------------------------------------------------------------------------
 
-      void solveOptProbAsLp ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a first solve.
-
       virtual void reSolveOptProbAsLp () = 0;
          //
          // Loads, solves and retrieves the solution to the optimization problem
@@ -96,6 +91,16 @@ class WitSolverIf: public WitProbAssoc
          //
          // Loads the optimization problem into CPLEX as an LP.
 
+      virtual void writeMpsSS () = 0;
+         //
+         // Does the solver-specific aspects of writeMps ().
+
+      void writeMps ();
+         //
+         // Writes an MPS file of the opt problem entered into CPLEX, if
+         // appropriate.
+         // This function should probably be private eventually.
+
       void getColumnData (
             WitVector <double> & lb,
             WitVector <double> & ub,
@@ -121,6 +126,11 @@ class WitSolverIf: public WitProbAssoc
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitSolverIf);
+
+      void solveOptProbAsLp ();
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as an LP for a first solve.
 
       //-----------------------------------------------------------------------
       // Private member data.
