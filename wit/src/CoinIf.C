@@ -125,6 +125,8 @@ void WitCoinIf::loadLp ()
 
    WitTimer::enterSection ("coin");
 
+   myClpSimplex_->setOptimizationDirection (-1.0);
+
    myClpSimplex_->
       loadProblem (
          myOptProblem ()->nOptVars (),
