@@ -33,8 +33,13 @@ MclModule: $(mcl_client_objects) $(mcl_lib)
 
 #-------------------------------------------------------------------------------
 # coin_lib_flags:
-#    When WIT is to embed COIN, this is the set of flags for linking COIN into
+#    When WIT is to embed COIN, this is the list of flags for linking COIN into
 #       a static library.
+#    Otherwise this is the null string.
+#
+# coin_link_flags:
+#    When WIT is to embed COIN, this is the list of additional flags needed for
+#       building the WIT stand-alone executable.
 #    Otherwise this is the null string.
 #
 # Prereqisite macro:
@@ -44,11 +49,15 @@ MclModule: $(mcl_client_objects) $(mcl_lib)
 
 ifneq ($(WIT_COIN_HOME),)
 
-   coin_lib_flags = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
+   coin_lib_flags  = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
+
+   coin_link_flags = -lz -llapack
 
 else
 
-   coin_lib_flags =
+   coin_lib_flags  =
+
+   coin_link_flags =
 
 endif
 
@@ -68,8 +77,13 @@ CoinModule: CoinIf.o
 
 #-------------------------------------------------------------------------------
 # cplex_lib_flags:
-#    When WIT is to embed CPLEX, this is the set of flags for linking CPLEX into
+#    When WIT is to embed CPLEX, this is the list of flags for linking CPLEX into
 #       a static library.
+#    Otherwise this is the null string.
+#
+# cplex_link_flags:
+#    When WIT is to embed CPLEX, this is the list of additional flags needed for
+#       building the WIT stand-alone executable.
 #    Otherwise this is the null string.
 #
 # Prereqisite macros:
@@ -82,11 +96,15 @@ CoinModule: CoinIf.o
 
 ifneq ($(WIT_CPLEX_HOME),)
 
-   cplex_lib_flags = -L$(cplex_lib_dir) -lcplex
+   cplex_lib_flags  = -L$(cplex_lib_dir) -lcplex
+
+   cplex_link_flags = $(ds_posix_threads_flag)
 
 else
 
-   cplex_lib_flags =
+   cplex_lib_flags  =
+
+   cplex_link_flags =
 
 endif
 
@@ -129,4 +147,4 @@ libwit.a:	$(lib_objects) MclModule CoinModule CplexModule BuildDate.o
 #-------------------------------------------------------------------------------
 
 wit:	wit.o libwit.a
-	$(CXX) $(ds_link_flags) $^ $(ds_posix_threads_flag) -o $@
+	$(CXX) $(ds_link_flags) $^ $(coin_link_flags) $(cplex_link_flags) -o $@
