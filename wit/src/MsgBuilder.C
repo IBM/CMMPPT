@@ -7943,4 +7943,30 @@ void WitMsgBuilder::buildMsgs ()
    currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
+
+   makeMsg (
+      "clpWriteMpsErrSmsg",
+      1063,
+      severe_,
+      "ClpModel::writeMps returned a non-zero error code.\n"
+      "\n"
+      "   Error Code: %1$d");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "clpWriteMpsExcSmsg",
+      1064,
+      severe_,
+      "ClpModel::writeMps threw an exception.\n"
+      "\n"
+      "   File Name: \"%1$s\"");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
    }

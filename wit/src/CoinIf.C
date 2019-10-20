@@ -147,11 +147,24 @@ void WitCoinIf::loadLp ()
 
 void WitCoinIf::writeMpsSS ()
    {
+   int errCode;
+
    WitTimer::enterSection ("coin");
 
-   myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
+   try
+      {
+      errCode = myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
+      }
+
+   catch (...)
+      {
+      myMsgFac () ("clpWriteMpsExcSmsg", "opt-prob.mps");
+      }
 
    WitTimer::leaveSection ("coin");
+
+   if (errCode != 0)
+      myMsgFac () ("clpWriteMpsErrSmsg", errCode);
    }
 
 //------------------------------------------------------------------------------
