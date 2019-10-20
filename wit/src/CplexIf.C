@@ -204,8 +204,6 @@ void WitCplexIf::solveOptProbAsLexOpt ()
 
 void WitCplexIf::finishSolveOptProbAsLp ()
    {
-   setLpMethodByOptStarter ();
-
    loadInitSoln ();
 
    solveLp (myOptProblem ()->needDual ());
@@ -291,6 +289,20 @@ void WitCplexIf::writeMpsSS ()
    checkErrCode ("CPXwriteprob");
 
    WitTimer::leaveSection ("cplex");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setLpMethodByOptStarter ()
+   {
+   if (myOptComp ()->crashOptStarter ()->isChosen ())
+      {
+      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_DUAL);
+      }
+   else
+      {
+      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_PRIMAL);
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -720,20 +732,6 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
    checkErrCode ("CPXchgbds");
 
    WitTimer::leaveSection ("cplex");
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::setLpMethodByOptStarter ()
-   {
-   if (myOptComp ()->crashOptStarter ()->isChosen ())
-      {
-      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_DUAL);
-      }
-   else
-      {
-      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_PRIMAL);
-      }
    }
 
 //------------------------------------------------------------------------------

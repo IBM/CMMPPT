@@ -19,9 +19,11 @@
 
 #ifdef COIN_EMBEDDED
 
+#include <OptComp.h>
 #include <OptProblem.h>
 #include <OptCon.h>
 #include <OptVar.h>
+#include <OptStarter.h>
 #include <MsgFrag.h>
 #include <MsgFac.h>
 #include <Timing.h>
@@ -92,7 +94,8 @@ void WitCoinIf::solveOptProbAsLexOpt ()
 
 void WitCoinIf::finishSolveOptProbAsLp ()
    {
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion and Stochastic Implosion");
+   myMsgFac () ("coinNYISmsg",
+      "Optimizing Implosion and Stochastic Implosion (1)");
    }
 
 //------------------------------------------------------------------------------
@@ -165,6 +168,20 @@ void WitCoinIf::writeMpsSS ()
 
    if (errCode != 0)
       myMsgFac () ("clpWriteMpsErrSmsg", errCode);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::setLpMethodByOptStarter ()
+   {
+   if (myOptComp ()->crashOptStarter ()->isChosen ())
+      {
+      myClpSimplex_->setAlgorithm (-1); // Dual Simplex
+      }
+   else
+      {
+      myClpSimplex_->setAlgorithm  (1); // Primal Simplex
+      }
    }
 
 //------------------------------------------------------------------------------

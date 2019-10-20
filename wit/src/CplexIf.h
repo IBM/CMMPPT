@@ -91,13 +91,14 @@ class WitCplexIf: public WitSolverIf
          //
          // Shuts down the CPLEX log file.
 
-      virtual void reSolveOptProbAsLp     ();
-      virtual void solveOptProbAsMip      ();
-      virtual void solveOptProbAsLexOpt   ();
-      virtual void finishSolveOptProbAsLp ();
-      virtual void issueSolveMsg          ();
-      virtual void loadLp                 ();
-      virtual void writeMpsSS             ();
+      virtual void reSolveOptProbAsLp      ();
+      virtual void solveOptProbAsMip       ();
+      virtual void solveOptProbAsLexOpt    ();
+      virtual void finishSolveOptProbAsLp  ();
+      virtual void issueSolveMsg           ();
+      virtual void loadLp                  ();
+      virtual void writeMpsSS              ();
+      virtual void setLpMethodByOptStarter ();
          //
          // Overrides from class SolverIf.
 
@@ -161,10 +162,6 @@ class WitCplexIf: public WitSolverIf
          // Assuming theOptVar represents a lexicographic objective element that
          // has just been maximized, this function locks the variable at its
          // maximum value minus a tolerance.
-
-      void setLpMethodByOptStarter ();
-         //
-         // Sets the LP method to be used by CPXlpopt based on the OptStarter.
 
       void solveLp (bool optNeeded);
          //

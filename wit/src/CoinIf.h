@@ -69,13 +69,14 @@ class WitCoinIf: public WitSolverIf
 
       noCopyCtorAssign (WitCoinIf);
 
-      virtual void reSolveOptProbAsLp     ();
-      virtual void solveOptProbAsMip      ();
-      virtual void solveOptProbAsLexOpt   ();
-      virtual void finishSolveOptProbAsLp ();
-      virtual void issueSolveMsg          ();
-      virtual void loadLp                 ();
-      virtual void writeMpsSS             ();
+      virtual void reSolveOptProbAsLp      ();
+      virtual void solveOptProbAsMip       ();
+      virtual void solveOptProbAsLexOpt    ();
+      virtual void finishSolveOptProbAsLp  ();
+      virtual void issueSolveMsg           ();
+      virtual void loadLp                  ();
+      virtual void writeMpsSS              ();
+      virtual void setLpMethodByOptStarter ();
          //
          // Overrides from class SolverIf.
 

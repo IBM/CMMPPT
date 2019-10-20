@@ -110,5 +110,7 @@ void WitSolverIf::solveOptProbAsLp ()
 
    writeMps ();
 
+   setLpMethodByOptStarter ();
+
    finishSolveOptProbAsLp ();
    }

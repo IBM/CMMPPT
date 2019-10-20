@@ -95,6 +95,10 @@ class WitSolverIf: public WitProbAssoc
          //
          // Does the solver-specific aspects of writeMps ().
 
+      virtual void setLpMethodByOptStarter () = 0;
+         //
+         // Sets the LP method to be used by the solver based on the OptStarter.
+
       void writeMps ();
          //
          // Writes an MPS file of the opt problem entered into CPLEX, if
