@@ -104,6 +104,16 @@ class WitSolverIf: public WitProbAssoc
          // Does the solver-specific aspects of loadInitSoln ().
          // initSoln is the initial solution to be loaded.
 
+      virtual void setParams ();
+         //
+         // Sets the solver's parameters, if appropraite.
+         // Default behavior: No-op.
+
+      virtual void finishSolveLp (bool optNeeded) = 0;
+         //
+         // Does all aspects of solveLp (optNeeded) that have not been moved
+         // to more specific functions.
+
       void writeMps ();
          //
          // Writes an MPS file of the opt problem entered into CPLEX, if
@@ -123,6 +133,13 @@ class WitSolverIf: public WitProbAssoc
          //
          // Retrieves the column portion of the LP aspect of the problem in a
          // standard format.
+
+      void solveLp (bool optNeeded);
+         //
+         // Makes appropriate calls to the solver to solve the optimization
+         // problem as an LP.
+         // optNeeded is to be true, iff an optimal solution is required.
+         // This function should probably be private eventually.
 
       bool mipMode ();
          //

@@ -204,8 +204,6 @@ void WitCplexIf::solveOptProbAsLexOpt ()
 
 void WitCplexIf::finishSolveOptProbAsLp ()
    {
-   solveLp (myOptProblem ()->needDual ());
-
    storePrimalSoln ();
 
    if (myOptProblem ()->needDual ())
@@ -323,6 +321,39 @@ void WitCplexIf::loadInitSolnSS (const double * initSoln)
    checkErrCode ("CPXcopystart");
 
    WitTimer::leaveSection ("cplex");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::finishSolveLp (bool optNeeded)
+   {
+   WitTimer::enterSection ("cplex");
+
+   myErrCode_ =
+      CPXlpopt (myCpxEnv_, myCpxLp_);
+
+   checkErrCode ("CPXlpopt");
+
+   WitTimer::leaveSection ("cplex");
+
+   checkLpSolnStatus (optNeeded);
+
+   printLpSolveInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setParams ()
+   {
+   WitCpxParSpec * theCpxParSpec;
+
+   forEachEl (theCpxParSpec, myOptComp ()->myCpxParSpecMgr ()->myCpxParSpecs ())
+      {
+      if (theCpxParSpec->valTypeIsInt ())
+         setSpecIntCpxPar (theCpxParSpec);
+      else
+         setSpecDblCpxPar (theCpxParSpec);
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -756,26 +787,6 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::solveLp (bool optNeeded)
-   {
-   setSpecCpxPars ();
-
-   WitTimer::enterSection ("cplex");
-
-   myErrCode_ =
-      CPXlpopt (myCpxEnv_, myCpxLp_);
-
-   checkErrCode ("CPXlpopt");
-
-   WitTimer::leaveSection ("cplex");
-
-   checkLpSolnStatus (optNeeded);
-
-   printLpSolveInfo ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::printLpSolveInfo ()
    {
    int nSimpItns;
@@ -859,7 +870,7 @@ void WitCplexIf::solveMip (bool optNeeded)
    if (countIntVars () == 0)
       myMsgFac () ("mipModeNoIntVarsSmsg");
 
-   setSpecCpxPars ();
+   setParams ();
 
    WitTimer::enterSection ("cplex");
 
@@ -1020,21 +1031,6 @@ void WitCplexIf::storeDualSoln ()
       theIdx = theCon->index ();
 
       theCon->setDualValue (dualSoln[theIdx]);
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::setSpecCpxPars ()
-   {
-   WitCpxParSpec * theCpxParSpec;
-
-   forEachEl (theCpxParSpec, myOptComp ()->myCpxParSpecMgr ()->myCpxParSpecs ())
-      {
-      if (theCpxParSpec->valTypeIsInt ())
-         setSpecIntCpxPar (theCpxParSpec);
-      else
-         setSpecDblCpxPar (theCpxParSpec);
       }
    }
 

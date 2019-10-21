@@ -197,6 +197,14 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 //------------------------------------------------------------------------------
 
+void WitCoinIf::finishSolveLp (bool)
+   {
+   myMsgFac () ("coinNYISmsg",
+      "Optimizing Implosion and Stochastic Implosion (2)");
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinIf::getRowData (
       WitVector <double> & rowlb,
       WitVector <double> & rowub)

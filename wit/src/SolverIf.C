@@ -56,6 +56,12 @@ WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
 //------------------------------------------------------------------------------
 
+void WitSolverIf::setParams ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
 void WitSolverIf::writeMps ()
    {
    if (myOptComp ()->printMps ())
@@ -114,6 +120,15 @@ void WitSolverIf::getColumnData (
 
 //------------------------------------------------------------------------------
 
+void WitSolverIf::solveLp (bool optNeeded)
+   {
+   setParams ();
+
+   finishSolveLp (optNeeded);
+   }
+
+//------------------------------------------------------------------------------
+
 bool WitSolverIf::mipMode ()
    {
    return myOptComp ()->mipMode ();
@@ -132,6 +147,8 @@ void WitSolverIf::solveOptProbAsLp ()
    setLpMethodByOptStarter ();
 
    loadInitSoln ();
+
+   solveLp (myOptProblem ()->needDual ());
 
    finishSolveOptProbAsLp ();
    }

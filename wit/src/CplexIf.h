@@ -100,6 +100,8 @@ class WitCplexIf: public WitSolverIf
       virtual void writeMpsSS              ();
       virtual void setLpMethodByOptStarter ();
       virtual void loadInitSolnSS          (const double *);
+      virtual void finishSolveLp           (bool);
+      virtual void setParams               ();
          //
          // Overrides from class SolverIf.
 
@@ -164,12 +166,6 @@ class WitCplexIf: public WitSolverIf
          // has just been maximized, this function locks the variable at its
          // maximum value minus a tolerance.
 
-      void solveLp (bool optNeeded);
-         //
-         // Makes appropriate calls to CPLEX to solve the optimization problem
-         // as an LP.
-         // optNeeded is to be true, iff an optimal solution is required.
-
       void printLpSolveInfo ();
          //
          // Prints some information about the LP solve.
@@ -212,10 +208,6 @@ class WitCplexIf: public WitSolverIf
       void storeDualSoln ();
          //
          // Stores the dual solution in myOptProblem ().
-
-      void setSpecCpxPars ();
-         //
-         // Sets the CPLEX parameters as specified by the CpxParSpecs.
 
       void setSpecIntCpxPar (WitCpxParSpec * theCpxParSpec);
          //
