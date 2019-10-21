@@ -204,8 +204,6 @@ void WitCplexIf::solveOptProbAsLexOpt ()
 
 void WitCplexIf::finishSolveOptProbAsLp ()
    {
-   loadInitSoln ();
-
    solveLp (myOptProblem ()->needDual ());
 
    storePrimalSoln ();
@@ -303,6 +301,28 @@ void WitCplexIf::setLpMethodByOptStarter ()
       {
       setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_PRIMAL);
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::loadInitSolnSS (const double * initSoln)
+   {
+   WitTimer::enterSection ("cplex");
+
+   myErrCode_ =
+      CPXcopystart (
+         myCpxEnv_,
+         myCpxLp_,
+         NULL,
+         NULL,
+         initSoln,
+         NULL,
+         NULL,
+         NULL);
+
+   checkErrCode ("CPXcopystart");
+
+   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
@@ -752,39 +772,6 @@ void WitCplexIf::solveLp (bool optNeeded)
    checkLpSolnStatus (optNeeded);
 
    printLpSolveInfo ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::loadInitSoln ()
-   {
-   WitVector <double> initSoln;
-   WitOptVar *        theVar;
-      
-   if (not myOptComp ()->optInitMethod ()->external ())
-      return;
-
-   initSoln.resize (myOptProblem ()->nOptVars (), 0.0);
-
-   forEachEl (theVar, myOptProblem ()->myOptVars ())
-      initSoln[theVar->index ()] = theVar->primalValue ();
-
-   WitTimer::enterSection ("cplex");
-
-   myErrCode_ =
-      CPXcopystart (
-         myCpxEnv_,
-         myCpxLp_,
-         NULL,
-         NULL,
-         initSoln.myCVec (),
-         NULL,
-         NULL,
-         NULL);
-
-   checkErrCode ("CPXcopystart");
-
-   WitTimer::leaveSection ("cplex");
    }
 
 //------------------------------------------------------------------------------

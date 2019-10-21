@@ -99,6 +99,7 @@ class WitCplexIf: public WitSolverIf
       virtual void loadLp                  ();
       virtual void writeMpsSS              ();
       virtual void setLpMethodByOptStarter ();
+      virtual void loadInitSolnSS          (const double *);
          //
          // Overrides from class SolverIf.
 
@@ -168,11 +169,6 @@ class WitCplexIf: public WitSolverIf
          // Makes appropriate calls to CPLEX to solve the optimization problem
          // as an LP.
          // optNeeded is to be true, iff an optimal solution is required.
-
-      void loadInitSoln ();
-         //
-         // Loads the initial primal solution from myOptProblem () into CPLEX,
-         // as needed.
 
       void printLpSolveInfo ();
          //

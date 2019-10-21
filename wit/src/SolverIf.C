@@ -14,6 +14,7 @@
 #include <OptVar.h>
 #include <OptComp.h>
 #include <OptProblem.h>
+#include <OptStarter.h>
 #include <MsgFac.h>
 
 //------------------------------------------------------------------------------
@@ -67,6 +68,24 @@ void WitSolverIf::writeMps ()
 
 //------------------------------------------------------------------------------
 
+void WitSolverIf::loadInitSoln ()
+   {
+   WitVector <double> initSoln;
+   WitOptVar *        theVar;
+      
+   if (not myOptComp ()->optInitMethod ()->external ())
+      return;
+
+   initSoln.resize (myOptProblem ()->nOptVars (), 0.0);
+
+   forEachEl (theVar, myOptProblem ()->myOptVars ())
+      initSoln[theVar->index ()] = theVar->primalValue ();
+
+   loadInitSolnSS (initSoln.myCVec ());
+   }
+
+//------------------------------------------------------------------------------
+
 void WitSolverIf::getColumnData (
       WitVector <double> & lb,
       WitVector <double> & ub,
@@ -111,6 +130,8 @@ void WitSolverIf::solveOptProbAsLp ()
    writeMps ();
 
    setLpMethodByOptStarter ();
+
+   loadInitSoln ();
 
    finishSolveOptProbAsLp ();
    }

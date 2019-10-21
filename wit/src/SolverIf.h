@@ -99,10 +99,21 @@ class WitSolverIf: public WitProbAssoc
          //
          // Sets the LP method to be used by the solver based on the OptStarter.
 
+      virtual void loadInitSolnSS (const double * initSoln) = 0;
+         //
+         // Does the solver-specific aspects of loadInitSoln ().
+         // initSoln is the initial solution to be loaded.
+
       void writeMps ();
          //
          // Writes an MPS file of the opt problem entered into CPLEX, if
          // appropriate.
+         // This function should probably be private eventually.
+
+      void loadInitSoln ();
+         //
+         // Loads the initial primal solution from myOptProblem () into the
+         // solver, as needed.
          // This function should probably be private eventually.
 
       void getColumnData (

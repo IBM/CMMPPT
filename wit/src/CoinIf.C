@@ -186,6 +186,17 @@ void WitCoinIf::setLpMethodByOptStarter ()
 
 //------------------------------------------------------------------------------
 
+void WitCoinIf::loadInitSolnSS (const double * initSoln)
+   {
+   WitTimer::enterSection ("coin");
+
+   myClpSimplex_->setColSolution (initSoln);
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinIf::getRowData (
       WitVector <double> & rowlb,
       WitVector <double> & rowub)

@@ -77,6 +77,7 @@ class WitCoinIf: public WitSolverIf
       virtual void loadLp                  ();
       virtual void writeMpsSS              ();
       virtual void setLpMethodByOptStarter ();
+      virtual void loadInitSolnSS          (const double *);
          //
          // Overrides from class SolverIf.
 

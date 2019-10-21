@@ -1531,7 +1531,8 @@ SolverIf.obj: ../src/OptVar.h ../src/OptVC.h ../src/BoundPair.h
 SolverIf.obj: ../src/PtrVec.h ../../config/dummy_headers/algorithm
 SolverIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
 SolverIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-SolverIf.obj: ../src/Link.h ../src/MsgFac.h ../src/MsgArg.h
+SolverIf.obj: ../src/Link.h ../src/OptStarter.h ../src/MsgFac.h
+SolverIf.obj: ../src/MsgArg.h
 StCons.obj: ../src/StCons.h ../src/StochCon.h ../src/OptCon.h ../src/OptVC.h
 StCons.obj: ../src/BoundPair.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 StCons.obj: ../../config/dummy_headers/stdio.h
