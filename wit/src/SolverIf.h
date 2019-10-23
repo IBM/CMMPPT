@@ -95,24 +95,16 @@ class WitSolverIf: public WitProbAssoc
          //
          // Does the solver-specific aspects of writeMps ().
 
-      virtual void setLpMethodByOptStarter () = 0;
-         //
-         // Sets the LP method to be used by the solver based on the OptStarter.
-
       virtual void loadInitSolnSS (const double * initSoln) = 0;
          //
          // Does the solver-specific aspects of loadInitSoln ().
          // initSoln is the initial solution to be loaded.
 
-      virtual void setParams ();
+      virtual void solveLp (bool optNeeded) = 0;
          //
-         // Sets the solver's parameters, if appropraite.
-         // Default behavior: No-op.
-
-      virtual void finishSolveLp (bool optNeeded) = 0;
-         //
-         // Does all aspects of solveLp (optNeeded) that have not been moved
-         // to more specific functions.
+         // Makes appropriate calls to the solver to solve the optimization
+         // problem as an LP.
+         // optNeeded is to be true, iff an optimal solution is required.
 
       void writeMps ();
          //
@@ -134,22 +126,20 @@ class WitSolverIf: public WitProbAssoc
          // Retrieves the column portion of the LP aspect of the problem in a
          // standard format.
 
-      void solveLp (bool optNeeded);
-         //
-         // Makes appropriate calls to the solver to solve the optimization
-         // problem as an LP.
-         // optNeeded is to be true, iff an optimal solution is required.
-         // This function should probably be private eventually.
-
       bool mipMode ();
          //
          // Returns true, iff myOptProblem is a MIP.
+
+      void setUseDualSimplex (bool);
+         //
+         // "Set" function.
 
       //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
       accessFunc (WitOptProblem *, myOptProblem)
+      accessFunc (bool,            useDualSimplex)
 
    private:
 
@@ -171,6 +161,11 @@ class WitSolverIf: public WitProbAssoc
       WitOptProblem * const myOptProblem_;
          //
          // The OptProblem that owns this SolverIf.
+
+      bool useDualSimplex_;
+         //
+         // If true,  dual   simplex is to be used.
+         // If false, primal simplex is to be used.
    };
 
 #endif

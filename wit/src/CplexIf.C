@@ -153,7 +153,7 @@ void WitCplexIf::reSolveOptProbAsLp ()
 
    writeMps ();
 
-   setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_DUAL);
+   setUseDualSimplex (true);
 
    solveLp (myOptProblem ()->needDual ());
 
@@ -289,20 +289,6 @@ void WitCplexIf::writeMpsSS ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::setLpMethodByOptStarter ()
-   {
-   if (myOptComp ()->crashOptStarter ()->isChosen ())
-      {
-      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_DUAL);
-      }
-   else
-      {
-      setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_PRIMAL);
-      }
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::loadInitSolnSS (const double * initSoln)
    {
    WitTimer::enterSection ("cplex");
@@ -325,12 +311,17 @@ void WitCplexIf::loadInitSolnSS (const double * initSoln)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::finishSolveLp (bool optNeeded)
+void WitCplexIf::solveLp (bool optNeeded)
    {
+   setIntParam (
+      CPX_PARAM_LPMETHOD,
+      useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
+
+   setSpecCpxPars ();
+
    WitTimer::enterSection ("cplex");
 
-   myErrCode_ =
-      CPXlpopt (myCpxEnv_, myCpxLp_);
+   myErrCode_ = CPXlpopt (myCpxEnv_, myCpxLp_);
 
    checkErrCode ("CPXlpopt");
 
@@ -339,21 +330,6 @@ void WitCplexIf::finishSolveLp (bool optNeeded)
    checkLpSolnStatus (optNeeded);
 
    printLpSolveInfo ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::setParams ()
-   {
-   WitCpxParSpec * theCpxParSpec;
-
-   forEachEl (theCpxParSpec, myOptComp ()->myCpxParSpecMgr ()->myCpxParSpecs ())
-      {
-      if (theCpxParSpec->valTypeIsInt ())
-         setSpecIntCpxPar (theCpxParSpec);
-      else
-         setSpecDblCpxPar (theCpxParSpec);
-      }
    }
 
 //------------------------------------------------------------------------------
@@ -690,9 +666,13 @@ void WitCplexIf::solveLexOpt ()
       else
          {
          if (prevOptVar != NULL)
-            setIntParam (CPX_PARAM_LPMETHOD, CPX_ALG_PRIMAL);
+            {
+            setUseDualSimplex (false);
+            }
          else
-            setLpMethodByOptStarter ();
+            {
+            setUseDualSimplex (myOptComp ()->crashOptStarter ()->isChosen ());
+            }
 
          solveLp (true);
          }
@@ -870,7 +850,7 @@ void WitCplexIf::solveMip (bool optNeeded)
    if (countIntVars () == 0)
       myMsgFac () ("mipModeNoIntVarsSmsg");
 
-   setParams ();
+   setSpecCpxPars ();
 
    WitTimer::enterSection ("cplex");
 
@@ -1031,6 +1011,21 @@ void WitCplexIf::storeDualSoln ()
       theIdx = theCon->index ();
 
       theCon->setDualValue (dualSoln[theIdx]);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setSpecCpxPars ()
+   {
+   WitCpxParSpec * theCpxParSpec;
+
+   forEachEl (theCpxParSpec, myOptComp ()->myCpxParSpecMgr ()->myCpxParSpecs ())
+      {
+      if (theCpxParSpec->valTypeIsInt ())
+         setSpecIntCpxPar (theCpxParSpec);
+      else
+         setSpecDblCpxPar (theCpxParSpec);
       }
    }
 

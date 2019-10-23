@@ -49,14 +49,9 @@ void WitSolverIf::solveOptProb ()
 
 WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
-      WitProbAssoc  (theOptProblem->myProblem ()),
-      myOptProblem_ (theOptProblem)
-   {
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::setParams ()
+      WitProbAssoc    (theOptProblem->myProblem ()),
+      myOptProblem_   (theOptProblem),
+      useDualSimplex_ (true)
    {
    }
 
@@ -120,18 +115,16 @@ void WitSolverIf::getColumnData (
 
 //------------------------------------------------------------------------------
 
-void WitSolverIf::solveLp (bool optNeeded)
+bool WitSolverIf::mipMode ()
    {
-   setParams ();
-
-   finishSolveLp (optNeeded);
+   return myOptComp ()->mipMode ();
    }
 
 //------------------------------------------------------------------------------
 
-bool WitSolverIf::mipMode ()
+void WitSolverIf::setUseDualSimplex (bool theValue)
    {
-   return myOptComp ()->mipMode ();
+   useDualSimplex_ = theValue;
    }
 
 //------------------------------------------------------------------------------
@@ -144,7 +137,7 @@ void WitSolverIf::solveOptProbAsLp ()
 
    writeMps ();
 
-   setLpMethodByOptStarter ();
+   setUseDualSimplex (myOptComp ()->crashOptStarter ()->isChosen ());
 
    loadInitSoln ();
 

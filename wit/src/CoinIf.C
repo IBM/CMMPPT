@@ -172,20 +172,6 @@ void WitCoinIf::writeMpsSS ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::setLpMethodByOptStarter ()
-   {
-   if (myOptComp ()->crashOptStarter ()->isChosen ())
-      {
-      myClpSimplex_->setAlgorithm (-1); // Dual Simplex
-      }
-   else
-      {
-      myClpSimplex_->setAlgorithm  (1); // Primal Simplex
-      }
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinIf::loadInitSolnSS (const double * initSoln)
    {
    WitTimer::enterSection ("coin");
@@ -197,7 +183,7 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::finishSolveLp (bool)
+void WitCoinIf::solveLp (bool)
    {
    myMsgFac () ("coinNYISmsg",
       "Optimizing Implosion and Stochastic Implosion (2)");

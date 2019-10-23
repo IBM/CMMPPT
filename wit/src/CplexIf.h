@@ -91,17 +91,15 @@ class WitCplexIf: public WitSolverIf
          //
          // Shuts down the CPLEX log file.
 
-      virtual void reSolveOptProbAsLp      ();
-      virtual void solveOptProbAsMip       ();
-      virtual void solveOptProbAsLexOpt    ();
-      virtual void finishSolveOptProbAsLp  ();
-      virtual void issueSolveMsg           ();
-      virtual void loadLp                  ();
-      virtual void writeMpsSS              ();
-      virtual void setLpMethodByOptStarter ();
-      virtual void loadInitSolnSS          (const double *);
-      virtual void finishSolveLp           (bool);
-      virtual void setParams               ();
+      virtual void reSolveOptProbAsLp     ();
+      virtual void solveOptProbAsMip      ();
+      virtual void solveOptProbAsLexOpt   ();
+      virtual void finishSolveOptProbAsLp ();
+      virtual void issueSolveMsg          ();
+      virtual void loadLp                 ();
+      virtual void writeMpsSS             ();
+      virtual void loadInitSolnSS         (const double *);
+      virtual void solveLp                (bool);
          //
          // Overrides from class SolverIf.
 
@@ -208,6 +206,10 @@ class WitCplexIf: public WitSolverIf
       void storeDualSoln ();
          //
          // Stores the dual solution in myOptProblem ().
+
+      void setSpecCpxPars ();
+         //
+         // Sets the CPLEX parameters as specified by the CpxParSpecs.
 
       void setSpecIntCpxPar (WitCpxParSpec * theCpxParSpec);
          //
