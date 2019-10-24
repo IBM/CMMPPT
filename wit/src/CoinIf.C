@@ -56,12 +56,16 @@ WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
    myClpSimplex_ = new ClpSimplex;
 
    WitTimer::leaveSection ("coin");
+
+   setUpMessageHandler ();
    }
 
 //------------------------------------------------------------------------------
 
 WitCoinIf::~WitCoinIf ()
    {
+   shutDownMessageHandler ();
+
    WitTimer::enterSection ("coin");
 
    delete myClpSimplex_;
@@ -185,8 +189,61 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 void WitCoinIf::solveLp (bool)
    {
+   WitTimer::enterSection ("coin");
+
+   if (useDualSimplex ())
+      {
+      myClpSimplex_->dual ();
+      }
+   else
+      {
+      myClpSimplex_->primal ();
+      }
+
+   WitTimer::leaveSection ("coin");
+
    myMsgFac () ("coinNYISmsg",
       "Optimizing Implosion and Stochastic Implosion (2)");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::setUpMessageHandler ()
+   {
+   FILE *               theFile;
+   CoinMessageHandler * theHandler;
+
+   theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
+
+   WitTimer::enterSection ("coin");
+
+   theHandler = new CoinMessageHandler (theFile);
+
+   myClpSimplex_->passInMessageHandler (theHandler);
+
+   WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::shutDownMessageHandler ()
+   {
+   CoinMessageHandler * theHandler;
+   FILE *               theFile;
+
+   WitTimer::enterSection ("coin");
+
+   theHandler = myClpSimplex_->messageHandler ();
+
+   myClpSimplex_->setDefaultMessageHandler ();
+
+   theFile = theHandler->filePointer ();
+
+   delete theHandler;
+
+   WitTimer::leaveSection ("coin");
+
+   fclose (theFile);
    }
 
 //------------------------------------------------------------------------------

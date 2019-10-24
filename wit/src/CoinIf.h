@@ -81,6 +81,14 @@ class WitCoinIf: public WitSolverIf
          //
          // Overrides from class SolverIf.
 
+      void setUpMessageHandler ();
+         //
+         // Sets up the COIN Message Handler.
+
+      void shutDownMessageHandler ();
+         //
+         // Shouts down the COIN Message Handler.
+
       void getRowData (
             WitVector <double> & rowlb,
             WitVector <double> & rowub);
