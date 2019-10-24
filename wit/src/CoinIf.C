@@ -186,19 +186,21 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
    }
 
 //------------------------------------------------------------------------------
+// solveLp
+//
+// dual   is called with ifValuesPass == 0, meaning don't do a values pass.
+// primal is called with ifValuesPass == 1, meaning       do a values pass.
+// Both  are called with startFinshOptions == 0.
+//------------------------------------------------------------------------------
 
 void WitCoinIf::solveLp (bool)
    {
    WitTimer::enterSection ("coin");
 
    if (useDualSimplex ())
-      {
-      myClpSimplex_->dual ();
-      }
+      myClpSimplex_->dual   (0, 0);
    else
-      {
-      myClpSimplex_->primal ();
-      }
+      myClpSimplex_->primal (1, 0);
 
    WitTimer::leaveSection ("coin");
 
