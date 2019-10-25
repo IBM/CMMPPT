@@ -12,6 +12,7 @@
 
 #include <SolverIf.h>
 #include <OptVar.h>
+#include <OptCon.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <OptStarter.h>
@@ -115,6 +116,46 @@ void WitSolverIf::getColumnData (
 
 //------------------------------------------------------------------------------
 
+void WitSolverIf::storePrimalSoln ()
+   {
+   WitVector <double> primalSoln;
+   WitOptVar *        theVar;
+   int                theIdx;
+
+   primalSoln.resize (myOptProblem ()->nOptVars ());
+
+   getPrimalSoln (primalSoln);
+
+   forEachEl (theVar, myOptProblem ()->myOptVars ())
+      {
+      theIdx = theVar->index ();
+
+      theVar->setPrimalValue (primalSoln[theIdx]);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::storeDualSoln ()
+   {
+   WitVector <double> dualSoln;
+   WitOptCon *        theCon;
+   int                theIdx;
+
+   dualSoln.resize (myOptProblem ()->nOptCons ());
+
+   getDualSoln (dualSoln);
+
+   forEachEl (theCon, myOptProblem ()->myOptCons ())
+      {
+      theIdx = theCon->index ();
+
+      theCon->setDualValue (dualSoln[theIdx]);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
 bool WitSolverIf::mipMode ()
    {
    return myOptComp ()->mipMode ();
@@ -143,5 +184,8 @@ void WitSolverIf::solveOptProbAsLp ()
 
    solveLp (myOptProblem ()->needDual ());
 
-   finishSolveOptProbAsLp ();
+   storePrimalSoln ();
+
+   if (myOptProblem ()->needDual ())
+      storeDualSoln ();
    }

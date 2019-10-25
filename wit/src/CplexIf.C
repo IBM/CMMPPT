@@ -202,16 +202,6 @@ void WitCplexIf::solveOptProbAsLexOpt ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::finishSolveOptProbAsLp ()
-   {
-   storePrimalSoln ();
-
-   if (myOptProblem ()->needDual ())
-      storeDualSoln ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::issueSolveMsg ()
    {
    CPXCCHARptr theVersionID;
@@ -330,6 +320,44 @@ void WitCplexIf::solveLp (bool optNeeded)
    checkLpSolnStatus (optNeeded);
 
    printLpSolveInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::getPrimalSoln (WitVector <double> & primalSoln)
+   {
+   enteringCplex ();
+
+   myErrCode_ =
+      CPXgetx (
+         myCpxEnv_,
+         myCpxLp_,
+         primalSoln.myCVecForUpdate (),
+         0,
+         myOptProblem ()->nOptVars () - 1);
+
+   checkErrCode ("CPXgetx");
+
+   leftCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::getDualSoln (WitVector <double> & dualSoln)
+   {
+   enteringCplex ();
+
+   myErrCode_ =
+      CPXgetpi (
+         myCpxEnv_,
+         myCpxLp_,
+         dualSoln.myCVecForUpdate (),
+         0,
+         myOptProblem ()->nOptCons () - 1);
+
+   checkErrCode ("CPXgetpi");
+
+   leftCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -948,70 +976,6 @@ void WitCplexIf::issueStatusMsg (WitMsgID theMsgID)
    myMsgFac () (theMsgID,
       myOptComp ()->cplexStatusCode (),
       myOptComp ()->cplexStatusText ());
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::storePrimalSoln ()
-   {
-   WitVector <double> primalSoln;
-   WitOptVar *        theVar;
-   int                theIdx;
-
-   primalSoln.resize (myOptProblem ()->nOptVars ());
-
-   enteringCplex ();
-
-   myErrCode_ =
-      CPXgetx (
-         myCpxEnv_,
-         myCpxLp_,
-         primalSoln.myCVecForUpdate (),
-         0,
-         myOptProblem ()->nOptVars () - 1);
-
-   checkErrCode ("CPXgetx");
-
-   leftCplex ();
-
-   forEachEl (theVar, myOptProblem ()->myOptVars ())
-      {
-      theIdx = theVar->index ();
-
-      theVar->setPrimalValue (primalSoln[theIdx]);
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::storeDualSoln ()
-   {
-   WitVector <double> dualSoln;
-   WitOptCon *        theCon;
-   int                theIdx;
-
-   dualSoln.resize (myOptProblem ()->nOptCons ());
-
-   enteringCplex ();
-
-   myErrCode_ =
-      CPXgetpi (
-         myCpxEnv_,
-         myCpxLp_,
-         dualSoln.myCVecForUpdate (),
-         0,
-         myOptProblem ()->nOptCons () - 1);
-
-   checkErrCode ("CPXgetpi");
-
-   leftCplex ();
-
-   forEachEl (theCon, myOptProblem ()->myOptCons ())
-      {
-      theIdx = theCon->index ();
-
-      theCon->setDualValue (dualSoln[theIdx]);
-      }
    }
 
 //------------------------------------------------------------------------------

@@ -69,15 +69,16 @@ class WitCoinIf: public WitSolverIf
 
       noCopyCtorAssign (WitCoinIf);
 
-      virtual void reSolveOptProbAsLp     ();
-      virtual void solveOptProbAsMip      ();
-      virtual void solveOptProbAsLexOpt   ();
-      virtual void finishSolveOptProbAsLp ();
-      virtual void issueSolveMsg          ();
-      virtual void loadLp                 ();
-      virtual void writeMpsSS             ();
-      virtual void loadInitSolnSS         (const double *);
-      virtual void solveLp                (bool);
+      virtual void reSolveOptProbAsLp   ();
+      virtual void solveOptProbAsMip    ();
+      virtual void solveOptProbAsLexOpt ();
+      virtual void issueSolveMsg        ();
+      virtual void loadLp               ();
+      virtual void writeMpsSS           ();
+      virtual void loadInitSolnSS       (const double *);
+      virtual void solveLp              (bool);
+      virtual void getPrimalSoln        (WitVector <double> &);
+      virtual void getDualSoln          (WitVector <double> &);
          //
          // Overrides from class SolverIf.
 

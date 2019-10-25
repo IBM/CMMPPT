@@ -78,11 +78,6 @@ class WitSolverIf: public WitProbAssoc
          // Loads, solves and retrieves the solution to the optimization problem
          // as a lexicographic optimization.
 
-      virtual void finishSolveOptProbAsLp () = 0;
-         //
-         // Does all aspects of solveOptProbAsLp () that have not been moved
-         // to more specific functions.
-
       virtual void issueSolveMsg () = 0;
          //
          // Issues a msg for the solve.
@@ -106,6 +101,16 @@ class WitSolverIf: public WitProbAssoc
          // problem as an LP.
          // optNeeded is to be true, iff an optimal solution is required.
 
+      virtual void getPrimalSoln (WitVector <double> & primalSoln) = 0;
+         //
+         // Sets primalSoln to the vector of primal solution values.
+         // primalSoln must already be of the appropriate size.
+
+      virtual void getDualSoln (WitVector <double> & dualSoln) = 0;
+         //
+         // Sets dualSoln to the vector of dual solution values.
+         // dualSoln must already be of the appropriate size.
+
       void writeMps ();
          //
          // Writes an MPS file of the opt problem entered into CPLEX, if
@@ -125,6 +130,16 @@ class WitSolverIf: public WitProbAssoc
          //
          // Retrieves the column portion of the LP aspect of the problem in a
          // standard format.
+
+      void storePrimalSoln ();
+         //
+         // Stores the primal solution in myOptProblem ().
+         // This function should probably be private eventually.
+
+      void storeDualSoln ();
+         //
+         // Stores the dual solution in myOptProblem ().
+         // This function should probably be private eventually.
 
       bool mipMode ();
          //

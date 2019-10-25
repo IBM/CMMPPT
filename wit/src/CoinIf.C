@@ -96,14 +96,6 @@ void WitCoinIf::solveOptProbAsLexOpt ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::finishSolveOptProbAsLp ()
-   {
-   myMsgFac () ("coinNYISmsg",
-      "Optimizing Implosion and Stochastic Implosion (1)");
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinIf::issueSolveMsg ()
    {
    myMsgFac () ("solveOptProblemMsg",
@@ -207,6 +199,20 @@ void WitCoinIf::solveLp (bool)
    checkLpSolnStatus ();
 
    myMsgFac () ("nSimplexItersMsg", myClpSimplex_->numberIterations ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::getPrimalSoln (WitVector <double> & primalSoln)
+   {
+   primalSoln = myClpSimplex_->getColSolution ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::getDualSoln (WitVector <double> & dualSoln)
+   {
+   dualSoln = myClpSimplex_->getRowPrice ();
    }
 
 //------------------------------------------------------------------------------
