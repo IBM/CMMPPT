@@ -96,6 +96,16 @@ class WitCoinIf: public WitSolverIf
          // Retrieves the row portion of the LP aspect of the problem in the
          // representation required for loadProblem.
 
+      static void coinIn ();
+         //
+         // Indicates, for timing purposes, that a COIN function is about to
+         // be called.
+
+      static void coinOut ();
+         //
+         // Indicates, for timing purposes, that a COIN function was just
+         // called.
+
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------

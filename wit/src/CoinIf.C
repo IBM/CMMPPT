@@ -51,11 +51,11 @@ WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
       WitSolverIf   (theOptProblem),
       myClpSimplex_ (NULL)
    {
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    myClpSimplex_ = new ClpSimplex;
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
 
    setUpMessageHandler ();
    }
@@ -66,11 +66,11 @@ WitCoinIf::~WitCoinIf ()
    {
    shutDownMessageHandler ();
 
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    delete myClpSimplex_;
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
    }
 
 //------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ void WitCoinIf::loadLp ()
 
    getRowData (rowlb, rowub);
 
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    myClpSimplex_->setOptimizationDirection (-1.0);
 
@@ -147,7 +147,7 @@ void WitCoinIf::loadLp ()
          rowlb.myCVec (),
          rowub.myCVec ());
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
    }
 
 //------------------------------------------------------------------------------
@@ -156,19 +156,19 @@ void WitCoinIf::writeMpsSS ()
    {
    int errCode;
 
-   WitTimer::enterSection ("coin");
-
    try
       {
+      coinIn ();
+
       errCode = myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
+
+      coinOut ();
       }
 
    catch (...)
       {
       myMsgFac () ("clpWriteMpsExcSmsg", "opt-prob.mps");
       }
-
-   WitTimer::leaveSection ("coin");
 
    if (errCode != 0)
       myMsgFac () ("clpWriteMpsErrSmsg", errCode);
@@ -178,11 +178,11 @@ void WitCoinIf::writeMpsSS ()
 
 void WitCoinIf::loadInitSolnSS (const double * initSoln)
    {
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    myClpSimplex_->setColSolution (initSoln);
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
    }
 
 //------------------------------------------------------------------------------
@@ -195,14 +195,14 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 void WitCoinIf::solveLp (bool)
    {
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    if (useDualSimplex ())
       myClpSimplex_->dual   (0, 0);
    else
       myClpSimplex_->primal (1, 0);
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
 
    myMsgFac () ("coinNYISmsg",
       "Optimizing Implosion and Stochastic Implosion (2)");
@@ -217,13 +217,13 @@ void WitCoinIf::setUpMessageHandler ()
 
    theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
 
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    theHandler = new CoinMessageHandler (theFile);
 
    myClpSimplex_->passInMessageHandler (theHandler);
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
    }
 
 //------------------------------------------------------------------------------
@@ -233,7 +233,7 @@ void WitCoinIf::shutDownMessageHandler ()
    CoinMessageHandler * theHandler;
    FILE *               theFile;
 
-   WitTimer::enterSection ("coin");
+   coinIn ();
 
    theHandler = myClpSimplex_->messageHandler ();
 
@@ -243,7 +243,7 @@ void WitCoinIf::shutDownMessageHandler ()
 
    delete theHandler;
 
-   WitTimer::leaveSection ("coin");
+   coinOut ();
 
    fclose (theFile);
    }
@@ -267,6 +267,20 @@ void WitCoinIf::getRowData (
       rowlb[theIdx] = theOptCon->bounds ().lower ();
       rowub[theIdx] = theOptCon->bounds ().upper ();
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::coinIn ()
+   {
+   WitTimer::enterSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::coinOut ()
+   {
+   WitTimer::leaveSection ("coin");
    }
 
 #endif // COIN_EMBEDDED
