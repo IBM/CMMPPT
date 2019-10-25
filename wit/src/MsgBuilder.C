@@ -7969,4 +7969,51 @@ void WitMsgBuilder::buildMsgs ()
    currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
+
+   makeMsg (
+      "iterOrTimeLimitSmsg",
+      1065,
+      severe_,
+      "The solver terminated early due to reaching its iteration limit or time "
+      "limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "solverStoppedErrorsSmsg",
+      1066,
+      severe_,
+      "The solver terminated early due to errors.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "solverStoppedEventSmsg",
+      1067,
+      severe_,
+      "CLP was terminated by its event handler.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "unexpClpStatusCodeSmsg",
+      1068,
+      severe_,
+      "CLP terminated with an unexpected problem status code.\n"
+      "\n"
+      "   Problem Status Code: %1$d");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
    }

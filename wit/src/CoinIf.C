@@ -204,6 +204,8 @@ void WitCoinIf::solveLp (bool)
 
    coinOut ();
 
+   checkLpSolnStatus ();
+
    myMsgFac () ("coinNYISmsg",
       "Optimizing Implosion and Stochastic Implosion (2)");
    }
@@ -266,6 +268,47 @@ void WitCoinIf::getRowData (
 
       rowlb[theIdx] = theOptCon->bounds ().lower ();
       rowub[theIdx] = theOptCon->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::checkLpSolnStatus ()
+   {
+   int statusCode;
+
+   coinIn ();
+
+   statusCode = myClpSimplex_->problemStatus ();
+
+   coinOut ();
+
+   switch (statusCode)
+      {
+      case 0:
+         {
+         myMsgFac () ("optSolnFoundMsg");
+
+         return;
+         }
+
+      case 1:
+         myMsgFac () ("infeasSmsg");
+
+      case 2:
+         myMsgFac () ("unboundedOrInfeasSmsg");
+
+      case 3:
+         myMsgFac () ("iterOrTimeLimitSmsg");
+
+      case 4:
+         myMsgFac () ("solverStoppedErrorsSmsg");
+
+      case 5:
+         myMsgFac () ("clpStoppedEventSmsg");
+
+      default:
+         myMsgFac () ("unexpClpStatusCodeSmsg", statusCode);
       }
    }
 
