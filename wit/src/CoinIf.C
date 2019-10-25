@@ -51,11 +51,11 @@ WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
       WitSolverIf   (theOptProblem),
       myClpSimplex_ (NULL)
    {
-   coinIn ();
+   enteringCoin ();
 
    myClpSimplex_ = new ClpSimplex;
 
-   coinOut ();
+   leftCoin ();
 
    setUpMessageHandler ();
    }
@@ -66,11 +66,11 @@ WitCoinIf::~WitCoinIf ()
    {
    shutDownMessageHandler ();
 
-   coinIn ();
+   enteringCoin ();
 
    delete myClpSimplex_;
 
-   coinOut ();
+   leftCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ void WitCoinIf::loadLp ()
 
    getRowData (rowlb, rowub);
 
-   coinIn ();
+   enteringCoin ();
 
    myClpSimplex_->setOptimizationDirection (-1.0);
 
@@ -147,7 +147,7 @@ void WitCoinIf::loadLp ()
          rowlb.myCVec (),
          rowub.myCVec ());
 
-   coinOut ();
+   leftCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -158,11 +158,11 @@ void WitCoinIf::writeMpsSS ()
 
    try
       {
-      coinIn ();
+      enteringCoin ();
 
       errCode = myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
 
-      coinOut ();
+      leftCoin ();
       }
 
    catch (...)
@@ -178,11 +178,11 @@ void WitCoinIf::writeMpsSS ()
 
 void WitCoinIf::loadInitSolnSS (const double * initSoln)
    {
-   coinIn ();
+   enteringCoin ();
 
    myClpSimplex_->setColSolution (initSoln);
 
-   coinOut ();
+   leftCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -195,19 +195,18 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 void WitCoinIf::solveLp (bool)
    {
-   coinIn ();
+   enteringCoin ();
 
    if (useDualSimplex ())
       myClpSimplex_->dual   (0, 0);
    else
       myClpSimplex_->primal (1, 0);
 
-   coinOut ();
+   leftCoin ();
 
    checkLpSolnStatus ();
 
-   myMsgFac () ("coinNYISmsg",
-      "Optimizing Implosion and Stochastic Implosion (2)");
+   myMsgFac () ("nSimplexItersMsg", myClpSimplex_->numberIterations ());
    }
 
 //------------------------------------------------------------------------------
@@ -219,13 +218,13 @@ void WitCoinIf::setUpMessageHandler ()
 
    theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
 
-   coinIn ();
+   enteringCoin ();
 
    theHandler = new CoinMessageHandler (theFile);
 
    myClpSimplex_->passInMessageHandler (theHandler);
 
-   coinOut ();
+   leftCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -235,7 +234,7 @@ void WitCoinIf::shutDownMessageHandler ()
    CoinMessageHandler * theHandler;
    FILE *               theFile;
 
-   coinIn ();
+   enteringCoin ();
 
    theHandler = myClpSimplex_->messageHandler ();
 
@@ -245,7 +244,7 @@ void WitCoinIf::shutDownMessageHandler ()
 
    delete theHandler;
 
-   coinOut ();
+   leftCoin ();
 
    fclose (theFile);
    }
@@ -277,11 +276,11 @@ void WitCoinIf::checkLpSolnStatus ()
    {
    int statusCode;
 
-   coinIn ();
+   enteringCoin ();
 
    statusCode = myClpSimplex_->problemStatus ();
 
-   coinOut ();
+   leftCoin ();
 
    switch (statusCode)
       {
@@ -314,14 +313,14 @@ void WitCoinIf::checkLpSolnStatus ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::coinIn ()
+void WitCoinIf::enteringCoin ()
    {
    WitTimer::enterSection ("coin");
    }
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::coinOut ()
+void WitCoinIf::leftCoin ()
    {
    WitTimer::leaveSection ("coin");
    }

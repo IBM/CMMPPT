@@ -8016,4 +8016,14 @@ void WitMsgBuilder::buildMsgs ()
    currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
+
+   makeMsg (
+      "nSimplexItersMsg",
+      1069,
+      info_,
+      "# simplex iterations: %1$d");
+
+   currentMsg_->testable              (false);
+
+   //---------------------------------------------------------------------------
    }

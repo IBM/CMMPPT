@@ -100,12 +100,12 @@ class WitCoinIf: public WitSolverIf
          //
          // Checks the status of the LP solution.
 
-      static void coinIn ();
+      static void enteringCoin ();
          //
          // Indicates, for timing purposes, that a COIN function is about to
          // be called.
 
-      static void coinOut ();
+      static void leftCoin ();
          //
          // Indicates, for timing purposes, that a COIN function was just
          // called.
