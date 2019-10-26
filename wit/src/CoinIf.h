@@ -42,7 +42,7 @@ class WitCoinIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
-      static WitCoinIf * newInstanceIfAllowed (WitOptProblem * theOptProblem);
+      static WitCoinIf * newInstance (WitOptProblem * theOptProblem);
          //
          // If COIN is embedded,
          //    creates and returns a new CoinIf for theOptProblem.

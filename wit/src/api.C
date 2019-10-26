@@ -5115,6 +5115,18 @@ witReturnCode witGetPrefHighStockSLBs (
 
 //------------------------------------------------------------------------------
 
+witReturnCode witGetPreferCplex (
+      WitRun * const theWitRun,
+      witBoolean * preferCplex)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witGetPreferCplex, (
+         preferCplex))
+   }
+ 
+//------------------------------------------------------------------------------
+
 witReturnCode witGetPreprocessed (
       WitRun * const theWitRun,
       witBoolean * preprocessed)
@@ -8342,6 +8354,18 @@ witReturnCode witSetPrefHighStockSLBs (
       theWitRun,
       witSetPrefHighStockSLBs, (
          prefHighStockSLBs))
+   }
+
+//------------------------------------------------------------------------------
+
+witReturnCode witSetPreferCplex (
+      WitRun * const theWitRun,
+      const witBoolean preferCplex)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witSetPreferCplex, (
+         preferCplex))
    }
 
 //------------------------------------------------------------------------------

@@ -926,8 +926,8 @@ OptProblem.obj: ../src/BoundPair.h ../src/OptCon.h ../src/Coeff.h
 OptProblem.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
 OptProblem.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
 OptProblem.obj: ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
-OptProblem.obj: ../src/MsgArg.h ../src/Session.h ../src/GlobalComp.h
-OptProblem.obj: ../src/PairStack.h ../../config/dummy_headers/float.h
+OptProblem.obj: ../src/MsgArg.h ../src/Session.h
+OptProblem.obj: ../../config/dummy_headers/float.h
 Param.obj: ../src/Param.h ../src/Str.h ../src/Vector.h ../src/Util.h
 Param.obj: ../src/typedefs.h ../src/macs.h ../../config/dummy_headers/stdio.h
 Param.obj: ../../config/dummy_headers/string.h

@@ -44,7 +44,7 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
+WitCplexIf * WitCplexIf::newInstance (WitOptProblem * theOptProblem)
    {
    return new WitCplexIf (theOptProblem);
    }
@@ -1197,7 +1197,7 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstanceIfAllowed (WitOptProblem *)
+WitCplexIf * WitCplexIf::newInstance (WitOptProblem *)
    {
    stronglyAssert (false);
 

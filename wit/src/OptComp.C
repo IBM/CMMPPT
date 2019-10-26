@@ -63,6 +63,7 @@ WitOptComp::WitOptComp (WitCompMgr * theCompMgr):
       wbounds_           (defWbounds           ()),
       optInitMethod_     (NULL),
       solverLogFileName_ (defSolverLogFileName ()),
+      preferCplex_       (defPreferCplex       ()),
       sglObjValuePtr_    (NULL),
       boundsValue_       (0.0),
       boundsValueValid_  (false),
@@ -226,6 +227,15 @@ void WitOptComp::setSolverLogFileName (const char * theValue)
    prepSetNonUnpostAttr ();
 
    solverLogFileName_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptComp::setPreferCplex (bool theValue)
+   {
+   prepSetUnpostAttr ();
+
+   preferCplex_ = theValue;
    }
 
 //------------------------------------------------------------------------------
@@ -402,6 +412,7 @@ void WitOptComp::display ()
    myMsgFac () ("optAttDdMsg",
       WitCoinIf::coinEmbedded   (),
       WitCplexIf::cplexEmbedded (),
+      preferCplex_,
       compPrices_,
       accAfterOptImp_,
       accAfterSoftLB_,
@@ -584,6 +595,11 @@ void WitOptComp::writeDataAttrs ()
       defSolverLogFileName ());
 
    myDataWriter ()->writeBool (
+        "preferCplex",
+         preferCplex (),
+      defPreferCplex ());
+
+   myDataWriter ()->writeBool (
         "multiObjMode",
          multiObjMode (),
       defMultiObjMode ());
@@ -602,6 +618,7 @@ void WitOptComp::copyAttrsFrom (WitOptComp * theOptComp)
    mipMode_           = theOptComp->mipMode_;
    wbounds_           = theOptComp->wbounds_;
    solverLogFileName_ = theOptComp->solverLogFileName_;
+   preferCplex_       = theOptComp->preferCplex_;
    objChoice_         = theOptComp->objChoice_;
 
    setAccAfterOptImp   (theOptComp->accAfterOptImp_);

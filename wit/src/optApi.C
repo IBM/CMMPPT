@@ -465,6 +465,17 @@ void WitRun::witGetOptInitMethod (WitAttr * optInitMethod)
 
 //------------------------------------------------------------------------------
 
+void WitRun::witGetPreferCplex (WitBoolean * preferCplex)
+   {
+   WitOptCompApiCall theCall (this);
+
+   apiGet (preferCplex, "preferCplex", theCall.myOptComp ()->preferCplex ());
+
+   issueGetAttrMsg ("preferCplex");
+   }
+
+//------------------------------------------------------------------------------
+
 void WitRun::witGetSolverLogFileName (char * * solverLogFileName)
    {
    WitOptCompApiCall theCall (this);
@@ -805,6 +816,21 @@ void WitRun::witSetOptInitMethod (WitAttr optInitMethod)
    myDetOptImpMgr ()->shutDown ();
    
    theOptStarter->beChosen ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitRun::witSetPreferCplex (WitBoolean newValue)
+   {
+   WitOptCompApiCall theCall (this);
+
+   theCall.prepBool (
+      "preferCplex", 
+      theCall.myOptComp ()->preferCplex (), 
+      newValue);
+
+   if (theCall.argsOK ())
+      theCall.myOptComp ()->setPreferCplex (asaBool (newValue));
    }
 
 //------------------------------------------------------------------------------

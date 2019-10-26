@@ -39,7 +39,7 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstanceIfAllowed (WitOptProblem * theOptProblem)
+WitCoinIf * WitCoinIf::newInstance (WitOptProblem * theOptProblem)
    {
    return new WitCoinIf (theOptProblem);
    }
@@ -346,7 +346,7 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstanceIfAllowed (WitOptProblem *)
+WitCoinIf * WitCoinIf::newInstance (WitOptProblem *)
    {
    stronglyAssert (false);
 

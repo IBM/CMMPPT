@@ -50,7 +50,7 @@ class WitCplexIf: public WitSolverIf
          //
          // Returns true, iff CPLEX embedded into the current build of WIT.
 
-      static WitCplexIf * newInstanceIfAllowed (WitOptProblem * theOptProblem);
+      static WitCplexIf * newInstance (WitOptProblem * theOptProblem);
          //
          // If CPLEX is embedded,
          //    creates and returns a new CplexIf for theOptProblem.

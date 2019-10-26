@@ -22,10 +22,6 @@
 #include <MsgFac.h>
 #include <Session.h>
 
-#include <GlobalComp.h>
-   //
-   // Temporary, for devpar1
-
 #include <float.h>
 
 //------------------------------------------------------------------------------
@@ -663,21 +659,20 @@ void WitOptProblem::prtMatrixByCols ()
 
 WitSolverIf * WitOptProblem::newSolverIf ()
    {
-   if (myGlobalComp ()->tempPar (1) == "coin")
-      {
-      if (WitCoinIf::coinEmbedded ())
-         return WitCoinIf::newInstanceIfAllowed  (this);
-      else
-         myMsgFac () ("genericSmsg",
-            "tempPar1 was set to \"coin\", but COIN is not embedded in this "
-            "build of WIT.");
-      }
-
    if (WitCplexIf::cplexEmbedded ())
-      return WitCplexIf::newInstanceIfAllowed  (this);
+      if (WitCoinIf::coinEmbedded ())
+         {
+         if (myOptComp ()->preferCplex ())
+            return WitCplexIf::newInstance (this);
+         else
+            return WitCoinIf::newInstance  (this);
+         }
 
    if (WitCoinIf::coinEmbedded ())
-      return WitCoinIf::newInstanceIfAllowed  (this);
+      return WitCoinIf::newInstance  (this);
+
+   if (WitCplexIf::cplexEmbedded ())
+      return WitCplexIf::newInstance (this);
 
    stronglyAssert (false);
 

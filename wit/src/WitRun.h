@@ -585,6 +585,9 @@ class WitRun
       void witGetOptInitMethod (
          WitAttr * optInitMethod);
 
+      void witGetPreferCplex (
+         WitBoolean * value);
+
       void witGetSolverLogFileName (
          char * * solverLogFileName);
 
@@ -636,6 +639,9 @@ class WitRun
 
       void witSetOptInitMethod (
          WitAttr optInitMethod);
+
+      void witSetPreferCplex (
+         WitBoolean preferCplex);
 
       void witSetSolverLogFileName (
          const char * solverLogFileName);

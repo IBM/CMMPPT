@@ -1581,17 +1581,18 @@ int main ()
 
    /* Opt implode */
    {
-   float    prodVol    [] = {5000., 5000., 2000., 0000., 2000.};
-   float    subVol1    [] = {4001., 4001., 1001., 501., 21.};
-   float    subVol     [] = {4000., 4000., 1000., 500., 20.};
-   double   subVolDbl  [] = {4000., 4000., 1000., 500., 20.};
-   float    shipVol    [] = {6000., 6000., 3000., 0000., 3000.};
-   double   shipVolDbl [] = {6000., 6000., 3000., 0000., 3000.};
-   float    cumShipSLB [] = {10000., 10000., 10000., 10000., 10000.};
-   float    cumShipHUB [] = {   -1.,    -1.,    -1.,    -1.,    -1.};
-   float *  fv;
-   double * dv;
-   char *   string;
+   float      prodVol    [] = {5000., 5000., 2000., 0000., 2000.};
+   float      subVol1    [] = {4001., 4001., 1001., 501., 21.};
+   float      subVol     [] = {4000., 4000., 1000., 500., 20.};
+   double     subVolDbl  [] = {4000., 4000., 1000., 500., 20.};
+   float      shipVol    [] = {6000., 6000., 3000., 0000., 3000.};
+   double     shipVolDbl [] = {6000., 6000., 3000., 0000., 3000.};
+   float      cumShipSLB [] = {10000., 10000., 10000., 10000., 10000.};
+   float      cumShipHUB [] = {   -1.,    -1.,    -1.,    -1.,    -1.};
+   float *    fv;
+   double *   dv;
+   char *     string;
+   witBoolean theBool;
 
    witSetDemandCumShipBounds (theWitRun, "PS1", "US",
                               NULL,
@@ -1604,6 +1605,13 @@ int main ()
    assert (strcmp (string, "solver-alt.log") == 0);
 
    witFree (string);
+
+   witSetPreferCplex (theWitRun,   WitFALSE);
+   witGetPreferCplex (theWitRun, & theBool);
+
+   assert (! theBool);
+
+   witSetPreferCplex (theWitRun,   WitTRUE);
 
    witSetPartProdVol( theWitRun, "PS1", prodVol );
    witGetPartProdVol( theWitRun, "PS1", &fv );

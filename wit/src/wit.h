@@ -1888,6 +1888,10 @@ witReturnCode witGetPrefHighStockSLBs (
    WitRun * const theWitRun,
    witBoolean * prefHighStockSLBs);
 
+witReturnCode witGetPreferCplex (
+   WitRun * const theWitRun,
+   witBoolean * preferCplex);
+
 witReturnCode witGetPreprocessed (
    WitRun * const theWitRun,
    witBoolean * preprocessed);
@@ -3043,6 +3047,10 @@ witReturnCode witSetPipSeqFromHeur (
 witReturnCode witSetPrefHighStockSLBs (
    WitRun * const theWitRun,
    const witBoolean prefHighStockSLBs);
+
+witReturnCode witSetPreferCplex (
+   WitRun * const theWitRun,
+   const witBoolean preferCplex);
 
 witReturnCode witSetProbability (
    WitRun * const theWitRun,

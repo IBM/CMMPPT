@@ -66,6 +66,7 @@ class WitOptComp: public WitComponent
       accessFunc (double,                        wbounds)
       accessFunc (WitOptStarter *,               optInitMethod)
       accessFunc (const WitString &,             solverLogFileName)
+      accessFunc (bool,                          preferCplex)
       accessFunc (double,                        boundsValue)
       accessFunc (bool,                          boundsValueValid)
       accessFunc (int,                           cplexStatusCode)
@@ -98,6 +99,7 @@ class WitOptComp: public WitComponent
       defaultValue (double       defWbounds,           1.0e4)
       defaultValue (const char * defSolverLogFileName, "solver.log")
       defaultValue (int          defObjChoice,         1)
+      defaultValue (bool         defPreferCplex,       true)
 
       WitOptStarter * defOptInitMethod () const;
 
@@ -113,6 +115,7 @@ class WitOptComp: public WitComponent
       void setObjChoice         (int);
       void setWbounds           (double);
       void setSolverLogFileName (const char *);
+      void setPreferCplex       (bool);
       void setPrintOptProblem   (bool);
       void setPrintMatByCols    (bool);
       void setPrintInitSoln     (bool);
@@ -303,6 +306,12 @@ class WitOptComp: public WitComponent
       WitString solverLogFileName_;
          //
          // Name of the solver log output file.
+
+      bool preferCplex_;
+         //
+         // When COIN and CPLEX are both embedded:
+         //    If preferCplex_ == true,   CPLEX    is to be used as the solver.
+         //    If preferCplex_ == false,  CPL/CBC are to be used as the solver.
 
       //------------------------------------------------------------------------
       // Solution data.
