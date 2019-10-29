@@ -97,9 +97,9 @@ class WitCoinIf: public WitSolverIf
          // Retrieves the row portion of the LP aspect of the problem in the
          // representation required for loadProblem.
 
-      void checkLpSolnStatus ();
+      void checkStatusCode (int statusCode);
          //
-         // Checks the status of the LP solution.
+         // Checks the status of the LP solution, given by statusCode.
 
       static void enteringCoin ();
          //

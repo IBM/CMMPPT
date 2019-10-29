@@ -29,6 +29,7 @@
 #include <Timing.h>
 
 #include <ClpSimplex.hpp>
+#include <ClpPresolve.hpp>
 
 //------------------------------------------------------------------------------
 
@@ -187,16 +188,44 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 
 void WitCoinIf::solveLp (bool)
    {
+   ClpPresolve * theClpPresolve;
+   ClpSimplex *  psClpSimplex;
+   int           statusCode;
+
    enteringCoin ();
 
+   theClpPresolve = new ClpPresolve;
+
+   psClpSimplex = theClpPresolve->presolvedModel (* myClpSimplex_);
+
+   if (psClpSimplex == NULL)
+      myMsgFac () ("unboundedOrInfeasSmsg");
+
    if (useDualSimplex ())
-      myClpSimplex_->dual   (0, 0);
+      psClpSimplex->dual   (0, 0);
    else
-      myClpSimplex_->primal (1, 0);
+      psClpSimplex->primal (1, 0);
+
+   statusCode = psClpSimplex->problemStatus ();
 
    leftCoin ();
 
-   checkLpSolnStatus ();
+   checkStatusCode (statusCode);
+
+   enteringCoin ();
+
+   theClpPresolve->postsolve (true);
+
+   delete theClpPresolve;
+
+   delete psClpSimplex;
+
+   if (not myClpSimplex_->isProvenOptimal ())
+      {
+      myClpSimplex_->primal (1, 0);
+      }
+
+   leftCoin ();
 
    myMsgFac () ("nSimplexItersMsg", myClpSimplex_->numberIterations ());
    }
@@ -278,16 +307,8 @@ void WitCoinIf::getRowData (
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::checkLpSolnStatus ()
+void WitCoinIf::checkStatusCode (int statusCode)
    {
-   int statusCode;
-
-   enteringCoin ();
-
-   statusCode = myClpSimplex_->problemStatus ();
-
-   leftCoin ();
-
    switch (statusCode)
       {
       case 0:
