@@ -662,10 +662,10 @@ WitSolverIf * WitOptProblem::newSolverIf ()
    if (WitCplexIf::cplexEmbedded ())
       if (WitCoinIf::coinEmbedded ())
          {
-         if (myOptComp ()->preferCplex ())
-            return WitCplexIf::newInstance (this);
-         else
+         if (myOptComp ()->preferCoin ())
             return WitCoinIf::newInstance  (this);
+         else
+            return WitCplexIf::newInstance (this);
          }
 
    if (WitCoinIf::coinEmbedded ())

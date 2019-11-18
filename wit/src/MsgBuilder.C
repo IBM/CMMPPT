@@ -4128,7 +4128,7 @@ void WitMsgBuilder::buildMsgs ()
       info_,
       "COIN  Embedded?                              %1$5b\n"
       "CPLEX Embedded?                              %2$5b\n"
-      "Use CPLEX, if there is a choice?             %3$5b\n"
+      "Use COIN solvers, if there is a choice?      %3$5b\n"
       "Compute shadow prices?                       %4$5b\n"
       "Stay accelerated after opt implosion?        %5$5b\n"
       "Stay accelerated after an LB is softened?    %6$5b\n"

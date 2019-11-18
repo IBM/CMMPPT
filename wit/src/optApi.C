@@ -465,13 +465,13 @@ void WitRun::witGetOptInitMethod (WitAttr * optInitMethod)
 
 //------------------------------------------------------------------------------
 
-void WitRun::witGetPreferCplex (WitBoolean * preferCplex)
+void WitRun::witGetPreferCoin (WitBoolean * preferCoin)
    {
    WitOptCompApiCall theCall (this);
 
-   apiGet (preferCplex, "preferCplex", theCall.myOptComp ()->preferCplex ());
+   apiGet (preferCoin, "preferCoin", theCall.myOptComp ()->preferCoin ());
 
-   issueGetAttrMsg ("preferCplex");
+   issueGetAttrMsg ("preferCoin");
    }
 
 //------------------------------------------------------------------------------
@@ -820,17 +820,17 @@ void WitRun::witSetOptInitMethod (WitAttr optInitMethod)
 
 //------------------------------------------------------------------------------
 
-void WitRun::witSetPreferCplex (WitBoolean newValue)
+void WitRun::witSetPreferCoin (WitBoolean newValue)
    {
    WitOptCompApiCall theCall (this);
 
    theCall.prepBool (
-      "preferCplex", 
-      theCall.myOptComp ()->preferCplex (), 
+      "preferCoin", 
+      theCall.myOptComp ()->preferCoin (), 
       newValue);
 
    if (theCall.argsOK ())
-      theCall.myOptComp ()->setPreferCplex (asaBool (newValue));
+      theCall.myOptComp ()->setPreferCoin (asaBool (newValue));
    }
 
 //------------------------------------------------------------------------------

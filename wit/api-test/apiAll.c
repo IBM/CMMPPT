@@ -1606,12 +1606,12 @@ int main ()
 
    witFree (string);
 
-   witSetPreferCplex (theWitRun,   WitFALSE);
-   witGetPreferCplex (theWitRun, & theBool);
+   witSetPreferCoin (theWitRun,   WitTRUE);
+   witGetPreferCoin (theWitRun, & theBool);
 
-   assert (! theBool);
+   assert (theBool);
 
-   witSetPreferCplex (theWitRun,   WitTRUE);
+   witSetPreferCoin (theWitRun,   WitFALSE);
 
    witSetPartProdVol( theWitRun, "PS1", prodVol );
    witGetPartProdVol( theWitRun, "PS1", &fv );
@@ -1670,6 +1670,8 @@ int main ()
 
    if (cplexEmbedded)
       witOptImplode (theWitRun);
+         /**/
+         /* Not ready for COIN yet: accAfterOptImp */
 
    witHeurImplode (theWitRun);
 

@@ -1888,9 +1888,9 @@ witReturnCode witGetPrefHighStockSLBs (
    WitRun * const theWitRun,
    witBoolean * prefHighStockSLBs);
 
-witReturnCode witGetPreferCplex (
+witReturnCode witGetPreferCoin (
    WitRun * const theWitRun,
-   witBoolean * preferCplex);
+   witBoolean * preferCoin);
 
 witReturnCode witGetPreprocessed (
    WitRun * const theWitRun,
@@ -3048,9 +3048,9 @@ witReturnCode witSetPrefHighStockSLBs (
    WitRun * const theWitRun,
    const witBoolean prefHighStockSLBs);
 
-witReturnCode witSetPreferCplex (
+witReturnCode witSetPreferCoin (
    WitRun * const theWitRun,
-   const witBoolean preferCplex);
+   const witBoolean preferCoin);
 
 witReturnCode witSetProbability (
    WitRun * const theWitRun,

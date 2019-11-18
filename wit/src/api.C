@@ -5115,14 +5115,14 @@ witReturnCode witGetPrefHighStockSLBs (
 
 //------------------------------------------------------------------------------
 
-witReturnCode witGetPreferCplex (
+witReturnCode witGetPreferCoin (
       WitRun * const theWitRun,
-      witBoolean * preferCplex)
+      witBoolean * preferCoin)
    {
    STANDARD_API_IMPL (
       theWitRun,
-      witGetPreferCplex, (
-         preferCplex))
+      witGetPreferCoin, (
+         preferCoin))
    }
  
 //------------------------------------------------------------------------------
@@ -8358,14 +8358,14 @@ witReturnCode witSetPrefHighStockSLBs (
 
 //------------------------------------------------------------------------------
 
-witReturnCode witSetPreferCplex (
+witReturnCode witSetPreferCoin (
       WitRun * const theWitRun,
-      const witBoolean preferCplex)
+      const witBoolean preferCoin)
    {
    STANDARD_API_IMPL (
       theWitRun,
-      witSetPreferCplex, (
-         preferCplex))
+      witSetPreferCoin, (
+         preferCoin))
    }
 
 //------------------------------------------------------------------------------
