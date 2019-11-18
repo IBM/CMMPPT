@@ -1217,6 +1217,7 @@ void testCase34 ()
 
    makeNewWitRun         (theWitRun);
    witInitialize         (theWitRun);
+   witSetPreferCoin      (theWitRun,      WitTRUE);
    witAddPart            (theWitRun, "A", WitMATERIAL);
    witSetStageByObject   (theWitRun,      WitTRUE);
    witSetStochMode       (theWitRun,      WitTRUE);
@@ -1260,6 +1261,7 @@ void testCase36 ()
 
    makeNewWitRun         (theWitRun);
    witInitialize         (theWitRun);
+   witSetPreferCoin      (theWitRun,           WitTRUE);
    witSetNPeriods        (theWitRun,           1);
    witAddPart            (theWitRun, "A",      WitMATERIAL);
    witAddDemand          (theWitRun, "A", "B");
@@ -1312,6 +1314,7 @@ void testCase38 ()
 
    makeNewWitRun         (theWitRun);
    witInitialize         (theWitRun);
+   witSetPreferCoin      (theWitRun,           WitTRUE);
    witSetNPeriods        (theWitRun,           1);
    witAddPart            (theWitRun, "A",      WitMATERIAL);
    witAddDemand          (theWitRun, "A", "B");
