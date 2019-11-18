@@ -2415,6 +2415,8 @@ int main ()
    if (cplexEmbedded)
       {
       witOptImplode (theObj1Run);
+         /**/
+         /* Not ready for COIN yet: MIP mode */
 
       remove ("solver.log");
       }
@@ -2437,6 +2439,8 @@ int main ()
       double cplexMipRelGapDbl;
 
       witOptImplode         (theObj1Run);
+         /**/
+         /* CPLEX-specific test */
 
       witGetCplexStatusCode (theObj1Run, & cplexStatusCode);
 
@@ -3991,9 +3995,13 @@ void testDeletion ()
    witPurgeData          (theWitRun);
    witDisplayData        (theWitRun, WitSTDOUT);
 
-   if (cplexEmbedded)
+   if (coinEmbedded || cplexEmbedded)
       {
-      witOptImplode (theWitRun);
+      witSetPreferCoin (theWitRun, WitTRUE);
+
+      witOptImplode    (theWitRun);
+
+      witSetPreferCoin (theWitRun, WitFALSE);
 
       remove ("solver.log");
       }
@@ -6001,7 +6009,9 @@ void optImpA1 (WitRun * theWitRunA)
    witSetSolverLogFileName    (theWitRunA, "solver-a.log");
 
    witOptImplode              (theWitRunA);
- 
+       /**/
+      /* Not ready for COIN yet: accAfterOptImp */
+
    witWriteExecSched          (theWitRunA, "exec-a1.out", WitBSV);
    }
 
@@ -6030,6 +6040,8 @@ void optImpB1 (WitRun * theWitRunB)
                                NULL);
 
    witOptImplode              (theWitRunB);
+       /**/
+      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched          (theWitRunB, "exec-b1.out", WitBSV);
    }
@@ -6045,6 +6057,8 @@ void optImpA2 (WitRun * theWitRunA)
    witSetPartSupplyVol (theWitRunA, "COMP2", supplyVol);
 
    witOptImplode       (theWitRunA);
+       /**/
+      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched   (theWitRunA, "exec-a2.out", WitBSV);
    }
@@ -6060,6 +6074,8 @@ void optImpB2 (WitRun * theWitRunB)
    witSetPartSupplyVol (theWitRunB, "Bread", supplyVol);
 
    witOptImplode       (theWitRunB);
+       /**/
+      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched   (theWitRunB, "exec-b2.out", WitBSV);
    }
@@ -6775,8 +6791,9 @@ void testStageByObject ()
    {
    WitRun * theWitRun;
 
-   if (! cplexEmbedded)
-      return;
+   if (! coinEmbedded)
+      if (! cplexEmbedded)
+         return;
 
    witNewRun         (& theWitRun);
    buildCoreProblemSBO (theWitRun);
@@ -6815,6 +6832,7 @@ void buildCoreProblemSBO (WitRun * theWitRun)
    witSetNPeriods            (theWitRun, 1);
    witSetWbounds             (theWitRun, 0.0);
    witSetOptInitMethod       (theWitRun, WitCRASH_OPT_INIT_METHOD);
+   witSetPreferCoin          (theWitRun, WitTRUE);
 
    witAddPart                (theWitRun, "A",      WitMATERIAL);
    witAddPart                (theWitRun, "B",      WitMATERIAL);
@@ -7028,13 +7046,13 @@ void testStochImplode (WitRun * theWitRun)
    {
    witBoolean theBool;
 
-   witGetStochSolnMode          (theWitRun,    & theBool);
-   assert                                     (! theBool);
+   witGetStochSolnMode (theWitRun, & theBool);
+   assert                         (! theBool);
 
-   witStochImplode              (theWitRun);
+   witStochImplode     (theWitRun);
 
-   witGetStochSolnMode          (theWitRun,    & theBool);
-   assert                                       (theBool);
+   witGetStochSolnMode (theWitRun, & theBool);
+   assert                           (theBool);
    }
 
 /*----------------------------------------------------------------------------*/
@@ -7126,8 +7144,9 @@ void testStageByPeriod ()
    {
    WitRun * theWitRun;
 
-   if (! cplexEmbedded)
-      return;
+   if (! coinEmbedded)
+      if (! cplexEmbedded)
+         return;
 
    witNewRun         (& theWitRun);
    buildCoreProblemSBP (theWitRun);
@@ -7155,6 +7174,7 @@ void buildCoreProblemSBP (WitRun * theWitRun)
 
    witSetNPeriods          (theWitRun, 2);
    witSetOptInitMethod     (theWitRun, WitCRASH_OPT_INIT_METHOD);
+   witSetPreferCoin        (theWitRun, WitTRUE);
 
    witAddPart              (theWitRun, "A", WitCAPACITY);
    witAddOperation         (theWitRun, "B");
@@ -7237,6 +7257,8 @@ void testMultiObjMode ()
    testGetObjVecs     (cpyWitRun);
 
    witOptImplode      (cpyWitRun);
+       /**/
+      /* Not ready for COIN yet: multiObjMode */
 
    testMultiObjValue  (cpyWitRun);
 
