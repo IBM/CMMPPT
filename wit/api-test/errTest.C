@@ -1,7 +1,8 @@
 //------------------------------------------------------------------------------
 // Source File: "errTest.C".
 //
-// A WIT application program whose purpose is to test WIT's handling of errors.
+// A WIT application program whose purpose is to test WIT's handling of errors
+// that cannot be tested in stand-alone mode.
 //------------------------------------------------------------------------------
 
 #include <wit.h>
@@ -87,6 +88,7 @@ void testCase68  ();
 void testCase69  ();
 void testCase70  ();
 void testCase71  ();
+void testCase72  ();
 
 //------------------------------------------------------------------------------
 
@@ -363,6 +365,9 @@ int main (int argc, char * argv[])
 
    else if (theArg == "71")
       testCase71 ();
+
+   else if (theArg == "72")
+      testCase72 ();
 
    else
       {
@@ -2431,6 +2436,30 @@ void testCase71 ()
       & peggedSupplyVolList);
 
    terminationExpected ("witGetDemandSupplyVolPip");
+   }
+
+//------------------------------------------------------------------------------
+
+void testCase72 ()
+   {
+   WitRun * theWitRun;
+
+   std::cout
+      << "Test of attempt to use accelerated mode with solver = CLP/CBC.";
+
+   makeNewWitRun        (theWitRun);
+   witInitialize        (theWitRun);
+   witSetPreferCoin     (theWitRun, WitTRUE);
+
+   witAddPart           (theWitRun, "A", WitMATERIAL);
+   witAddDemand         (theWitRun, "A", "B");
+
+   witSetAccAfterOptImp (theWitRun, WitTRUE);
+
+   witOptImplode        (theWitRun);
+   witOptImplode        (theWitRun);
+
+   terminationExpected ("witOptImplode");
    }
 
 //------------------------------------------------------------------------------
