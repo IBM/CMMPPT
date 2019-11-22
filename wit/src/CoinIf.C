@@ -78,7 +78,7 @@ WitCoinIf::~WitCoinIf ()
 
 void WitCoinIf::reSolveOptProbAsLp ()
    {
-   myMsgFac () ("coinNYISmsg", "Accelarated Optimizing Implosion");
+   myMsgFac () ("coinNYISmsg", "Accelerated Optimizing Implosion");
    }
 
 //------------------------------------------------------------------------------
