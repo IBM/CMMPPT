@@ -191,6 +191,7 @@ void WitCoinIf::solveLp (bool)
    ClpPresolve * theClpPresolve;
    ClpSimplex *  psClpSimplex;
    int           statusCode;
+   int           nIters;
 
    enteringCoin ();
 
@@ -205,6 +206,8 @@ void WitCoinIf::solveLp (bool)
       psClpSimplex->dual   (0, 0);
    else
       psClpSimplex->primal (1, 0);
+
+   nIters     = psClpSimplex->numberIterations ();
 
    statusCode = psClpSimplex->problemStatus ();
 
@@ -223,11 +226,13 @@ void WitCoinIf::solveLp (bool)
    if (not myClpSimplex_->isProvenOptimal ())
       {
       myClpSimplex_->primal (1, 0);
+
+      nIters += myClpSimplex_->numberIterations ();
       }
 
    leftCoin ();
 
-   myMsgFac () ("nSimplexItersMsg", myClpSimplex_->numberIterations ());
+   myMsgFac () ("nSimplexItersMsg", nIters);
    }
 
 //------------------------------------------------------------------------------
