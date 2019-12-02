@@ -51,7 +51,9 @@ ifneq ($(WIT_COIN_HOME),)
 
    coin_lib_flags  = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
 
-   coin_link_flags = -lz -llapack
+#  coin_link_flags = -lz -llapack
+
+   coin_link_flags = -lcoinglpk -lcoinlapack -lcoinmumps
 
 else
 
