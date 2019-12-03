@@ -844,8 +844,8 @@ OptProblem.o: ../src/BoundPair.h ../src/OptCon.h ../src/Coeff.h
 OptProblem.o: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
 OptProblem.o: ../src/OptComp.h ../src/Component.h ../src/Str.h
 OptProblem.o: ../src/Timing.h ../src/MsgFrag.h ../src/MsgFac.h
-OptProblem.o: ../src/MsgArg.h ../src/Session.h ../src/GlobalComp.h
-OptProblem.o: ../src/PairStack.h ../../config/dummy_headers/float.h
+OptProblem.o: ../src/MsgArg.h ../src/Session.h
+OptProblem.o: ../../config/dummy_headers/float.h
 Param.o: ../src/Param.h ../src/Str.h ../src/Vector.h ../src/Util.h
 Param.o: ../src/typedefs.h ../src/macs.h ../../config/dummy_headers/stdio.h
 Param.o: ../../config/dummy_headers/string.h
@@ -1415,9 +1415,10 @@ SolverIf.o: ../../config/dummy_headers/string.h
 SolverIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
 SolverIf.o: ../src/TVec.h ../src/Vector.h ../src/OptVar.h ../src/OptVC.h
 SolverIf.o: ../src/BoundPair.h ../src/PtrVec.h
-SolverIf.o: ../../config/dummy_headers/algorithm ../src/OptComp.h
-SolverIf.o: ../src/Component.h ../src/Str.h ../src/OptProblem.h
-SolverIf.o: ../src/ObjStack.h ../src/Stack.h ../src/Link.h
+SolverIf.o: ../../config/dummy_headers/algorithm ../src/OptCon.h
+SolverIf.o: ../src/OptComp.h ../src/Component.h ../src/Str.h
+SolverIf.o: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+SolverIf.o: ../src/Link.h ../src/OptStarter.h ../src/MsgFac.h ../src/MsgArg.h
 StCons.o: ../src/StCons.h ../src/StochCon.h ../src/OptCon.h ../src/OptVC.h
 StCons.o: ../src/BoundPair.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 StCons.o: ../../config/dummy_headers/stdio.h

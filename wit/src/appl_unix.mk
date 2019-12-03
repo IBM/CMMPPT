@@ -42,18 +42,25 @@ MclModule: $(mcl_client_objects) $(mcl_lib)
 #       building the WIT stand-alone executable.
 #    Otherwise this is the null string.
 #
-# Prereqisite macro:
+# Prereqisite macros:
 #    WIT_COIN_HOME
 #       For the meaning of this macro, see the comment in appl.mk.
+#
+#    WIT_COIN_LINK_FLAGS
+#       These are the additional link flags needed to build a WIT application
+#       program (including the stand-alone executable) when COIN is embedded.
+#       The choice of link flags depends on how COIN CLP and CBC were built.
+#       Suggested possible values:
+#          export WIT_COIN_LINK_FLAGS="-lz -llapack"
+#          export WIT_COIN_LINK_FLAGS="-lcoinglpk -lcoinlapack -lcoinmumps"
+#          export WIT_COIN_LINK_FLAGS=
 #-------------------------------------------------------------------------------
 
 ifneq ($(WIT_COIN_HOME),)
 
    coin_lib_flags  = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
 
-#  coin_link_flags = -lz -llapack
-
-   coin_link_flags = -lcoinglpk -lcoinlapack -lcoinmumps
+   coin_link_flags = $(WIT_COIN_LINK_FLAGS)
 
 else
 
