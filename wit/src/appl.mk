@@ -33,7 +33,8 @@ mcl_client_objects =        \
 cxx_objects =              \
    $(lib_objects)          \
    $(mcl_client_objects)   \
-   CplexMgr.$(obj_suffix)  \
+   CoinIf.$(obj_suffix)    \
+   CplexIf.$(obj_suffix)   \
    BuildDate.$(obj_suffix) \
    wit.$(obj_suffix)       \
 
@@ -95,6 +96,33 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(session_macro_flags)
 
 #-------------------------------------------------------------------------------
+# Special rule to compile CoinIf.C:
+#
+# Only applies when WIT is to embed COIN.
+#
+# Macro:
+#    comp_coin_flags
+#       The special compilation flags for compiling CoinIf.C.
+#
+# Prereqisite macro:
+#    WIT_COIN_HOME:
+#       This is an environment variable.
+#       If COIN is to be embedded into WIT, WIT_COIN_HOME should be defined as
+#       the path where COIN files are found.
+#       If COIN is not to be embedded into WIT, WIT_COIN_HOME should be left
+#       undefined, or defined as the null string.
+#-------------------------------------------------------------------------------
+
+ifneq ($(WIT_COIN_HOME),)
+
+   comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
+
+   CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
+			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
+
+endif
+
+#-------------------------------------------------------------------------------
 # Macros to facilitate building WIT, when CPLEX is to be embedded.
 #
 # Macro:
@@ -112,7 +140,7 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 #       undefined, or defined as the null string.
 #
 #    cplex_lib_subdir:
-#       This is defined in the p_{platform}.mk files.
+#       This is defined in the {platform}/Makefile files.
 #       This is the default subdirectory in which the CPLEX library can be found
 #       on the current platform (when CPLEX is installed).
 #       It only includes the part of the directory path after /lib/.
@@ -156,21 +184,20 @@ else
 endif
 
 #-------------------------------------------------------------------------------
-# Special rule to compile CplexMgr.C:
+# Special rule to compile CplexIf.C:
 #
 # Only applies when WIT is to embed CPLEX.
 #
 # Macro:
-#
 #    comp_cplex_flags
-#       The special compilation flags for compiling CplexMgr.C.
+#       The special compilation flags for compiling CplexIf.C.
 #-------------------------------------------------------------------------------
 
 ifneq ($(WIT_CPLEX_HOME),)
 
-comp_cplex_flags = -DCPLEX_EMBEDDED -I$(WIT_CPLEX_HOME)/include/ilcplex
+   comp_cplex_flags = -DCPLEX_EMBEDDED -I$(WIT_CPLEX_HOME)/include/ilcplex
 
-CplexMgr.$(obj_suffix):	CplexMgr.$(cxx_suffix)
+   CplexIf.$(obj_suffix):	CplexIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_cplex_flags)
 
 endif

@@ -23,7 +23,8 @@
 #include <Material.h>
 #include <Operation.h>
 #include <SubEntry.h>
-#include <CplexMgrNC.h>
+#include <CoinIf.h>
+#include <CplexIf.h>
 #include <wit/src/Variant.h>
 #include <wit.h>
 #include <CompMgr.h>
@@ -62,6 +63,7 @@ WitOptComp::WitOptComp (WitCompMgr * theCompMgr):
       wbounds_           (defWbounds           ()),
       optInitMethod_     (NULL),
       solverLogFileName_ (defSolverLogFileName ()),
+      preferCoin_        (defPreferCoin        ()),
       sglObjValuePtr_    (NULL),
       boundsValue_       (0.0),
       boundsValueValid_  (false),
@@ -229,6 +231,15 @@ void WitOptComp::setSolverLogFileName (const char * theValue)
 
 //------------------------------------------------------------------------------
 
+void WitOptComp::setPreferCoin (bool theValue)
+   {
+   prepSetUnpreAttr ();
+
+   preferCoin_ = theValue;
+   }
+
+//------------------------------------------------------------------------------
+
 void WitOptComp::setPrintOptProblem (bool theValue)
    {
    printOptProblem_ = theValue;
@@ -313,7 +324,7 @@ void WitOptComp::storeStochBoundsValue (double theValue)
 
 void WitOptComp::storeCplexStatusCode (int theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexStatusCode_ = theValue;
    }
@@ -322,7 +333,7 @@ void WitOptComp::storeCplexStatusCode (int theValue)
 
 void WitOptComp::storeCplexStatusText (const char * theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexStatusText_ = theValue;
    }
@@ -331,7 +342,7 @@ void WitOptComp::storeCplexStatusText (const char * theValue)
 
 void WitOptComp::storeCplexMipBound (double theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
 
    cplexMipBound_ = theValue;
    }
@@ -340,7 +351,7 @@ void WitOptComp::storeCplexMipBound (double theValue)
 
 void WitOptComp::storeCplexMipRelGap (double theValue)
    {
-   witAssert (cplexEmbedded ());
+   witAssert (WitCplexIf::cplexEmbedded ());
    
    cplexMipRelGap_ = theValue;
    }
@@ -399,7 +410,9 @@ void WitOptComp::unpostprocess ()
 void WitOptComp::display ()
    {
    myMsgFac () ("optAttDdMsg",
-      cplexEmbedded (),
+      WitCoinIf::coinEmbedded   (),
+      WitCplexIf::cplexEmbedded (),
+      preferCoin_,
       compPrices_,
       accAfterOptImp_,
       accAfterSoftLB_,
@@ -465,10 +478,11 @@ bool WitOptComp::negativeCostsExist ()
 
 //------------------------------------------------------------------------------
 
-void WitOptComp::requireCplex ()
+void WitOptComp::requireCoinOrCplex ()
    {
-   if (not cplexEmbedded ())
-      myMsgFac () ("cplexNeededSmsg");
+   if (not WitCoinIf::coinEmbedded ())
+      if (not WitCplexIf::cplexEmbedded ())
+         myMsgFac () ("coinOrCplexNeededSmsg");
    }
 
 //------------------------------------------------------------------------------
@@ -581,6 +595,11 @@ void WitOptComp::writeDataAttrs ()
       defSolverLogFileName ());
 
    myDataWriter ()->writeBool (
+        "preferCoin",
+         preferCoin (),
+      defPreferCoin ());
+
+   myDataWriter ()->writeBool (
         "multiObjMode",
          multiObjMode (),
       defMultiObjMode ());
@@ -599,6 +618,7 @@ void WitOptComp::copyAttrsFrom (WitOptComp * theOptComp)
    mipMode_           = theOptComp->mipMode_;
    wbounds_           = theOptComp->wbounds_;
    solverLogFileName_ = theOptComp->solverLogFileName_;
+   preferCoin_        = theOptComp->preferCoin_;
    objChoice_         = theOptComp->objChoice_;
 
    setAccAfterOptImp   (theOptComp->accAfterOptImp_);

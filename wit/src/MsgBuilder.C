@@ -403,8 +403,9 @@ void WitMsgBuilder::buildMsgs ()
       "Build Date:     %3$s\n"
       "Build Type:     %4$s\n"
       "Platform:       %5$s\n"
-      "CPLEX Embedded? %6$m\n"
-      "Run Started At: %7$s");
+      "COIN  Embedded? %6$m\n"
+      "CPLEX Embedded? %7$m\n"
+      "Run Started At: %8$s");
 
    currentMsg_->preceedingLineFeeds   (0);
 
@@ -736,7 +737,7 @@ void WitMsgBuilder::buildMsgs ()
       "solveOptProblemMsg",
       157,
       info_,
-      "Solving the %1$m problem with CPLEX.");
+      "Solving the %1$m problem with %2$s.");
 
    currentMsg_->dupToStdout           (true);
 
@@ -4125,14 +4126,16 @@ void WitMsgBuilder::buildMsgs ()
       "optAttDdMsg",
       692,
       info_,
-      "CPLEX  Embedded?                             %1$5b\n"
-      "Compute shadow prices?                       %2$5b\n"
-      "Stay accelerated after opt implosion?        %3$5b\n"
-      "Stay accelerated after an LB is softened?    %4$5b\n"
-      "Opt implosion in MIP mode?                   %5$5b\n"
-      "Multiple objectives mode?                    %6$5b\n"
-      "Bounds objective weight:                 %7$9.1f\n"
-      "Solver Log File Name:                   %8$10s");
+      "COIN  Embedded?                              %1$5b\n"
+      "CPLEX Embedded?                              %2$5b\n"
+      "Use COIN solvers, if there is a choice?      %3$5b\n"
+      "Compute shadow prices?                       %4$5b\n"
+      "Stay accelerated after opt implosion?        %5$5b\n"
+      "Stay accelerated after an LB is softened?    %6$5b\n"
+      "Opt implosion in MIP mode?                   %7$5b\n"
+      "Multiple objectives mode?                    %8$5b\n"
+      "Bounds objective weight:                 %9$9.1f\n"
+      "Solver Log File Name:                   %10$10s");
 
    //---------------------------------------------------------------------------
 
@@ -7596,11 +7599,11 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "cplexNeededSmsg",
+      "coinOrCplexNeededSmsg",
       1035,
       severe_,
       "Optimizing implosion and stochastic implosion cannot be invoked, "
-      "because CPLEX was not embedded into this build of WIT.");
+      "because neither COIN nor CPLEX were embedded into this build of WIT.");
 
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
@@ -7928,6 +7931,100 @@ void WitMsgBuilder::buildMsgs ()
       "CPLEX Version: \"%1$s\".");
 
    currentMsg_->dupToStdout           (true);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "coinNYISmsg",
+      1062,
+      severe_,
+      "%1$s with COIN is not yet implemented.");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "clpWriteMpsErrSmsg",
+      1063,
+      severe_,
+      "ClpModel::writeMps returned a non-zero error code.\n"
+      "\n"
+      "   Error Code: %1$d");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "clpWriteMpsExcSmsg",
+      1064,
+      severe_,
+      "ClpModel::writeMps threw an exception.\n"
+      "\n"
+      "   File Name: \"%1$s\"");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "iterOrTimeLimitSmsg",
+      1065,
+      severe_,
+      "The solver terminated early due to reaching its iteration limit or time "
+      "limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "solverStoppedErrorsSmsg",
+      1066,
+      severe_,
+      "The solver terminated early due to errors.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "solverStoppedEventSmsg",
+      1067,
+      severe_,
+      "CLP was terminated by its event handler.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "unexpClpStatusCodeSmsg",
+      1068,
+      severe_,
+      "CLP terminated with an unexpected problem status code.\n"
+      "\n"
+      "   Problem Status Code: %1$d");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "nSimplexItersMsg",
+      1069,
+      info_,
+      "# simplex iterations: %1$d");
+
+   currentMsg_->testable              (false);
 
    //---------------------------------------------------------------------------
    }

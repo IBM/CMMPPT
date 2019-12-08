@@ -150,6 +150,7 @@ public:
   static WitParseRC  witSetPipSeqClearsNow();
   static WitParseRC  witSetPipSeqFromHeur();
   static WitParseRC  witSetPrefHighStockSLBs();
+  static WitParseRC  witSetPreferCoin();
   static WitParseRC  witSetProbability();
   static WitParseRC  witSetRespectStockSLBs();
   static WitParseRC  witSetRoundReqVols();

@@ -43,6 +43,7 @@ WitTimer::WitTimer (WitMsgFacility & theMsgFac):
    new WitTimingSection (this, "preproc",    "Preprocessing");
    new WitTimingSection (this, "heuristic",  "Heuristic");
    new WitTimingSection (this, "opt-prob",   "Opt. Prob. Management");
+   new WitTimingSection (this, "coin",       "COIN");
    new WitTimingSection (this, "cplex",      "CPLEX");
    new WitTimingSection (this, "postproc",   "Postprocessing");
    new WitTimingSection (this, "pip",        "P.I. Pegging");

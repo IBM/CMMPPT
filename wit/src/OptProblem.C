@@ -14,7 +14,8 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <Coeff.h>
-#include <CplexMgrNC.h>
+#include <CoinIf.h>
+#include <CplexIf.h>
 #include <OptComp.h>
 #include <Timing.h>
 #include <MsgFrag.h>
@@ -263,7 +264,7 @@ WitOptProblem::WitOptProblem (WitProblem * theProblem):
 
       WitProbAssoc    (theProblem),
 
-      myCplexMgr_     (NULL),
+      mySolverIf_     (NULL),
       nCoeffs_        (0),
       curCon_         (NULL),
       curConCoeffs_   (myProblem ()),
@@ -278,8 +279,7 @@ WitOptProblem::~WitOptProblem ()
    {
    int idx;
 
-   if (cplexEmbedded ())
-      deleteCplexMgr (myCplexMgr_);
+   delete mySolverIf_;
 
    while (not myOptCons_.isEmpty ())
       delete myOptCons_.get ();
@@ -311,10 +311,10 @@ void WitOptProblem::solve ()
    if (myOptComp ()->printOptProblem ())
       print ();
 
-   if (myCplexMgr_ == NULL)
-       myCplexMgr_ =  newCplexMgr (this);
+   if (mySolverIf_ == NULL)
+       mySolverIf_ = newSolverIf ();
 
-   solveOptProb (myCplexMgr_);
+   mySolverIf_->solveOptProb ();
 
    if (needDual ())
       reconstructDual ();
@@ -653,6 +653,30 @@ void WitOptProblem::prtMatrixByCols ()
          theIdx,
          rowIdx  [theIdx],
          coeffVal[theIdx]);
+   }
+
+//------------------------------------------------------------------------------
+
+WitSolverIf * WitOptProblem::newSolverIf ()
+   {
+   if (WitCplexIf::cplexEmbedded ())
+      if (WitCoinIf::coinEmbedded ())
+         {
+         if (myOptComp ()->preferCoin ())
+            return WitCoinIf::newInstance  (this);
+         else
+            return WitCplexIf::newInstance (this);
+         }
+
+   if (WitCoinIf::coinEmbedded ())
+      return WitCoinIf::newInstance  (this);
+
+   if (WitCplexIf::cplexEmbedded ())
+      return WitCplexIf::newInstance (this);
+
+   stronglyAssert (false);
+
+   return NULL;
    }
 
 //------------------------------------------------------------------------------

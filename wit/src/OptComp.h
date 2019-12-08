@@ -66,6 +66,7 @@ class WitOptComp: public WitComponent
       accessFunc (double,                        wbounds)
       accessFunc (WitOptStarter *,               optInitMethod)
       accessFunc (const WitString &,             solverLogFileName)
+      accessFunc (bool,                          preferCoin)
       accessFunc (double,                        boundsValue)
       accessFunc (bool,                          boundsValueValid)
       accessFunc (int,                           cplexStatusCode)
@@ -98,6 +99,7 @@ class WitOptComp: public WitComponent
       defaultValue (double       defWbounds,           1.0e4)
       defaultValue (const char * defSolverLogFileName, "solver.log")
       defaultValue (int          defObjChoice,         1)
+      defaultValue (bool         defPreferCoin,        false)
 
       WitOptStarter * defOptInitMethod () const;
 
@@ -113,6 +115,7 @@ class WitOptComp: public WitComponent
       void setObjChoice         (int);
       void setWbounds           (double);
       void setSolverLogFileName (const char *);
+      void setPreferCoin        (bool);
       void setPrintOptProblem   (bool);
       void setPrintMatByCols    (bool);
       void setPrintInitSoln     (bool);
@@ -187,9 +190,9 @@ class WitOptComp: public WitComponent
          //
          // Returns true, iff there is at least one cost coefficient < 0.
 
-      void requireCplex ();
+      void requireCoinOrCplex ();
          //
-         // Verifies that CPLEX was embedded.
+         // Verifies that COIN or CPLEX were embedded.
 
       void writeObjValue ();
          //
@@ -303,6 +306,12 @@ class WitOptComp: public WitComponent
       WitString solverLogFileName_;
          //
          // Name of the solver log output file.
+
+      bool preferCoin_;
+         //
+         // When COIN and CPLEX are both embedded:
+         //    If preferCoin_ == true,  CPL/CBC are to be used as the solver.
+         //    If preferCoin_ == false, CPLEX    is to be used as the solver.
 
       //------------------------------------------------------------------------
       // Solution data.

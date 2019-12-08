@@ -281,6 +281,9 @@ WitRun* WitSymTable::myWitRun()
     {"set_problem_prefHighStockSLBs", 1, WitSymTable::witSetPrefHighStockSLBs,
       {WitDRParmType::boolScalar}},
 
+    {"set_problem_preferCoin", 1, WitSymTable::witSetPreferCoin,
+      {WitDRParmType::boolScalar}},
+
     {"set_problem_probability", 1, WitSymTable::witSetProbability,
       {WitDRParmType::doubleScalar}},
 
@@ -1127,6 +1130,13 @@ WitParseRC WitSymTable::witSetPipSeqFromHeur()
 WitParseRC WitSymTable::witSetPrefHighStockSLBs()
 {
   myWitRun()->witSetPrefHighStockSLBs
+    (WitParser::instance ()->currentAttr()->getBoolArg(0));
+  return 0;
+}
+
+WitParseRC WitSymTable::witSetPreferCoin()
+{
+  myWitRun()->witSetPreferCoin
     (WitParser::instance ()->currentAttr()->getBoolArg(0));
   return 0;
 }

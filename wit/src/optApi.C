@@ -16,7 +16,8 @@
 #include <OptComp.h>
 #include <DetOptImpMgr.h>
 #include <OptStarter.h>
-#include <CplexMgrNC.h>
+#include <CoinIf.h>
+#include <CplexIf.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
 #include <MultiObjMgr.h>
@@ -53,6 +54,15 @@ void WitRun::witAddIntCplexParSpec (const char * theName, int theValue)
       myMsgFac () ("noParamCpxParamSpecSmsg");
 
    theCall.myCpxParSpecMgr ()->addIntCpxParSpec (theName, theValue);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitRun::witClearCplexParSpecs ()
+   {
+   WitOptCompApiCall theCall (this);
+
+   theCall.myCpxParSpecMgr ()->clearCpxParSpecs ();
    }
 
 //------------------------------------------------------------------------------
@@ -105,11 +115,11 @@ void WitRun::witGetBoundsValue (const WitOSRealArg & boundsValue)
 
 //------------------------------------------------------------------------------
 
-void WitRun::witClearCplexParSpecs ()
+void WitRun::witGetCoinEmbedded (WitBoolean * coinEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   theCall.myCpxParSpecMgr ()->clearCpxParSpecs ();
+   apiGet (coinEmbedded, "coinEmbedded", WitCoinIf::coinEmbedded ());
    }
 
 //------------------------------------------------------------------------------
@@ -129,7 +139,7 @@ void WitRun::witGetCplexEmbedded (WitBoolean * cplexEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   apiGet (cplexEmbedded, "cplexEmbedded", WitNonClass::cplexEmbedded ());
+   apiGet (cplexEmbedded, "cplexEmbedded", WitCplexIf::cplexEmbedded ());
    }
 
 //------------------------------------------------------------------------------
@@ -451,6 +461,17 @@ void WitRun::witGetOptInitMethod (WitAttr * optInitMethod)
        optInitMethod,
       "optInitMethod",
       theCall.myOptComp ()->optInitMethod ()->myApiAttr ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitRun::witGetPreferCoin (WitBoolean * preferCoin)
+   {
+   WitOptCompApiCall theCall (this);
+
+   apiGet (preferCoin, "preferCoin", theCall.myOptComp ()->preferCoin ());
+
+   issueGetAttrMsg ("preferCoin");
    }
 
 //------------------------------------------------------------------------------
@@ -795,6 +816,21 @@ void WitRun::witSetOptInitMethod (WitAttr optInitMethod)
    myDetOptImpMgr ()->shutDown ();
    
    theOptStarter->beChosen ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitRun::witSetPreferCoin (WitBoolean newValue)
+   {
+   WitOptCompApiCall theCall (this);
+
+   theCall.prepBool (
+      "preferCoin", 
+      theCall.myOptComp ()->preferCoin (), 
+      newValue);
+
+   if (theCall.argsOK ())
+      theCall.myOptComp ()->setPreferCoin (asaBool (newValue));
    }
 
 //------------------------------------------------------------------------------

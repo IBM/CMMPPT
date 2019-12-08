@@ -4,57 +4,70 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef CplexMgrH
-#define CplexMgrH
+#ifndef CplexIfH
+#define CplexIfH
 
 //------------------------------------------------------------------------------
-// Header file: "CplexMgr.h"
+// Header file: "CplexIf.h"
 //
-// Contains the declaration of class CplexMgr.
-//    The declaration compiled only if CPLEX_EMBEDDED is defined.
-//
-// NOTE:
-//    This head file should be #included only by CplexMgr.C
-//    This is because the Makefiles apply the proper compiler flags for the
-//    CPLEX_EMBEDDED macro and the #include <cplex.h> statement only when
-//    compiling CplexMgr.C
+// Contains the declaration of class CplexIf.
 //------------------------------------------------------------------------------
 
-#ifdef CPLEX_EMBEDDED
-
-#include <Assoc.h>
-
-#include <cplex.h>
+#include <SolverIf.h>
 
 //------------------------------------------------------------------------------
-// class CplexMgr
+// The following typedefs are defined in the CPLEX header file cpxconst.h.
+// They are being duplicated here so as to avoid the need to #include CPLEX
+// header files from this header file, in order to allow this header file to be
+// #included by files that aren't set up to imbed CPLEX code. 
+//------------------------------------------------------------------------------
+
+typedef struct cpxenv * CPXENVptr;
+typedef struct cpxlp  * CPXLPptr;
+
+//------------------------------------------------------------------------------
+// class CplexIf
 //
+// "CPLEX Interface"
 // Responsible for all interactions with CPLEX.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
+//    SolverIf
+//       CplexIf
 //------------------------------------------------------------------------------
 
-class WitCplexMgr: public WitProbAssoc
+class WitCplexIf: public WitSolverIf
    {
    public:
+
+      //------------------------------------------------------------------------
+      // Static public member functions.
+      //------------------------------------------------------------------------
+
+      static bool cplexEmbedded ();
+         //
+         // Returns true, iff CPLEX embedded into the current build of WIT.
+
+      static WitCplexIf * newInstance (WitOptProblem * theOptProblem);
+         //
+         // If CPLEX is embedded,
+         //    creates and returns a new CplexIf for theOptProblem.
+         // If CPLEX is not embedded,
+         //    issues a fatal error.
 
       //------------------------------------------------------------------------
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitCplexMgr (WitOptProblem *);
+      WitCplexIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------
 
-      virtual ~WitCplexMgr ();
-
-      //------------------------------------------------------------------------
-      // Other public member functions.
-      //------------------------------------------------------------------------
-
-      virtual void solveOptProb ();
-         //
-         // Solves the optimization problem by invoking CPLEX.
+      virtual ~WitCplexIf ();
 
    private:
 
@@ -78,33 +91,18 @@ class WitCplexMgr: public WitProbAssoc
          //
          // Shuts down the CPLEX log file.
 
-      void solveOptProbAsLp ();
+      virtual void reSolveOptProbAsLp   ();
+      virtual void solveOptProbAsMip    ();
+      virtual void solveOptProbAsLexOpt ();
+      virtual void issueSolveMsg        ();
+      virtual void loadLp               ();
+      virtual void writeMpsSS           ();
+      virtual void loadInitSolnSS       (const double *);
+      virtual void solveLp              (bool);
+      virtual void getPrimalSoln        (WitVector <double> &);
+      virtual void getDualSoln          (WitVector <double> &);
          //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a first solve.
-
-      void reSolveOptProbAsLp ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a re-solve.
-
-      void solveOptProbAsMip ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a MIP.
-
-      void solveOptProbAsLexOpt ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a lexicographic optimization.
-
-      void issueSolveMsg ();
-         //
-         // Issues a msg for the solve.
-
-      void loadLp ();
-         //
-         // Loads the optimization problem into CPLEX as an LP.
+         // Overrides from class SolverIf.
 
       void getRowData (
             WitVector <double> & rhs,
@@ -113,17 +111,11 @@ class WitCplexMgr: public WitProbAssoc
          // Retrieves the row portion of the LP aspect of the problem in the
          // representation required for CPXcopylp.
 
-      void getColumnData (
-            WitVector <double> & objective,
-            WitVector <int> &    matbeg,
-            WitVector <int> &    matcnt,
-            WitVector <int> &    matind,
-            WitVector <double> & matval,
-            WitVector <double> & lb,
-            WitVector <double> & ub);
+      void getMatcnt (
+                  WitVector <int> & matcnt,
+            const WitVector <int> & matbeg);
          //
-         // Retrieves the column portion of the LP aspect of the problem in the
-         // representation required for CPXcopylp.
+         // Computes matcnt from matbeg as required for CPXcopylp.
 
       void reviseLp ();
          //
@@ -158,11 +150,6 @@ class WitCplexMgr: public WitProbAssoc
          // Counts and returns the number of integer variables in the
          // optimization problem.
 
-      void writeMps ();
-         //
-         // Writes an MPS file of the opt problem entered into CPLEX, if
-         // appropriate.
-
       void solveLexOpt ();
          //
          // Makes appropriate calls to CPLEX to solve the optimization problem
@@ -177,21 +164,6 @@ class WitCplexMgr: public WitProbAssoc
          // Assuming theOptVar represents a lexicographic objective element that
          // has just been maximized, this function locks the variable at its
          // maximum value minus a tolerance.
-
-      void setLpMethodByOptStarter ();
-         //
-         // Sets the LP method to be used by CPXlpopt based on the OptStarter.
-
-      void solveLp (bool optNeeded);
-         //
-         // Makes appropriate calls to CPLEX to solve the optimization problem
-         // as an LP.
-         // optNeeded is to be true, iff an optimal solution is required.
-
-      void loadInitSoln ();
-         //
-         // Loads the initial primal solution from myOptProblem () into CPLEX,
-         // as needed.
 
       void printLpSolveInfo ();
          //
@@ -227,14 +199,6 @@ class WitCplexMgr: public WitProbAssoc
          //
          // Issues the Msg identitied by theMsgID, passing it the solution
          // status code and text as arguments.
-
-      void storePrimalSoln ();
-         //
-         // Stores the primal solution in myOptProblem ().
-
-      void storeDualSoln ();
-         //
-         // Stores the dual solution in myOptProblem ().
 
       void setSpecCpxPars ();
          //
@@ -281,33 +245,33 @@ class WitCplexMgr: public WitProbAssoc
          // theErrCode as a CPLEX error code and theFuncName as the name of the
          // CPLEX function that returned the error code.
 
-      bool mipMode ();
+      static void enteringCplex ();
          //
-         // Returns true, iff myOptProblem is a MIP.
+         // Indicates, for timing purposes, that a CPLEX function is about to
+         // be called.
 
-      noCopyCtorAssign (WitCplexMgr);
+      static void leftCplex ();
+         //
+         // Indicates, for timing purposes, that a CPLEX function was just
+         // called.
+
+      noCopyCtorAssign (WitCplexIf);
 
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitOptProblem * const myOptProblem_;
-         //
-         // The OptProblem that owns this CplexMgr.
-
       CPXENVptr myCpxEnv_;
          //
-         // The CPLEX environment for this CplexMgr.
+         // The CPLEX environment for this CplexIf.
 
       CPXLPptr myCpxLp_;
          //
-         // The CPLEX LP problem for this CplexMgr.
+         // The CPLEX LP problem for this CplexIf.
 
       int myErrCode_;
          //
          // The error code from the most recent call to CPLEX, if any.
    };
-
-#endif // CPLEX_EMBEDDED
 
 #endif

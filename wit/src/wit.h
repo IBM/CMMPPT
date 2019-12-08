@@ -494,6 +494,10 @@ witReturnCode witGetBoundsValueDbl (
    WitRun * const theWitRun,
    double *       boundsValue);
 
+witReturnCode witGetCoinEmbedded (
+   WitRun * const theWitRun,
+   witBoolean *   coinEmbedded);
+
 witReturnCode witGetCompPrices (
    WitRun * const theWitRun,
    witBoolean * compPrices);
@@ -1884,6 +1888,10 @@ witReturnCode witGetPrefHighStockSLBs (
    WitRun * const theWitRun,
    witBoolean * prefHighStockSLBs);
 
+witReturnCode witGetPreferCoin (
+   WitRun * const theWitRun,
+   witBoolean * preferCoin);
+
 witReturnCode witGetPreprocessed (
    WitRun * const theWitRun,
    witBoolean * preprocessed);
@@ -3039,6 +3047,10 @@ witReturnCode witSetPipSeqFromHeur (
 witReturnCode witSetPrefHighStockSLBs (
    WitRun * const theWitRun,
    const witBoolean prefHighStockSLBs);
+
+witReturnCode witSetPreferCoin (
+   WitRun * const theWitRun,
+   const witBoolean preferCoin);
 
 witReturnCode witSetProbability (
    WitRun * const theWitRun,

@@ -495,6 +495,8 @@ class WitRun
          const char * theName,
          int          theValue);
 
+      void witClearCplexParSpecs ();
+
       void witGetAccAfterOptImp (
          WitBoolean * value);
 
@@ -507,7 +509,7 @@ class WitRun
       void witGetBoundsValue (
          const WitOSRealArg & boundsValue);
 
-      void witClearCplexParSpecs ();
+      void witGetCoinEmbedded (WitBoolean * coinEmbedded);
 
       void witGetCompPrices (
          WitBoolean * value);
@@ -583,6 +585,9 @@ class WitRun
       void witGetOptInitMethod (
          WitAttr * optInitMethod);
 
+      void witGetPreferCoin (
+         WitBoolean * value);
+
       void witGetSolverLogFileName (
          char * * solverLogFileName);
 
@@ -634,6 +639,9 @@ class WitRun
 
       void witSetOptInitMethod (
          WitAttr optInitMethod);
+
+      void witSetPreferCoin (
+         WitBoolean preferCoin);
 
       void witSetSolverLogFileName (
          const char * solverLogFileName);

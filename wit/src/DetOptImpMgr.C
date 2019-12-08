@@ -97,7 +97,7 @@ void WitDetOptImpMgr::implode ()
 
    myMsgFac () ("optImpMsg");
 
-   myOptComp ()->requireCplex ();
+   myOptComp ()->requireCoinOrCplex ();
 
    if (myOptComp ()->multiObjMode ())
       myOptComp ()->myMultiObjMgr ()->validateData ();

@@ -87,11 +87,11 @@ void WitStochOptMgr::startStochImp ()
 
    myMsgFac () ("stochImpMsg");
 
-   myOptComp    ()->requireCplex  ();
-   myScenAttMgr ()->downloadInput ();
-   myStageMgr   ()->validateData  ();
-   myScenMgr    ()->validateData  ();
-   myScenAttMgr ()->validateData  ();
+   myOptComp    ()->requireCoinOrCplex ();
+   myScenAttMgr ()->downloadInput      ();
+   myStageMgr   ()->validateData       ();
+   myScenMgr    ()->validateData       ();
+   myScenAttMgr ()->validateData       ();
 
    myProblem      ()->resetSoln ();
 

@@ -1342,6 +1342,18 @@ witReturnCode witGetBoundsValueDbl (
 
 //------------------------------------------------------------------------------
 
+witReturnCode witGetCoinEmbedded (
+      WitRun * const theWitRun,
+      witBoolean *   coinEmbedded)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witGetCoinEmbedded, (
+         coinEmbedded))
+   }
+
+//------------------------------------------------------------------------------
+
 witReturnCode witGetCompPrices (
       WitRun * const theWitRun,
       witBoolean * compPrices)
@@ -5103,6 +5115,18 @@ witReturnCode witGetPrefHighStockSLBs (
 
 //------------------------------------------------------------------------------
 
+witReturnCode witGetPreferCoin (
+      WitRun * const theWitRun,
+      witBoolean * preferCoin)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witGetPreferCoin, (
+         preferCoin))
+   }
+ 
+//------------------------------------------------------------------------------
+
 witReturnCode witGetPreprocessed (
       WitRun * const theWitRun,
       witBoolean * preprocessed)
@@ -8330,6 +8354,18 @@ witReturnCode witSetPrefHighStockSLBs (
       theWitRun,
       witSetPrefHighStockSLBs, (
          prefHighStockSLBs))
+   }
+
+//------------------------------------------------------------------------------
+
+witReturnCode witSetPreferCoin (
+      WitRun * const theWitRun,
+      const witBoolean preferCoin)
+   {
+   STANDARD_API_IMPL (
+      theWitRun,
+      witSetPreferCoin, (
+         preferCoin))
    }
 
 //------------------------------------------------------------------------------
