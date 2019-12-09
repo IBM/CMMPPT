@@ -46,6 +46,7 @@ else
 	LOADLIBES	+= -lmcl \
 			   $(ds_math_lib) \
 			   $(ds_posix_threads_flag) \
+			   $(WIT_COIN_LINK_FLAGS) \
 			   $(lex_yacc_lib)
 endif
 
