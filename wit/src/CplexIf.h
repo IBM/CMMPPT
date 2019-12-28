@@ -245,15 +245,15 @@ class WitCplexIf: public WitSolverIf
          // theErrCode as a CPLEX error code and theFuncName as the name of the
          // CPLEX function that returned the error code.
 
-      static void enteringCplex ();
+      static void enterCplex ();
          //
-         // Indicates, for timing purposes, that a CPLEX function is about to
+         // Indicates, for timing purposes, that CPLEX functions are about to
          // be called.
 
-      static void leftCplex ();
+      static void leaveCplex ();
          //
-         // Indicates, for timing purposes, that a CPLEX function was just
-         // called.
+         // Indicates, for timing purposes, that CPLEX functions are no longer
+         // about to be called.
 
       noCopyCtorAssign (WitCplexIf);
 
