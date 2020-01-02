@@ -49,8 +49,7 @@ class WitDetImpOP: public WitOptProblem
       // Overriding public virtual member functions.
       //-----------------------------------------------------------------------
 
-      virtual bool needDual    ();
-      virtual bool reSolveMode ();
+      virtual bool needDual ();
 
       //-----------------------------------------------------------------------
       // Access functions.

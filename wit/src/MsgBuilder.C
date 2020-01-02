@@ -1952,7 +1952,7 @@ void WitMsgBuilder::buildMsgs ()
       "reSolveLpMsg",
       431,
       info_,
-      "Re-solving the LP problem with CPLEX.");
+      "Re-solving the LP problem with %1$s.");
 
    currentMsg_->dupToStdout           (true);
 

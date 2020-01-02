@@ -32,7 +32,7 @@ void WitSolverIf::solveOptProb ()
       {
       solveOptProbAsLexOpt ();
       }
-   else if (myOptProblem ()->reSolveMode ())
+   else if (myOptComp ()->accOptStarter ()->isChosen ())
       {
       reSolveOptProbAsLp ();
       }
@@ -60,12 +60,12 @@ WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
 void WitSolverIf::writeMps ()
    {
-   if (myOptComp ()->printMps ())
-      {
-      myMsgFac () ("mpsFileMsg");
+   if (not myOptComp ()->printMps ())
+      return;
 
-      writeMpsSS ();
-      }
+   myMsgFac () ("mpsFileMsg");
+
+   writeMpsSS ();
    }
 
 //------------------------------------------------------------------------------

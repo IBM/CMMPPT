@@ -78,7 +78,18 @@ WitCoinIf::~WitCoinIf ()
 
 void WitCoinIf::reSolveOptProbAsLp ()
    {
-   myMsgFac () ("coinNYISmsg", "Accelerated Optimizing Implosion");
+   myMsgFac () ("reSolveLpMsg", "CLP");
+
+   reviseLp ();
+
+   writeMps ();
+
+   reSolveLp ();
+
+   storePrimalSoln ();
+
+   if (myOptProblem ()->needDual ())
+      storeDualSoln ();
    }
 
 //------------------------------------------------------------------------------
@@ -181,17 +192,25 @@ void WitCoinIf::loadInitSolnSS (const double * initSoln)
 //------------------------------------------------------------------------------
 // solveLp
 //
-// dual   is called with ifValuesPass == 0, meaning don't do a values pass.
-// primal is called with ifValuesPass == 1, meaning       do a values pass.
-// Both  are called with startFinshOptions == 0.
+// ifValuesPass == 0, means don't do a values pass.
+// ifValuesPass == 1, means       do a values pass.
+//
+// startFinishOptions == 1 means retain work areas and factorization at end.
+// startFinishOptions == 0 means delete work areas and factorization at end.
 //------------------------------------------------------------------------------
 
 void WitCoinIf::solveLp (bool)
    {
+   int           ifValuesPass;
+   int           startFinishOptions;
    ClpPresolve * theClpPresolve;
    ClpSimplex *  psClpSimplex;
    int           statusCode;
    int           nIters;
+
+   ifValuesPass       = useDualSimplex ()? 0: 1;
+
+   startFinishOptions = myOptComp ()->accAfterOptImp ()? 1: 0;
 
    enterCoin ();
 
@@ -203,13 +222,12 @@ void WitCoinIf::solveLp (bool)
       myMsgFac () ("unboundedOrInfeasSmsg");
 
    if (useDualSimplex ())
-      psClpSimplex->dual   (0, 0);
+      psClpSimplex->dual   (ifValuesPass, startFinishOptions);
    else
-      psClpSimplex->primal (1, 0);
+      psClpSimplex->primal (ifValuesPass, startFinishOptions);
 
+   statusCode = psClpSimplex->problemStatus    ();
    nIters     = psClpSimplex->numberIterations ();
-
-   statusCode = psClpSimplex->problemStatus ();
 
    leaveCoin ();
 
@@ -225,7 +243,7 @@ void WitCoinIf::solveLp (bool)
 
    if (not myClpSimplex_->isProvenOptimal ())
       {
-      myClpSimplex_->primal (1, 0);
+      myClpSimplex_->primal (1, startFinishOptions);
 
       nIters += myClpSimplex_->numberIterations ();
       }
@@ -341,6 +359,108 @@ void WitCoinIf::checkStatusCode (int statusCode)
       default:
          myMsgFac () ("unexpClpStatusCodeSmsg", statusCode);
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseLp ()
+   {
+   reviseVarBounds ();
+   reviseConBounds ();
+   reviseObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseVarBounds ()
+   {
+   double *    lowerBound;
+   double *    upperBound;
+   WitOptVar * theOptVar;
+
+   lowerBound = myClpSimplex_->columnLower ();
+   upperBound = myClpSimplex_->columnUpper ();
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      lowerBound[theOptVar->index ()] = theOptVar->bounds ().lower ();
+      upperBound[theOptVar->index ()] = theOptVar->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseConBounds ()
+   {
+   double *    lowerBound;
+   double *    upperBound;
+   WitOptCon * theOptCon;
+
+   lowerBound = myClpSimplex_->rowLower ();
+   upperBound = myClpSimplex_->rowUpper ();
+
+   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
+      {
+      lowerBound[theOptCon->index ()] = theOptCon->bounds ().lower ();
+      upperBound[theOptCon->index ()] = theOptCon->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseObjCoeffs ()
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      myClpSimplex_->
+         setObjectiveCoefficient (
+            theOptVar->index (),
+            theOptVar->objCoeff ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+// reSolveLp
+//
+// Note that the existing basis may be primal feasible, dual feasible, both, or
+// neither. Dual simplex is being used for this general case.
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reSolveLp ()
+   {
+   int ifValuespass;
+   int startFinishOptions;
+   int statusCode;
+   int nIters;
+
+   ifValuespass = 0;
+      //
+      // 0 means don't do a values pass.
+
+   startFinishOptions = 1 + 2 + 4;
+      //
+      // Interpreted as bits:
+      //    1 - do not delete work areas and factorization at end
+      //    2 - use old factorization if same number of rows
+      //    4 - skip as much initialization of work areas as possible
+      //        (based on whatsChanged in clpmodel.hpp)
+
+   enterCoin ();
+
+   myClpSimplex_->setWhatsChanged (MATRIX_SAME + BASIS_SAME);
+
+   myClpSimplex_->dual (ifValuespass, startFinishOptions);
+
+   statusCode = myClpSimplex_->problemStatus    ();
+   nIters     = myClpSimplex_->numberIterations ();
+
+   leaveCoin ();
+
+   checkStatusCode (statusCode);
+
+   myMsgFac () ("nSimplexItersMsg", nIters);
    }
 
 //------------------------------------------------------------------------------

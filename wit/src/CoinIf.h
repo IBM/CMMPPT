@@ -101,6 +101,30 @@ class WitCoinIf: public WitSolverIf
          //
          // Checks the status of the LP solution, given by statusCode.
 
+      void reviseLp ();
+         //
+         // Revises the LP problem that was previously loaded into CLP.
+
+      void reviseVarBounds ();
+         //
+         // Revises the upper and lower bounds on variables of the LP problem
+         // that was previously loaded into CLP.
+
+      void reviseConBounds ();
+         //
+         // Revises the upper and lower bounds on constraints of the LP problem
+         // that was previously loaded into CLP.
+
+      void reviseObjCoeffs ();
+         //
+         // Revises the objective function coefficients of the LP problem that
+         // was previously loaded into CLP.
+
+      void reSolveLp ();
+         //
+         // Makes appropriate calls to the solver to re-solve the optimization
+         // problem as an LP.
+
       static void enterCoin ();
          //
          // Indicates, for timing purposes, that COIN functions are about to

@@ -222,13 +222,6 @@ bool WitStochImpOP::needDual ()
 
 //------------------------------------------------------------------------------
 
-bool WitStochImpOP::reSolveMode ()
-   {
-   return false;
-   }
-
-//------------------------------------------------------------------------------
-
 void WitStochImpOP::printItem (WitNode * theNode)
    {
    fprintf (optProbFile (),

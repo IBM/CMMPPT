@@ -45,10 +45,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Returns true, iff a dual solution is needed.
 
-      virtual bool reSolveMode () = 0;
-         //
-         // Returns true, iff solving this OptProblem would be a re-solve.
-
       //-----------------------------------------------------------------------
       // Data access functions.
       //-----------------------------------------------------------------------

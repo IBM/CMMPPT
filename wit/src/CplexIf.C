@@ -147,7 +147,7 @@ void WitCplexIf::shutDownLogFile ()
 
 void WitCplexIf::reSolveOptProbAsLp ()
    {
-   myMsgFac () ("reSolveLpMsg");
+   myMsgFac () ("reSolveLpMsg", "CPLEX");
 
    reviseLp ();
 
