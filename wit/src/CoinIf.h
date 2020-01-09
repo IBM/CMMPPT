@@ -18,7 +18,7 @@
 class ClpSimplex;
 
 //------------------------------------------------------------------------------
-// class CoinIf
+// Class CoinIf
 //
 // "COIN Interface"
 // Responsible for all interactions with COIN.
@@ -42,18 +42,12 @@ class WitCoinIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
-      static WitCoinIf * newInstance (WitOptProblem * theOptProblem);
+      static WitCoinIf * newInstance (WitSolveMgr * theSolveMgr);
          //
          // If COIN is embedded,
-         //    creates and returns a new CoinIf for theOptProblem.
+         //    creates and returns a new CoinIf for theSolveMgr.
          // If COIN is not embedded,
          //    issues a fatal error.
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCoinIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -61,26 +55,34 @@ class WitCoinIf: public WitSolverIf
 
       virtual ~WitCoinIf ();
 
-   private:
-
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Overrides from class SolverIf.
       //------------------------------------------------------------------------
-
-      noCopyCtorAssign (WitCoinIf);
 
       virtual void reSolveOptProbAsLp   ();
       virtual void solveOptProbAsMip    ();
       virtual void solveOptProbAsLexOpt ();
       virtual void issueSolveMsg        ();
       virtual void loadLp               ();
-      virtual void writeMpsSS           ();
-      virtual void loadInitSolnSS       (const double *);
+      virtual void solverWriteMps       ();
+      virtual void loadInitSoln         (const WitVector <double> &);
       virtual void solveLp              (bool);
       virtual void getPrimalSoln        (WitVector <double> &);
       virtual void getDualSoln          (WitVector <double> &);
-         //
-         // Overrides from class SolverIf.
+
+   private:
+
+      //------------------------------------------------------------------------
+      // Private constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCoinIf (WitSolveMgr *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitCoinIf);
 
       void setUpMessageHandler ();
          //

@@ -20,11 +20,10 @@
 #include <DataWrit.h>
 #include <DetOptImpMgr.h>
 #include <StochImpMgr.h>
+#include <SolveGate.h>
 #include <Material.h>
 #include <Operation.h>
 #include <SubEntry.h>
-#include <CoinIf.h>
-#include <CplexIf.h>
 #include <wit/src/Variant.h>
 #include <wit.h>
 #include <CompMgr.h>
@@ -324,7 +323,7 @@ void WitOptComp::storeStochBoundsValue (double theValue)
 
 void WitOptComp::storeCplexStatusCode (int theValue)
    {
-   witAssert (WitCplexIf::cplexEmbedded ());
+   witAssert (WitSolveGate::cplexEmbedded ());
 
    cplexStatusCode_ = theValue;
    }
@@ -333,7 +332,7 @@ void WitOptComp::storeCplexStatusCode (int theValue)
 
 void WitOptComp::storeCplexStatusText (const char * theValue)
    {
-   witAssert (WitCplexIf::cplexEmbedded ());
+   witAssert (WitSolveGate::cplexEmbedded ());
 
    cplexStatusText_ = theValue;
    }
@@ -342,7 +341,7 @@ void WitOptComp::storeCplexStatusText (const char * theValue)
 
 void WitOptComp::storeCplexMipBound (double theValue)
    {
-   witAssert (WitCplexIf::cplexEmbedded ());
+   witAssert (WitSolveGate::cplexEmbedded ());
 
    cplexMipBound_ = theValue;
    }
@@ -351,7 +350,7 @@ void WitOptComp::storeCplexMipBound (double theValue)
 
 void WitOptComp::storeCplexMipRelGap (double theValue)
    {
-   witAssert (WitCplexIf::cplexEmbedded ());
+   witAssert (WitSolveGate::cplexEmbedded ());
    
    cplexMipRelGap_ = theValue;
    }
@@ -410,8 +409,8 @@ void WitOptComp::unpostprocess ()
 void WitOptComp::display ()
    {
    myMsgFac () ("optAttDdMsg",
-      WitCoinIf::coinEmbedded   (),
-      WitCplexIf::cplexEmbedded (),
+      WitSolveGate::coinEmbedded  (),
+      WitSolveGate::cplexEmbedded (),
       preferCoin_,
       compPrices_,
       accAfterOptImp_,
@@ -480,8 +479,8 @@ bool WitOptComp::negativeCostsExist ()
 
 void WitOptComp::requireCoinOrCplex ()
    {
-   if (not WitCoinIf::coinEmbedded ())
-      if (not WitCplexIf::cplexEmbedded ())
+   if (not WitSolveGate::coinEmbedded ())
+      if (not WitSolveGate::cplexEmbedded ())
          myMsgFac () ("coinOrCplexNeededSmsg");
    }
 

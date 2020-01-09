@@ -16,7 +16,7 @@
 #include <Assoc.h>
 
 //------------------------------------------------------------------------------
-// class SolverIf.
+// Class SolverIf.
 // "Solver Interface"
 // Responsible for all interactions with WIT's solver of optimization problems.
 // The interactions are implemented polymorphically.
@@ -27,6 +27,8 @@
 //    SolverIf
 //       CoinIf
 //       CplexIf
+//
+// Implemented in Solve.C
 //------------------------------------------------------------------------------
 
 class WitSolverIf: public WitProbAssoc
@@ -40,27 +42,7 @@ class WitSolverIf: public WitProbAssoc
       virtual ~WitSolverIf ();
 
       //------------------------------------------------------------------------
-      // Other public member functions.
-      //------------------------------------------------------------------------
-
-      void solveOptProb ();
-         //
-         // Solves the optimization problem.
-
-   protected:
-
-      //------------------------------------------------------------------------
-      // Protected member functions.
-      //------------------------------------------------------------------------
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitSolverIf (WitOptProblem *);
-
-      //------------------------------------------------------------------------
-      // Other protected member functions.
+      // Pure virtual public member functions.
       //------------------------------------------------------------------------
 
       virtual void reSolveOptProbAsLp () = 0;
@@ -86,14 +68,13 @@ class WitSolverIf: public WitProbAssoc
          //
          // Loads the optimization problem into CPLEX as an LP.
 
-      virtual void writeMpsSS () = 0;
+      virtual void solverWriteMps () = 0;
          //
-         // Does the solver-specific aspects of writeMps ().
+         // Calls the solver to write an MPS file
 
-      virtual void loadInitSolnSS (const double * initSoln) = 0;
+      virtual void loadInitSoln (const WitVector <double> & initSoln) = 0;
          //
-         // Does the solver-specific aspects of loadInitSoln ().
-         // initSoln is the initial solution to be loaded.
+         // Loads the initial primal solution (initSoln) into the solver.
 
       virtual void solveLp (bool optNeeded) = 0;
          //
@@ -111,50 +92,24 @@ class WitSolverIf: public WitProbAssoc
          // Sets dualSoln to the vector of dual solution values.
          // dualSoln must already be of the appropriate size.
 
-      void writeMps ();
-         //
-         // Writes an MPS file of the opt problem entered into CPLEX, if
-         // appropriate.
-         // This function should probably be private eventually.
+   protected:
 
-      void loadInitSoln ();
-         //
-         // Loads the initial primal solution from myOptProblem () into the
-         // solver, as needed.
-         // This function should probably be private eventually.
+      //------------------------------------------------------------------------
+      // Protected member functions.
+      //------------------------------------------------------------------------
 
-      void getColumnData (
-            WitVector <double> & lb,
-            WitVector <double> & ub,
-            WitVector <double> & obj);
-         //
-         // Retrieves the column portion of the LP aspect of the problem in a
-         // standard format.
+      //------------------------------------------------------------------------
+      // Constructor functions.
+      //------------------------------------------------------------------------
 
-      void storePrimalSoln ();
-         //
-         // Stores the primal solution in myOptProblem ().
-         // This function should probably be private eventually.
-
-      void storeDualSoln ();
-         //
-         // Stores the dual solution in myOptProblem ().
-         // This function should probably be private eventually.
-
-      bool mipMode ();
-         //
-         // Returns true, iff myOptProblem is a MIP.
-
-      void setUseDualSimplex (bool);
-         //
-         // "Set" function.
+      WitSolverIf (WitSolveMgr *);
 
       //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
+      accessFunc (WitSolveMgr *,   mySolveMgr)
       accessFunc (WitOptProblem *, myOptProblem)
-      accessFunc (bool,            useDualSimplex)
 
    private:
 
@@ -164,23 +119,17 @@ class WitSolverIf: public WitProbAssoc
 
       noCopyCtorAssign (WitSolverIf);
 
-      void solveOptProbAsLp ();
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a first solve.
-
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
 
+      WitSolveMgr * const mySolveMgr_;
+         //
+         // The SolveMgr that owns this SolverIf.
+
       WitOptProblem * const myOptProblem_;
          //
-         // The OptProblem that owns this SolverIf.
-
-      bool useDualSimplex_;
-         //
-         // If true,  dual   simplex is to be used.
-         // If false, primal simplex is to be used.
+         // The OptProblem for this SolverIf.
    };
 
 #endif

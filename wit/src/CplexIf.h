@@ -26,7 +26,7 @@ typedef struct cpxenv * CPXENVptr;
 typedef struct cpxlp  * CPXLPptr;
 
 //------------------------------------------------------------------------------
-// class CplexIf
+// Class CplexIf
 //
 // "CPLEX Interface"
 // Responsible for all interactions with CPLEX.
@@ -50,18 +50,12 @@ class WitCplexIf: public WitSolverIf
          //
          // Returns true, iff CPLEX embedded into the current build of WIT.
 
-      static WitCplexIf * newInstance (WitOptProblem * theOptProblem);
+      static WitCplexIf * newInstance (WitSolveMgr * theSolveMgr);
          //
          // If CPLEX is embedded,
-         //    creates and returns a new CplexIf for theOptProblem.
+         //    creates and returns a new CplexIf for theSolveMgr.
          // If CPLEX is not embedded,
          //    issues a fatal error.
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCplexIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -69,10 +63,31 @@ class WitCplexIf: public WitSolverIf
 
       virtual ~WitCplexIf ();
 
+      //------------------------------------------------------------------------
+      // Overrides from class SolverIf.
+      //------------------------------------------------------------------------
+
+      virtual void reSolveOptProbAsLp   ();
+      virtual void solveOptProbAsMip    ();
+      virtual void solveOptProbAsLexOpt ();
+      virtual void issueSolveMsg        ();
+      virtual void loadLp               ();
+      virtual void solverWriteMps       ();
+      virtual void loadInitSoln         (const WitVector <double> &);
+      virtual void solveLp              (bool);
+      virtual void getPrimalSoln        (WitVector <double> &);
+      virtual void getDualSoln          (WitVector <double> &);
+
    private:
 
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Private constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCplexIf (WitSolveMgr *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
       //------------------------------------------------------------------------
 
       void setUpCplex ();
@@ -90,19 +105,6 @@ class WitCplexIf: public WitSolverIf
       void shutDownLogFile ();
          //
          // Shuts down the CPLEX log file.
-
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
-      virtual void issueSolveMsg        ();
-      virtual void loadLp               ();
-      virtual void writeMpsSS           ();
-      virtual void loadInitSolnSS       (const double *);
-      virtual void solveLp              (bool);
-      virtual void getPrimalSoln        (WitVector <double> &);
-      virtual void getDualSoln          (WitVector <double> &);
-         //
-         // Overrides from class SolverIf.
 
       void getRowData (
             WitVector <double> & rhs,

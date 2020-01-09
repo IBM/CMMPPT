@@ -269,11 +269,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Performs screening of constraints and variables.
 
-      WitSolverIf * newSolverIf ();
-         //
-         // Creates and returns a new SolverIf for this OptProblem.
-         // Issues a fatal error, if neither COIN nor CPLEX is embedded.
-
       void reconstructDual ();
          //
          // Assuming the optimization problem was screened and an optimal dual
@@ -286,12 +281,6 @@ class WitOptProblem: public WitProbAssoc
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
-
-      WitSolverIf * mySolverIf_;
-         //
-         // The SolverIf owned by this OptProblem, when there is one;
-         // otherwise, NULL.
-         // Always NULL, if CPLEX is not embedded.
 
       WitList <WitOptVar> myOptVars_;
          //
@@ -330,7 +319,7 @@ class WitOptProblem: public WitProbAssoc
          // In single objective mode:
          //    Empty
 
-      WitPtrVec <WitBoundPair> varPreScreenBounds_;
+     WitPtrVec <WitBoundPair> varPreScreenBounds_;
          //
          // Stores the return values of preScreenBounds (OptVar *).
 
@@ -351,6 +340,11 @@ class WitOptProblem: public WitProbAssoc
       FILE * optProbFile_;
          //
          // Optimization problem output file.
+
+      WitSolveGate * mySolveGate_;
+         //
+         // The SolveGate owned by this OptProblem, when there is one;
+         // otherwise, NULL.
    };
 
 #endif

@@ -16,8 +16,7 @@
 #include <OptComp.h>
 #include <DetOptImpMgr.h>
 #include <OptStarter.h>
-#include <CoinIf.h>
-#include <CplexIf.h>
+#include <SolveGate.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
 #include <MultiObjMgr.h>
@@ -119,7 +118,7 @@ void WitRun::witGetCoinEmbedded (WitBoolean * coinEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   apiGet (coinEmbedded, "coinEmbedded", WitCoinIf::coinEmbedded ());
+   apiGet (coinEmbedded, "coinEmbedded", WitSolveGate::coinEmbedded ());
    }
 
 //------------------------------------------------------------------------------
@@ -139,7 +138,7 @@ void WitRun::witGetCplexEmbedded (WitBoolean * cplexEmbedded)
    {
    WitOptCompApiCall theCall (this);
 
-   apiGet (cplexEmbedded, "cplexEmbedded", WitCplexIf::cplexEmbedded ());
+   apiGet (cplexEmbedded, "cplexEmbedded", WitSolveGate::cplexEmbedded ());
    }
 
 //------------------------------------------------------------------------------

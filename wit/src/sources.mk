@@ -79,7 +79,7 @@ lib_objects = \
         SglSrcMgr.$(obj_suffix) \
         SglSrcSite.$(obj_suffix) \
         SolnWrit.$(obj_suffix) \
-        SolverIf.$(obj_suffix) \
+        Solve.$(obj_suffix) \
         StCons.$(obj_suffix) \
         StVars.$(obj_suffix) \
         Stack.$(obj_suffix) \

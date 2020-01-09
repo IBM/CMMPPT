@@ -11,14 +11,14 @@
 // If COIN_EMBEDDED is not defined, then only static functions are implemented.
 //------------------------------------------------------------------------------
 
+//------------------------------------------------------------------------------
+// All #include statements for WIT header files must be located in the
+// unconditional part of the source file, so that make depend will work
+// correctly.
+//------------------------------------------------------------------------------
+
 #include <CoinIf.h>
-
-//------------------------------------------------------------------------------
-// COIN-embedded Implementation of class CoinIf.
-//------------------------------------------------------------------------------
-
-#ifdef COIN_EMBEDDED
-
+#include <SolveMgr.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <OptCon.h>
@@ -27,6 +27,12 @@
 #include <MsgFrag.h>
 #include <MsgFac.h>
 #include <Timing.h>
+
+//------------------------------------------------------------------------------
+// COIN-embedded Implementation of class CoinIf.
+//------------------------------------------------------------------------------
+
+#ifdef COIN_EMBEDDED
 
 #include <ClpSimplex.hpp>
 #include <ClpPresolve.hpp>
@@ -40,25 +46,9 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstance (WitOptProblem * theOptProblem)
+WitCoinIf * WitCoinIf::newInstance (WitSolveMgr * theSolveMgr)
    {
-   return new WitCoinIf (theOptProblem);
-   }
-
-//------------------------------------------------------------------------------
-
-WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
-
-      WitSolverIf   (theOptProblem),
-      myClpSimplex_ (NULL)
-   {
-   enterCoin ();
-
-   myClpSimplex_ = new ClpSimplex;
-
-   leaveCoin ();
-
-   setUpMessageHandler ();
+   return new WitCoinIf (theSolveMgr);
    }
 
 //------------------------------------------------------------------------------
@@ -82,14 +72,14 @@ void WitCoinIf::reSolveOptProbAsLp ()
 
    reviseLp ();
 
-   writeMps ();
+   mySolveMgr ()->writeMps ();
 
    reSolveLp ();
 
-   storePrimalSoln ();
+   mySolveMgr ()->storePrimalSoln ();
 
    if (myOptProblem ()->needDual ())
-      storeDualSoln ();
+      mySolveMgr ()->storeDualSoln ();
    }
 
 //------------------------------------------------------------------------------
@@ -111,8 +101,8 @@ void WitCoinIf::solveOptProbAsLexOpt ()
 void WitCoinIf::issueSolveMsg ()
    {
    myMsgFac () ("solveOptProblemMsg",
-      myMsgFac ().myFrag (mipMode ()? "mipFrag": "lpFrag"),
-                          mipMode ()? "CBC":     "CLP");
+      myMsgFac ().myFrag (myOptComp ()->mipMode ()? "mipFrag": "lpFrag"),
+                          myOptComp ()->mipMode ()? "CBC":     "CLP");
    }
 
 //------------------------------------------------------------------------------
@@ -130,7 +120,7 @@ void WitCoinIf::loadLp ()
 
    myOptProblem ()->getMatrixByCols (start, index, value);
 
-   getColumnData (collb, colub, obj);
+   mySolveMgr ()->getColumnData (collb, colub, obj);
 
    getRowData (rowlb, rowub);
 
@@ -156,7 +146,7 @@ void WitCoinIf::loadLp ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::writeMpsSS ()
+void WitCoinIf::solverWriteMps ()
    {
    int errCode;
 
@@ -180,11 +170,11 @@ void WitCoinIf::writeMpsSS ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::loadInitSolnSS (const double * initSoln)
+void WitCoinIf::loadInitSoln (const WitVector <double> & initSoln)
    {
    enterCoin ();
 
-   myClpSimplex_->setColSolution (initSoln);
+   myClpSimplex_->setColSolution (initSoln.myCVec ());
 
    leaveCoin ();
    }
@@ -208,7 +198,7 @@ void WitCoinIf::solveLp (bool)
    int           statusCode;
    int           nIters;
 
-   ifValuesPass       = useDualSimplex ()? 0: 1;
+   ifValuesPass       = mySolveMgr ()->useDualSimplex ()? 0: 1;
 
    startFinishOptions = myOptComp ()->accAfterOptImp ()? 1: 0;
 
@@ -221,7 +211,7 @@ void WitCoinIf::solveLp (bool)
    if (psClpSimplex == NULL)
       myMsgFac () ("unboundedOrInfeasSmsg");
 
-   if (useDualSimplex ())
+   if (mySolveMgr ()->useDualSimplex ())
       psClpSimplex->dual   (ifValuesPass, startFinishOptions);
    else
       psClpSimplex->primal (ifValuesPass, startFinishOptions);
@@ -265,6 +255,22 @@ void WitCoinIf::getPrimalSoln (WitVector <double> & primalSoln)
 void WitCoinIf::getDualSoln (WitVector <double> & dualSoln)
    {
    dualSoln = myClpSimplex_->getRowPrice ();
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinIf::WitCoinIf (WitSolveMgr * theSolveMgr):
+
+      WitSolverIf   (theSolveMgr),
+      myClpSimplex_ (NULL)
+   {
+   enterCoin ();
+
+   myClpSimplex_ = new ClpSimplex;
+
+   leaveCoin ();
+
+   setUpMessageHandler ();
    }
 
 //------------------------------------------------------------------------------
@@ -492,7 +498,7 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstance (WitOptProblem *)
+WitCoinIf * WitCoinIf::newInstance (WitSolveMgr *)
    {
    stronglyAssert (false);
 

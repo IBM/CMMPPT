@@ -175,7 +175,7 @@ class WitDetOptImpMgr: public WitProbAssoc
 
       WitDetImpOP * myDetImpOP_;
          //
-         // The DetImpOP owned by this DetOptImpMgr, in any.
+         // The DetImpOP owned by this DetOptImpMgr, if any.
 
       bool extOptActive_;
          //

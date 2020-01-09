@@ -214,6 +214,8 @@ class WitShipVar;
 class WitSlbCon;
 class WitSlbvVar;
 class WitSolnWriter;
+class WitSolveGate;
+class WitSolveMgr;
 class WitSolverIf;
 class WitSplitCntr;
 class WitSplitPt;
