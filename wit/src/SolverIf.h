@@ -28,7 +28,7 @@
 //       CoinIf
 //       CplexIf
 //
-// Implemented in Solve.C
+// Implemented in OptSolve.C
 //------------------------------------------------------------------------------
 
 class WitSolverIf: public WitProbAssoc
@@ -45,11 +45,6 @@ class WitSolverIf: public WitProbAssoc
       // Pure virtual public member functions.
       //------------------------------------------------------------------------
 
-      virtual void reSolveOptProbAsLp () = 0;
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as an LP for a re-solve.
-
       virtual void solveOptProbAsMip () = 0;
          //
          // Loads, solves and retrieves the solution to the optimization problem
@@ -60,13 +55,17 @@ class WitSolverIf: public WitProbAssoc
          // Loads, solves and retrieves the solution to the optimization problem
          // as a lexicographic optimization.
 
-      virtual void issueSolveMsg () = 0;
+      virtual void issueVersionMsg () = 0;
          //
-         // Issues a msg for the solve.
+         // Issues a msg indicating the version # of the solver, if possible.
 
       virtual void loadLp () = 0;
          //
          // Loads the optimization problem into CPLEX as an LP.
+
+      virtual void reviseLp () = 0;
+         //
+         // Revises the LP problem that was previously loaded into the solver.
 
       virtual void solverWriteMps () = 0;
          //
@@ -75,6 +74,11 @@ class WitSolverIf: public WitProbAssoc
       virtual void loadInitSoln (const WitVector <double> & initSoln) = 0;
          //
          // Loads the initial primal solution (initSoln) into the solver.
+
+      virtual void reSolveLp () = 0;
+         //
+         // Makes appropriate calls to the solver to re-solve the optimization
+         // problem as an LP.
 
       virtual void solveLp (bool optNeeded) = 0;
          //
@@ -92,6 +96,10 @@ class WitSolverIf: public WitProbAssoc
          // Sets dualSoln to the vector of dual solution values.
          // dualSoln must already be of the appropriate size.
 
+      virtual const char * solverName () = 0;
+         //
+         // Returns the name of the solver.
+
    protected:
 
       //------------------------------------------------------------------------
@@ -102,14 +110,14 @@ class WitSolverIf: public WitProbAssoc
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitSolverIf (WitSolveMgr *);
+      WitSolverIf (WitOptSolveMgr *);
 
       //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
-      accessFunc (WitSolveMgr *,   mySolveMgr)
-      accessFunc (WitOptProblem *, myOptProblem)
+      accessFunc (WitOptSolveMgr *, myOptSolveMgr)
+      accessFunc (WitOptProblem *,  myOptProblem)
 
    private:
 
@@ -123,9 +131,9 @@ class WitSolverIf: public WitProbAssoc
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitSolveMgr * const mySolveMgr_;
+      WitOptSolveMgr * const myOptSolveMgr_;
          //
-         // The SolveMgr that owns this SolverIf.
+         // The OptSolveMgr that owns this SolverIf.
 
       WitOptProblem * const myOptProblem_;
          //

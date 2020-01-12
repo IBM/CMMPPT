@@ -112,13 +112,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Calculates an initial solution.
 
-      void getMatrixByCols (
-            WitVector <int> &    firstCoeffIdx,
-            WitVector <int> &    rowIdx,
-            WitVector <double> & coeffVal);
-         //
-         // Retrieves the constraint matrix in the column major ordered format.
-
       void print ();
          //
          // Prints this OptProblem.
@@ -131,6 +124,33 @@ class WitOptProblem: public WitProbAssoc
          //
          // Computes and returns the objective fnuction value for the current
          // primal solution.
+
+      //-----------------------------------------------------------------------
+      // Each of the following functions retrieves a portion of the opt
+      // problem in a form suitable for loading into a solver.
+      //-----------------------------------------------------------------------
+
+      void getMatrixByCols (
+            WitVector <int> &    firstCoeffIdx,
+            WitVector <int> &    rowIdx,
+            WitVector <double> & coeffVal);
+         //
+         // Retrieves the constraint matrix in the column major ordered format.
+
+      void getColumnData (
+            WitVector <double> & colLB,
+            WitVector <double> & colUB,
+            WitVector <double> & colObj);
+         //
+         // Retrieves the column portion of the problem in a form suitable
+         // for loading into a solver.
+
+      void getRowData (
+            WitVector <double> & rowLB,
+            WitVector <double> & rowUB);
+         //
+         // Retrieves the row portion of the problem in a form suitable
+         // for loading into a solver.
 
    protected:
 
@@ -341,9 +361,9 @@ class WitOptProblem: public WitProbAssoc
          //
          // Optimization problem output file.
 
-      WitSolveGate * mySolveGate_;
+      WitOptSolveGate * myOptSolveGate_;
          //
-         // The SolveGate owned by this OptProblem, when there is one;
+         // The OptSolveGate owned by this OptProblem, when there is one;
          // otherwise, NULL.
    };
 

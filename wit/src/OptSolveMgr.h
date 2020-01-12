@@ -4,35 +4,36 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef SolveMgrH
-#define SolveMgrH
+#ifndef OptSolveMgrH
+#define OptSolveMgrH
 
 //------------------------------------------------------------------------------
-// Header file: "SolveMgr.h"
+// Header file: "OptSolveMgr.h"
 //
-// Contains the declaration of class SolveMgr
+// Contains the declaration of class OptSolveMgr
 //------------------------------------------------------------------------------
 
 #include <Assoc.h>
 
 //------------------------------------------------------------------------------
-// Class SolveMgr.
+// Class OptSolveMgr.
 //
-// "Solve Manager"
-// Oversees the Solve Process, the process of solving the optimization problem.
+// "Opt-Solve Manager"
+// Oversees the Opt-Solve Process, the process of solving the optimization
+// problem.
 // Directly responsible for the aspects of solving the optimization problem
 // that do not actually involve invoking the embedded solver.
 //
-// Implemented in Solve.C
+// Implemented in OptSolve.C
 //------------------------------------------------------------------------------
 
-class WitSolveMgr: public WitProbAssoc
+class WitOptSolveMgr: public WitProbAssoc
    {
       //------------------------------------------------------------------------
       // Friends.
       //------------------------------------------------------------------------
 
-      friend class WitSolveGate;
+      friend class WitOptSolveGate;
 
    public:
 
@@ -51,13 +52,9 @@ class WitSolveMgr: public WitProbAssoc
          //
          // Solves the optimization problem.
 
-      void getColumnData (
-            WitVector <double> & lb,
-            WitVector <double> & ub,
-            WitVector <double> & obj);
+      void issueSolveMsg ();
          //
-         // Retrieves the column portion of the LP aspect of the problem in a
-         // standard format.
+         // Issues a msg indicating that the solve has begun.
 
       void writeMps ();
          //
@@ -73,10 +70,6 @@ class WitSolveMgr: public WitProbAssoc
          //
          // Stores the primal solution in myOptProblem_.
 
-      void storeDualSoln ();
-         //
-         // Stores the dual solution in myOptProblem_.
-
       void setUseDualSimplex (bool);
          //
          // Setter
@@ -85,28 +78,37 @@ class WitSolveMgr: public WitProbAssoc
 
       //------------------------------------------------------------------------
       // Constructor function.
-      // To be called by friend class SolveGate.
+      // To be called by friend class OptSolveGate.
       //------------------------------------------------------------------------
 
-      WitSolveMgr (WitOptProblem *);
+      WitOptSolveMgr (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
-      // To be called by friend class SolveGate.
+      // To be called by friend class OptSolveGate.
       //------------------------------------------------------------------------
 
-      ~WitSolveMgr ();
+      ~WitOptSolveMgr ();
 
       //------------------------------------------------------------------------
       // Other private member functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitSolveMgr);
+      noCopyCtorAssign (WitOptSolveMgr);
 
       void solveOptProbAsLp ();
          //
          // Loads, solves and retrieves the solution to the optimization problem
          // as an LP for a first solve.
+
+      void reSolveOptProbAsLp ();
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as an LP for a re-solve.
+
+      void storeDualSoln ();
+         //
+         // Stores the dual solution in myOptProblem_.
 
       //-----------------------------------------------------------------------
       // Private member data.
@@ -118,7 +120,7 @@ class WitSolveMgr: public WitProbAssoc
 
       WitSolverIf * mySolverIf_;
          //
-         // The SolverIf owned by this SolveMgr.
+         // The SolverIf owned by this OptSolveMgr.
 
       bool useDualSimplex_;
          //

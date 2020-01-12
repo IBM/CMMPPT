@@ -50,10 +50,10 @@ class WitCplexIf: public WitSolverIf
          //
          // Returns true, iff CPLEX embedded into the current build of WIT.
 
-      static WitCplexIf * newInstance (WitSolveMgr * theSolveMgr);
+      static WitCplexIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
          //
          // If CPLEX is embedded,
-         //    creates and returns a new CplexIf for theSolveMgr.
+         //    creates and returns a new CplexIf for theOptSolveMgr.
          // If CPLEX is not embedded,
          //    issues a fatal error.
 
@@ -67,16 +67,18 @@ class WitCplexIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
-      virtual void issueSolveMsg        ();
-      virtual void loadLp               ();
-      virtual void solverWriteMps       ();
-      virtual void loadInitSoln         (const WitVector <double> &);
-      virtual void solveLp              (bool);
-      virtual void getPrimalSoln        (WitVector <double> &);
-      virtual void getDualSoln          (WitVector <double> &);
+      virtual void         solveOptProbAsMip    ();
+      virtual void         solveOptProbAsLexOpt ();
+      virtual void         issueVersionMsg      ();
+      virtual void         loadLp               ();
+      virtual void         reviseLp             ();
+      virtual void         solverWriteMps       ();
+      virtual void         loadInitSoln         (const WitVector <double> &);
+      virtual void         reSolveLp            ();
+      virtual void         solveLp              (bool);
+      virtual void         getPrimalSoln        (WitVector <double> &);
+      virtual void         getDualSoln          (WitVector <double> &);
+      virtual const char * solverName           ();
 
    private:
 
@@ -84,7 +86,7 @@ class WitCplexIf: public WitSolverIf
       // Private constructor functions.
       //------------------------------------------------------------------------
 
-      WitCplexIf (WitSolveMgr *);
+      WitCplexIf (WitOptSolveMgr *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
@@ -119,14 +121,14 @@ class WitCplexIf: public WitSolverIf
          //
          // Computes matcnt from matbeg as required for CPXcopylp.
 
-      void reviseLp ();
+      void reviseColData ();
          //
-         // Revises the LP problem that was previously loaded into CPLEX.
+         // Revises the bounds and objective coefficients of variables of the
+         // LP problem that was previously loaded into CPLEX.
 
-      void reviseBounds ();
+      void getColIndices (WitVector <int> & indices);
          //
-         // Revises the upper and lower bounds on variables of the LP problem
-         // that was previously loaded into CPLEX.
+         // Sets indices to a vector of column indices for the opt problem.
 
       void reviseRHS ();
          //
@@ -137,11 +139,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Sets rhs and sense to the CPLEX RHS and constraint sense for
          // theOptCon.
-
-      void reviseObjCoeffs ();
-         //
-         // Revises the objective function coefficients of the LP problem that
-         // was previously loaded into CPLEX.
 
       void loadIntData ();
          //

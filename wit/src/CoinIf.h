@@ -42,10 +42,10 @@ class WitCoinIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
-      static WitCoinIf * newInstance (WitSolveMgr * theSolveMgr);
+      static WitCoinIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
          //
          // If COIN is embedded,
-         //    creates and returns a new CoinIf for theSolveMgr.
+         //    creates and returns a new CoinIf for theOptSolveMgr.
          // If COIN is not embedded,
          //    issues a fatal error.
 
@@ -59,16 +59,18 @@ class WitCoinIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
-      virtual void issueSolveMsg        ();
-      virtual void loadLp               ();
-      virtual void solverWriteMps       ();
-      virtual void loadInitSoln         (const WitVector <double> &);
-      virtual void solveLp              (bool);
-      virtual void getPrimalSoln        (WitVector <double> &);
-      virtual void getDualSoln          (WitVector <double> &);
+      virtual void         solveOptProbAsMip    ();
+      virtual void         solveOptProbAsLexOpt ();
+      virtual void         issueVersionMsg      ();
+      virtual void         loadLp               ();
+      virtual void         reviseLp             ();
+      virtual void         solverWriteMps       ();
+      virtual void         loadInitSoln         (const WitVector <double> &);
+      virtual void         reSolveLp            ();
+      virtual void         solveLp              (bool);
+      virtual void         getPrimalSoln        (WitVector <double> &);
+      virtual void         getDualSoln          (WitVector <double> &);
+      virtual const char * solverName           ();
 
    private:
 
@@ -76,7 +78,7 @@ class WitCoinIf: public WitSolverIf
       // Private constructor functions.
       //------------------------------------------------------------------------
 
-      WitCoinIf (WitSolveMgr *);
+      WitCoinIf (WitOptSolveMgr *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
@@ -92,20 +94,9 @@ class WitCoinIf: public WitSolverIf
          //
          // Shouts down the COIN Message Handler.
 
-      void getRowData (
-            WitVector <double> & rowlb,
-            WitVector <double> & rowub);
-         //
-         // Retrieves the row portion of the LP aspect of the problem in the
-         // representation required for loadProblem.
-
       void checkStatusCode (int statusCode);
          //
          // Checks the status of the LP solution, given by statusCode.
-
-      void reviseLp ();
-         //
-         // Revises the LP problem that was previously loaded into CLP.
 
       void reviseVarBounds ();
          //
@@ -121,11 +112,6 @@ class WitCoinIf: public WitSolverIf
          //
          // Revises the objective function coefficients of the LP problem that
          // was previously loaded into CLP.
-
-      void reSolveLp ();
-         //
-         // Makes appropriate calls to the solver to re-solve the optimization
-         // problem as an LP.
 
       static void enterCoin ();
          //
