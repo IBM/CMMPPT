@@ -289,8 +289,7 @@ CoinIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
 CoinIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
 CoinIf.obj: ../src/Link.h ../src/PtrVec.h
 CoinIf.obj: ../../config/dummy_headers/algorithm ../src/OptCon.h
-CoinIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptVar.h
-CoinIf.obj: ../src/OptStarter.h ../src/MsgFrag.h ../src/MsgFac.h
+CoinIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptVar.h ../src/MsgFac.h
 CoinIf.obj: ../src/MsgArg.h ../src/Timing.h
 CompMgr.obj: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
@@ -344,8 +343,8 @@ CplexIf.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h
 CplexIf.obj: ../../config/dummy_headers/algorithm ../src/CpxParSpecMgr.h
 CplexIf.obj: ../src/CpxParSpec.h ../src/MultiObjMgr.h ../src/SaeMgr.h
 CplexIf.obj: ../src/OptVar.h ../src/OptVC.h ../src/BoundPair.h
-CplexIf.obj: ../src/OptCon.h ../src/OptStarter.h ../src/MsgFrag.h
-CplexIf.obj: ../src/MsgFac.h ../src/MsgArg.h ../src/Timing.h
+CplexIf.obj: ../src/OptCon.h ../src/OptStarter.h ../src/MsgFac.h
+CplexIf.obj: ../src/MsgArg.h ../src/Timing.h
 CpxParSpec.obj: ../src/CpxParSpecMgr.h ../src/Assoc.h ../src/Problem.h
 CpxParSpec.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
 CpxParSpec.obj: ../../config/dummy_headers/stdio.h

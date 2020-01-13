@@ -23,8 +23,6 @@
 #include <OptProblem.h>
 #include <OptCon.h>
 #include <OptVar.h>
-#include <OptStarter.h>
-#include <MsgFrag.h>
 #include <MsgFac.h>
 #include <Timing.h>
 
