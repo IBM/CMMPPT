@@ -767,7 +767,9 @@ void WitCplexIf::printLpSolveInfo ()
    nSimpItns = CPXgetitcnt     (myCpxEnv_, myCpxLp_);
    nPh1Itns  = CPXgetphase1cnt (myCpxEnv_, myCpxLp_);
 
-   myMsgFac () ("lpSolveInfoMsg", nSimpItns, nPh1Itns);
+   myMsgFac () ("nSimplexItersMsg", nSimpItns);
+
+   myMsgFac () ("nPhase1ItersMsg",  nPh1Itns);
    }
 
 //------------------------------------------------------------------------------

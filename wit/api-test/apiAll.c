@@ -92,9 +92,9 @@ void testPgdCritList  (WitRun *);
 void printPgdCritList (WitRun *);
 
 void testObjItr (WitRun *);
-void testAccOptImp ();
-void optImpA1 (WitRun *);
-void optImpB1 (WitRun *);
+void testAccOptImp (witBoolean);
+void optImpA1 (WitRun *, witBoolean);
+void optImpB1 (WitRun *, witBoolean);
 void optImpA2 (WitRun *);
 void optImpB2 (WitRun *);
 void prtFiles ();
@@ -2513,7 +2513,10 @@ int main ()
    testDeletion ();
 
    if (cplexEmbedded)
-      testAccOptImp ();
+      testAccOptImp (WitFALSE);
+
+   if (coinEmbedded)
+      testAccOptImp (WitTRUE);
 
    testCumShipVol ();
 
@@ -5968,7 +5971,7 @@ void testObjItr (WitRun * theWitRun)
 /* Tests accelerated optimizing implosion.                                    */
 /*----------------------------------------------------------------------------*/
 
-void testAccOptImp ()
+void testAccOptImp (witBoolean preferCoin)
    {
    WitRun * theWitRunA;
    WitRun * theWitRunB;
@@ -5981,8 +5984,8 @@ void testAccOptImp ()
    witNewRun  (& theWitRunA);
    witNewRun  (& theWitRunB);
 
-   optImpA1     (theWitRunA);
-   optImpB1     (theWitRunB);
+   optImpA1     (theWitRunA, preferCoin);
+   optImpB1     (theWitRunB, preferCoin);
    optImpA2     (theWitRunA);
    optImpB2     (theWitRunB);
 
@@ -5996,7 +5999,7 @@ void testAccOptImp ()
 /* optImpA1                                                                   */
 /*----------------------------------------------------------------------------*/
 
-void optImpA1 (WitRun * theWitRunA)
+void optImpA1 (WitRun * theWitRunA, witBoolean preferCoin)
    {
    witSetMesgFileName         (theWitRunA, WitTRUE, "wit-a.log");
 
@@ -6008,9 +6011,9 @@ void optImpA1 (WitRun * theWitRunA)
 
    witSetSolverLogFileName    (theWitRunA, "solver-a.log");
 
+   witSetPreferCoin           (theWitRunA, preferCoin);
+
    witOptImplode              (theWitRunA);
-       /**/
-      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched          (theWitRunA, "exec-a1.out", WitBSV);
    }
@@ -6019,7 +6022,7 @@ void optImpA1 (WitRun * theWitRunA)
 /* optImpB1                                                                   */
 /*----------------------------------------------------------------------------*/
 
-void optImpB1 (WitRun * theWitRunB)
+void optImpB1 (WitRun * theWitRunB, witBoolean preferCoin)
    {
    float hardLB[] = {0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -6039,9 +6042,9 @@ void optImpB1 (WitRun * theWitRunB)
                                NULL,
                                NULL);
 
+   witSetPreferCoin           (theWitRunB, preferCoin);
+
    witOptImplode              (theWitRunB);
-       /**/
-      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched          (theWitRunB, "exec-b1.out", WitBSV);
    }
@@ -6057,8 +6060,6 @@ void optImpA2 (WitRun * theWitRunA)
    witSetPartSupplyVol (theWitRunA, "COMP2", supplyVol);
 
    witOptImplode       (theWitRunA);
-       /**/
-      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched   (theWitRunA, "exec-a2.out", WitBSV);
    }
@@ -6074,8 +6075,6 @@ void optImpB2 (WitRun * theWitRunB)
    witSetPartSupplyVol (theWitRunB, "Bread", supplyVol);
 
    witOptImplode       (theWitRunB);
-       /**/
-      /* Not ready for COIN yet: accAfterOptImp */
 
    witWriteExecSched   (theWitRunB, "exec-b2.out", WitBSV);
    }
