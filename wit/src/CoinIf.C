@@ -11,22 +11,26 @@
 // If COIN_EMBEDDED is not defined, then only static functions are implemented.
 //------------------------------------------------------------------------------
 
+//------------------------------------------------------------------------------
+// All #include statements for WIT header files must be located in the
+// unconditional part of the source file, so that make depend will work
+// correctly.
+//------------------------------------------------------------------------------
+
 #include <CoinIf.h>
+#include <OptSolveMgr.h>
+#include <OptComp.h>
+#include <OptProblem.h>
+#include <OptCon.h>
+#include <OptVar.h>
+#include <MsgFac.h>
+#include <Timing.h>
 
 //------------------------------------------------------------------------------
 // COIN-embedded Implementation of class CoinIf.
 //------------------------------------------------------------------------------
 
 #ifdef COIN_EMBEDDED
-
-#include <OptComp.h>
-#include <OptProblem.h>
-#include <OptCon.h>
-#include <OptVar.h>
-#include <OptStarter.h>
-#include <MsgFrag.h>
-#include <MsgFac.h>
-#include <Timing.h>
 
 #include <ClpSimplex.hpp>
 #include <ClpPresolve.hpp>
@@ -40,25 +44,9 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstance (WitOptProblem * theOptProblem)
+WitCoinIf * WitCoinIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
    {
-   return new WitCoinIf (theOptProblem);
-   }
-
-//------------------------------------------------------------------------------
-
-WitCoinIf::WitCoinIf (WitOptProblem * theOptProblem):
-
-      WitSolverIf   (theOptProblem),
-      myClpSimplex_ (NULL)
-   {
-   enteringCoin ();
-
-   myClpSimplex_ = new ClpSimplex;
-
-   leftCoin ();
-
-   setUpMessageHandler ();
+   return new WitCoinIf (theOptSolveMgr);
    }
 
 //------------------------------------------------------------------------------
@@ -67,18 +55,11 @@ WitCoinIf::~WitCoinIf ()
    {
    shutDownMessageHandler ();
 
-   enteringCoin ();
+   enterCoin ();
 
    delete myClpSimplex_;
 
-   leftCoin ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinIf::reSolveOptProbAsLp ()
-   {
-   myMsgFac () ("coinNYISmsg", "Accelerated Optimizing Implosion");
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -97,11 +78,8 @@ void WitCoinIf::solveOptProbAsLexOpt ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::issueSolveMsg ()
+void WitCoinIf::issueVersionMsg ()
    {
-   myMsgFac () ("solveOptProblemMsg",
-      myMsgFac ().myFrag (mipMode ()? "mipFrag": "lpFrag"),
-                          mipMode ()? "CBC":     "CLP");
    }
 
 //------------------------------------------------------------------------------
@@ -119,11 +97,10 @@ void WitCoinIf::loadLp ()
 
    myOptProblem ()->getMatrixByCols (start, index, value);
 
-   getColumnData (collb, colub, obj);
+   myOptProblem ()->getColumnData   (collb, colub, obj);
+   myOptProblem ()->getRowData      (rowlb, rowub);
 
-   getRowData (rowlb, rowub);
-
-   enteringCoin ();
+   enterCoin ();
 
    myClpSimplex_->setOptimizationDirection (-1.0);
 
@@ -140,22 +117,31 @@ void WitCoinIf::loadLp ()
          rowlb.myCVec (),
          rowub.myCVec ());
 
-   leftCoin ();
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::writeMpsSS ()
+void WitCoinIf::reviseLp ()
+   {
+   reviseVarBounds ();
+   reviseConBounds ();
+   reviseObjCoeffs ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::solverWriteMps ()
    {
    int errCode;
 
    try
       {
-      enteringCoin ();
+      enterCoin ();
 
       errCode = myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
 
-      leftCoin ();
+      leaveCoin ();
       }
 
    catch (...)
@@ -169,31 +155,81 @@ void WitCoinIf::writeMpsSS ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::loadInitSolnSS (const double * initSoln)
+void WitCoinIf::loadInitSoln (const WitVector <double> & initSoln)
    {
-   enteringCoin ();
+   enterCoin ();
 
-   myClpSimplex_->setColSolution (initSoln);
+   myClpSimplex_->setColSolution (initSoln.myCVec ());
 
-   leftCoin ();
+   leaveCoin ();
+   }
+
+//------------------------------------------------------------------------------
+// reSolveLp
+//
+// Note that the existing basis may be primal feasible, dual feasible, both, or
+// neither. Dual simplex is being used for this general case.
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reSolveLp ()
+   {
+   int ifValuespass;
+   int startFinishOptions;
+   int statusCode;
+   int nIters;
+
+   ifValuespass = 0;
+      //
+      // 0 means don't do a values pass.
+
+   startFinishOptions = 1 + 2 + 4;
+      //
+      // Interpreted as bits:
+      //    1 - do not delete work areas and factorization at end
+      //    2 - use old factorization if same number of rows
+      //    4 - skip as much initialization of work areas as possible
+      //        (based on whatsChanged in clpmodel.hpp)
+
+   enterCoin ();
+
+   myClpSimplex_->setWhatsChanged (MATRIX_SAME + BASIS_SAME);
+
+   myClpSimplex_->dual (ifValuespass, startFinishOptions);
+
+   statusCode = myClpSimplex_->problemStatus    ();
+   nIters     = myClpSimplex_->numberIterations ();
+
+   leaveCoin ();
+
+   checkStatusCode (statusCode);
+
+   myMsgFac () ("nSimplexItersMsg", nIters);
    }
 
 //------------------------------------------------------------------------------
 // solveLp
 //
-// dual   is called with ifValuesPass == 0, meaning don't do a values pass.
-// primal is called with ifValuesPass == 1, meaning       do a values pass.
-// Both  are called with startFinshOptions == 0.
+// ifValuesPass == 0, means don't do a values pass.
+// ifValuesPass == 1, means       do a values pass.
+//
+// startFinishOptions == 1 means retain work areas and factorization at end.
+// startFinishOptions == 0 means delete work areas and factorization at end.
 //------------------------------------------------------------------------------
 
 void WitCoinIf::solveLp (bool)
    {
+   int           ifValuesPass;
+   int           startFinishOptions;
    ClpPresolve * theClpPresolve;
    ClpSimplex *  psClpSimplex;
    int           statusCode;
    int           nIters;
 
-   enteringCoin ();
+   ifValuesPass       = myOptSolveMgr ()->useDualSimplex ()? 0: 1;
+
+   startFinishOptions = myOptComp ()->accAfterOptImp ()? 1: 0;
+
+   enterCoin ();
 
    theClpPresolve = new ClpPresolve;
 
@@ -202,20 +238,19 @@ void WitCoinIf::solveLp (bool)
    if (psClpSimplex == NULL)
       myMsgFac () ("unboundedOrInfeasSmsg");
 
-   if (useDualSimplex ())
-      psClpSimplex->dual   (0, 0);
+   if (myOptSolveMgr ()->useDualSimplex ())
+      psClpSimplex->dual   (ifValuesPass, startFinishOptions);
    else
-      psClpSimplex->primal (1, 0);
+      psClpSimplex->primal (ifValuesPass, startFinishOptions);
 
+   statusCode = psClpSimplex->problemStatus    ();
    nIters     = psClpSimplex->numberIterations ();
 
-   statusCode = psClpSimplex->problemStatus ();
-
-   leftCoin ();
+   leaveCoin ();
 
    checkStatusCode (statusCode);
 
-   enteringCoin ();
+   enterCoin ();
 
    theClpPresolve->postsolve (true);
 
@@ -225,12 +260,12 @@ void WitCoinIf::solveLp (bool)
 
    if (not myClpSimplex_->isProvenOptimal ())
       {
-      myClpSimplex_->primal (1, 0);
+      myClpSimplex_->primal (1, startFinishOptions);
 
       nIters += myClpSimplex_->numberIterations ();
       }
 
-   leftCoin ();
+   leaveCoin ();
 
    myMsgFac () ("nSimplexItersMsg", nIters);
    }
@@ -251,6 +286,29 @@ void WitCoinIf::getDualSoln (WitVector <double> & dualSoln)
 
 //------------------------------------------------------------------------------
 
+const char * WitCoinIf::solverName ()
+   {
+   return myOptComp ()->mipMode ()? "CBC": "CLP";
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinIf::WitCoinIf (WitOptSolveMgr * theOptSolveMgr):
+
+      WitSolverIf   (theOptSolveMgr),
+      myClpSimplex_ (NULL)
+   {
+   enterCoin ();
+
+   myClpSimplex_ = new ClpSimplex;
+
+   leaveCoin ();
+
+   setUpMessageHandler ();
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinIf::setUpMessageHandler ()
    {
    FILE *               theFile;
@@ -258,13 +316,13 @@ void WitCoinIf::setUpMessageHandler ()
 
    theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
 
-   enteringCoin ();
+   enterCoin ();
 
    theHandler = new CoinMessageHandler (theFile);
 
    myClpSimplex_->passInMessageHandler (theHandler);
 
-   leftCoin ();
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -274,7 +332,7 @@ void WitCoinIf::shutDownMessageHandler ()
    CoinMessageHandler * theHandler;
    FILE *               theFile;
 
-   enteringCoin ();
+   enterCoin ();
 
    theHandler = myClpSimplex_->messageHandler ();
 
@@ -284,30 +342,9 @@ void WitCoinIf::shutDownMessageHandler ()
 
    delete theHandler;
 
-   leftCoin ();
+   leaveCoin ();
 
    fclose (theFile);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinIf::getRowData (
-      WitVector <double> & rowlb,
-      WitVector <double> & rowub)
-   {
-   WitOptCon * theOptCon;
-   int         theIdx;
-
-   rowlb.resize (myOptProblem ()->nOptCons ());
-   rowub.resize (myOptProblem ()->nOptCons ());
-
-   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
-      {
-      theIdx = theOptCon->index ();
-
-      rowlb[theIdx] = theOptCon->bounds ().lower ();
-      rowub[theIdx] = theOptCon->bounds ().upper ();
-      }
    }
 
 //------------------------------------------------------------------------------
@@ -345,14 +382,65 @@ void WitCoinIf::checkStatusCode (int statusCode)
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::enteringCoin ()
+void WitCoinIf::reviseVarBounds ()
+   {
+   double *    lowerBound;
+   double *    upperBound;
+   WitOptVar * theOptVar;
+
+   lowerBound = myClpSimplex_->columnLower ();
+   upperBound = myClpSimplex_->columnUpper ();
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      lowerBound[theOptVar->index ()] = theOptVar->bounds ().lower ();
+      upperBound[theOptVar->index ()] = theOptVar->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseConBounds ()
+   {
+   double *    lowerBound;
+   double *    upperBound;
+   WitOptCon * theOptCon;
+
+   lowerBound = myClpSimplex_->rowLower ();
+   upperBound = myClpSimplex_->rowUpper ();
+
+   forEachEl (theOptCon, myOptProblem ()->myOptCons ())
+      {
+      lowerBound[theOptCon->index ()] = theOptCon->bounds ().lower ();
+      upperBound[theOptCon->index ()] = theOptCon->bounds ().upper ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::reviseObjCoeffs ()
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      myClpSimplex_->
+         setObjectiveCoefficient (
+            theOptVar->index (),
+            theOptVar->objCoeff ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::enterCoin ()
    {
    WitTimer::enterSection ("coin");
    }
 
 //------------------------------------------------------------------------------
 
-void WitCoinIf::leftCoin ()
+void WitCoinIf::leaveCoin ()
    {
    WitTimer::leaveSection ("coin");
    }
@@ -372,7 +460,7 @@ bool WitCoinIf::coinEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCoinIf * WitCoinIf::newInstance (WitOptProblem *)
+WitCoinIf * WitCoinIf::newInstance (WitOptSolveMgr *)
    {
    stronglyAssert (false);
 

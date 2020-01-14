@@ -125,21 +125,6 @@ class WitExtOptMgr: public WitProbAssoc
       // Private member functions.
       //------------------------------------------------------------------------
 
-      void getColData (
-            WitVector <double> & collb,
-            WitVector <double> & colub,
-            WitVector <double> & obj);
-         //
-         // Retrieves data specifying column data for the optimization problem,
-         // for getProb (...).
-
-      void getRowData (
-            WitVector <double> & rowlb,
-            WitVector <double> & rowub);
-         //
-         // Retrieves data specifying row data for the optimization problem,
-         // for getProb (...).
-
       int slbvVarIndexOf (WitBoundedVar * theBoundedVar);
          //
          // Returns the index of the SlbvVar for theBoundedVar, if any;

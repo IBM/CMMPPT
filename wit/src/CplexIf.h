@@ -26,7 +26,7 @@ typedef struct cpxenv * CPXENVptr;
 typedef struct cpxlp  * CPXLPptr;
 
 //------------------------------------------------------------------------------
-// class CplexIf
+// Class CplexIf
 //
 // "CPLEX Interface"
 // Responsible for all interactions with CPLEX.
@@ -50,18 +50,12 @@ class WitCplexIf: public WitSolverIf
          //
          // Returns true, iff CPLEX embedded into the current build of WIT.
 
-      static WitCplexIf * newInstance (WitOptProblem * theOptProblem);
+      static WitCplexIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
          //
          // If CPLEX is embedded,
-         //    creates and returns a new CplexIf for theOptProblem.
+         //    creates and returns a new CplexIf for theOptSolveMgr.
          // If CPLEX is not embedded,
          //    issues a fatal error.
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCplexIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -69,10 +63,33 @@ class WitCplexIf: public WitSolverIf
 
       virtual ~WitCplexIf ();
 
+      //------------------------------------------------------------------------
+      // Overrides from class SolverIf.
+      //------------------------------------------------------------------------
+
+      virtual void         solveOptProbAsMip    ();
+      virtual void         solveOptProbAsLexOpt ();
+      virtual void         issueVersionMsg      ();
+      virtual void         loadLp               ();
+      virtual void         reviseLp             ();
+      virtual void         solverWriteMps       ();
+      virtual void         loadInitSoln         (const WitVector <double> &);
+      virtual void         reSolveLp            ();
+      virtual void         solveLp              (bool);
+      virtual void         getPrimalSoln        (WitVector <double> &);
+      virtual void         getDualSoln          (WitVector <double> &);
+      virtual const char * solverName           ();
+
    private:
 
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Private constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCplexIf (WitOptSolveMgr *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
       //------------------------------------------------------------------------
 
       void setUpCplex ();
@@ -91,19 +108,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Shuts down the CPLEX log file.
 
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
-      virtual void issueSolveMsg        ();
-      virtual void loadLp               ();
-      virtual void writeMpsSS           ();
-      virtual void loadInitSolnSS       (const double *);
-      virtual void solveLp              (bool);
-      virtual void getPrimalSoln        (WitVector <double> &);
-      virtual void getDualSoln          (WitVector <double> &);
-         //
-         // Overrides from class SolverIf.
-
       void getRowData (
             WitVector <double> & rhs,
             WitVector <char> &   sense);
@@ -117,14 +121,14 @@ class WitCplexIf: public WitSolverIf
          //
          // Computes matcnt from matbeg as required for CPXcopylp.
 
-      void reviseLp ();
+      void reviseColData ();
          //
-         // Revises the LP problem that was previously loaded into CPLEX.
+         // Revises the bounds and objective coefficients of variables of the
+         // LP problem that was previously loaded into CPLEX.
 
-      void reviseBounds ();
+      void getColIndices (WitVector <int> & indices);
          //
-         // Revises the upper and lower bounds on variables of the LP problem
-         // that was previously loaded into CPLEX.
+         // Sets indices to a vector of column indices for the opt problem.
 
       void reviseRHS ();
          //
@@ -135,11 +139,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Sets rhs and sense to the CPLEX RHS and constraint sense for
          // theOptCon.
-
-      void reviseObjCoeffs ();
-         //
-         // Revises the objective function coefficients of the LP problem that
-         // was previously loaded into CPLEX.
 
       void loadIntData ();
          //
@@ -245,15 +244,15 @@ class WitCplexIf: public WitSolverIf
          // theErrCode as a CPLEX error code and theFuncName as the name of the
          // CPLEX function that returned the error code.
 
-      static void enteringCplex ();
+      static void enterCplex ();
          //
-         // Indicates, for timing purposes, that a CPLEX function is about to
+         // Indicates, for timing purposes, that CPLEX functions are about to
          // be called.
 
-      static void leftCplex ();
+      static void leaveCplex ();
          //
-         // Indicates, for timing purposes, that a CPLEX function was just
-         // called.
+         // Indicates, for timing purposes, that CPLEX functions are no longer
+         // about to be called.
 
       noCopyCtorAssign (WitCplexIf);
 

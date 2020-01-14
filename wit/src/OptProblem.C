@@ -14,8 +14,7 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <Coeff.h>
-#include <CoinIf.h>
-#include <CplexIf.h>
+#include <OptSolveGate.h>
 #include <OptComp.h>
 #include <Timing.h>
 #include <MsgFrag.h>
@@ -170,45 +169,6 @@ void WitOptProblem::calcInitSoln ()
 
 //------------------------------------------------------------------------------
 
-void WitOptProblem::getMatrixByCols (
-      WitVector <int> &    firstCoeffIdx,
-      WitVector <int> &    rowIdx,
-      WitVector <double> & coeffVal)
-   {
-   WitCoeffItr theItr;
-   WitOptVar * theVar;
-   WitCoeff *  theCoeff;
-   int         idx;
-
-   rowIdx       .resize (nCoeffs_);
-   firstCoeffIdx.resize (nOptVars () + 1);
-   coeffVal     .resize (nCoeffs_);
-
-   idx = 0;
-
-   forEachEl (theVar, myOptVars_)
-      {
-      firstCoeffIdx[theVar->index ()] = idx;
-
-      theVar->attachCoeffItr (theItr);
-
-      while (theItr.advance (theCoeff))
-         {
-         rowIdx  [idx] = theCoeff->myCon ()->index ();
-
-         coeffVal[idx] = theCoeff->myValue ();
-
-         idx ++;
-         }
-      }
-
-   firstCoeffIdx[nOptVars ()] = idx;
-
-   witAssert (idx == nCoeffs ());
-   }
-
-//------------------------------------------------------------------------------
-
 void WitOptProblem::print ()
    {
    WitTimer::enterSection ("extra");
@@ -264,12 +224,12 @@ WitOptProblem::WitOptProblem (WitProblem * theProblem):
 
       WitProbAssoc    (theProblem),
 
-      mySolverIf_     (NULL),
       nCoeffs_        (0),
       curCon_         (NULL),
       curConCoeffs_   (myProblem ()),
       myLexOptVarSeq_ (),
-      optProbFile_    (NULL)
+      optProbFile_    (NULL),
+      myOptSolveGate_ (NULL)
    {
    }
 
@@ -279,7 +239,7 @@ WitOptProblem::~WitOptProblem ()
    {
    int idx;
 
-   delete mySolverIf_;
+   delete myOptSolveGate_;
 
    while (not myOptCons_.isEmpty ())
       delete myOptCons_.get ();
@@ -311,10 +271,10 @@ void WitOptProblem::solve ()
    if (myOptComp ()->printOptProblem ())
       print ();
 
-   if (mySolverIf_ == NULL)
-       mySolverIf_ = newSolverIf ();
+   if (myOptSolveGate_ == NULL)
+       myOptSolveGate_ = new WitOptSolveGate (this);
 
-   mySolverIf_->solveOptProb ();
+   myOptSolveGate_->solveOptProb ();
 
    if (needDual ())
       reconstructDual ();
@@ -337,6 +297,85 @@ double WitOptProblem::compObjValue ()
       }
 
    return theObjValue;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProblem::getMatrixByCols (
+      WitVector <int> &    firstCoeffIdx,
+      WitVector <int> &    rowIdx,
+      WitVector <double> & coeffVal)
+   {
+   WitCoeffItr theItr;
+   WitOptVar * theVar;
+   WitCoeff *  theCoeff;
+   int         idx;
+
+   rowIdx       .resize (nCoeffs_);
+   firstCoeffIdx.resize (nOptVars () + 1);
+   coeffVal     .resize (nCoeffs_);
+
+   idx = 0;
+
+   forEachEl (theVar, myOptVars_)
+      {
+      firstCoeffIdx[theVar->index ()] = idx;
+
+      theVar->attachCoeffItr (theItr);
+
+      while (theItr.advance (theCoeff))
+         {
+         rowIdx  [idx] = theCoeff->myCon ()->index ();
+
+         coeffVal[idx] = theCoeff->myValue ();
+
+         idx ++;
+         }
+      }
+
+   firstCoeffIdx[nOptVars ()] = idx;
+
+   witAssert (idx == nCoeffs ());
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProblem::getColumnData (
+      WitVector <double> & colLB,
+      WitVector <double> & colUB,
+      WitVector <double> & colObj)
+   {
+   WitOptVar * theOptVar;
+
+   colLB .resize (nOptVars ());
+   colUB .resize (nOptVars ());
+   colObj.resize (nOptVars ());
+
+   forEachEl (theOptVar, myOptVars_)
+      {
+      colLB [theOptVar->index ()] = theOptVar->bounds ().lower ();
+      colUB [theOptVar->index ()] = theOptVar->bounds ().upper ();
+
+      colObj[theOptVar->index ()] = theOptVar->objCoeff ();
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptProblem::getRowData (
+      WitVector <double> & rowLB,
+      WitVector <double> & rowUB)
+   {
+   WitOptCon * theOptCon;
+
+   rowLB .resize (nOptCons ());
+   rowUB .resize (nOptCons ());
+
+   forEachEl (theOptCon, myOptCons_)
+      {
+      rowLB [theOptCon->index ()] = theOptCon->bounds ().lower ();
+      rowUB [theOptCon->index ()] = theOptCon->bounds ().upper ();
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -653,30 +692,6 @@ void WitOptProblem::prtMatrixByCols ()
          theIdx,
          rowIdx  [theIdx],
          coeffVal[theIdx]);
-   }
-
-//------------------------------------------------------------------------------
-
-WitSolverIf * WitOptProblem::newSolverIf ()
-   {
-   if (WitCplexIf::cplexEmbedded ())
-      if (WitCoinIf::coinEmbedded ())
-         {
-         if (myOptComp ()->preferCoin ())
-            return WitCoinIf::newInstance  (this);
-         else
-            return WitCplexIf::newInstance (this);
-         }
-
-   if (WitCoinIf::coinEmbedded ())
-      return WitCoinIf::newInstance  (this);
-
-   if (WitCplexIf::cplexEmbedded ())
-      return WitCplexIf::newInstance (this);
-
-   stronglyAssert (false);
-
-   return NULL;
    }
 
 //------------------------------------------------------------------------------

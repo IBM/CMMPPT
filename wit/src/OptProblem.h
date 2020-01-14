@@ -45,10 +45,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Returns true, iff a dual solution is needed.
 
-      virtual bool reSolveMode () = 0;
-         //
-         // Returns true, iff solving this OptProblem would be a re-solve.
-
       //-----------------------------------------------------------------------
       // Data access functions.
       //-----------------------------------------------------------------------
@@ -116,13 +112,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Calculates an initial solution.
 
-      void getMatrixByCols (
-            WitVector <int> &    firstCoeffIdx,
-            WitVector <int> &    rowIdx,
-            WitVector <double> & coeffVal);
-         //
-         // Retrieves the constraint matrix in the column major ordered format.
-
       void print ();
          //
          // Prints this OptProblem.
@@ -135,6 +124,33 @@ class WitOptProblem: public WitProbAssoc
          //
          // Computes and returns the objective fnuction value for the current
          // primal solution.
+
+      //-----------------------------------------------------------------------
+      // Each of the following functions retrieves a portion of the opt
+      // problem in a form suitable for loading into a solver.
+      //-----------------------------------------------------------------------
+
+      void getMatrixByCols (
+            WitVector <int> &    firstCoeffIdx,
+            WitVector <int> &    rowIdx,
+            WitVector <double> & coeffVal);
+         //
+         // Retrieves the constraint matrix in the column major ordered format.
+
+      void getColumnData (
+            WitVector <double> & colLB,
+            WitVector <double> & colUB,
+            WitVector <double> & colObj);
+         //
+         // Retrieves the column portion of the problem in a form suitable
+         // for loading into a solver.
+
+      void getRowData (
+            WitVector <double> & rowLB,
+            WitVector <double> & rowUB);
+         //
+         // Retrieves the row portion of the problem in a form suitable
+         // for loading into a solver.
 
    protected:
 
@@ -273,11 +289,6 @@ class WitOptProblem: public WitProbAssoc
          //
          // Performs screening of constraints and variables.
 
-      WitSolverIf * newSolverIf ();
-         //
-         // Creates and returns a new SolverIf for this OptProblem.
-         // Issues a fatal error, if neither COIN nor CPLEX is embedded.
-
       void reconstructDual ();
          //
          // Assuming the optimization problem was screened and an optimal dual
@@ -290,12 +301,6 @@ class WitOptProblem: public WitProbAssoc
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
-
-      WitSolverIf * mySolverIf_;
-         //
-         // The SolverIf owned by this OptProblem, when there is one;
-         // otherwise, NULL.
-         // Always NULL, if CPLEX is not embedded.
 
       WitList <WitOptVar> myOptVars_;
          //
@@ -334,7 +339,7 @@ class WitOptProblem: public WitProbAssoc
          // In single objective mode:
          //    Empty
 
-      WitPtrVec <WitBoundPair> varPreScreenBounds_;
+     WitPtrVec <WitBoundPair> varPreScreenBounds_;
          //
          // Stores the return values of preScreenBounds (OptVar *).
 
@@ -355,6 +360,11 @@ class WitOptProblem: public WitProbAssoc
       FILE * optProbFile_;
          //
          // Optimization problem output file.
+
+      WitOptSolveGate * myOptSolveGate_;
+         //
+         // The OptSolveGate owned by this OptProblem, when there is one;
+         // otherwise, NULL.
    };
 
 #endif

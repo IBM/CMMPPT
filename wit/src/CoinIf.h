@@ -18,7 +18,7 @@
 class ClpSimplex;
 
 //------------------------------------------------------------------------------
-// class CoinIf
+// Class CoinIf
 //
 // "COIN Interface"
 // Responsible for all interactions with COIN.
@@ -42,18 +42,12 @@ class WitCoinIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
-      static WitCoinIf * newInstance (WitOptProblem * theOptProblem);
+      static WitCoinIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
          //
          // If COIN is embedded,
-         //    creates and returns a new CoinIf for theOptProblem.
+         //    creates and returns a new CoinIf for theOptSolveMgr.
          // If COIN is not embedded,
          //    issues a fatal error.
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCoinIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -61,26 +55,36 @@ class WitCoinIf: public WitSolverIf
 
       virtual ~WitCoinIf ();
 
+      //------------------------------------------------------------------------
+      // Overrides from class SolverIf.
+      //------------------------------------------------------------------------
+
+      virtual void         solveOptProbAsMip    ();
+      virtual void         solveOptProbAsLexOpt ();
+      virtual void         issueVersionMsg      ();
+      virtual void         loadLp               ();
+      virtual void         reviseLp             ();
+      virtual void         solverWriteMps       ();
+      virtual void         loadInitSoln         (const WitVector <double> &);
+      virtual void         reSolveLp            ();
+      virtual void         solveLp              (bool);
+      virtual void         getPrimalSoln        (WitVector <double> &);
+      virtual void         getDualSoln          (WitVector <double> &);
+      virtual const char * solverName           ();
+
    private:
 
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Private constructor functions.
+      //------------------------------------------------------------------------
+
+      WitCoinIf (WitOptSolveMgr *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitCoinIf);
-
-      virtual void reSolveOptProbAsLp   ();
-      virtual void solveOptProbAsMip    ();
-      virtual void solveOptProbAsLexOpt ();
-      virtual void issueSolveMsg        ();
-      virtual void loadLp               ();
-      virtual void writeMpsSS           ();
-      virtual void loadInitSolnSS       (const double *);
-      virtual void solveLp              (bool);
-      virtual void getPrimalSoln        (WitVector <double> &);
-      virtual void getDualSoln          (WitVector <double> &);
-         //
-         // Overrides from class SolverIf.
 
       void setUpMessageHandler ();
          //
@@ -90,26 +94,34 @@ class WitCoinIf: public WitSolverIf
          //
          // Shouts down the COIN Message Handler.
 
-      void getRowData (
-            WitVector <double> & rowlb,
-            WitVector <double> & rowub);
-         //
-         // Retrieves the row portion of the LP aspect of the problem in the
-         // representation required for loadProblem.
-
       void checkStatusCode (int statusCode);
          //
          // Checks the status of the LP solution, given by statusCode.
 
-      static void enteringCoin ();
+      void reviseVarBounds ();
          //
-         // Indicates, for timing purposes, that a COIN function is about to
+         // Revises the upper and lower bounds on variables of the LP problem
+         // that was previously loaded into CLP.
+
+      void reviseConBounds ();
+         //
+         // Revises the upper and lower bounds on constraints of the LP problem
+         // that was previously loaded into CLP.
+
+      void reviseObjCoeffs ();
+         //
+         // Revises the objective function coefficients of the LP problem that
+         // was previously loaded into CLP.
+
+      static void enterCoin ();
+         //
+         // Indicates, for timing purposes, that COIN functions are about to
          // be called.
 
-      static void leftCoin ();
+      static void leaveCoin ();
          //
-         // Indicates, for timing purposes, that a COIN function was just
-         // called.
+         // Indicates, for timing purposes, that COIN functions are no longer
+         // about to be called.
 
       //-----------------------------------------------------------------------
       // Private member data.

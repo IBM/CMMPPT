@@ -52,8 +52,8 @@ void WitExtOptMgr::getLpProb (
 
    myDetImpOP_->getMatrixByCols (start, index, value);
 
-   getColData (collb, colub, obj);
-   getRowData (rowlb, rowub);
+   myDetImpOP_->getColumnData   (collb, colub, obj);
+   myDetImpOP_->getRowData      (rowlb, rowub);
 
    WitTimer::leaveSection ("opt-prob");
    }
@@ -224,52 +224,6 @@ int WitExtOptMgr::cumShipSlbConIndex (
       WitPeriod   thePer)
    {
    return slbConIndexOf (myDetImpOP_->myCumShipVar (theDemand, thePer));
-   }
-
-//------------------------------------------------------------------------------
-
-void WitExtOptMgr::getColData (
-      WitVector <double> & collb,
-      WitVector <double> & colub,
-      WitVector <double> & obj)
-   {
-   WitOptVar * theOptVar;
-   int         theIdx;
-
-   collb.resize (myDetImpOP_->nOptVars ());
-   colub.resize (myDetImpOP_->nOptVars ());
-   obj  .resize (myDetImpOP_->nOptVars ());
-
-   forEachEl (theOptVar, myDetImpOP_->myOptVars ())
-      {
-      theIdx        = theOptVar->index ();
-
-      collb[theIdx] = theOptVar->bounds ().lower ();
-      colub[theIdx] = theOptVar->bounds ().upper ();
-
-      obj  [theIdx] = theOptVar->objCoeff ();
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitExtOptMgr::getRowData (
-      WitVector <double> & rowlb,
-      WitVector <double> & rowub)
-   {
-   WitOptCon * theOptCon;
-   int         theIdx;
-
-   rowlb.resize (myDetImpOP_->nOptCons ());
-   rowub.resize (myDetImpOP_->nOptCons ());
-
-   forEachEl (theOptCon, myDetImpOP_->myOptCons ())
-      {
-      theIdx        = theOptCon->index ();
-
-      rowlb[theIdx] = theOptCon->bounds ().lower ();
-      rowub[theIdx] = theOptCon->bounds ().upper ();
-      }
    }
 
 //------------------------------------------------------------------------------

@@ -1952,7 +1952,7 @@ void WitMsgBuilder::buildMsgs ()
       "reSolveLpMsg",
       431,
       info_,
-      "Re-solving the LP problem with CPLEX.");
+      "Re-solving the LP problem with %1$s.");
 
    currentMsg_->dupToStdout           (true);
 
@@ -7588,11 +7588,10 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "lpSolveInfoMsg",
+      "nPhase1ItersMsg",
       1034,
       info_,
-      "# simplex iterations: %1$d\n"
-      "# phase 1 iterations: %2$d");
+      "# phase 1 iterations: %1$d");
 
    currentMsg_->testable              (false);
 
@@ -8023,8 +8022,6 @@ void WitMsgBuilder::buildMsgs ()
       1069,
       info_,
       "# simplex iterations: %1$d");
-
-   currentMsg_->testable              (false);
 
    //---------------------------------------------------------------------------
    }

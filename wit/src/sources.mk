@@ -43,6 +43,7 @@ lib_objects = \
         OptComp.$(obj_suffix) \
         OptMisc.$(obj_suffix) \
         OptProblem.$(obj_suffix) \
+        OptSolve.$(obj_suffix) \
         Param.$(obj_suffix) \
         ParamMgr.$(obj_suffix) \
         Parlex.$(obj_suffix) \
@@ -79,7 +80,6 @@ lib_objects = \
         SglSrcMgr.$(obj_suffix) \
         SglSrcSite.$(obj_suffix) \
         SolnWrit.$(obj_suffix) \
-        SolverIf.$(obj_suffix) \
         StCons.$(obj_suffix) \
         StVars.$(obj_suffix) \
         Stack.$(obj_suffix) \

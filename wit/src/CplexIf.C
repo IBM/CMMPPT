@@ -11,14 +11,14 @@
 // If CPLEX_EMBEDDED is not defined, then only static functions are implemented.
 //------------------------------------------------------------------------------
 
+//------------------------------------------------------------------------------
+// All #include statements for WIT header files must be located in the
+// unconditional part of the source file, so that make depend will work
+// correctly.
+//------------------------------------------------------------------------------
+
 #include <CplexIf.h>
-
-//------------------------------------------------------------------------------
-// CPLEX-embedded implementation of class CplexIf.
-//------------------------------------------------------------------------------
-
-#ifdef CPLEX_EMBEDDED
-
+#include <OptSolveMgr.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <CpxParSpecMgr.h>
@@ -28,9 +28,14 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <OptStarter.h>
-#include <MsgFrag.h>
 #include <MsgFac.h>
 #include <Timing.h>
+
+//------------------------------------------------------------------------------
+// CPLEX-embedded implementation of class CplexIf.
+//------------------------------------------------------------------------------
+
+#ifdef CPLEX_EMBEDDED
 
 #include <cplex.h>
 #include <float.h>
@@ -44,21 +49,9 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstance (WitOptProblem * theOptProblem)
+WitCplexIf * WitCplexIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
    {
-   return new WitCplexIf (theOptProblem);
-   }
-
-//------------------------------------------------------------------------------
-
-WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
-
-      WitSolverIf (theOptProblem),
-      myCpxEnv_   (NULL),
-      myCpxLp_    (NULL),
-      myErrCode_  (0)
-   {
-   setUpCplex ();
+   return new WitCplexIf (theOptSolveMgr);
    }
 
 //------------------------------------------------------------------------------
@@ -70,145 +63,46 @@ WitCplexIf::~WitCplexIf ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::setUpCplex ()
-   {
-   int theErrCode;
-
-   enteringCplex ();
-
-   myCpxEnv_ = CPXopenCPLEX (& theErrCode);
-
-   if (theErrCode != 0)
-      myMsgFac () ("nonZeroOpenCplexErrCodeSmsg", theErrCode);
-
-   stronglyAssert (myCpxEnv_ != NULL);
-
-   //...........................................................................
-
-   setUpLogFile ();
-
-   //...........................................................................
-
-   myCpxLp_ = CPXcreateprob (myCpxEnv_, & myErrCode_, "Implosion");
-
-   checkErrCode ("createprob");
-
-   stronglyAssert (myCpxLp_ != NULL);
-
-   leftCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::setUpLogFile ()
-   {
-   const char * theFileName;
-
-   theFileName = myOptComp ()->solverLogFileName ().myCstring ();
-
-   myErrCode_  = CPXsetlogfilename (myCpxEnv_, theFileName, "w");
-
-   checkErrCode ("CPXsetlogfilename");
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::shutDownCplex ()
-   {
-   enteringCplex ();
-
-   myErrCode_ = CPXfreeprob (myCpxEnv_, & myCpxLp_);
-
-   checkErrCode ("CPXfreeprob");
-
-   //...........................................................................
-
-   shutDownLogFile ();
-
-   //...........................................................................
-
-   myErrCode_ = CPXcloseCPLEX (& myCpxEnv_);
-
-   checkErrCode ("CPXcloseCPLEX");
-
-   leftCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::shutDownLogFile ()
-   {
-   myErrCode_  = CPXsetlogfilename (myCpxEnv_, NULL, "");
-
-   checkErrCode ("CPXsetlogfilename");
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::reSolveOptProbAsLp ()
-   {
-   myMsgFac () ("reSolveLpMsg");
-
-   reviseLp ();
-
-   writeMps ();
-
-   setUseDualSimplex (true);
-
-   solveLp (myOptProblem ()->needDual ());
-
-   storePrimalSoln ();
-
-   if (myOptProblem ()->needDual ())
-      storeDualSoln ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::solveOptProbAsMip ()
    {
-   issueSolveMsg ();
+   myOptSolveMgr ()->issueSolveMsg ();
 
    loadLp ();
 
    loadIntData ();
 
-   writeMps ();
+   myOptSolveMgr ()->writeMps ();
 
    solveMip (false);
 
-   storePrimalSoln ();
+   myOptSolveMgr ()->storePrimalSoln ();
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::solveOptProbAsLexOpt ()
    {
-   issueSolveMsg ();
+   myOptSolveMgr ()->issueSolveMsg ();
 
    myMsgFac () ("lexOptMsg");
 
    loadLp ();
 
-   if (mipMode ())
+   if (myOptComp ()->mipMode ())
       loadIntData ();
 
-   writeMps ();
+   myOptSolveMgr ()->writeMps ();
 
    solveLexOpt ();
 
-   storePrimalSoln ();
+   myOptSolveMgr ()->storePrimalSoln ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::issueSolveMsg ()
+void WitCplexIf::issueVersionMsg ()
    {
    CPXCCHARptr theVersionID;
-
-   myMsgFac () ("solveOptProblemMsg",
-      myMsgFac ().myFrag (mipMode ()? "mipFrag": "lpFrag"),
-      "CPLEX");
 
    theVersionID = CPXversion (myCpxEnv_);
 
@@ -237,9 +131,9 @@ void WitCplexIf::loadLp ()
 
    getMatcnt (matcnt, matbeg);
 
-   getColumnData (lb, ub, objective);
+   myOptProblem ()->getColumnData (lb, ub, objective);
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXcopylp (
@@ -261,27 +155,35 @@ void WitCplexIf::loadLp ()
 
    checkErrCode ("CPXcopylp");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::writeMpsSS ()
+void WitCplexIf::reviseLp ()
    {
-   enteringCplex ();
+   reviseColData ();
+   reviseRHS     ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::solverWriteMps ()
+   {
+   enterCplex ();
 
    myErrCode_ = CPXwriteprob (myCpxEnv_, myCpxLp_, "opt-prob.mps", NULL);
 
    checkErrCode ("CPXwriteprob");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::loadInitSolnSS (const double * initSoln)
+void WitCplexIf::loadInitSoln (const WitVector <double> & initSoln)
    {
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXcopystart (
@@ -289,14 +191,23 @@ void WitCplexIf::loadInitSolnSS (const double * initSoln)
          myCpxLp_,
          NULL,
          NULL,
-         initSoln,
+         initSoln.myCVec (),
          NULL,
          NULL,
          NULL);
 
    checkErrCode ("CPXcopystart");
 
-   leftCplex ();
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::reSolveLp ()
+   {
+   myOptSolveMgr ()->setUseDualSimplex (true);
+
+   solveLp (myOptProblem ()->needDual ());
    }
 
 //------------------------------------------------------------------------------
@@ -305,17 +216,17 @@ void WitCplexIf::solveLp (bool optNeeded)
    {
    setIntParam (
       CPX_PARAM_LPMETHOD,
-      useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
+      myOptSolveMgr ()->useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
 
    setSpecCpxPars ();
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ = CPXlpopt (myCpxEnv_, myCpxLp_);
 
    checkErrCode ("CPXlpopt");
 
-   leftCplex ();
+   leaveCplex ();
 
    checkLpSolnStatus (optNeeded);
 
@@ -326,7 +237,7 @@ void WitCplexIf::solveLp (bool optNeeded)
 
 void WitCplexIf::getPrimalSoln (WitVector <double> & primalSoln)
    {
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXgetx (
@@ -338,14 +249,14 @@ void WitCplexIf::getPrimalSoln (WitVector <double> & primalSoln)
 
    checkErrCode ("CPXgetx");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::getDualSoln (WitVector <double> & dualSoln)
    {
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXgetpi (
@@ -357,7 +268,101 @@ void WitCplexIf::getDualSoln (WitVector <double> & dualSoln)
 
    checkErrCode ("CPXgetpi");
 
-   leftCplex ();
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+const char * WitCplexIf::solverName ()
+   {
+   return "CPLEX";
+   }
+
+//------------------------------------------------------------------------------
+
+WitCplexIf::WitCplexIf (WitOptSolveMgr * theOptSolveMgr):
+
+      WitSolverIf (theOptSolveMgr),
+      myCpxEnv_   (NULL),
+      myCpxLp_    (NULL),
+      myErrCode_  (0)
+   {
+   setUpCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setUpCplex ()
+   {
+   int theErrCode;
+
+   enterCplex ();
+
+   myCpxEnv_ = CPXopenCPLEX (& theErrCode);
+
+   if (theErrCode != 0)
+      myMsgFac () ("nonZeroOpenCplexErrCodeSmsg", theErrCode);
+
+   stronglyAssert (myCpxEnv_ != NULL);
+
+   //...........................................................................
+
+   setUpLogFile ();
+
+   //...........................................................................
+
+   myCpxLp_ = CPXcreateprob (myCpxEnv_, & myErrCode_, "Implosion");
+
+   checkErrCode ("createprob");
+
+   stronglyAssert (myCpxLp_ != NULL);
+
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setUpLogFile ()
+   {
+   const char * theFileName;
+
+   theFileName = myOptComp ()->solverLogFileName ().myCstring ();
+
+   myErrCode_  = CPXsetlogfilename (myCpxEnv_, theFileName, "w");
+
+   checkErrCode ("CPXsetlogfilename");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::shutDownCplex ()
+   {
+   enterCplex ();
+
+   myErrCode_ = CPXfreeprob (myCpxEnv_, & myCpxLp_);
+
+   checkErrCode ("CPXfreeprob");
+
+   //...........................................................................
+
+   shutDownLogFile ();
+
+   //...........................................................................
+
+   myErrCode_ = CPXcloseCPLEX (& myCpxEnv_);
+
+   checkErrCode ("CPXcloseCPLEX");
+
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::shutDownLogFile ()
+   {
+   myErrCode_  = CPXsetlogfilename (myCpxEnv_, NULL, "");
+
+   checkErrCode ("CPXsetlogfilename");
    }
 
 //------------------------------------------------------------------------------
@@ -401,29 +406,69 @@ void WitCplexIf::getMatcnt (
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::reviseLp ()
+void WitCplexIf::reviseColData ()
    {
-   reviseBounds    ();
-   reviseRHS       ();
-   reviseObjCoeffs ();
+   WitVector <int>    indices;
+   WitVector <double> theLBVec;
+   WitVector <double> theUBVec;
+   WitVector <double> theObjVec;
+   WitVector <char>   theLUVec;
+
+   getColIndices (indices);
+
+   myOptProblem ()->getColumnData (theLBVec, theUBVec, theObjVec);
+
+   theLUVec.resize (myOptProblem ()->nOptVars ());
+
+   theLUVec = 'L'; 
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXchgbds (
+         myCpxEnv_,
+         myCpxLp_,
+         myOptProblem ()->nOptVars (),
+         indices .myCVec (),
+         theLUVec.myCVec (),
+         theLBVec.myCVec ());
+
+   checkErrCode ("CPXchgbds");
+
+   theLUVec = 'U'; 
+
+   myErrCode_ =
+      CPXchgbds (
+         myCpxEnv_,
+         myCpxLp_,
+         myOptProblem ()->nOptVars (),
+         indices .myCVec (),
+         theLUVec.myCVec (),
+         theUBVec.myCVec ());
+
+   checkErrCode ("CPXchgbds");
+
+   myErrCode_ =
+      CPXchgobj (
+         myCpxEnv_,
+         myCpxLp_,
+         myOptProblem ()->nOptVars (),
+         indices  .myCVec (),
+         theObjVec.myCVec ());
+
+   checkErrCode ("CPXchgobj");
+
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::reviseBounds ()
+void WitCplexIf::getColIndices (WitVector <int> & indices)
    {
-   int                cnt;
-   WitVector <int>    indices;
-   WitVector <char>   lu;
-   WitVector <double> bd;
-   WitOptVar *        theOptVar;
-   int                theColIdx;
+   WitOptVar * theOptVar;
+   int         theColIdx;
 
-   cnt = myOptProblem ()->nOptVars ();
-
-   indices.resize (cnt);
-   lu     .resize (cnt);
-   bd     .resize (cnt);
+   indices.resize (myOptProblem ()->nOptVars ());
 
    theColIdx = -1;
 
@@ -434,49 +479,7 @@ void WitCplexIf::reviseBounds ()
       witAssert (theColIdx == theOptVar->index ());
 
       indices[theColIdx] = theColIdx;
-      lu     [theColIdx] = 'L';
-      bd     [theColIdx] = theOptVar->bounds ().lower ();
       }
-
-   enteringCplex ();
-
-   myErrCode_ =
-      CPXchgbds (
-         myCpxEnv_,
-         myCpxLp_,
-         cnt,
-         indices.myCVec (),
-         lu     .myCVec (),
-         bd     .myCVec ());
-
-   checkErrCode ("CPXchgbds");
-
-   leftCplex ();
-
-   theColIdx = -1;
-
-   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
-      {
-      theColIdx ++;
-
-      lu[theColIdx] = 'U';
-      bd[theColIdx] = theOptVar->bounds ().upper ();
-      }
-
-   enteringCplex ();
-
-   myErrCode_ =
-      CPXchgbds (
-         myCpxEnv_,
-         myCpxLp_,
-         cnt,
-         indices.myCVec (),
-         lu     .myCVec (),
-         bd     .myCVec ());
-
-   checkErrCode ("myCpxEnv");
-
-   leftCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -508,7 +511,7 @@ void WitCplexIf::reviseRHS ()
       getConData (values[theRowIdx], sense, theOptCon);
       }
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXchgrhs (
@@ -520,7 +523,7 @@ void WitCplexIf::reviseRHS ()
 
    checkErrCode ("CPXchgrhs");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -556,48 +559,6 @@ void WitCplexIf::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::reviseObjCoeffs ()
-   {
-   int                cnt;
-   WitVector <int>    indices;
-   WitVector <double> values;
-   WitOptVar *        theOptVar;
-   int                theColIdx;
-
-   cnt = myOptProblem ()->nOptVars ();
-
-   indices.resize (cnt);
-   values .resize (cnt);
-
-   theColIdx = -1;
-
-   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
-      {
-      theColIdx ++;
-
-      witAssert (theColIdx == theOptVar->index ());
-
-      indices[theColIdx] = theColIdx;
-      values [theColIdx] = theOptVar->objCoeff ();
-      }
-
-   enteringCplex ();
-
-   myErrCode_ =
-      CPXchgobj (
-         myCpxEnv_,
-         myCpxLp_,
-         cnt,
-         indices.myCVec (),
-         values .myCVec ());
-
-   checkErrCode ("CPXchgobj");
-
-   leftCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::loadIntData ()
    {
    int              nIntVars;
@@ -623,7 +584,7 @@ void WitCplexIf::loadIntData ()
          }
       }
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXchgctype (
@@ -635,7 +596,7 @@ void WitCplexIf::loadIntData ()
 
    checkErrCode ("CPXchgctype");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -667,8 +628,8 @@ void WitCplexIf::solveLexOpt ()
    if (devMode ())
       WitTimer::getTimeAndChargeToCurrent ();
 
-   if (not mipMode ())
-      loadInitSoln ();
+   if (not myOptComp ()->mipMode ())
+      myOptSolveMgr ()->loadInitSoln ();
 
    prevOptVar = NULL;
 
@@ -687,7 +648,7 @@ void WitCplexIf::solveLexOpt ()
 
       setObjCoef (theOptVar, 1.0);
 
-      if (mipMode ())
+      if (myOptComp ()->mipMode ())
          {
          solveMip (true);
          }
@@ -695,11 +656,13 @@ void WitCplexIf::solveLexOpt ()
          {
          if (prevOptVar != NULL)
             {
-            setUseDualSimplex (false);
+            myOptSolveMgr ()->setUseDualSimplex (false);
             }
          else
             {
-            setUseDualSimplex (myOptComp ()->crashOptStarter ()->isChosen ());
+            myOptSolveMgr ()->
+               setUseDualSimplex (
+                  myOptComp ()->crashOptStarter ()->isChosen ());
             }
 
          solveLp (true);
@@ -724,7 +687,7 @@ void WitCplexIf::setObjCoef (WitOptVar * theOptVar, double theVal)
    indices[0]  = theOptVar->index ();
    values [0]  = theVal;
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXchgobj (
@@ -736,7 +699,7 @@ void WitCplexIf::setObjCoef (WitOptVar * theOptVar, double theVal)
 
    checkErrCode ("CPXchgobj");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -754,7 +717,7 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
 
    theColIdx     = theOptVar->index ();
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXgetx (
@@ -765,7 +728,7 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
 
    checkErrCode ("CPXgetx");
 
-   leftCplex ();
+   leaveCplex ();
 
    optObjVal     = primalSoln[0];
 
@@ -777,7 +740,7 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
    lu     [0]    = 'L';
    bd     [0]    = optObjVal - theTol;
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXchgbds (
@@ -790,7 +753,7 @@ void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
 
    checkErrCode ("CPXchgbds");
 
-   leftCplex ();
+   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------
@@ -803,7 +766,9 @@ void WitCplexIf::printLpSolveInfo ()
    nSimpItns = CPXgetitcnt     (myCpxEnv_, myCpxLp_);
    nPh1Itns  = CPXgetphase1cnt (myCpxEnv_, myCpxLp_);
 
-   myMsgFac () ("lpSolveInfoMsg", nSimpItns, nPh1Itns);
+   myMsgFac () ("nSimplexItersMsg", nSimpItns);
+
+   myMsgFac () ("nPhase1ItersMsg",  nPh1Itns);
    }
 
 //------------------------------------------------------------------------------
@@ -880,14 +845,14 @@ void WitCplexIf::solveMip (bool optNeeded)
 
    setSpecCpxPars ();
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_ =
       CPXmipopt (myCpxEnv_, myCpxLp_);
 
    checkErrCode ("CPXmipopt");
 
-   leftCplex ();
+   leaveCplex ();
 
    checkMipSolnStatus (optNeeded);
 
@@ -1089,7 +1054,7 @@ int WitCplexIf::findCpxParamNum (WitCpxParSpec * theCpxParSpec)
       "CPX_PARAM_%s",
       theCpxParSpec->myName ().myCstring ());
 
-   enteringCplex ();
+   enterCplex ();
 
    myErrCode_      =
       CPXgetparamnum (
@@ -1102,7 +1067,7 @@ int WitCplexIf::findCpxParamNum (WitCpxParSpec * theCpxParSpec)
 
    checkErrCode ("getparamnum");
 
-   leftCplex ();
+   leaveCplex ();
 
    return theParamNum;
    }
@@ -1166,14 +1131,14 @@ void WitCplexIf::checkErrCode (const char * theFuncName)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::enteringCplex ()
+void WitCplexIf::enterCplex ()
    {
    WitTimer::enterSection ("cplex");
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::leftCplex ()
+void WitCplexIf::leaveCplex ()
    {
    WitTimer::leaveSection ("cplex");
    }
@@ -1197,7 +1162,7 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstance (WitOptProblem *)
+WitCplexIf * WitCplexIf::newInstance (WitOptSolveMgr *)
    {
    stronglyAssert (false);
 
@@ -1205,4 +1170,3 @@ WitCplexIf * WitCplexIf::newInstance (WitOptProblem *)
    }
 
 #endif // not CPLEX_EMBEDDED
-
