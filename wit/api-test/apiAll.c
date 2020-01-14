@@ -5979,7 +5979,9 @@ void testAccOptImp (witBoolean preferCoin)
    printf (
       "\n"
       "--- Testing Accelerated Optimizing Implosion ---\n"
-      "\n");
+      "\n"
+      "Preferred Solver: %s\n",
+      preferCoin? "COIN": "CPLEX");
 
    witNewRun  (& theWitRunA);
    witNewRun  (& theWitRunB);
