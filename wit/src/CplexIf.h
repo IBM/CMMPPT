@@ -67,15 +67,16 @@ class WitCplexIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         solveOptProbAsMip    ();
       virtual void         solveOptProbAsLexOpt ();
       virtual void         issueVersionMsg      ();
       virtual void         loadLp               ();
+      virtual void         loadIntData          ();
       virtual void         reviseLp             ();
       virtual void         solverWriteMps       ();
       virtual void         loadInitSoln         (const WitVector <double> &);
       virtual void         reSolveLp            ();
       virtual void         solveLp              (bool);
+      virtual void         solveMip             (bool);
       virtual void         getPrimalSoln        (WitVector <double> &);
       virtual void         getDualSoln          (WitVector <double> &);
       virtual const char * solverName           ();
@@ -140,15 +141,6 @@ class WitCplexIf: public WitSolverIf
          // Sets rhs and sense to the CPLEX RHS and constraint sense for
          // theOptCon.
 
-      void loadIntData ();
-         //
-         // Loads the integrality data of the optimization problem into CPLEX.
-
-      int countIntVars ();
-         //
-         // Counts and returns the number of integer variables in the
-         // optimization problem.
-
       void solveLexOpt ();
          //
          // Makes appropriate calls to CPLEX to solve the optimization problem
@@ -177,12 +169,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Reports the status of the LP solution, in cases where the solve
          // routine terminated early.
-         // optNeeded is to be true, iff an optimal solution is required.
-
-      void solveMip (bool optNeeded);
-         //
-         // Makes appropriate calls to CPLEX to solve the optimization problem
-         // as a MIP.
          // optNeeded is to be true, iff an optimal solution is required.
 
       void printMipSolveInfo ();
@@ -262,11 +248,11 @@ class WitCplexIf: public WitSolverIf
 
       CPXENVptr myCpxEnv_;
          //
-         // The CPLEX environment for this CplexIf.
+         // The CPLEX environment owned by this CplexIf.
 
       CPXLPptr myCpxLp_;
          //
-         // The CPLEX LP problem for this CplexIf.
+         // The CPLEX LP problem owned by this CplexIf.
 
       int myErrCode_;
          //

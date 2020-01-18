@@ -16,6 +16,7 @@
 #include <SolverIf.h>
 
 class ClpSimplex;
+class CbcModel;
 
 //------------------------------------------------------------------------------
 // Class CoinIf
@@ -59,15 +60,16 @@ class WitCoinIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         solveOptProbAsMip    ();
       virtual void         solveOptProbAsLexOpt ();
       virtual void         issueVersionMsg      ();
       virtual void         loadLp               ();
+      virtual void         loadIntData          ();
       virtual void         reviseLp             ();
       virtual void         solverWriteMps       ();
       virtual void         loadInitSoln         (const WitVector <double> &);
       virtual void         reSolveLp            ();
       virtual void         solveLp              (bool);
+      virtual void         solveMip             (bool);
       virtual void         getPrimalSoln        (WitVector <double> &);
       virtual void         getDualSoln          (WitVector <double> &);
       virtual const char * solverName           ();
@@ -85,6 +87,10 @@ class WitCoinIf: public WitSolverIf
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitCoinIf);
+
+      static CbcModel * newClpBasedCbcModel ();
+         //
+         // creates and return a CbcModel that owns a ClpSimplex.
 
       void setUpMessageHandler ();
          //
@@ -113,6 +119,20 @@ class WitCoinIf: public WitSolverIf
          // Revises the objective function coefficients of the LP problem that
          // was previously loaded into CLP.
 
+      void checkMipSolnStatus (bool optNeeded);
+         //
+         // Checks the status of the MIP solution.
+         // optNeeded is to be true, iff an optimal solution is required.
+
+      ClpSimplex * myClpSimplex ();
+         //
+         // Returns the ClpSimplex for this CoinIf.
+
+      ClpSimplex * getClpSimplexFromCbcModel ();
+         //
+         // Returns the ClpSimplex owned by myCbcModel_;
+         // Valid only in MIP mode.
+
       static void enterCoin ();
          //
          // Indicates, for timing purposes, that COIN functions are about to
@@ -129,7 +149,13 @@ class WitCoinIf: public WitSolverIf
 
       ClpSimplex * myClpSimplex_;
          //
-         // The ClpSimplex owmned by this CoinIf.
+         // The ClpSimplex owned by this CoinIf, in LP  mode.
+         // NULL,                                in MIP mode.
+
+      CbcModel * myCbcModel_;
+         //
+         // The CbcModel owned by this CoinIf, in MIP  mode.
+         // NULL,                              in LP mode.
    };
 
 #endif

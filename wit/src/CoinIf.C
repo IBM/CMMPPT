@@ -34,6 +34,8 @@
 
 #include <ClpSimplex.hpp>
 #include <ClpPresolve.hpp>
+#include <OsiClpSolverInterface.hpp>
+#include <CbcModel.hpp>
 
 //------------------------------------------------------------------------------
 
@@ -57,16 +59,10 @@ WitCoinIf::~WitCoinIf ()
 
    enterCoin ();
 
+   delete myCbcModel_;
    delete myClpSimplex_;
 
    leaveCoin ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinIf::solveOptProbAsMip ()
-   {
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion in MIP mode");
    }
 
 //------------------------------------------------------------------------------
@@ -102,9 +98,9 @@ void WitCoinIf::loadLp ()
 
    enterCoin ();
 
-   myClpSimplex_->setOptimizationDirection (-1.0);
+   myClpSimplex ()->setOptimizationDirection (-1.0);
 
-   myClpSimplex_->
+   myClpSimplex ()->
       loadProblem (
          myOptProblem ()->nOptVars (),
          myOptProblem ()->nOptCons (),
@@ -118,6 +114,21 @@ void WitCoinIf::loadLp ()
          rowub.myCVec ());
 
    leaveCoin ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::loadIntData ()
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      if (theOptVar->isAnIntVar ())
+         {
+         myClpSimplex ()->setInteger (theOptVar->index ());
+         }
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -139,7 +150,7 @@ void WitCoinIf::solverWriteMps ()
       {
       enterCoin ();
 
-      errCode = myClpSimplex_->writeMps ("opt-prob.mps", 0, 1, -1.0);
+      errCode = myClpSimplex ()->writeMps ("opt-prob.mps", 0, 1, -1.0);
 
       leaveCoin ();
       }
@@ -159,7 +170,7 @@ void WitCoinIf::loadInitSoln (const WitVector <double> & initSoln)
    {
    enterCoin ();
 
-   myClpSimplex_->setColSolution (initSoln.myCVec ());
+   myClpSimplex ()->setColSolution (initSoln.myCVec ());
 
    leaveCoin ();
    }
@@ -192,12 +203,12 @@ void WitCoinIf::reSolveLp ()
 
    enterCoin ();
 
-   myClpSimplex_->setWhatsChanged (MATRIX_SAME + BASIS_SAME);
+   myClpSimplex ()->setWhatsChanged (MATRIX_SAME + BASIS_SAME);
 
-   myClpSimplex_->dual (ifValuespass, startFinishOptions);
+   myClpSimplex ()->dual (ifValuespass, startFinishOptions);
 
-   statusCode = myClpSimplex_->problemStatus    ();
-   nIters     = myClpSimplex_->numberIterations ();
+   statusCode = myClpSimplex ()->problemStatus    ();
+   nIters     = myClpSimplex ()->numberIterations ();
 
    leaveCoin ();
 
@@ -233,7 +244,7 @@ void WitCoinIf::solveLp (bool)
 
    theClpPresolve = new ClpPresolve;
 
-   psClpSimplex = theClpPresolve->presolvedModel (* myClpSimplex_);
+   psClpSimplex = theClpPresolve->presolvedModel (* myClpSimplex ());
 
    if (psClpSimplex == NULL)
       myMsgFac () ("unboundedOrInfeasSmsg");
@@ -258,11 +269,11 @@ void WitCoinIf::solveLp (bool)
 
    delete psClpSimplex;
 
-   if (not myClpSimplex_->isProvenOptimal ())
+   if (not myClpSimplex ()->isProvenOptimal ())
       {
-      myClpSimplex_->primal (1, startFinishOptions);
+      myClpSimplex ()->primal (1, startFinishOptions);
 
-      nIters += myClpSimplex_->numberIterations ();
+      nIters += myClpSimplex ()->numberIterations ();
       }
 
    leaveCoin ();
@@ -272,16 +283,25 @@ void WitCoinIf::solveLp (bool)
 
 //------------------------------------------------------------------------------
 
+void WitCoinIf::solveMip (bool)
+   {
+   myCbcModel_->branchAndBound ();
+
+   myMsgFac () ("coinNYISmsg", "Optimizing Implosion in MIP mode (3)");
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinIf::getPrimalSoln (WitVector <double> & primalSoln)
    {
-   primalSoln = myClpSimplex_->getColSolution ();
+   primalSoln = myClpSimplex ()->getColSolution ();
    }
 
 //------------------------------------------------------------------------------
 
 void WitCoinIf::getDualSoln (WitVector <double> & dualSoln)
    {
-   dualSoln = myClpSimplex_->getRowPrice ();
+   dualSoln = myClpSimplex ()->getRowPrice ();
    }
 
 //------------------------------------------------------------------------------
@@ -296,15 +316,39 @@ const char * WitCoinIf::solverName ()
 WitCoinIf::WitCoinIf (WitOptSolveMgr * theOptSolveMgr):
 
       WitSolverIf   (theOptSolveMgr),
-      myClpSimplex_ (NULL)
+      myClpSimplex_ (NULL),
+      myCbcModel_   (NULL)
    {
    enterCoin ();
 
-   myClpSimplex_ = new ClpSimplex;
+   if (myOptComp ()->mipMode ())
+      {
+      myCbcModel_   = newClpBasedCbcModel ();
+      }
+   else
+      {
+      myClpSimplex_ = new ClpSimplex;
+      }
 
    leaveCoin ();
 
    setUpMessageHandler ();
+   }
+
+//------------------------------------------------------------------------------
+
+CbcModel * WitCoinIf::newClpBasedCbcModel ()
+   {
+   OsiClpSolverInterface * theOsiClpSI;
+   CbcModel *              theCbcModel;
+
+   theOsiClpSI = new OsiClpSolverInterface;
+
+   theCbcModel = new CbcModel (* theOsiClpSI);
+
+   delete theOsiClpSI;
+
+   return theCbcModel;
    }
 
 //------------------------------------------------------------------------------
@@ -320,7 +364,7 @@ void WitCoinIf::setUpMessageHandler ()
 
    theHandler = new CoinMessageHandler (theFile);
 
-   myClpSimplex_->passInMessageHandler (theHandler);
+   myClpSimplex ()->passInMessageHandler (theHandler);
 
    leaveCoin ();
    }
@@ -334,9 +378,9 @@ void WitCoinIf::shutDownMessageHandler ()
 
    enterCoin ();
 
-   theHandler = myClpSimplex_->messageHandler ();
+   theHandler = myClpSimplex ()->messageHandler ();
 
-   myClpSimplex_->setDefaultMessageHandler ();
+   myClpSimplex ()->setDefaultMessageHandler ();
 
    theFile = theHandler->filePointer ();
 
@@ -388,8 +432,8 @@ void WitCoinIf::reviseVarBounds ()
    double *    upperBound;
    WitOptVar * theOptVar;
 
-   lowerBound = myClpSimplex_->columnLower ();
-   upperBound = myClpSimplex_->columnUpper ();
+   lowerBound = myClpSimplex ()->columnLower ();
+   upperBound = myClpSimplex ()->columnUpper ();
 
    forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
@@ -406,8 +450,8 @@ void WitCoinIf::reviseConBounds ()
    double *    upperBound;
    WitOptCon * theOptCon;
 
-   lowerBound = myClpSimplex_->rowLower ();
-   upperBound = myClpSimplex_->rowUpper ();
+   lowerBound = myClpSimplex ()->rowLower ();
+   upperBound = myClpSimplex ()->rowUpper ();
 
    forEachEl (theOptCon, myOptProblem ()->myOptCons ())
       {
@@ -424,11 +468,40 @@ void WitCoinIf::reviseObjCoeffs ()
 
    forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
-      myClpSimplex_->
+      myClpSimplex ()->
          setObjectiveCoefficient (
             theOptVar->index (),
             theOptVar->objCoeff ());
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinIf::checkMipSolnStatus (bool optNeeded)
+   {
+   myMsgFac () ("coinNYISmsg", "Optimizing Implosion in MIP mode (4)");
+   }
+
+//------------------------------------------------------------------------------
+
+ClpSimplex * WitCoinIf::myClpSimplex ()
+   {
+   return
+      myOptComp ()->mipMode ()?
+         getClpSimplexFromCbcModel ():
+         myClpSimplex_;
+   }
+
+//------------------------------------------------------------------------------
+
+ClpSimplex * WitCoinIf::getClpSimplexFromCbcModel ()
+   {
+   OsiClpSolverInterface * theOsiClpSI;
+
+   theOsiClpSI =
+      dynamic_cast <OsiClpSolverInterface * > (myCbcModel_->solver ());
+
+   return theOsiClpSI->getModelPtr ();
    }
 
 //------------------------------------------------------------------------------

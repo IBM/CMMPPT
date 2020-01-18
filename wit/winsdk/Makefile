@@ -60,7 +60,7 @@ BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexIf.obj wit.obj
 #       this is the null string.
 #
 # Prereqisite macro:
-#    WIT_CPLEX_HOME
+#    WIT_COIN_HOME
 #       For the meaning of this macro, see the comment in appl.mk.
 #------------------------------------------------------------------------------
 
@@ -69,6 +69,10 @@ ifneq ($(WIT_COIN_HOME),)
    coin_libs =                              \
       $(WIT_COIN_HOME)/lib/libClp.lib       \
       $(WIT_COIN_HOME)/lib/libCoinUtils.lib \
+      $(WIT_COIN_HOME)/lib/libOsi.lib       \
+      $(WIT_COIN_HOME)/lib/libOsiClp.lib    \
+      $(WIT_COIN_HOME)/lib/libCgl.lib       \
+      $(WIT_COIN_HOME)/lib/libCbc.lib       \
 
 else
 

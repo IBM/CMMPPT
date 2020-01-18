@@ -45,11 +45,6 @@ class WitSolverIf: public WitProbAssoc
       // Pure virtual public member functions.
       //------------------------------------------------------------------------
 
-      virtual void solveOptProbAsMip () = 0;
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a MIP.
-
       virtual void solveOptProbAsLexOpt () = 0;
          //
          // Loads, solves and retrieves the solution to the optimization problem
@@ -62,6 +57,10 @@ class WitSolverIf: public WitProbAssoc
       virtual void loadLp () = 0;
          //
          // Loads the optimization problem into CPLEX as an LP.
+
+      virtual void loadIntData () = 0;
+         //
+         // Loads the integrality data of the opt problem into the solver.
 
       virtual void reviseLp () = 0;
          //
@@ -84,6 +83,12 @@ class WitSolverIf: public WitProbAssoc
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as an LP.
+         // optNeeded is to be true, iff an optimal solution is required.
+
+      virtual void solveMip (bool optNeeded) = 0;
+         //
+         // Makes appropriate calls to the solver to solve the optimization
+         // problem as a MIP.
          // optNeeded is to be true, iff an optimal solution is required.
 
       virtual void getPrimalSoln (WitVector <double> & primalSoln) = 0;

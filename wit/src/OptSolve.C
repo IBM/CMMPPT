@@ -79,7 +79,7 @@ void WitOptSolveMgr::solveOptProb ()
       }
    else if (myOptComp ()->mipMode ())
       {
-      mySolverIf_->solveOptProbAsMip ();
+      solveOptProbAsMip ();
       }
    else
       {
@@ -234,6 +234,43 @@ void WitOptSolveMgr::reSolveOptProbAsLp ()
 
    if (myOptProblem ()->needDual ())
       storeDualSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveOptProbAsMip ()
+   {
+   issueSolveMsg ();
+
+   if (not optProbHasIntVars ())
+      myMsgFac () ("mipModeNoIntVarsSmsg");
+
+   mySolverIf_->loadLp ();
+
+   mySolverIf_->loadIntData ();
+
+   writeMps ();
+
+   mySolverIf_->solveMip (false);
+
+   storePrimalSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOptSolveMgr::optProbHasIntVars ()
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      if (theOptVar->isAnIntVar ())
+         {
+         return true;
+         }
+      }
+
+   return false;
    }
 
 //------------------------------------------------------------------------------
