@@ -4,36 +4,34 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef OptSolveGateH
-#define OptSolveGateH
+#ifndef CoinMipIfH
+#define CoinMipIfH
 
 //------------------------------------------------------------------------------
-// Header file: "OptSolveGate.h"
+// Header file: "CoinMipIf.h"
 //
-// Contains the declaration of class OptSolveGate
+// Contains the declaration of class CoinMipIf.
 //------------------------------------------------------------------------------
 
-#include <typedefs.h>
+#include <CoinComIf.h>
+
+class CbcModel;
 
 //------------------------------------------------------------------------------
-// Class OptSolveGate.
+// Class CoinMipIf
 //
-// Gateway (i.e., Facade) to the Opt-Solve Subsystem.
-// The Opt-Solve Subsystem is responsible for solving the optimization problem
-// using an embedded solver, either COIN or CPLEX.
-// It consists of the following classes:
-//    OptSolveGate
-//    OptSolveMgr
+// "COIN MIP Interface"
+// Responsible for all interactions with COIN that occur in MIP mode only.
+//
+// Class Hierarchy:
+//
+// ProbAssoc
 //    SolverIf
-//    CoinComIf
-//    CoinLpIf
-//    CoinMipIf
-//    CplexIf
-//
-// Implemented in OptSolve.C.
+//       CoinComIf
+//          CoinMipIf
 //------------------------------------------------------------------------------
 
-class WitOptSolveGate
+class WitCoinMipIf: public WitCoinComIf
    {
    public:
 
@@ -41,50 +39,57 @@ class WitOptSolveGate
       // Static public member functions.
       //------------------------------------------------------------------------
 
-      static bool coinEmbedded ();
+      static WitCoinMipIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
          //
-         // Returns true, iff COIN embedded into the current build of WIT.
-
-      static bool cplexEmbedded ();
-         //
-         // Returns true, iff CPLEX embedded into the current build of WIT.
-
-      //------------------------------------------------------------------------
-      // Constructor functions.
-      //------------------------------------------------------------------------
-
-      WitOptSolveGate (WitOptProblem *);
+         // If COIN is embedded,
+         //    creates and returns a new CoinMipIf for theOptSolveMgr.
+         // If COIN is not embedded,
+         //    issues a fatal error.
 
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------
 
-      ~WitOptSolveGate ();
+      virtual ~WitCoinMipIf ();
 
       //------------------------------------------------------------------------
-      // Other public member functions.
+      // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      void solveOptProb ();
-         //
-         // Solves the optimization problem.
+      virtual void         loadIntData  ();
+      virtual void         reviseLp     ();
+      virtual void         loadInitSoln (const WitVector <double> &);
+      virtual void         reSolveLp    ();
+      virtual void         solveLp      (bool);
+      virtual void         solveMip     (bool);
+      virtual void         getDualSoln  (WitVector <double> &);
+      virtual const char * solverName   ();
 
    private:
 
       //------------------------------------------------------------------------
-      // Private member functions.
+      // Private constructor functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitOptSolveGate);
+      WitCoinMipIf (WitOptSolveMgr *);
+
+      //------------------------------------------------------------------------
+      // Other private member functions.
+      //------------------------------------------------------------------------
+
+      noCopyCtorAssign (WitCoinMipIf);
+
+      virtual ClpModel * myClpModel ();
+         //
+         // Override from class CoinComIf.
 
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitOptSolveMgr * const myOptSolveMgr_;
+      CbcModel * myCbcModel_;
          //
-         // The OptSolveMgr owned by this SolverIf.
+         // The CbcModel owned by this CoinMipIf.
    };
-
 
 #endif

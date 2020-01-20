@@ -58,7 +58,14 @@ MclModule: $(mcl_client_objects) $(mcl_lib)
 
 ifneq ($(WIT_COIN_HOME),)
 
-   coin_lib_flags  = -L$(WIT_COIN_HOME)/lib -lClp -lCoinUtils
+   coin_lib_flags  =         \
+      -L$(WIT_COIN_HOME)/lib \
+      -lClp                  \
+      -lCoinUtils            \
+      -lCbc                  \
+      -lOsiClp               \
+      -lOsi                  \
+      -lCgl                  \
 
    coin_link_flags = $(WIT_COIN_LINK_FLAGS)
 
@@ -74,14 +81,14 @@ endif
 # Rule to build the CoinModule library object file.
 #
 # In COIN-embedded mode, this file contains:
-#    CoinIf.o
+#    The COIN client objects (CoinComIf.o, CoinLpIf.o, CoinMipIf.o)
 #    The relevent contents of the COIN libraries
 #
 # In COIN-not-embedded mode, this file contains:
-#    CoinIf.o
+#    The COIN client objects
 #-------------------------------------------------------------------------------
 
-CoinModule: CoinIf.o
+CoinModule: $(coin_client_objects)
 	$(reloc_ld) -o $@ $(ds_link_reloc_flags) $^ $(coin_lib_flags)
 
 #-------------------------------------------------------------------------------

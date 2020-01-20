@@ -18,14 +18,16 @@
 //------------------------------------------------------------------------------
 // Class SolverIf.
 // "Solver Interface"
-// Responsible for all interactions with WIT's solver of optimization problems.
-// The interactions are implemented polymorphically.
+// Responsible for all interactions with the embedded solver of the optimization
+// problem. The interactions are implemented im the derived classes.
 //
 // Class Hierarchy:
 //
 // ProbAssoc
 //    SolverIf
-//       CoinIf
+//       CoinComIf
+//          CoinLpIf
+//          CoinMipIf
 //       CplexIf
 //
 // Implemented in OptSolve.C
