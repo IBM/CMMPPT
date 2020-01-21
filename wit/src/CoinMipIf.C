@@ -43,8 +43,6 @@ WitCoinMipIf * WitCoinMipIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
 
 WitCoinMipIf::~WitCoinMipIf ()
    {
-   shutDownMessageHandler ();
-
    enterCoin ();
 
    delete myCbcModel_;
@@ -139,9 +137,10 @@ WitCoinMipIf::WitCoinMipIf (WitOptSolveMgr * theOptSolveMgr):
 
    delete theOsiClpSI;
 
-   leaveCoin ();
+   myCbcModel_->           passInMessageHandler (myMsgHandler ());
+   myCbcModel_->solver ()->passInMessageHandler (myMsgHandler ());
 
-   setUpMessageHandler ();
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------

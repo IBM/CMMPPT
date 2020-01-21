@@ -45,8 +45,6 @@ WitCoinLpIf * WitCoinLpIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
 
 WitCoinLpIf::~WitCoinLpIf ()
    {
-   shutDownMessageHandler ();
-
    enterCoin ();
 
    delete myClpSimplex_;
@@ -215,9 +213,9 @@ WitCoinLpIf::WitCoinLpIf (WitOptSolveMgr * theOptSolveMgr):
 
    myClpSimplex_ = new ClpSimplex;
 
-   leaveCoin ();
+   myClpSimplex_->passInMessageHandler (myMsgHandler ());
 
-   setUpMessageHandler ();
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------

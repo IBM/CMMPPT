@@ -42,6 +42,7 @@ bool WitCoinComIf::coinEmbedded ()
 
 WitCoinComIf::~WitCoinComIf ()
    {
+   shutDownMessageHandler ();
    }
 
 //------------------------------------------------------------------------------
@@ -130,48 +131,10 @@ void WitCoinComIf::getPrimalSoln (WitVector <double> & primalSoln)
 
 WitCoinComIf::WitCoinComIf (WitOptSolveMgr * theOptSolveMgr):
 
-      WitSolverIf (theOptSolveMgr)
+      WitSolverIf   (theOptSolveMgr),
+      myMsgHandler_ (NULL)
    {
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinComIf::setUpMessageHandler ()
-   {
-   FILE *               theFile;
-   CoinMessageHandler * theHandler;
-
-   theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
-
-   enterCoin ();
-
-   theHandler = new CoinMessageHandler (theFile);
-
-   myClpModel ()->passInMessageHandler (theHandler);
-
-   leaveCoin ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinComIf::shutDownMessageHandler ()
-   {
-   CoinMessageHandler * theHandler;
-   FILE *               theFile;
-
-   enterCoin ();
-
-   theHandler = myClpModel ()->messageHandler ();
-
-   myClpModel ()->setDefaultMessageHandler ();
-
-   theFile = theHandler->filePointer ();
-
-   delete theHandler;
-
-   leaveCoin ();
-
-   fclose (theFile);
+   setUpMessageHandler ();
    }
 
 //------------------------------------------------------------------------------
@@ -186,6 +149,40 @@ void WitCoinComIf::enterCoin ()
 void WitCoinComIf::leaveCoin ()
    {
    WitTimer::leaveSection ("coin");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinComIf::setUpMessageHandler ()
+   {
+   FILE * theFile;
+
+   theFile = openFile (myOptComp ()->solverLogFileName ().myCstring (), "w");
+
+   enterCoin ();
+
+   myMsgHandler_ = new CoinMessageHandler (theFile);
+
+   leaveCoin ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinComIf::shutDownMessageHandler ()
+   {
+   FILE * theFile;
+
+   enterCoin ();
+
+   theFile = myMsgHandler_->filePointer ();
+
+   delete myMsgHandler_;
+
+   myMsgHandler_ = NULL;
+
+   leaveCoin ();
+
+   fclose (theFile);
    }
 
 #endif // COIN_EMBEDDED

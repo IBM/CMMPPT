@@ -16,6 +16,7 @@
 #include <SolverIf.h>
 
 class ClpModel;
+class CoinMessageHandler;
 
 //------------------------------------------------------------------------------
 // Class CoinComIf
@@ -73,17 +74,11 @@ class WitCoinComIf: public WitSolverIf
       // Other protected constructor functions.
       //------------------------------------------------------------------------
 
-      void setUpMessageHandler ();
-         //
-         // Sets up the COIN Message Handler.
-
-      void shutDownMessageHandler ();
-         //
-         // Shuts down the COIN Message Handler.
-
       virtual ClpModel * myClpModel () = 0;
          //
          // Returns the ClpModel for this CoinComIf.
+
+      accessFunc (CoinMessageHandler *, myMsgHandler)
 
       static void enterCoin ();
          //
@@ -102,6 +97,22 @@ class WitCoinComIf: public WitSolverIf
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitCoinComIf);
+
+      void setUpMessageHandler ();
+         //
+         // Sets up the COIN Message Handler.
+
+      void shutDownMessageHandler ();
+         //
+         // Shuts down the COIN Message Handler.
+
+      //-----------------------------------------------------------------------
+      // Private member data.
+      //-----------------------------------------------------------------------
+
+      CoinMessageHandler * myMsgHandler_;
+         //
+         // The CoinMessageHandler owned by this CoinLpIf.
    };
 
 #endif
