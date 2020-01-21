@@ -98,6 +98,10 @@ class WitCoinLpIf: public WitCoinComIf
          // Revises the objective function coefficients of the LP problem that
          // was previously loaded into CLP.
 
+      void checkLpSolnStatus (ClpSimplex * theClpSimplex);
+         //
+         // Checks the status of the LP solution in theClpSimplex.
+
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------

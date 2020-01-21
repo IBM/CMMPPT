@@ -56,18 +56,13 @@ WitCoinMipIf::~WitCoinMipIf ()
 
 void WitCoinMipIf::loadIntData ()
    {
-   ClpModel *  theClpModel;
    WitOptVar * theOptVar;
 
-   theClpModel = myClpModel ();
-
    forEachEl (theOptVar, myOptProblem ()->myOptVars ())
-      {
       if (theOptVar->isAnIntVar ())
          {
-         theClpModel->setInteger (theOptVar->index ());
+         myCbcModel_->solver ()->setInteger (theOptVar->index ());
          }
-      }
    }
 
 //------------------------------------------------------------------------------
@@ -102,9 +97,15 @@ void WitCoinMipIf::solveLp (bool)
 
 void WitCoinMipIf::solveMip (bool)
    {
+   enterCoin ();
+
    myCbcModel_->branchAndBound ();
 
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion in MIP mode (3)");
+   leaveCoin ();
+
+   checkMipSolnStatus ();
+
+   printMipSolveInfo ();
    }
 
 //------------------------------------------------------------------------------
@@ -145,12 +146,56 @@ WitCoinMipIf::WitCoinMipIf (WitOptSolveMgr * theOptSolveMgr):
 
 //------------------------------------------------------------------------------
 
+void WitCoinMipIf::checkMipSolnStatus ()
+   {
+   if (myCbcModel_->isProvenOptimal ())
+      myMsgFac () ("optSolnFoundMsg");
+
+   else if (myCbcModel_->isAbandoned ())
+      myMsgFac () ("optProbAbandonedSmsg");
+
+   else if (myCbcModel_->isProvenInfeasible ())
+      myMsgFac () ("infeasSmsg");
+
+   else if (myCbcModel_->isContinuousUnbounded ())
+      myMsgFac () ("unboundedSmsg");
+
+   else if (myCbcModel_->isNodeLimitReached ())
+      myMsgFac () ("nodeLimitSmsg");
+
+   else if (myCbcModel_->isSecondsLimitReached ())
+      myMsgFac () ("iterOrTimeLimitSmsg");
+
+   else if (myCbcModel_->isSolutionLimitReached ())
+      myMsgFac () ("solutionLimitSmsg");
+
+   else
+      myMsgFac () ("noOptReasonUnknownSmsg");
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinMipIf::printMipSolveInfo ()
+   {
+   int nItns;
+   int nNodes;
+
+   nItns  = myCbcModel_->getIterationCount ();
+   nNodes = myCbcModel_->getNodeCount ();
+
+   myMsgFac () ("CbcSolveInfoMsg", nItns, nNodes);
+   }
+
+//------------------------------------------------------------------------------
+
 ClpModel * WitCoinMipIf::myClpModel ()
    {
    OsiClpSolverInterface * theOsiClpSI;
 
    theOsiClpSI =
       dynamic_cast <OsiClpSolverInterface *> (myCbcModel_->solver ());
+
+   witAssert (theOsiClpSI != NULL);
 
    return theOsiClpSI->getModelPtr ();
    }

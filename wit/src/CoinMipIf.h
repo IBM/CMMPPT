@@ -79,6 +79,14 @@ class WitCoinMipIf: public WitCoinComIf
 
       noCopyCtorAssign (WitCoinMipIf);
 
+      void checkMipSolnStatus ();
+         //
+         // Checks the status of the MIP solution.
+
+      void printMipSolveInfo ();
+         //
+         // Prints some information about the MIP solve.
+
       virtual ClpModel * myClpModel ();
          //
          // Override from class CoinComIf.

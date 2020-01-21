@@ -92,7 +92,6 @@ void WitCoinLpIf::reSolveLp ()
    {
    int ifValuespass;
    int startFinishOptions;
-   int statusCode;
    int nIters;
 
    ifValuespass = 0;
@@ -113,12 +112,11 @@ void WitCoinLpIf::reSolveLp ()
 
    myClpSimplex_->dual (ifValuespass, startFinishOptions);
 
-   statusCode = myClpSimplex_->problemStatus    ();
-   nIters     = myClpSimplex_->numberIterations ();
+   nIters = myClpSimplex_->numberIterations ();
 
    leaveCoin ();
 
-   checkStatusCode (statusCode);
+   checkLpSolnStatus (myClpSimplex_);
 
    myMsgFac () ("nSimplexItersMsg", nIters);
    }
@@ -139,7 +137,6 @@ void WitCoinLpIf::solveLp (bool)
    int           startFinishOptions;
    ClpPresolve * theClpPresolve;
    ClpSimplex *  psClpSimplex;
-   int           statusCode;
    int           nIters;
 
    ifValuesPass       = myOptSolveMgr ()->useDualSimplex ()? 0: 1;
@@ -160,12 +157,11 @@ void WitCoinLpIf::solveLp (bool)
    else
       psClpSimplex->primal (ifValuesPass, startFinishOptions);
 
-   statusCode = psClpSimplex->problemStatus    ();
-   nIters     = psClpSimplex->numberIterations ();
+   nIters = psClpSimplex->numberIterations ();
 
    leaveCoin ();
 
-   checkStatusCode (statusCode);
+   checkLpSolnStatus (psClpSimplex);
 
    enterCoin ();
 
@@ -279,6 +275,43 @@ void WitCoinLpIf::reviseObjCoeffs ()
          setObjectiveCoefficient (
             theOptVar->index (),
             theOptVar->objCoeff ());
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinLpIf::checkLpSolnStatus (ClpSimplex * theClpSimplex)
+   {
+   int statusCode;
+
+   statusCode = theClpSimplex->problemStatus ();
+
+   switch (statusCode)
+      {
+      case 0:
+         {
+         myMsgFac () ("optSolnFoundMsg");
+
+         return;
+         }
+
+      case 1:
+         myMsgFac () ("infeasSmsg");
+
+      case 2:
+         myMsgFac () ("unboundedOrInfeasSmsg");
+
+      case 3:
+         myMsgFac () ("iterOrTimeLimitSmsg");
+
+      case 4:
+         myMsgFac () ("solverStoppedErrorsSmsg");
+
+      case 5:
+         myMsgFac () ("clpStoppedEventSmsg");
+
+      default:
+         myMsgFac () ("unexpClpStatusCodeSmsg", statusCode);
       }
    }
 

@@ -8024,4 +8024,52 @@ void WitMsgBuilder::buildMsgs ()
       "# simplex iterations: %1$d");
 
    //---------------------------------------------------------------------------
+
+   makeMsg (
+      "unboundedSmsg",
+      1070,
+      severe_,
+      "The solver has determined that the optimization problem has no optimal "
+      "solution, because its objective function goes to positive infinity.");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "nodeLimitSmsg",
+      1071,
+      severe_,
+      "The solver terminated early due to reaching its branch-and-bound node "
+      "limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "solutionLimitSmsg",
+      1072,
+      severe_,
+      "The solver terminated early due to reaching its branch-and-bound"
+      "solution limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "CbcSolveInfoMsg",
+      1073,
+      info_,
+      "# simplex iterations:      %1$d\n"
+      "# nodes:                   %2$d");
+
+   currentMsg_->testable              (false);
+   currentMsg_->preceedingLineFeeds   (1);
+
+   //---------------------------------------------------------------------------
    }

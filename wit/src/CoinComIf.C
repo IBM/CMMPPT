@@ -176,39 +176,6 @@ void WitCoinComIf::shutDownMessageHandler ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinComIf::checkStatusCode (int statusCode)
-   {
-   switch (statusCode)
-      {
-      case 0:
-         {
-         myMsgFac () ("optSolnFoundMsg");
-
-         return;
-         }
-
-      case 1:
-         myMsgFac () ("infeasSmsg");
-
-      case 2:
-         myMsgFac () ("unboundedOrInfeasSmsg");
-
-      case 3:
-         myMsgFac () ("iterOrTimeLimitSmsg");
-
-      case 4:
-         myMsgFac () ("solverStoppedErrorsSmsg");
-
-      case 5:
-         myMsgFac () ("clpStoppedEventSmsg");
-
-      default:
-         myMsgFac () ("unexpClpStatusCodeSmsg", statusCode);
-      }
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinComIf::enterCoin ()
    {
    WitTimer::enterSection ("coin");

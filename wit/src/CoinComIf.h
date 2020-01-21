@@ -81,10 +81,6 @@ class WitCoinComIf: public WitSolverIf
          //
          // Shuts down the COIN Message Handler.
 
-      void checkStatusCode (int statusCode);
-         //
-         // Checks the status of the LP solution, given by statusCode.
-
       virtual ClpModel * myClpModel () = 0;
          //
          // Returns the ClpModel for this CoinComIf.
