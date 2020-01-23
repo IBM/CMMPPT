@@ -28,7 +28,6 @@
 
 #ifdef COIN_EMBEDDED
 
-#include <ClpSimplex.hpp>
 #include <OsiClpSolverInterface.hpp>
 #include <CbcModel.hpp>
 
@@ -137,8 +136,7 @@ WitCoinMipIf::WitCoinMipIf (WitOptSolveMgr * theOptSolveMgr):
 
    delete theOsiClpSI;
 
-   myCbcModel_->           passInMessageHandler (myMsgHandler ());
-   myCbcModel_->solver ()->passInMessageHandler (myMsgHandler ());
+   myCbcModel_->passInMessageHandler (myMsgHandler ());
 
    leaveCoin ();
    }
@@ -187,16 +185,9 @@ void WitCoinMipIf::printMipSolveInfo ()
 
 //------------------------------------------------------------------------------
 
-ClpModel * WitCoinMipIf::myClpModel ()
+OsiSolverInterface * WitCoinMipIf::myOsiSI ()
    {
-   OsiClpSolverInterface * theOsiClpSI;
-
-   theOsiClpSI =
-      dynamic_cast <OsiClpSolverInterface *> (myCbcModel_->solver ());
-
-   witAssert (theOsiClpSI != NULL);
-
-   return theOsiClpSI->getModelPtr ();
+   return myCbcModel_->solver ();
    }
 
 #endif // COIN_EMBEDDED

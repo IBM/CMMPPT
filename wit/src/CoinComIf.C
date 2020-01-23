@@ -29,7 +29,7 @@
 
 #ifdef COIN_EMBEDDED
 
-#include <ClpSimplex.hpp>
+#include <OsiSolverInterface.hpp>
 
 //------------------------------------------------------------------------------
 
@@ -78,9 +78,9 @@ void WitCoinComIf::loadLp ()
 
    enterCoin ();
 
-   myClpModel ()->setOptimizationDirection (-1.0);
+   myOsiSI ()->setObjSense (-1.0);
 
-   myClpModel ()->
+   myOsiSI ()->
       loadProblem (
          myOptProblem ()->nOptVars (),
          myOptProblem ()->nOptCons (),
@@ -100,31 +100,26 @@ void WitCoinComIf::loadLp ()
 
 void WitCoinComIf::solverWriteMps ()
    {
-   int errCode;
-
    try
       {
       enterCoin ();
 
-      errCode = myClpModel ()->writeMps ("opt-prob.mps", 0, 1, -1.0);
+      myOsiSI ()->writeMps ("opt-prob", "mps", -1.0);
 
       leaveCoin ();
       }
 
    catch (...)
       {
-      myMsgFac () ("clpWriteMpsExcSmsg", "opt-prob.mps");
+      myMsgFac () ("osiWriteMpsExcSmsg", "opt-prob.mps");
       }
-
-   if (errCode != 0)
-      myMsgFac () ("clpWriteMpsErrSmsg", errCode);
    }
 
 //------------------------------------------------------------------------------
 
 void WitCoinComIf::getPrimalSoln (WitVector <double> & primalSoln)
    {
-   primalSoln = myClpModel ()->getColSolution ();
+   primalSoln = myOsiSI ()->getColSolution ();
    }
 
 //------------------------------------------------------------------------------

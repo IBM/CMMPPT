@@ -79,7 +79,7 @@ class WitCoinLpIf: public WitCoinComIf
 
       noCopyCtorAssign (WitCoinLpIf);
 
-      virtual ClpModel * myClpModel ();
+      virtual OsiSolverInterface * myOsiSI ();
          //
          // Override from class CoinComIf.
 
@@ -109,6 +109,11 @@ class WitCoinLpIf: public WitCoinComIf
       ClpSimplex * myClpSimplex_;
          //
          // The ClpSimplex owned by this CoinLpIf.
+
+      OsiSolverInterface * myOsiSI_;
+         //
+         // The OsiSolverInterface owned by this CoinLpIf.
+         // myOsiSI_ represents myClpSimplex_.
    };
 
 #endif

@@ -87,7 +87,7 @@ class WitCoinMipIf: public WitCoinComIf
          //
          // Prints some information about the MIP solve.
 
-      virtual ClpModel * myClpModel ();
+      virtual OsiSolverInterface * myOsiSI ();
          //
          // Override from class CoinComIf.
 

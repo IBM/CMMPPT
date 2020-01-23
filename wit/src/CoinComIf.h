@@ -15,7 +15,7 @@
 
 #include <SolverIf.h>
 
-class ClpModel;
+class OsiSolverInterface;
 class CoinMessageHandler;
 
 //------------------------------------------------------------------------------
@@ -74,9 +74,9 @@ class WitCoinComIf: public WitSolverIf
       // Other protected constructor functions.
       //------------------------------------------------------------------------
 
-      virtual ClpModel * myClpModel () = 0;
+      virtual OsiSolverInterface * myOsiSI () = 0;
          //
-         // Returns the ClpModel for this CoinComIf.
+         // Returns the OsiSolverInterface for this CoinComIf.
 
       accessFunc (CoinMessageHandler *, myMsgHandler)
 

@@ -31,6 +31,7 @@
 
 #ifdef COIN_EMBEDDED
 
+#include <OsiClpSolverInterface.hpp>
 #include <ClpSimplex.hpp>
 #include <ClpPresolve.hpp>
 
@@ -47,6 +48,7 @@ WitCoinLpIf::~WitCoinLpIf ()
    {
    enterCoin ();
 
+   delete myOsiSI_;
    delete myClpSimplex_;
 
    leaveCoin ();
@@ -207,11 +209,16 @@ const char * WitCoinLpIf::solverName ()
 WitCoinLpIf::WitCoinLpIf (WitOptSolveMgr * theOptSolveMgr):
 
       WitCoinComIf  (theOptSolveMgr),
-      myClpSimplex_ (NULL)
+      myClpSimplex_ (NULL),
+      myOsiSI_      (NULL)
    {
+   OsiClpSolverInterface * theOsiClpSI;
+
    enterCoin ();
 
    myClpSimplex_ = new ClpSimplex;
+
+   myOsiSI_      = new OsiClpSolverInterface (myClpSimplex_);
 
    myClpSimplex_->passInMessageHandler (myMsgHandler ());
 
@@ -220,9 +227,9 @@ WitCoinLpIf::WitCoinLpIf (WitOptSolveMgr * theOptSolveMgr):
 
 //------------------------------------------------------------------------------
 
-ClpModel * WitCoinLpIf::myClpModel ()
+OsiSolverInterface * WitCoinLpIf::myOsiSI ()
    {
-   return myClpSimplex_;
+   return myOsiSI_;
    }
 
 //------------------------------------------------------------------------------
