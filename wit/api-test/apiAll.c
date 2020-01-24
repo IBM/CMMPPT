@@ -1671,7 +1671,7 @@ int main ()
    if (cplexEmbedded)
       witOptImplode (theWitRun);
          /**/
-         /* Not ready for COIN yet: accAfterOptImp */
+         /* This test is somewhat CPLEX-specific */
 
    witHeurImplode (theWitRun);
 
@@ -2410,18 +2410,20 @@ int main ()
 
    testWriteReadData (theObj1Run, "obj1-test.data");
 
+   witSetPreferCoin (theObj1Run, WitTRUE);
+
    /* Do objective 1 implosion */
    {
-   if (cplexEmbedded)
+   if (coinEmbedded || cplexEmbedded)
       {
       witOptImplode (theObj1Run);
-         /**/
-         /* Not ready for COIN yet: MIP mode */
 
       remove ("solver.log");
       }
    else
       witHeurImplode (theObj1Run);
+
+   witSetPreferCoin (theObj1Run, WitFALSE);
 
    witWriteExecSched( theObj1Run, WitSTDOUT, WitBSV );
    witWriteShipSched( theObj1Run, WitSTDOUT, WitBSV );
