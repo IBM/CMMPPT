@@ -466,6 +466,11 @@ void WitParamMgr::buildDevParams ()
       "Set all operations as PIP enabled?",
       false);
 
+   buildBoolParam (
+      "preferCoin",
+      "Use COIN solvers, if there is a choice?",
+      myOptComp ()->preferCoin ());
+
       // Build tempPars.
       //
    for (theIdx = 1; theIdx <= myGlobalComp ()->nTempPars (); theIdx ++)
@@ -679,6 +684,7 @@ void WitParamMgr::applyDevParams ()
    myOptComp    ()->setPrintOptSoln    (boolParamVal ("printOptSoln"));
    myOptComp    ()->setPrintMps        (boolParamVal ("printMps"));
    myOptComp    ()->setSkipScreening   (boolParamVal ("skipScreening"));
+   myOptComp    ()->setPreferCoin      (boolParamVal ("preferCoin"));
 
    myGlobalComp ()->setPrintIncAlloc   (boolParamVal ("prtIncAlloc"));
    myGlobalComp ()->setPrintEqAlloc    (boolParamVal ("printEqAlloc"));
