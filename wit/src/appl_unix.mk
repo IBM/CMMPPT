@@ -61,11 +61,11 @@ ifneq ($(WIT_COIN_HOME),)
    coin_lib_flags  =         \
       -L$(WIT_COIN_HOME)/lib \
       -lClp                  \
-      -lCoinUtils            \
       -lCbc                  \
       -lOsiClp               \
       -lOsi                  \
       -lCgl                  \
+      -lCoinUtils            \
 
    coin_link_flags = $(WIT_COIN_LINK_FLAGS)
 
