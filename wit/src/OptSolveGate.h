@@ -25,7 +25,9 @@
 //    OptSolveGate
 //    OptSolveMgr
 //    SolverIf
-//    CoinIf
+//    CoinComIf
+//    CoinLpIf
+//    CoinMipIf
 //    CplexIf
 //
 // Implemented in OptSolve.C.

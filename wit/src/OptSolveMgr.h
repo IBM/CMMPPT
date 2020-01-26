@@ -106,6 +106,15 @@ class WitOptSolveMgr: public WitProbAssoc
          // Loads, solves and retrieves the solution to the optimization problem
          // as an LP for a re-solve.
 
+      void solveOptProbAsMip ();
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as a MIP.
+
+      bool optProbHasIntVars ();
+         //
+         // Return true, iff the opt problem has at least one integer variable.
+
       void storeDualSoln ();
          //
          // Stores the dual solution in myOptProblem_.

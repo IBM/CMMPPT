@@ -63,23 +63,6 @@ WitCplexIf::~WitCplexIf ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::solveOptProbAsMip ()
-   {
-   myOptSolveMgr ()->issueSolveMsg ();
-
-   loadLp ();
-
-   loadIntData ();
-
-   myOptSolveMgr ()->writeMps ();
-
-   solveMip (false);
-
-   myOptSolveMgr ()->storePrimalSoln ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::solveOptProbAsLexOpt ()
    {
    myOptSolveMgr ()->issueSolveMsg ();
@@ -160,6 +143,52 @@ void WitCplexIf::loadLp ()
 
 //------------------------------------------------------------------------------
 
+void WitCplexIf::loadIntData ()
+   {
+   int              nIntVars;
+   WitVector <int>  theIndices;
+   WitVector <char> theTypeChars;
+   int              theIdx;
+   WitOptVar *      theOptVar;
+
+   nIntVars = 0;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      if (theOptVar->isAnIntVar ())
+         {
+         nIntVars ++;
+         }
+
+   theIndices  .resize (nIntVars);
+   theTypeChars.resize (nIntVars, 'I');
+
+   theIdx = -1;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      if (theOptVar->isAnIntVar ())
+         {
+         theIdx ++;
+
+         theIndices[theIdx] = theOptVar->index ();
+         }
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXchgctype (
+         myCpxEnv_,
+         myCpxLp_,
+         nIntVars,
+         theIndices  .myCVec (),
+         theTypeChars.myCVec ());
+
+   checkErrCode ("CPXchgctype");
+
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCplexIf::reviseLp ()
    {
    reviseColData ();
@@ -231,6 +260,28 @@ void WitCplexIf::solveLp (bool optNeeded)
    checkLpSolnStatus (optNeeded);
 
    printLpSolveInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::solveMip (bool optNeeded)
+   {
+   setSpecCpxPars ();
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXmipopt (myCpxEnv_, myCpxLp_);
+
+   checkErrCode ("CPXmipopt");
+
+   leaveCplex ();
+
+   checkMipSolnStatus (optNeeded);
+
+   storeObjBoundInfo ();
+
+   printMipSolveInfo ();
    }
 
 //------------------------------------------------------------------------------
@@ -559,66 +610,6 @@ void WitCplexIf::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::loadIntData ()
-   {
-   int              nIntVars;
-   WitVector <int>  theIndices;
-   WitVector <char> theTypeChars;
-   int              theIdx;
-   WitOptVar *      theOptVar;
-
-   nIntVars = countIntVars ();
-
-   theIndices  .resize (nIntVars);
-   theTypeChars.resize (nIntVars, 'I');
-
-   theIdx = -1;
-
-   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
-      {
-      if (theOptVar->isAnIntVar ())
-         {
-         theIdx ++;
-
-         theIndices[theIdx] = theOptVar->index ();
-         }
-      }
-
-   enterCplex ();
-
-   myErrCode_ =
-      CPXchgctype (
-         myCpxEnv_,
-         myCpxLp_,
-         nIntVars,
-         theIndices  .myCVec (),
-         theTypeChars.myCVec ());
-
-   checkErrCode ("CPXchgctype");
-
-   leaveCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-int WitCplexIf::countIntVars ()
-   {
-   int         nIntVars;
-   WitOptVar * theOptVar;
-
-   nIntVars = 0;
-
-   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
-      {
-      if (theOptVar->isAnIntVar ())
-         nIntVars ++;
-      }
-
-   return nIntVars;
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::solveLexOpt ()
    {
    WitOptVar *              prevOptVar;
@@ -834,31 +825,6 @@ void WitCplexIf::repEarlyTermLpSolnStatus (bool optNeeded)
 
    else
       issueStatusMsg ("nonOptButFeasLpCpxStatWmsg");
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::solveMip (bool optNeeded)
-   {
-   if (countIntVars () == 0)
-      myMsgFac () ("mipModeNoIntVarsSmsg");
-
-   setSpecCpxPars ();
-
-   enterCplex ();
-
-   myErrCode_ =
-      CPXmipopt (myCpxEnv_, myCpxLp_);
-
-   checkErrCode ("CPXmipopt");
-
-   leaveCplex ();
-
-   checkMipSolnStatus (optNeeded);
-
-   storeObjBoundInfo ();
-
-   printMipSolveInfo ();
    }
 
 //------------------------------------------------------------------------------

@@ -27,13 +27,23 @@ mcl_client_objects =        \
    MsgBuilder.$(obj_suffix) \
 
 #-------------------------------------------------------------------------------
+# Object files that invoke COIN.
+# (Note that these are not listed in lib_objects.)
+#-------------------------------------------------------------------------------
+
+coin_client_objects =      \
+   CoinComIf.$(obj_suffix) \
+   CoinLpIf.$(obj_suffix)  \
+   CoinMipIf.$(obj_suffix) \
+
+#-------------------------------------------------------------------------------
 # Object files corresponding to C++ source files:
 #-------------------------------------------------------------------------------
 
 cxx_objects =              \
    $(lib_objects)          \
    $(mcl_client_objects)   \
-   CoinIf.$(obj_suffix)    \
+   $(coin_client_objects)  \
    CplexIf.$(obj_suffix)   \
    BuildDate.$(obj_suffix) \
    wit.$(obj_suffix)       \
@@ -96,13 +106,16 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(session_macro_flags)
 
 #-------------------------------------------------------------------------------
-# Special rule to compile CoinIf.C:
+# Special rule to compile the COIN client source files:
+#    CoinComIf.C
+#    CoinLpIf.C
+#    CoinMipIf.C:
 #
 # Only applies when WIT is to embed COIN.
 #
 # Macro:
 #    comp_coin_flags
-#       The special compilation flags for compiling CoinIf.C.
+#       The special compilation flags for compiling COIN client source files.
 #
 # Prereqisite macro:
 #    WIT_COIN_HOME:
@@ -117,7 +130,13 @@ ifneq ($(WIT_COIN_HOME),)
 
    comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
 
-   CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
+   CoinComIf.$(obj_suffix):	CoinComIf.$(cxx_suffix)
+			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
+
+   CoinLpIf.$(obj_suffix):	CoinLpIf.$(cxx_suffix)
+			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
+
+   CoinMipIf.$(obj_suffix):	CoinMipIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
 
 endif

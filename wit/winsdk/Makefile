@@ -60,7 +60,7 @@ BuildDate.obj:	$(lib_objects) $(mcl_client_objects) CplexIf.obj wit.obj
 #       this is the null string.
 #
 # Prereqisite macro:
-#    WIT_CPLEX_HOME
+#    WIT_COIN_HOME
 #       For the meaning of this macro, see the comment in appl.mk.
 #------------------------------------------------------------------------------
 
@@ -69,6 +69,10 @@ ifneq ($(WIT_COIN_HOME),)
    coin_libs =                              \
       $(WIT_COIN_HOME)/lib/libClp.lib       \
       $(WIT_COIN_HOME)/lib/libCoinUtils.lib \
+      $(WIT_COIN_HOME)/lib/libCbc.lib       \
+      $(WIT_COIN_HOME)/lib/libOsiClp.lib    \
+      $(WIT_COIN_HOME)/lib/libOsi.lib       \
+      $(WIT_COIN_HOME)/lib/libCgl.lib       \
 
 else
 
@@ -104,7 +108,11 @@ endif
 # Rule for building the WIT static library:
 #------------------------------------------------------------------------------
 
-special_wit_objects = $(mcl_client_objects) CoinIf.obj CplexIf.obj BuildDate.obj
+special_wit_objects =     \
+   $(mcl_client_objects)  \
+   $(coin_client_objects) \
+   CplexIf.obj            \
+   BuildDate.obj          \
 
 mcl_lib             = ../../mcl/winsdk/mcl.lib
 
@@ -279,18 +287,42 @@ BuildDate.obj: ../src/typedefs.h ../src/macs.h
 BuildDate.obj: ../../config/dummy_headers/stdio.h
 BuildDate.obj: ../../config/dummy_headers/string.h
 BuildDate.obj: ../../config/dummy_headers/math.h
-CoinIf.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h
-CoinIf.obj: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
-CoinIf.obj: ../../config/dummy_headers/stdio.h
-CoinIf.obj: ../../config/dummy_headers/string.h
-CoinIf.obj: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
-CoinIf.obj: ../src/TVec.h ../src/Vector.h ../src/OptSolveMgr.h
-CoinIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
-CoinIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-CoinIf.obj: ../src/Link.h ../src/PtrVec.h
-CoinIf.obj: ../../config/dummy_headers/algorithm ../src/OptCon.h
-CoinIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptVar.h ../src/MsgFac.h
-CoinIf.obj: ../src/MsgArg.h ../src/Timing.h
+CoinComIf.obj: ../src/CoinComIf.h ../src/SolverIf.h ../src/Assoc.h
+CoinComIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
+CoinComIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
+CoinComIf.obj: ../../config/dummy_headers/string.h
+CoinComIf.obj: ../../config/dummy_headers/math.h
+CoinComIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CoinComIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
+CoinComIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CoinComIf.obj: ../src/Link.h ../src/PtrVec.h
+CoinComIf.obj: ../../config/dummy_headers/algorithm ../src/MsgFac.h
+CoinComIf.obj: ../src/MsgArg.h ../src/Timing.h
+CoinLpIf.obj: ../src/CoinLpIf.h ../src/CoinComIf.h ../src/SolverIf.h
+CoinLpIf.obj: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
+CoinLpIf.obj: ../src/typedefs.h ../src/macs.h
+CoinLpIf.obj: ../../config/dummy_headers/stdio.h
+CoinLpIf.obj: ../../config/dummy_headers/string.h
+CoinLpIf.obj: ../../config/dummy_headers/math.h
+CoinLpIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CoinLpIf.obj: ../src/OptSolveMgr.h ../src/OptComp.h ../src/Component.h
+CoinLpIf.obj: ../src/Str.h ../src/OptProblem.h ../src/ObjStack.h
+CoinLpIf.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h
+CoinLpIf.obj: ../../config/dummy_headers/algorithm ../src/OptVar.h
+CoinLpIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptCon.h
+CoinLpIf.obj: ../src/MsgFac.h ../src/MsgArg.h
+CoinMipIf.obj: ../src/CoinMipIf.h ../src/CoinComIf.h ../src/SolverIf.h
+CoinMipIf.obj: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
+CoinMipIf.obj: ../src/typedefs.h ../src/macs.h
+CoinMipIf.obj: ../../config/dummy_headers/stdio.h
+CoinMipIf.obj: ../../config/dummy_headers/string.h
+CoinMipIf.obj: ../../config/dummy_headers/math.h
+CoinMipIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CoinMipIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CoinMipIf.obj: ../src/Link.h ../src/PtrVec.h
+CoinMipIf.obj: ../../config/dummy_headers/algorithm ../src/OptVar.h
+CoinMipIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/MsgFac.h
+CoinMipIf.obj: ../src/MsgArg.h
 CompMgr.obj: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
 CompMgr.obj: ../../config/dummy_headers/string.h
@@ -946,9 +978,9 @@ OptSolve.obj: ../../config/dummy_headers/string.h
 OptSolve.obj: ../../config/dummy_headers/math.h ../src/OptSolveMgr.h
 OptSolve.obj: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
 OptSolve.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
-OptSolve.obj: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
-OptSolve.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-OptSolve.obj: ../src/Link.h ../src/PtrVec.h
+OptSolve.obj: ../src/CoinLpIf.h ../src/CoinComIf.h ../src/SolverIf.h
+OptSolve.obj: ../src/CoinMipIf.h ../src/CplexIf.h ../src/OptProblem.h
+OptSolve.obj: ../src/ObjStack.h ../src/Stack.h ../src/Link.h ../src/PtrVec.h
 OptSolve.obj: ../../config/dummy_headers/algorithm ../src/OptVar.h
 OptSolve.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptCon.h
 OptSolve.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h

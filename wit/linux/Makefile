@@ -228,17 +228,42 @@ BuildDate.o: ../src/typedefs.h ../src/macs.h
 BuildDate.o: ../../config/dummy_headers/stdio.h
 BuildDate.o: ../../config/dummy_headers/string.h
 BuildDate.o: ../../config/dummy_headers/math.h
-CoinIf.o: ../src/CoinIf.h ../src/SolverIf.h ../src/Assoc.h ../src/Problem.h
-CoinIf.o: ../src/List.h ../src/Util.h ../src/typedefs.h ../src/macs.h
-CoinIf.o: ../../config/dummy_headers/stdio.h
-CoinIf.o: ../../config/dummy_headers/string.h
-CoinIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
-CoinIf.o: ../src/TVec.h ../src/Vector.h ../src/OptSolveMgr.h ../src/OptComp.h
-CoinIf.o: ../src/Component.h ../src/Str.h ../src/OptProblem.h
-CoinIf.o: ../src/ObjStack.h ../src/Stack.h ../src/Link.h ../src/PtrVec.h
-CoinIf.o: ../../config/dummy_headers/algorithm ../src/OptCon.h ../src/OptVC.h
-CoinIf.o: ../src/BoundPair.h ../src/OptVar.h ../src/MsgFac.h ../src/MsgArg.h
-CoinIf.o: ../src/Timing.h
+CoinComIf.o: ../src/CoinComIf.h ../src/SolverIf.h ../src/Assoc.h
+CoinComIf.o: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
+CoinComIf.o: ../src/macs.h ../../config/dummy_headers/stdio.h
+CoinComIf.o: ../../config/dummy_headers/string.h
+CoinComIf.o: ../../config/dummy_headers/math.h
+CoinComIf.o: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CoinComIf.o: ../src/OptComp.h ../src/Component.h ../src/Str.h
+CoinComIf.o: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CoinComIf.o: ../src/Link.h ../src/PtrVec.h
+CoinComIf.o: ../../config/dummy_headers/algorithm ../src/MsgFac.h
+CoinComIf.o: ../src/MsgArg.h ../src/Timing.h
+CoinLpIf.o: ../src/CoinLpIf.h ../src/CoinComIf.h ../src/SolverIf.h
+CoinLpIf.o: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
+CoinLpIf.o: ../src/typedefs.h ../src/macs.h
+CoinLpIf.o: ../../config/dummy_headers/stdio.h
+CoinLpIf.o: ../../config/dummy_headers/string.h
+CoinLpIf.o: ../../config/dummy_headers/math.h ../../config/dummy_headers/list
+CoinLpIf.o: ../src/TVec.h ../src/Vector.h ../src/OptSolveMgr.h
+CoinLpIf.o: ../src/OptComp.h ../src/Component.h ../src/Str.h
+CoinLpIf.o: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CoinLpIf.o: ../src/Link.h ../src/PtrVec.h
+CoinLpIf.o: ../../config/dummy_headers/algorithm ../src/OptVar.h
+CoinLpIf.o: ../src/OptVC.h ../src/BoundPair.h ../src/OptCon.h ../src/MsgFac.h
+CoinLpIf.o: ../src/MsgArg.h
+CoinMipIf.o: ../src/CoinMipIf.h ../src/CoinComIf.h ../src/SolverIf.h
+CoinMipIf.o: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
+CoinMipIf.o: ../src/typedefs.h ../src/macs.h
+CoinMipIf.o: ../../config/dummy_headers/stdio.h
+CoinMipIf.o: ../../config/dummy_headers/string.h
+CoinMipIf.o: ../../config/dummy_headers/math.h
+CoinMipIf.o: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
+CoinMipIf.o: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
+CoinMipIf.o: ../src/Link.h ../src/PtrVec.h
+CoinMipIf.o: ../../config/dummy_headers/algorithm ../src/OptVar.h
+CoinMipIf.o: ../src/OptVC.h ../src/BoundPair.h ../src/MsgFac.h
+CoinMipIf.o: ../src/MsgArg.h
 CompMgr.o: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.o: ../src/macs.h ../../config/dummy_headers/stdio.h
 CompMgr.o: ../../config/dummy_headers/string.h
@@ -862,9 +887,9 @@ OptSolve.o: ../../config/dummy_headers/string.h
 OptSolve.o: ../../config/dummy_headers/math.h ../src/OptSolveMgr.h
 OptSolve.o: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
 OptSolve.o: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
-OptSolve.o: ../src/CoinIf.h ../src/SolverIf.h ../src/CplexIf.h
-OptSolve.o: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-OptSolve.o: ../src/Link.h ../src/PtrVec.h
+OptSolve.o: ../src/CoinLpIf.h ../src/CoinComIf.h ../src/SolverIf.h
+OptSolve.o: ../src/CoinMipIf.h ../src/CplexIf.h ../src/OptProblem.h
+OptSolve.o: ../src/ObjStack.h ../src/Stack.h ../src/Link.h ../src/PtrVec.h
 OptSolve.o: ../../config/dummy_headers/algorithm ../src/OptVar.h
 OptSolve.o: ../src/OptVC.h ../src/BoundPair.h ../src/OptCon.h
 OptSolve.o: ../src/OptComp.h ../src/Component.h ../src/Str.h

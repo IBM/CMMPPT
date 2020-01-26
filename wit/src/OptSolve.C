@@ -15,7 +15,8 @@
 
 #include <OptSolveGate.h>
 #include <OptSolveMgr.h>
-#include <CoinIf.h>
+#include <CoinLpIf.h>
+#include <CoinMipIf.h>
 #include <CplexIf.h>
 #include <OptProblem.h>
 #include <OptVar.h>
@@ -31,7 +32,7 @@
 
 bool WitOptSolveGate::coinEmbedded ()
    {
-   return WitCoinIf::coinEmbedded ();
+   return WitCoinComIf::coinEmbedded ();
    }
 
 //------------------------------------------------------------------------------
@@ -79,7 +80,7 @@ void WitOptSolveMgr::solveOptProb ()
       }
    else if (myOptComp ()->mipMode ())
       {
-      mySolverIf_->solveOptProbAsMip ();
+      solveOptProbAsMip ();
       }
    else
       {
@@ -166,11 +167,11 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
    {
    bool useCoin;
 
-   if (WitCoinIf::coinEmbedded () and WitCplexIf::cplexEmbedded ())
+   if (WitCoinComIf::coinEmbedded () and WitCplexIf::cplexEmbedded ())
       {
       useCoin = myOptComp ()->preferCoin ();
       }
-   else if (WitCoinIf::coinEmbedded ())
+   else if (WitCoinComIf::coinEmbedded ())
       {
       useCoin = true;
       }
@@ -184,9 +185,14 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
       }
 
    if (useCoin)
-      mySolverIf_ = WitCoinIf ::newInstance (this);
+      {
+      if (myOptComp ()->mipMode ())
+         mySolverIf_ = WitCoinMipIf::newInstance (this);
+      else
+         mySolverIf_ =  WitCoinLpIf::newInstance (this);
+      }
    else
-      mySolverIf_ = WitCplexIf::newInstance (this);
+      mySolverIf_    =   WitCplexIf::newInstance (this);
    }
 
 //------------------------------------------------------------------------------
@@ -234,6 +240,43 @@ void WitOptSolveMgr::reSolveOptProbAsLp ()
 
    if (myOptProblem ()->needDual ())
       storeDualSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveOptProbAsMip ()
+   {
+   issueSolveMsg ();
+
+   if (not optProbHasIntVars ())
+      myMsgFac () ("mipModeNoIntVarsSmsg");
+
+   mySolverIf_->loadLp ();
+
+   mySolverIf_->loadIntData ();
+
+   writeMps ();
+
+   mySolverIf_->solveMip (false);
+
+   storePrimalSoln ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitOptSolveMgr::optProbHasIntVars ()
+   {
+   WitOptVar * theOptVar;
+
+   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+      {
+      if (theOptVar->isAnIntVar ())
+         {
+         return true;
+         }
+      }
+
+   return false;
    }
 
 //------------------------------------------------------------------------------
