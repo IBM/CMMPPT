@@ -1,0 +1,77 @@
+#!/bin/sh
+
+#--------------------------------------------------------------------
+# Sh Script wit-coin-only-test.
+#
+# Tests WIT with COIN embedded and CPLEX not embedded.
+#
+# This script is implemented for the winsdk and linux platforms only.
+#--------------------------------------------------------------------
+
+if [ "$PLATFORM" != "winsdk" -a "$PLATFORM" != "linux" ]
+then
+
+   echo
+   echo "ERROR: Script wit-coin-only-test was invoked with PLATFORM = $PLATFORM."
+   echo "       This script is implemented for the winsdk and linux" \
+               "platforms only."
+   echo
+   echo "Script aborted."
+   echo
+
+   exit
+
+fi
+
+echo
+echo "Running the WIT COIN-Only test."
+echo
+
+cd $WIT_HOME/wit/api-test
+
+rm coin-only-out-new.txt 2> /dev/null
+
+echo "Building apiAll."
+
+cl-wit-ap-c apiAll 2>&1 | cat >> coin-only-out-new.txt
+
+echo "Running  apiAll."
+
+export  API_ALL_COIN_REQ="Embedded"
+export API_ALL_CPLEX_REQ="Not Embedded"
+
+./apiAll           2>&1 | cat >> coin-only-out-new.txt
+
+echo
+echo "Comparing coin-only-out-new.txt with coin-only-out-$PLATFORM.txt."
+echo
+
+diff                             \
+  -I "^Build Date:"              \
+  -I "^Run Started At:"          \
+  -I "^         Build Date:"     \
+  -I "^         Run Started At:" \
+                                 \
+   coin-only-out-$PLATFORM.txt   \
+   coin-only-out-new.txt         \
+ > coin-only-out-diff.txt        \
+
+
+if [ -s coin-only-out-diff.txt ]
+then
+
+   echo "Significant differences were found. See:"
+   echo
+   echo "   $WIT_HOME/wit/api-test/coin-only-out-diff.txt"
+   echo
+   echo "The WIT COIN-Only test was unsuccessful."
+   echo
+
+else
+
+   echo "No significant differences were found."
+   echo
+   echo "The WIT COIN-Only test was successful."
+   echo
+
+fi
