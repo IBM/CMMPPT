@@ -1,0 +1,80 @@
+#!/bin/sh
+
+#--------------------------------------------------------------------
+# Sh Script wit-no-solver-test.
+#
+# Tests WIT without an embedded solver (COIN or CPLEX).
+#
+# This script is implemented for the winsdk and linux platforms only.
+#--------------------------------------------------------------------
+
+if [ "$PLATFORM" != "winsdk" -a "$PLATFORM" != "linux" ]
+then
+
+   echo
+   echo "ERROR: Script wit-no-solver-test was invoked with PLATFORM = $PLATFORM."
+   echo "       This script is implemented for the winsdk and linux" \
+               "platforms only."
+   echo
+   echo "Script aborted."
+   echo
+
+   exit
+
+fi
+
+echo
+echo "Running the WIT No-Solver test."
+echo
+
+cd $WIT_HOME/wit/api-test
+
+rm no-solver-out-new.txt 2> /dev/null
+
+echo "Building apiAll."
+
+cl-wit-ap-c apiAll 2>&1 | cat >> no-solver-out-new.txt
+
+echo "Running  apiAll."
+
+export  API_ALL_COIN_REQ="Not Embedded"
+export API_ALL_CPLEX_REQ="Not Embedded"
+   #
+   # These variable settings tell apiAll to require a build of WIT with
+   # COIN not embedded and CPLEX not embedded.
+
+./apiAll           2>&1 | cat >> no-solver-out-new.txt
+
+echo
+echo "Comparing no-solver-out-new.txt with no-solver-out-$PLATFORM.txt."
+echo
+
+diff                             \
+  -I "^Build Date:"              \
+  -I "^Run Started At:"          \
+  -I "^         Build Date:"     \
+  -I "^         Run Started At:" \
+                                 \
+   no-solver-out-$PLATFORM.txt   \
+   no-solver-out-new.txt         \
+ > no-solver-out-diff.txt        \
+
+
+if [ -s no-solver-out-diff.txt ]
+then
+
+   echo "Significant differences were found. See:"
+   echo
+   echo "   $WIT_HOME/wit/api-test/no-solver-out-diff.txt"
+   echo
+   echo "The WIT No-Solver test was unsuccessful."
+   echo
+
+else
+
+   echo "No significant differences were found."
+   echo
+   echo "The WIT No-Solver test was successful."
+   echo
+
+fi

@@ -1,0 +1,80 @@
+#!/bin/sh
+
+#--------------------------------------------------------------------
+# Sh Script wit-cplex-only-test.
+#
+# Tests WIT with CPLEX embedded and COIN not embedded.
+#
+# This script is implemented for the winsdk and linux platforms only.
+#--------------------------------------------------------------------
+
+if [ "$PLATFORM" != "winsdk" -a "$PLATFORM" != "linux" ]
+then
+
+   echo
+   echo "ERROR: Script wit-cplex-only-test was invoked with PLATFORM = $PLATFORM."
+   echo "       This script is implemented for the winsdk and linux" \
+               "platforms only."
+   echo
+   echo "Script aborted."
+   echo
+
+   exit
+
+fi
+
+echo
+echo "Running the WIT CPLEX-Only test."
+echo
+
+cd $WIT_HOME/wit/api-test
+
+rm cplex-only-out-new.txt 2> /dev/null
+
+echo "Building apiAll."
+
+cl-wit-ap-c apiAll 2>&1 | cat >> cplex-only-out-new.txt
+
+echo "Running  apiAll."
+
+export  API_ALL_COIN_REQ="Not Embedded"
+export API_ALL_CPLEX_REQ="Embedded"
+   #
+   # These variable settings tell apiAll to require a build of WIT with
+   # COIN not embedded and CPLEX embedded.
+
+./apiAll           2>&1 | cat >> cplex-only-out-new.txt
+
+echo
+echo "Comparing cplex-only-out-new.txt with cplex-only-out-$PLATFORM.txt."
+echo
+
+diff                             \
+  -I "^Build Date:"              \
+  -I "^Run Started At:"          \
+  -I "^         Build Date:"     \
+  -I "^         Run Started At:" \
+                                 \
+   cplex-only-out-$PLATFORM.txt  \
+   cplex-only-out-new.txt        \
+ > cplex-only-out-diff.txt       \
+
+
+if [ -s cplex-only-out-diff.txt ]
+then
+
+   echo "Significant differences were found. See:"
+   echo
+   echo "   $WIT_HOME/wit/api-test/cplex-only-out-diff.txt"
+   echo
+   echo "The WIT CPLEX-Only test was unsuccessful."
+   echo
+
+else
+
+   echo "No significant differences were found."
+   echo
+   echo "The WIT CPLEX-Only test was successful."
+   echo
+
+fi

@@ -22,6 +22,9 @@
 
 void testStandAlone ();
 
+void setUpCoinEmbedded  (WitRun *);
+void setUpCplexEmbedded (WitRun *);
+
 void testCplexParSpecs      (WitRun *);
 void testClearCplexParSpecs (WitRun *);
 void testCplexParSpecAtts   (WitRun *);
@@ -212,27 +215,8 @@ int main ()
 
    witSetWit34Compatible( theWitRun, WitTRUE );
 
-   witGetCoinEmbedded (theWitRun, & coinEmbedded);
-
-   if (coinEmbedded)
-      printf (
-         "\n"
-         "This is a COIN-embedded build of WIT.\n");
-   else
-      printf (
-         "\n"
-         "This is a COIN-non-embedded build of WIT.\n");
-
-   witGetCplexEmbedded (theWitRun, & cplexEmbedded);
-
-   if (cplexEmbedded)
-      printf (
-         "\n"
-         "This is a CPLEX-embedded build of WIT.\n");
-   else
-      printf (
-         "\n"
-         "This is a CPLEX-non-embedded build of WIT.\n");
+   setUpCoinEmbedded  (theWitRun);
+   setUpCplexEmbedded (theWitRun);
 
    testCplexParSpecs (theWitRun);
 
@@ -2563,6 +2547,72 @@ void testStandAlone ()
    witNewRun       (& theWitRun);
    witExecStandAlone (theWitRun, "diner.params");
    witDeleteRun      (theWitRun);
+   }
+
+/*----------------------------------------------------------------------------*/
+/* setUpCoinEmbedded (WitRun * theWitRun)                                     */
+/*                                                                            */
+/* Sets coinEmbedded.                                                         */
+/* Verifies that it has the required value indicated by the environment       */
+/* variable API_ALL_COIN_REQ, if any.                                         */
+/*----------------------------------------------------------------------------*/
+
+void setUpCoinEmbedded (WitRun * theWitRun)
+   {
+   const char * coinReq;
+
+   witGetCoinEmbedded (theWitRun, & coinEmbedded);
+
+   printf ( "\n");
+
+   if (coinEmbedded)
+      printf ("This is a COIN-embedded build of WIT.\n");
+   else
+      printf ("This is a COIN-non-embedded build of WIT.\n");
+
+   coinReq = getenv ("API_ALL_COIN_REQ");
+
+   if (coinReq != NULL)
+      {
+      if (equalStrings (coinReq, "Embedded"))
+         assert (coinEmbedded);
+
+      if (equalStrings (coinReq, "Not Embedded"))
+         assert (! coinEmbedded);
+      }
+   }
+
+/*----------------------------------------------------------------------------*/
+/* setUpCplexEmbedded (WitRun * theWitRun)                                    */
+/*                                                                            */
+/* Sets cplexEmbedded.                                                        */
+/* Verifies that it has the required value indicated by the environment       */
+/* variable API_ALL_CPLEX_REQ, if any.                                        */
+/*----------------------------------------------------------------------------*/
+
+void setUpCplexEmbedded (WitRun * theWitRun)
+   {
+   const char * cplexReq;
+
+   witGetCplexEmbedded (theWitRun, & cplexEmbedded);
+
+   printf ( "\n");
+
+   if (cplexEmbedded)
+      printf ("This is a CPLEX-embedded build of WIT.\n");
+   else
+      printf ("This is a CPLEX-non-embedded build of WIT.\n");
+
+   cplexReq = getenv ("API_ALL_CPLEX_REQ");
+
+   if (cplexReq != NULL)
+      {
+      if (equalStrings (cplexReq, "Embedded"))
+         assert (cplexEmbedded);
+
+      if (equalStrings (cplexReq, "Not Embedded"))
+         assert (! cplexEmbedded);
+      }
    }
 
 /*----------------------------------------------------------------------------*/
