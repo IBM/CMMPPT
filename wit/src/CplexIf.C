@@ -23,8 +23,6 @@
 #include <OptProblem.h>
 #include <CpxParSpecMgr.h>
 #include <CpxParSpec.h>
-#include <MultiObjMgr.h>
-#include <SaeMgr.h>
 #include <OptVar.h>
 #include <OptCon.h>
 #include <OptStarter.h>
@@ -59,26 +57,6 @@ WitCplexIf * WitCplexIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
 WitCplexIf::~WitCplexIf ()
    {
    shutDownCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::solveOptProbAsLexOpt ()
-   {
-   myOptSolveMgr ()->issueSolveMsg ();
-
-   myMsgFac () ("lexOptMsg");
-
-   loadLp ();
-
-   if (myOptComp ()->mipMode ())
-      loadIntData ();
-
-   myOptSolveMgr ()->writeMps ();
-
-   solveLexOpt ();
-
-   myOptSolveMgr ()->storePrimalSoln ();
    }
 
 //------------------------------------------------------------------------------
@@ -282,6 +260,81 @@ void WitCplexIf::solveMip (bool optNeeded)
    storeObjBoundInfo ();
 
    printMipSolveInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setVarLB (int theColIdx, double theLB)
+   {
+   int    indices[1];
+   char   lu     [1];
+   double bd     [1];
+
+   indices[0] = theColIdx;
+   lu     [0] = 'L';
+   bd     [0] = theLB;
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXchgbds (
+         myCpxEnv_,
+         myCpxLp_,
+         1,
+         indices,
+         lu,
+         bd);
+
+   checkErrCode ("CPXchgbds");
+
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::setObjCoeff (int theColIdx, double theVal)
+   {
+   int    indices[1];
+   double values [1];
+
+   indices[0] = theColIdx;
+   values [0] = theVal;
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXchgobj (
+         myCpxEnv_,
+         myCpxLp_,
+         1,
+         indices,
+         values);
+
+   checkErrCode ("CPXchgobj");
+
+   leaveCplex ();
+   }
+
+//------------------------------------------------------------------------------
+
+double WitCplexIf::primalVarVal (int theColIdx)
+   {
+   double primalSoln[1];
+
+   enterCplex ();
+
+   myErrCode_ =
+      CPXgetx (
+         myCpxEnv_,
+         myCpxLp_,
+         primalSoln,
+         theColIdx, theColIdx);
+
+   checkErrCode ("CPXgetx");
+
+   leaveCplex ();
+
+   return primalSoln[0];
    }
 
 //------------------------------------------------------------------------------
@@ -606,145 +659,6 @@ void WitCplexIf::getConData (double & rhs, char & sense, WitOptCon * theOptCon)
       {
       stronglyAssert (false);
       }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::solveLexOpt ()
-   {
-   WitOptVar *              prevOptVar;
-   WitPtrVecItr <WitOptVar> theOptVarItr;
-   WitOptVar *              theOptVar;
-
-   if (devMode ())
-      WitTimer::getTimeAndChargeToCurrent ();
-
-   if (not myOptComp ()->mipMode ())
-      myOptSolveMgr ()->loadInitSoln ();
-
-   prevOptVar = NULL;
-
-   myOptProblem ()->myLexOptVarSeq ().attachItr (theOptVarItr);
-
-   while (theOptVarItr.advance (theOptVar))
-      {
-      myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
-
-      if (prevOptVar != NULL)
-         {
-         lockLexObjElemVal (prevOptVar);
-
-         setObjCoef (prevOptVar, 0.0);
-         }
-
-      setObjCoef (theOptVar, 1.0);
-
-      if (myOptComp ()->mipMode ())
-         {
-         solveMip (true);
-         }
-      else
-         {
-         if (prevOptVar != NULL)
-            {
-            myOptSolveMgr ()->setUseDualSimplex (false);
-            }
-         else
-            {
-            myOptSolveMgr ()->
-               setUseDualSimplex (
-                  myOptComp ()->crashOptStarter ()->isChosen ());
-            }
-
-         solveLp (true);
-         }
-
-      if (devMode ())
-         if (WitSaeMgr::standAloneMode ())
-            myMsgFac () ("lexObjElemCpuTimeMsg",
-               WitTimer::getTimeAndChargeToCurrent ());
-
-      prevOptVar = theOptVar;
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::setObjCoef (WitOptVar * theOptVar, double theVal)
-   {
-   int    indices[1];
-   double values [1];
-
-   indices[0]  = theOptVar->index ();
-   values [0]  = theVal;
-
-   enterCplex ();
-
-   myErrCode_ =
-      CPXchgobj (
-         myCpxEnv_,
-         myCpxLp_,
-         1,
-         indices,
-         values);
-
-   checkErrCode ("CPXchgobj");
-
-   leaveCplex ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::lockLexObjElemVal (WitOptVar * theOptVar)
-   {
-   int    theColIdx;
-   double primalSoln[1];
-   double optObjVal;
-   double moTol;
-   double theTol;
-   int    indices[1];
-   char   lu     [1];
-   double bd     [1];
-
-   theColIdx     = theOptVar->index ();
-
-   enterCplex ();
-
-   myErrCode_ =
-      CPXgetx (
-         myCpxEnv_,
-         myCpxLp_,
-         primalSoln,
-         theColIdx, theColIdx);
-
-   checkErrCode ("CPXgetx");
-
-   leaveCplex ();
-
-   optObjVal     = primalSoln[0];
-
-   moTol         = myOptComp ()->myMultiObjMgr ()->multiObjTol ();
-
-   theTol        = WitNonClass::max (moTol * fabs (optObjVal), moTol);
-
-   indices[0]    = theColIdx;
-   lu     [0]    = 'L';
-   bd     [0]    = optObjVal - theTol;
-
-   enterCplex ();
-
-   myErrCode_ =
-      CPXchgbds (
-         myCpxEnv_,
-         myCpxLp_,
-         1,
-         indices,
-         lu,
-         bd);
-
-   checkErrCode ("CPXchgbds");
-
-   leaveCplex ();
    }
 
 //------------------------------------------------------------------------------

@@ -18,8 +18,9 @@
 //------------------------------------------------------------------------------
 // Class SolverIf.
 // "Solver Interface"
-// Responsible for all interactions with the embedded solver of the optimization
-// problem. The interactions are implemented im the derived classes.
+// Abstract base class
+// The classes derived from this class are responsible for all interactions
+// with the embedded solver of the optimization problem.
 //
 // Class Hierarchy:
 //
@@ -46,11 +47,6 @@ class WitSolverIf: public WitProbAssoc
       //------------------------------------------------------------------------
       // Pure virtual public member functions.
       //------------------------------------------------------------------------
-
-      virtual void solveOptProbAsLexOpt () = 0;
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a lexicographic optimization.
 
       virtual void issueVersionMsg () = 0;
          //
@@ -92,6 +88,20 @@ class WitSolverIf: public WitProbAssoc
          // Makes appropriate calls to the solver to solve the optimization
          // problem as a MIP.
          // optNeeded is to be true, iff an optimal solution is required.
+
+      virtual void setVarLB (int theColIdx, double theLB) = 0;
+         //
+         // Sets the lower bound on the variable whose index is theColIdx to
+         // theLB.
+
+      virtual void setObjCoeff (int theColIdx, double theVal) = 0;
+         //
+         // Sets the objective coefficient on the variable whose index is
+         // theColIdx to theVal.
+
+      virtual double primalVarVal (int theColIdx) = 0;
+         //
+         // Returns the value of the primal variable whose index is theColIdx.
 
       virtual void getPrimalSoln (WitVector <double> & primalSoln) = 0;
          //

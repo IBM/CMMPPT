@@ -19,12 +19,15 @@
 #include <CoinMipIf.h>
 #include <CplexIf.h>
 #include <OptProblem.h>
+#include <SaeMgr.h>
 #include <OptVar.h>
 #include <OptCon.h>
 #include <OptComp.h>
 #include <OptStarter.h>
+#include <MultiObjMgr.h>
 #include <MsgFrag.h>
 #include <MsgFac.h>
+#include <Timing.h>
 
 //------------------------------------------------------------------------------
 // Implementation of class OptSolveGate
@@ -72,7 +75,7 @@ void WitOptSolveMgr::solveOptProb ()
    {
    if      (myOptComp ()->multiObjMode ())
       {
-      mySolverIf_->solveOptProbAsLexOpt ();
+      solveOptProbAsLexOpt ();
       }
    else if (myOptComp ()->accOptStarter ()->isChosen ())
       {
@@ -85,67 +88,6 @@ void WitOptSolveMgr::solveOptProb ()
    else
       {
       solveOptProbAsLp ();
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::issueSolveMsg ()
-   {
-   myMsgFac () ("solveOptProblemMsg",
-      myMsgFac ().myFrag (myOptComp ()->mipMode ()? "mipFrag": "lpFrag"),
-      mySolverIf_->solverName ());
-
-   mySolverIf_->issueVersionMsg ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::writeMps ()
-   {
-   if (not myOptComp ()->printMps ())
-      return;
-
-   myMsgFac () ("mpsFileMsg");
-
-   mySolverIf_->solverWriteMps ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::loadInitSoln ()
-   {
-   WitVector <double> initSoln;
-   WitOptVar *        theVar;
-      
-   if (not myOptComp ()->optInitMethod ()->external ())
-      return;
-
-   initSoln.resize (myOptProblem_->nOptVars (), 0.0);
-
-   forEachEl (theVar, myOptProblem_->myOptVars ())
-      initSoln[theVar->index ()] = theVar->primalValue ();
-
-   mySolverIf_->loadInitSoln (initSoln);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::storePrimalSoln ()
-   {
-   WitVector <double> primalSoln;
-   WitOptVar *        theVar;
-   int                theIdx;
-
-   primalSoln.resize (myOptProblem_->nOptVars ());
-
-   mySolverIf_->getPrimalSoln (primalSoln);
-
-   forEachEl (theVar, myOptProblem_->myOptVars ())
-      {
-      theIdx = theVar->index ();
-
-      theVar->setPrimalValue (primalSoln[theIdx]);
       }
    }
 
@@ -200,6 +142,26 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
 WitOptSolveMgr::~WitOptSolveMgr ()
    {
    delete mySolverIf_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveOptProbAsLexOpt ()
+   {
+   issueSolveMsg ();
+
+   myMsgFac () ("lexOptMsg");
+
+   mySolverIf_->loadLp ();
+
+   if (myOptComp ()->mipMode ())
+      mySolverIf_->loadIntData ();
+
+   writeMps ();
+
+   solveLexOpt ();
+
+   storePrimalSoln ();
    }
 
 //------------------------------------------------------------------------------
@@ -264,6 +226,123 @@ void WitOptSolveMgr::solveOptProbAsMip ()
 
 //------------------------------------------------------------------------------
 
+void WitOptSolveMgr::issueSolveMsg ()
+   {
+   myMsgFac () ("solveOptProblemMsg",
+      myMsgFac ().myFrag (myOptComp ()->mipMode ()? "mipFrag": "lpFrag"),
+      mySolverIf_->solverName ());
+
+   mySolverIf_->issueVersionMsg ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::writeMps ()
+   {
+   if (not myOptComp ()->printMps ())
+      return;
+
+   myMsgFac () ("mpsFileMsg");
+
+   mySolverIf_->solverWriteMps ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveLexOpt ()
+   {
+   WitOptVar *              prevOptVar;
+   WitPtrVecItr <WitOptVar> theOptVarItr;
+   WitOptVar *              theOptVar;
+
+   if (devMode ())
+      WitTimer::getTimeAndChargeToCurrent ();
+
+   if (not myOptComp ()->mipMode ())
+      loadInitSoln ();
+
+   prevOptVar = NULL;
+
+   myOptProblem ()->myLexOptVarSeq ().attachItr (theOptVarItr);
+
+   while (theOptVarItr.advance (theOptVar))
+      {
+      myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
+
+      if (prevOptVar != NULL)
+         {
+         lockLexObjElemVal (prevOptVar);
+
+         mySolverIf_->setObjCoeff (prevOptVar->index (), 0.0);
+         }
+
+      mySolverIf_->setObjCoeff (theOptVar->index (), 1.0);
+
+      solveCurrentObj (prevOptVar == NULL);
+
+      if (devMode ())
+         if (WitSaeMgr::standAloneMode ())
+            myMsgFac () ("lexObjElemCpuTimeMsg",
+               WitTimer::getTimeAndChargeToCurrent ());
+
+      prevOptVar = theOptVar;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::loadInitSoln ()
+   {
+   WitVector <double> initSoln;
+   WitOptVar *        theVar;
+      
+   if (not myOptComp ()->optInitMethod ()->external ())
+      return;
+
+   initSoln.resize (myOptProblem_->nOptVars (), 0.0);
+
+   forEachEl (theVar, myOptProblem_->myOptVars ())
+      initSoln[theVar->index ()] = theVar->primalValue ();
+
+   mySolverIf_->loadInitSoln (initSoln);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::lockLexObjElemVal (WitOptVar * theOptVar)
+   {
+   double objVal;
+   double moTol;
+   double theTol;
+
+   objVal = mySolverIf_->primalVarVal (theOptVar->index ());
+
+   moTol  = myOptComp ()->myMultiObjMgr ()->multiObjTol ();
+
+   theTol = WitNonClass::max (moTol * fabs (objVal), moTol);
+
+   mySolverIf_->setVarLB (theOptVar->index (), objVal - theTol);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveCurrentObj (bool firstObj)
+   {
+   if (myOptComp ()->mipMode ())
+      {
+      mySolverIf_->solveMip (true);
+      }
+   else
+      {
+      useDualSimplex_ =
+         firstObj and myOptComp ()->crashOptStarter ()->isChosen ();
+
+      mySolverIf_->solveLp (true);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
 bool WitOptSolveMgr::optProbHasIntVars ()
    {
    WitOptVar * theOptVar;
@@ -277,6 +356,26 @@ bool WitOptSolveMgr::optProbHasIntVars ()
       }
 
    return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::storePrimalSoln ()
+   {
+   WitVector <double> primalSoln;
+   WitOptVar *        theVar;
+   int                theIdx;
+
+   primalSoln.resize (myOptProblem_->nOptVars ());
+
+   mySolverIf_->getPrimalSoln (primalSoln);
+
+   forEachEl (theVar, myOptProblem_->myOptVars ())
+      {
+      theIdx = theVar->index ();
+
+      theVar->setPrimalValue (primalSoln[theIdx]);
+      }
    }
 
 //------------------------------------------------------------------------------

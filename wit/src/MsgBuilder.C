@@ -7934,17 +7934,6 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "coinNYISmsg",
-      1062,
-      severe_,
-      "%1$s with COIN is not yet implemented.");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "osiWriteMpsExcSmsg",
       1064,
       severe_,

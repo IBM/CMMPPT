@@ -52,24 +52,6 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // Solves the optimization problem.
 
-      void issueSolveMsg ();
-         //
-         // Issues a msg indicating that the solve has begun.
-
-      void writeMps ();
-         //
-         // Writes an MPS file of the opt problem entered into the solver, if
-         // appropriate.
-
-      void loadInitSoln ();
-         //
-         // If an external initial primal solution is to be used, this function
-         // acquires it from myOptProblem_ and then loads it into the solver.
-
-      void storePrimalSoln ();
-         //
-         // Stores the primal solution in myOptProblem_.
-
       void setUseDualSimplex (bool);
          //
          // Setter
@@ -96,6 +78,11 @@ class WitOptSolveMgr: public WitProbAssoc
 
       noCopyCtorAssign (WitOptSolveMgr);
 
+      void solveOptProbAsLexOpt ();
+         //
+         // Loads, solves and retrieves the solution to the optimization problem
+         // as a lexicographic optimization.
+
       void solveOptProbAsLp ();
          //
          // Loads, solves and retrieves the solution to the optimization problem
@@ -111,9 +98,43 @@ class WitOptSolveMgr: public WitProbAssoc
          // Loads, solves and retrieves the solution to the optimization problem
          // as a MIP.
 
+      void issueSolveMsg ();
+         //
+         // Issues a msg indicating that the solve has begun.
+
+      void writeMps ();
+         //
+         // Writes an MPS file of the opt problem entered into the solver, if
+         // appropriate.
+
+      void solveLexOpt ();
+         //
+         // Solves the lexicographic optimization problem.
+
+      void loadInitSoln ();
+         //
+         // If an external initial primal solution is to be used, this function
+         // acquires it from myOptProblem_ and then loads it into the solver.
+         // Not valid in MIP mode.
+
+      void lockLexObjElemVal (WitOptVar * theOptVar);
+         //
+         // Assuming theOptVar represents a lexicographic objective element that
+         // has just been maximized, this function locks the theOptVar at its
+         // maximum value minus a tolerance.
+
+      void solveCurrentObj (bool firstObj);
+         //
+         // Optimizies the current objective in a lexicographic optimization.
+         // firstObj is true, iff the current objective is the first objecetve.
+
       bool optProbHasIntVars ();
          //
          // Return true, iff the opt problem has at least one integer variable.
+
+      void storePrimalSoln ();
+         //
+         // Stores the primal solution in myOptProblem_.
 
       void storeDualSoln ();
          //

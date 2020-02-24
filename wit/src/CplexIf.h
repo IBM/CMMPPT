@@ -67,19 +67,21 @@ class WitCplexIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         solveOptProbAsLexOpt ();
-      virtual void         issueVersionMsg      ();
-      virtual void         loadLp               ();
-      virtual void         loadIntData          ();
-      virtual void         reviseLp             ();
-      virtual void         solverWriteMps       ();
-      virtual void         loadInitSoln         (const WitVector <double> &);
-      virtual void         reSolveLp            ();
-      virtual void         solveLp              (bool);
-      virtual void         solveMip             (bool);
-      virtual void         getPrimalSoln        (WitVector <double> &);
-      virtual void         getDualSoln          (WitVector <double> &);
-      virtual const char * solverName           ();
+      virtual void         issueVersionMsg ();
+      virtual void         loadLp          ();
+      virtual void         loadIntData     ();
+      virtual void         reviseLp        ();
+      virtual void         solverWriteMps  ();
+      virtual void         loadInitSoln    (const WitVector <double> &);
+      virtual void         reSolveLp       ();
+      virtual void         solveLp         (bool);
+      virtual void         solveMip        (bool);
+      virtual void         setVarLB        (int, double);
+      virtual void         setObjCoeff     (int, double);
+      virtual double       primalVarVal    (int);
+      virtual void         getPrimalSoln   (WitVector <double> &);
+      virtual void         getDualSoln     (WitVector <double> &);
+      virtual const char * solverName      ();
 
    private:
 
@@ -140,21 +142,6 @@ class WitCplexIf: public WitSolverIf
          //
          // Sets rhs and sense to the CPLEX RHS and constraint sense for
          // theOptCon.
-
-      void solveLexOpt ();
-         //
-         // Makes appropriate calls to CPLEX to solve the optimization problem
-         // as a lexicographic optimization.
-
-      void setObjCoef (WitOptVar * theOptVar, double theVal);
-         //
-         // Sets the objective coefficient of theOptVar to theVal.
-
-      void lockLexObjElemVal (WitOptVar * theOptVar);
-         //
-         // Assuming theOptVar represents a lexicographic objective element that
-         // has just been maximized, this function locks the variable at its
-         // maximum value minus a tolerance.
 
       void printLpSolveInfo ();
          //

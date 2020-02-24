@@ -20,6 +20,7 @@
 #include <CoinComIf.h>
 #include <OptComp.h>
 #include <OptProblem.h>
+#include <OptVar.h>
 #include <MsgFac.h>
 #include <Timing.h>
 
@@ -43,13 +44,6 @@ bool WitCoinComIf::coinEmbedded ()
 WitCoinComIf::~WitCoinComIf ()
    {
    shutDownMessageHandler ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinComIf::solveOptProbAsLexOpt ()
-   {
-   myMsgFac () ("coinNYISmsg", "Optimizing Implosion with Multiple Objectives");
    }
 
 //------------------------------------------------------------------------------
@@ -113,6 +107,27 @@ void WitCoinComIf::solverWriteMps ()
       {
       myMsgFac () ("osiWriteMpsExcSmsg", "opt-prob.mps");
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinComIf::setVarLB (int theColIdx, double theLB)
+   {
+   myOsiSI ()->setColLower (theColIdx, theLB);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinComIf::setObjCoeff (int theColIdx, double theVal)
+   {
+   myOsiSI ()->setObjCoeff (theColIdx, theVal);
+   }
+
+//------------------------------------------------------------------------------
+
+double WitCoinComIf::primalVarVal (int theColIdx)
+   {
+   return myOsiSI ()->getColSolution()[theColIdx];
    }
 
 //------------------------------------------------------------------------------
