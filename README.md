@@ -1,5 +1,5 @@
 # CMMPPT
-This software was developed for an analytical decision making approach to optimally determine if equipment is worth selling as whole or dismantled for service parts
+This software enables determination of optimal allocation of scarce resources when the resources are consumed in "kits" corresponding to sets of parts (for example a bill of material) and/or a set of capacities (for example, specifically skilled technicians) . It could also be used in analytical decision making to optimally determine if equipment is worth selling as whole or dismantled for service parts
 
 Running Docker build
 
