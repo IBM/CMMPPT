@@ -1,4 +1,4 @@
-all: clean build
+all: clean unitTest
 clean:
 	-rm *.o
 	-rm unitTest
@@ -12,12 +12,13 @@ LIBRARY_PATH+=-L /opt/ibm/ILOG/CPLEX_Studio_Community129/cplex/lib/x86-64_linux/
 C_INCLUDE_PATH=../../wit/src
 
 OBJECTS=../src/scoFile.o ../src/unitTest.o ../src/CoinFinite.o ../src/visorProblem.o
-build: wit mcl $(OBJECTS)
-	gcc -o unitTest $(OBJECTS)  -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
+libraries: wit mcl 
+unitTest: $(OBJECTS)
+	gcc -o unitTest $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
 
-mcl:
+mcl: 
 	(cd ../../mcl/linux; make all exe_type=released)
-wit: mcl
+wit: mcl 
 	(cd ../../wit/linux; make all exe_type=released)
 %.o:	../src/%.cpp
 	gcc -c -o $@     ../src/$*.cpp -I$(C_INCLUDE_PATH)
