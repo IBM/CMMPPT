@@ -93,7 +93,7 @@ void VISORproblem::addPrinter(
     const std::string & name, 
     const std::string & location, 
     float prodRate, 
-    bool n175, bool n285, bool petg, bool,bool pla, bool abs, bool onyx)
+    bool n175, bool n285, bool petg, bool pla, bool abs, bool onyx)
 {
 	std::string printerNm      = printerName(name, location );
 	std::string printerOperNm  = printerOperName(name, location );
@@ -128,6 +128,37 @@ void VISORproblem::addPrinter(
 	printerBaseNames_.insert(baseName);
 }
 
+void VISORproblem::getPrinters(
+    std::vector<std::string> & names,
+    std::vector<std::string> & locs ) 
+{
+  names.clear();
+  locs.clear();
+  std::set<std::string>::const_iterator it;
+  for ( it=printerBaseNames_.begin(); it!=printerBaseNames_.end(); ++it ) {
+  	 names.push_back( printerFromPrinterName(*it) );
+    locs.push_back( locationFromPrinterName(*it) );
+  } 
+}
+
+std::vector<float> VISORproblem::getPrinterProdRate(
+             const std::string & name, 
+             const std::string & loc )
+{
+  std::vector<float> retVal;
+  std::string nm = printerName(name,loc);
+  retVal = witGetNameAttribute(witGetPartSupplyVol,nm);
+  return retVal;
+}
+std::vector<float> VISORproblem::getPrinterShipVol(
+             const std::string & name, 
+             const std::string & loc )
+{
+  std::vector<float> retVal;
+  std::string visorPartNm = visorPartName(name, loc);
+  retVal = witGetDemandAttribute(witGetDemandShipVol,visorPartNm,"demand");
+  return retVal;
+}
 
 #if 0
 void VISORproblem::addMtm(const std::string & mtmName, const std::string & mtmLoc,
@@ -265,6 +296,14 @@ std::string VISORproblem::visorPartName(const std::string & name, const std::str
 std::string VISORproblem::basePrinterName(const std::string & name, const std::string & location )
 {
   return "Printer: "+name+" at-> "+location;
+}
+std::string VISORproblem::printerFromPrinterName(const std::string & baseName)
+{  
+  return textBetween(baseName,"Printer: "," at-> ");
+}
+std::string VISORproblem::locationFromPrinterName(const std::string & baseName)
+{  
+  return textAfter(baseName," at-> ");
 }
 
 //-------------------------------------------------------------------------
@@ -857,8 +896,8 @@ VISORproblem::test()
 
 
          
-  // Test materials 
   {
+  	 // Test materials 
     VISORproblem prob;
     assert(prob.getNPeriods()==30);
     prob.setNPeriods(25);    
@@ -893,7 +932,22 @@ VISORproblem::test()
     sv=prob.getSharedSupply("Amawalk",   "N175","ABS");
     assert( eq(sv[0],33.) );
     assert( eq(sv[20],0.0) );
-    
+
+
+    // Test printers
+    prob.addPrinter("DigiLab3D45","Kitchawan Rd", 30.f,   true, false,    true, true, true, false);
+    std::vector<std::string> printerName, printerLoc;
+    prob.getPrinters( printerName, printerLoc );
+    assert( printerName.size()==1 );
+    assert( printerLoc.size()==1 );    
+    assert( printerName[0]=="DigiLab3D45" );
+    assert( printerLoc[0]=="Kitchawan Rd" );
+    std::vector<float> pr=prob.getPrinterProdRate("DigiLab3D45","Kitchawan Rd");
+    assert( eq(pr[0],30.) );
+    assert( eq(pr[20],30.) );
+    std::vector<float> shipVol=prob.getPrinterShipVol("DigiLab3D45","Kitchawan Rd");
+    assert( eq(shipVol[0],0.) );
+    assert( eq(shipVol[10],0.) );
     
     //std::vector<float> vol = p1.getPartDemandShipVol("0000000P1413","980","980");
     //assert(eq(vol[0],0.0));

@@ -145,7 +145,14 @@ public:
   //----------------------
   // Printer Methods
   //----------------------
-  void addPrinter(const std::string & name, const std::string & location,float prodRate, bool n175, bool n285, bool petg, bool,bool pla, bool abs, bool onyx);
+  void addPrinter(const std::string & name, const std::string & location,
+     float prodRate, 
+     bool n175, bool n285, 
+     bool petg, bool pla, bool abs, bool onyx);
+  
+  void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs ); 
+  std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
+  std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
   
   //-------------------------------------------------------------------------
   // printer Name Methods
@@ -155,7 +162,8 @@ public:
   std::string noSupplyPartName(const std::string & name, const std::string & location );
   std::string visorPartName(const std::string & name, const std::string & location );
   std::string basePrinterName(const std::string & name, const std::string & location );
-
+  std::string printerFromPrinterName(const std::string & baseName);
+  std::string locationFromPrinterName(const std::string & baseName);
 
 
   // String Utilities
