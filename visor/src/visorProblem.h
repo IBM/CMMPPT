@@ -401,6 +401,7 @@ private:
   int nPeriods_; // cached for performance
 
   std::set<std::string> materialBaseNames_; 
+  std::set<std::string> printerBaseNames_;
   
 };
 
