@@ -141,6 +141,22 @@ public:
   std::string locationFromMaterialName(const std::string & matName);
   std::string nozSizeFromMaterialName(const std::string & matName);
   std::string plasticTypeFromMaterailName(const std::string & matName);
+  
+  //----------------------
+  // Printer Methods
+  //----------------------
+  void addPrinter(const std::string & name, const std::string & location,float prodRate, bool n175, bool n285, bool petg, bool,bool pla, bool abs, bool onyx);
+  
+  //-------------------------------------------------------------------------
+  // printer Name Methods
+  //-------------------------------------------------------------------------
+  std::string printerName(const std::string & name, const std::string & location );
+  std::string printerOperName(const std::string & name, const std::string & location );
+  std::string noSupplyPartName(const std::string & name, const std::string & location );
+  std::string visorPartName(const std::string & name, const std::string & location );
+  std::string basePrinterName(const std::string & name, const std::string & location );
+
+
 
   // String Utilities
   static std::string textBetween(const std::string & src, const std::string & before,const std::string & after);

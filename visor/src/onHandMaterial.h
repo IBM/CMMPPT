@@ -1,55 +1,61 @@
-#ifndef VISOR_requestQuantity_h
-#define VISOR_requestQuantity_h
+#ifndef VISOR_onHandMaterial_h
+#define VISOR_onHandMaterial_h
 
 #include "scoFile.h"
 
 
-class VISORrequestQuantity : public SCOcsvFormatFile {
+class VISORonHandMaterial : public SCOcsvFormatFile {
 public:
 
   // Fields
   getFieldH(location);
-  getIntFieldH(date);
-  getIntFieldH(requestedQuantity);
+  getFieldH(nozSize);
+  getFieldH(plasticType);
+  getFloatFieldH(quantity);
+  getIntFieldH(share);
   
   // preferred constructor
-  VISORrequestQuantity(std::string filename)
+  VISORonHandMaterial(std::string filename)
     : SCOcsvFormatFile(filename)
   {  
     fieldSeperator(',');
     strip(true);
-    hasHeaderRecord(3);
+    hasHeaderRecord(5);
     commentRecords(true);
   };
 
   // compute key for storing record in dictionary
   static std::string key( 
     const std::string & location,
-    const std::string & date ) 
+    const std::string & nozSize,
+    const std::string & plasticType ) 
   {
-    std::string retVal = location+"$+&"+date;
+    std::string retVal = location+"$+&"+nozSize+"$+&"+plasticType;
     return retVal;
   };
   
   // destructor
-  ~VISORrequestQuantity(){/*nothing to do here*/};
+  ~VISORonHandMaterial(){/*nothing to do here*/};
   
   // Self-test
   static void test()
   {
-    VISORrequestQuantity file("../data/DataFilesV1/requestQuantity.csv");
+    VISORonHandMaterial file("../data/DataFilesV1/onHandMaterial.csv");
     
     // Test reading first record
 
-    assert( file.location(0)=="HospitalA");
-    assert( file.date(0) == "0" );
-    assert( file.requestedQuantity(0) == "25" );
-    assert( file.dateAsInt(0) == 0 );
-    assert( file.requestedQuantityAsInt(0) == 25 );
-    // assert( file.altConvTimeAsFloat(0) == 2.0f );
-
-    assert( file.requestedQuantityAsInt(key("HospitalB","0"))==10);
-   
+    assert( file.location(3)=="Amawalk");
+    assert( file.nozSize(3) == "1.75mm" );
+    assert( file.plasticType(3) == "PLA" );    
+    assert( file.quantity(3) == "20" );
+    assert( file.share(3) == "100" );
+    
+    assert( file.quantityAsFloat(3) == 20.0 );
+    
+    assert( file.shareAsInt(3) == 100 );
+/*
+    assert( file.quantityAsFloat(key("Pleasant Valley","1.75mm","ONYX"))==2.5);
+*/ 
   }
   
 protected:
@@ -59,61 +65,67 @@ protected:
   {
     std::string retVal = key(
       location(recNum),
-      date(recNum) );
+      nozSize(recNum),
+      plasticType(recNum) );
     return retVal;
   };
 
 private:
   
   // default constructor -- don't use!
-  VISORrequestQuantity();
+  VISORonHandMaterial();
   
   // copy constructor  -- don't use!
-  VISORrequestQuantity( const VISORrequestQuantity& source );
+  VISORonHandMaterial( const VISORonHandMaterial& source );
   
   // assignment operator -- don't use!
-  VISORrequestQuantity&
-  operator=(const VISORrequestQuantity& rhs);
+  VISORonHandMaterial&
+  operator=(const VISORonHandMaterial& rhs);
 
   
 };
 
 
 
-class VISORrequestQuantityIterator : public SCOfileIterator {
+class VISORonHandMaterialIterator : public SCOfileIterator {
 public:
     
   // Fields
   getFieldFileWithIteratorH(location);
-  getIntFieldFileWithIteratorH(date);
-  getIntFieldFileWithIteratorH(requestedQuantity);
+  getFieldFileWithIteratorH(nozSize);
+  getFieldFileWithIteratorH(plasticType);
+  getFloatFieldFileWithIteratorH(quantity);
+  getIntFieldFileWithIteratorH(share);
   
   
   // preferred constructor
-  VISORrequestQuantityIterator(const VISORrequestQuantity & file)
+  VISORonHandMaterialIterator(const VISORonHandMaterial & file)
     :SCOfileIterator(file)
   { /* Nothing to do here */};
   
   // destructor
-  ~VISORrequestQuantityIterator(){/* nothing to do here */};
+  ~VISORonHandMaterialIterator(){/* nothing to do here */};
   
   // Self-test
   static void test()
   {
-    VISORrequestQuantity file("../data/DataFilesV1/requestQuantity.csv");
-    VISORrequestQuantityIterator fileIter(file);
+    VISORonHandMaterial file("../data/DataFilesV1/onHandMaterial.csv");
+    VISORonHandMaterialIterator fileIter(file);
     
     // loop once for each record
     int recNo=0;
     for ( ; fileIter()!=NULL; ) {    
-      if ( recNo == 0 ) {
-        
-        assert( fileIter.location()=="HospitalA");
-        assert( fileIter.date() == "0" );
-        assert( fileIter.requestedQuantity() == "25" );
-        assert( fileIter.dateAsInt() == 0 );
-        assert( fileIter.requestedQuantityAsInt() == 25 );
-        //assert( fileIter.altConvTimeAsFloat() == 2.0f );
+      if ( recNo == 3 ) {
+               
+        assert( fileIter.location()=="Amawalk");
+        assert( fileIter.nozSize() == "1.75mm" );
+        assert( fileIter.plasticType() == "PLA" );    
+        assert( fileIter.quantity() == "20" );
+        assert( fileIter.share() == "100" );
+    
+        assert( fileIter.quantityAsFloat() == 20.0 );
+    
+        assert( fileIter.shareAsInt() == 100 );
           
       }
       recNo++;
@@ -125,14 +137,14 @@ private:
   
   
   // default constructor -- don't use!
-  VISORrequestQuantityIterator();
+  VISORonHandMaterialIterator();
   
   // copy constructor  -- don't use!
-  VISORrequestQuantityIterator( const VISORrequestQuantityIterator& source );
+  VISORonHandMaterialIterator( const VISORonHandMaterialIterator& source );
   
   // assignment operator -- don't use!
-  VISORrequestQuantityIterator&
-  operator=(const VISORrequestQuantityIterator& rhs);
+  VISORonHandMaterialIterator&
+  operator=(const VISORonHandMaterialIterator& rhs);
 
   
 };

@@ -85,6 +85,49 @@ std::vector<float> VISORproblem::getSharedSupply(
   return retVal;
 }
 
+// 
+//----------------------
+// Printer Methods
+//----------------------
+void VISORproblem::addPrinter(
+    const std::string & name, 
+    const std::string & location, 
+    float prodRate, 
+    bool n175, bool n285, bool petg, bool,bool pla, bool abs, bool onyx)
+{
+	std::string printerNm      = printerName(name, location );
+	std::string printerOperNm  = printerOperName(name, location );
+	std::string noSupplyPartNm = noSupplyPartName(name, location );
+	std::string visorPartNm    = visorPartName(name, location );
+	
+	// Add parts: Printer, NoSupply, and produced visor
+	witAddPart(witRun(), printerNm.c_str(),      WitCAPACITY);
+	witAddPart(witRun(), noSupplyPartNm.c_str(), WitMATERIAL);
+	witAddPart(witRun(), visorPartNm.c_str(),    WitCAPACITY);
+	
+	// Add opertaion
+	witAddOperation(witRun(),printerOperNm.c_str());
+		
+	// Add bom connecting operation to printer and noSupplyPart	
+	witAddBomEntry(witRun(), printerOperNm.c_str(), printerNm.c_str());		
+	witAddBomEntry(witRun(), printerOperNm.c_str(), noSupplyPartNm.c_str());
+	
+	// Connect operation to produced visor
+	witAddBopEntry(witRun(), printerOperNm.c_str(), visorPartNm.c_str());
+	
+	// Set printer supply volume to be the number that can be produced in a day
+	witSetNameAttribute(&witGetPartSupplyVol,witSetPartSupplyVol,printerNm,prodRate);
+	
+	
+	//float shrQty = quantity*(float)sharePercent/100.0f;
+	//float ownQty = quantity-shrQty;
+	//witSetNameAttribute(&witGetPartSupplyVol,witSetPartSupplyVol,ownMatName,0,ownQty);
+	//witSetNameAttribute(&witGetPartSupplyVol,witSetPartSupplyVol,shrMatName,0,shrQty);
+	
+	//std::string baseName = baseMaterialName(location, nozSize, plasticType);
+	//materialBaseNames_.insert(baseName);
+}
+
 
 #if 0
 void VISORproblem::addMtm(const std::string & mtmName, const std::string & mtmLoc,
@@ -200,7 +243,29 @@ std::string VISORproblem::plasticTypeFromMaterailName(const std::string & matNam
   return textBetween(matName," Type "," at ");
 }
 
-
+//-------------------------------------------------------------------------
+// printer Name Methods
+//-------------------------------------------------------------------------
+std::string VISORproblem::printerName(const std::string & name, const std::string & location )
+{
+  return basePrinterName(name,location);
+}
+std::string VISORproblem::printerOperName(const std::string & name, const std::string & location )
+{
+  return "Make on "+basePrinterName(name,location);
+}
+std::string VISORproblem::noSupplyPartName(const std::string & name, const std::string & location )
+{
+  return "No supply part for "+basePrinterName(name,location);
+}
+std::string VISORproblem::visorPartName(const std::string & name, const std::string & location )
+{
+  return "Visor made on "+basePrinterName(name,location);
+}
+std::string VISORproblem::basePrinterName(const std::string & name, const std::string & location )
+{
+  return "Printer: "+name+" at-> "+location;
+}
 
 //-------------------------------------------------------------------------
 // text utilities Methods
