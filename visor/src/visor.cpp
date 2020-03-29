@@ -12,11 +12,11 @@
 
 
 //#include "CoinFloatEqual.h"
-#include "visor2.h"
+#include "visor.h"
 #include "printer.h"
 #include "requestQuantity.h"
-#include "onHandMaterail.h"
-//#include "visorProblem.h"
+#include "onHandMaterial.h"
+#include "visorProblem.h"
 
 
 typedef std::vector<std::string> StdStringVec;
@@ -77,21 +77,21 @@ main (int argc, char * argv[])
     
     std::string outputDirectory=args[1];
     std::string inputDirectory=args[1];
-    //ESO2problem eso2Prob;
+    VISORproblem visorProb;
     int nPeriods;
     
     int nWfmvScaleFactors;
     bool writeZeros=true;
     
     
-    eso2Prob.setSolverLogFileName(outputDirectory+"/clpMesgFile.txt");
+    visorProb.setSolverLogFileName(outputDirectory+"/clpMesgFile.txt");
     bool useGlobalAttrFileSettings = true;
-    createModel(eso2Prob, inputDirectory, useGlobalAttrFileSettings);
-    nPeriods = eso2Prob.getNPeriods();
+    //createModel(eso2Prob, inputDirectory, useGlobalAttrFileSettings);
+    nPeriods = visorProb.getNPeriods();
 
     
     //---------------------------------------------------------
-    
+#if 0    
     std::string mtmAcquirePlanFileName = outputDirectory+"/mtmAcquirePlanO.csv";
     FILE * mtmAcquirePlanFilePtr = fopen(mtmAcquirePlanFileName.c_str(),"w");
     
@@ -287,27 +287,11 @@ main (int argc, char * argv[])
     fclose(peggedDemandPlanFilePtr);
     fclose(kpiFilePtr);
     //--------------------------------------
-
-
-#if 0
-      // Get list of shortages and print 
-      if ( shortages )
-      {          
-        std::vector<std::string> resourceDescriptions;
-        std::vector<int> periods;
-        std::vector<float> shortageVols;
-        eso2Prob.getResourceShortages(resourceDescriptions,periods,shortageVols );
-        if ( periods.size()>0 )
-          printf("Resource Shortages:");
-        int s;
-        for ( s=0; s<periods.size(); s++ ) {
-          printf("%d, %f, %s\n",periods[s],shortageVols[s],resourceDescriptions[s].c_str());
-        }
-      }
 #endif
+
       
   }
 
-  std::cout <<"eso2 application is finished." <<std::endl;
+  std::cout <<"visor application is finished." <<std::endl;
   return 0;
 }

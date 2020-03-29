@@ -20,13 +20,13 @@
 //----------------------
 // Material Methods
 //----------------------
-void VISORproblem::addMaterial    (const std::string & location, const std::string & nozSize, const std::string & plasticType, float quantity, int sharePercent )
+void VISORproblem::addMaterial    (const std::string & location, const std::string & filamentSize, const std::string & plasticType, float quantity, int sharePercent )
 {
-	assert(nozSize=="1.75mm"||nozSize=="2.85mm");
+	assert(filamentSize=="1.75mm"||filamentSize=="2.85mm");
    assert(plasticType=="PETG"||plasticType=="PLA"||plasticType=="ABS"||plasticType=="ONYX");	
 	
-	std::string ownMatName = ownMaterialName(location, nozSize, plasticType );
-	std::string shrMatName = shrMaterialName(location, nozSize, plasticType );
+	std::string ownMatName = ownMaterialName(location, filamentSize, plasticType );
+	std::string shrMatName = shrMaterialName(location, filamentSize, plasticType );
 	
 	witAddPart(witRun(), ownMatName.c_str(), WitMATERIAL);
 	witAddPart(witRun(), shrMatName.c_str(), WitCAPACITY);
@@ -36,31 +36,31 @@ void VISORproblem::addMaterial    (const std::string & location, const std::stri
 	witSetNameAttribute(&witGetPartSupplyVol,witSetPartSupplyVol,ownMatName,0,ownQty);
 	witSetNameAttribute(&witGetPartSupplyVol,witSetPartSupplyVol,shrMatName,0,shrQty);
 	
-	std::string baseName = baseMaterialName(location, nozSize, plasticType);
+	std::string baseName = baseMaterialName(location, filamentSize, plasticType);
 	materialBaseNames_.insert(baseName);
 }
 
 void VISORproblem::getMaterials(
     std::vector<std::string> & locs,
-    std::vector<std::string> & nozSizes,
+    std::vector<std::string> & filamentSizes,
     std::vector<std::string> & pTypes ) 
 {
   locs.clear();
-  nozSizes.clear();
+  filamentSizes.clear();
   pTypes.clear();
 #if 0
   int nMtms = materialBaseNames_.size();
   int m;
   for ( m=0; m<nMtms; m++ ) {
     locs.push_back( locationFromMaterialName(materialBaseNames_[m]) );
-    nozSizes.push_back( nozSizeFromMaterialName(materialBaseNames_[m]) );
+    filamentSizes.push_back( filamentSizeFromMaterialName(materialBaseNames_[m]) );
     pTypes.push_back( plasticTypeFromMaterialName(materialBaseNames_[m]) );
   }
 #else
   std::set<std::string>::const_iterator it;
   for ( it=materialBaseNames_.begin(); it!=materialBaseNames_.end(); ++it ) {
     locs.push_back( locationFromMaterialName(*it) );
-    nozSizes.push_back( nozSizeFromMaterialName(*it) );
+    filamentSizes.push_back( filamentSizeFromMaterialName(*it) );
     pTypes.push_back( plasticTypeFromMaterailName(*it) );
   }
 #endif  
@@ -96,7 +96,7 @@ void VISORproblem::addPrinter(
     const std::string & name, 
     const std::string & location, 
     float prodRate, 
-    bool n175, bool n285, bool petg, bool pla, bool abs, bool onyx)
+    bool F175, bool F285, bool petg, bool pla, bool abs, bool onyx)
 {
 	std::string printerNm      = printerName(name, location );
 	std::string printerOperNm  = printerOperName(name, location );
@@ -123,7 +123,7 @@ void VISORproblem::addPrinter(
    witSetNameAttribute(witSetPartSupplyVol,printerNm,sv);
    
    float sumSupplyVol=1;
-   for ( int i=0; i<sv.size() ) sumSupplyVol += sv[i]];
+   for ( int i=0; i<sv.size();i++ ) sumSupplyVol += sv[i];
    
    // Add Demand for visor and set demandVol to big M
    witAddDemand(witRun(),visorPartNm.c_str(),"demand");
@@ -137,8 +137,8 @@ void VISORproblem::addPrinter(
    
    //Subs Boms for all materaials printer can use
    {
-      std::vector<std::string> matLoc, nozSize, plasticType;
-      getMaterials( matLoc, nozSize, plasticType );
+      std::vector<std::string> matLoc, filamentSize, plasticType;
+      getMaterials( matLoc, filamentSize, plasticType );
       
       float * ownSubCost = floatToConstFloatStar(0.0f);
       float * ownShrSubCost = floatToConstFloatStar(1.0f);
@@ -150,10 +150,10 @@ void VISORproblem::addPrinter(
       for (int i=0; i<matLoc.size(); i++)
       {
       	// Determine if i'th material can be used with this printer
-      	//std::cout <<n175 <<" " <<n285 <<" " <<nozSize[i]+"\n";
+      	//std::cout <<F175 <<" " <<F285 <<" " <<filamentSize[i]+"\n";
       	//std::cout <<petg <<" " <<pla <<" " <<abs <<" " <<onyx <<" " <<plasticType[i]+"\n";
       	//std::cout <<location <<" " <<matLoc[i] <<"\n";
-      	bool nozOk  = ( n175 && nozSize[i]=="1.75mm" ) || ( n285 && nozSize[i]=="2.85mm" );
+      	bool nozOk  = ( F175 && filamentSize[i]=="1.75mm" ) || ( F285 && filamentSize[i]=="2.85mm" );
       	bool typeOk = ( petg && plasticType[i]=="PETG" )
       	            ||( pla  && plasticType[i]=="PLA" )
       	            ||( abs  && plasticType[i]=="ABS" )      	            
@@ -162,7 +162,7 @@ void VISORproblem::addPrinter(
       	if (nozOk && typeOk)
       	{
       		// Material is good to use, so add SubBom Entry
-	         std::string shrMatName = shrMaterialName(matLoc[i], nozSize[i], plasticType[i] );
+	         std::string shrMatName = shrMaterialName(matLoc[i], filamentSize[i], plasticType[i] );
             witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,shrMatName.c_str());
             
             if ( location==matLoc[i] )
@@ -182,7 +182,7 @@ void VISORproblem::addPrinter(
             // if material is local then add own supply
             if ( location==matLoc[i] )
             {
-            	std::string ownMatName = ownMaterialName(matLoc[i], nozSize[i], plasticType[i] );
+            	std::string ownMatName = ownMaterialName(matLoc[i], filamentSize[i], plasticType[i] );
                witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,ownMatName.c_str());      	
                witSetSubsBomEntrySubCost(witRun(),printerOperNm.c_str(),1,nSubBomEntries,ownSubCost);	
                nSubBomEntries++;         
@@ -267,7 +267,7 @@ void VISORproblem::getSubVol(
            witGetSubsBomEntryConsumedPart(witRun(),operationName,bomEntry,subEntry,&consPart);
            
            matLoc.push_back(locationFromMaterialName(consPart));
-           matSize.push_back(nozSizeFromMaterialName(consPart));;
+           matSize.push_back(filamentSizeFromMaterialName(consPart));;
            matType.push_back(plasticTypeFromMaterailName(consPart));                     
            subVol.push_back(sv);
            if( ownSupply(consPart) )own.push_back("yes");
@@ -284,23 +284,23 @@ void VISORproblem::getSubVol(
 //-------------------------------------------------------------------------
 // material Name Methods
 //-------------------------------------------------------------------------
-std::string VISORproblem::ownMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType )
+std::string VISORproblem::ownMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType )
 {
-  return "ownSupply: "+baseMaterialName(location, nozSize, plasticType);
+  return "ownSupply: "+baseMaterialName(location, filamentSize, plasticType);
 }
-std::string VISORproblem::shrMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType )
+std::string VISORproblem::shrMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType )
 {
-  return "shareableSupply: "+baseMaterialName(location, nozSize, plasticType);
+  return "shareableSupply: "+baseMaterialName(location, filamentSize, plasticType);
 }
-std::string VISORproblem::baseMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType )
+std::string VISORproblem::baseMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType )
 {
-  return " Size "+nozSize+" Type "+plasticType+" at "+location;
+  return " Size "+filamentSize+" Type "+plasticType+" at "+location;
 }
 std::string VISORproblem::locationFromMaterialName(const std::string & matName)
 {  
   return textAfter(matName," at ");
 }
-std::string VISORproblem::nozSizeFromMaterialName(const std::string & matName)
+std::string VISORproblem::filamentSizeFromMaterialName(const std::string & matName)
 { 
   return textBetween(matName," Size "," Type ");
 }
@@ -700,6 +700,12 @@ void VISORproblem::setNPeriods( int nP )
   witSetNPeriods(witRun(),nP);
   nPeriods_ = nP;
 }
+// Set OSL Logfile name
+void VISORproblem::setSolverLogFileName(const std::string & name)
+{
+  witSetSolverLogFileName(witRun(),name.c_str());
+}
+
 
 
 
@@ -954,13 +960,13 @@ VISORproblem::test()
     
     prob.addMaterial("Briarcliff","1.75mm","PLA",200.0,75);
     
-    std::vector<std::string> location, nozSize, plasticType;
-    prob.getMaterials( location, nozSize, plasticType );
+    std::vector<std::string> location, filamentSize, plasticType;
+    prob.getMaterials( location, filamentSize, plasticType );
     assert( location.size()==1 );
-    assert( nozSize.size()==1 );
+    assert( filamentSize.size()==1 );
     assert( plasticType.size()==1 );    
     assert( location[0]=="Briarcliff" );
-    assert( nozSize[0]=="1.75mm" );
+    assert( filamentSize[0]=="1.75mm" );
     assert( plasticType[0]=="PLA" ); 
     
     std::vector<float> sv=prob.getOwnSupply("Briarcliff","1.75mm","PLA");
@@ -973,7 +979,7 @@ VISORproblem::test()
     
     
     prob.addMaterial("Amawalk",   "1.75mm","ABS",100.0,33);    
-    prob.getMaterials( location, nozSize, plasticType );
+    prob.getMaterials( location, filamentSize, plasticType );
     assert( location.size()==2 );
     sv=prob.getOwnSupply("Amawalk",   "1.75mm","ABS");
     assert( eq(sv[0],67.) );
