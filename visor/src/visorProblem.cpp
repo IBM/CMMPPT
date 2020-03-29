@@ -22,6 +22,9 @@
 //----------------------
 void VISORproblem::addMaterial    (const std::string & location, const std::string & nozSize, const std::string & plasticType, float quantity, int sharePercent )
 {
+	assert(nozSize=="1.75mm"||nozSize=="2.85mm");
+   assert(plasticType=="PETG"||plasticType=="PLA"||plasticType=="ABS"||plasticType=="ONYX");	
+	
 	std::string ownMatName = ownMaterialName(location, nozSize, plasticType );
 	std::string shrMatName = shrMaterialName(location, nozSize, plasticType );
 	
@@ -123,6 +126,41 @@ void VISORproblem::addPrinter(
    witAddDemand(witRun(),visorPartNm.c_str(),"demand");
    std::vector<float> dv=floatToStlVec(99999.0);
    witSetDemandAttribute(witSetDemandDemandVol,visorPartNm,"demand",dv);
+   
+   //Subs Boms for all materaials printer can use
+   {
+      std::vector<std::string> matLoc, nozSize, plasticType;
+      getMaterials( matLoc, nozSize, plasticType );
+      
+      //Loop once for each material
+      for (int i=0; i<matLoc.size(); i++)
+      {
+      	// Determine if i'th material can be used with this printer
+      	//std::cout <<n175 <<" " <<n285 <<" " <<nozSize[i]+"\n";
+      	//std::cout <<petg <<" " <<pla <<" " <<abs <<" " <<onyx <<" " <<plasticType[i]+"\n";
+      	//std::cout <<location <<" " <<matLoc[i] <<"\n";
+      	bool nozOk  = ( n175 && nozSize[i]=="1.75mm" ) || ( n285 && nozSize[i]=="2.85mm" );
+      	bool typeOk = ( petg && plasticType[i]=="PETG" )
+      	            ||( pla  && plasticType[i]=="PLA" )
+      	            ||( abs  && plasticType[i]=="ABS" )      	            
+      	            ||( onyx && plasticType[i]=="ONYX" );
+      	//std::cout <<"nozOk " <<nozOk <<"typeOk " <<typeOk <<std::endl;            
+      	if (nozOk && typeOk)
+      	{
+      		// Material is good to use, so add SubBom Entry
+	         std::string shrMatName = shrMaterialName(matLoc[i], nozSize[i], plasticType[i] );
+            witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,shrMatName.c_str());
+            
+            // if material is local then add own supply
+            if ( location==matLoc[i] )
+            {
+            	std::string ownMatName = ownMaterialName(matLoc[i], nozSize[i], plasticType[i] );
+               witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,ownMatName.c_str());      		
+                        
+            }
+      	}
+      }
+   }
 	
 	std::string baseName = basePrinterName(name,location);
 	printerBaseNames_.insert(baseName);
@@ -160,89 +198,53 @@ std::vector<float> VISORproblem::getPrinterShipVol(
   return retVal;
 }
 
-#if 0
-void VISORproblem::addMtm(const std::string & mtmName, const std::string & mtmLoc,
-                         float demanCostS, float demanTimeS)
-{
-  std::string igfMtmWitName = igfMtmName(mtmName, mtmLoc );
-  std::string acquireMtmWitName = acquireMtmName(mtmName, mtmLoc, mtmLoc );
-  std::string serverMtmWitName = serverMtmName(mtmName, mtmLoc, mtmLoc );
-  std::string demanMtmWitName = demanMtmName(mtmName, mtmLoc, mtmLoc );
 
-  int np = getNPeriods();
-
-  // Add igf owned mtm, acquire operation, and connect them
-  witAddPart(witRun(), igfMtmWitName.c_str(), WitCAPACITY);
-  witAddOperation(witRun(), acquireMtmWitName.c_str() );
-  witAddBomEntry(witRun(), acquireMtmWitName.c_str(), igfMtmWitName.c_str() );
-
-  // Add substitute boms to allow period 0 supply to be consumed in latter periods.
-  addSubsForPeriod1SupplyPerishPeriod(acquireMtmWitName,igfMtmWitName,0.0f);
-
-  // Add server owned mtm, and connect to acquire operation
-  addNonScrapableCapacity(serverMtmWitName.c_str());
-  witAddBopEntry(witRun(), acquireMtmWitName.c_str(), serverMtmWitName.c_str() );
-
-  // Add demanufacturing operation and connect to server owned mtm
-  witAddOperation(witRun(), demanMtmWitName.c_str() );
-  witAddBomEntry(witRun(), demanMtmWitName.c_str(), serverMtmWitName.c_str() );
-
-  // Set default demanCost
-  float * demanCost = floatToConstFloatStar( (float) demanCostS );
-  witSetOperationObj1ExecCost(witRun(), demanMtmWitName.c_str(), demanCost );
-  delete [] demanCost;
-
-  // Set default demanTime
-  float * demanTime = floatToConstFloatStar( (float) demanTimeS );
-  witSetBomEntryOffset(witRun(), demanMtmWitName.c_str(), 0, demanTime );
-  delete [] demanTime;
-
-  // Set default app data to hold wfmv
-  ESO2mtmAppData * appData = new ESO2mtmAppData(np);
-  std::vector<float> moveCost = floatToStlVec(0.0f);
-  appData->setMoveCost(moveCost);
-  witSetOperationAppData (mutableWitRun(), acquireMtmWitName.c_str(), appData);
-  
-  std::string baseName = baseMtmName(mtmName, mtmLoc );
-  materialBaseNames_.insert(baseName);
-  //addMtmAcquireLoc(baseName,mtmLoc);
-}
-
-
-bool VISORproblem::mtmExists(const std::string & mtmName, const std::string & mtmLoc )const
-{
-  std::string igfMtmWitName = igfMtmName(mtmName, mtmLoc );
-  witBoolean partExists;
-  witGetPartExists(mutableWitRun(),igfMtmWitName.c_str(),&partExists);
-  bool retVal = false;
-  if( partExists) retVal = true;
-  return retVal;
-}
-
-
-
-//-------------------------------------------------
-// Optimization methods
-//-------------------------------------------------
-void VISORproblem::solve()
-{
-
-  //writeWitData("eso2.wit");
-
- 
-
-  witBoolean postProcessed; 
-  witGetPostprocessed(mutableWitRun(),&postProcessed);
-  assert(postProcessed);
-
-}
-
-void VISORproblem::solveWithPegging() {
-  std::cout <<"entered: VISORproblem::solveWithPegging()" <<std::endl;
-  solve();
-  doPegging();
-}
-#endif
+//------------------------------------------
+// Subs Bom Entry methods
+//-----------------------------------------
+void VISORproblem::getSubVol(
+            std::vector<std::string> & printerName, std::vector<std::string> & printerLoc,
+            std::vector<std::string> & matLoc, std::vector<std::string> & matSize, std::vector<std::string> &matType,
+            std::vector< std::vector<float>> &subVol, std::vector<std::string> & own )
+{  
+      printerName.clear();
+      printerLoc.clear();
+      matLoc.clear();
+      matSize.clear();
+      matType.clear();     
+      subVol.clear();
+      own.clear();
+      witAttr objItrState;
+      witGetObjItrState(witRun(), &objItrState);
+      while( true )   {
+         witAdvanceObjItr(witRun());
+         witGetObjItrState(witRun(), &objItrState);
+         if (objItrState==WitINACTIVE) break;
+         if( objItrState == WitAT_SUB_ENTRY ) {
+           char * operationName;
+           int bomEntry;
+           int subEntry;
+           witGetObjItrSubsBomEntry(witRun(),&operationName, &bomEntry, &subEntry);
+           std::vector<float> sv = witGetSubArcAttribute(witGetSubsBomEntrySubVol,operationName,bomEntry,subEntry);
+      
+           printerName.push_back( printerFromPrinterName(operationName) );
+           printerLoc.push_back( locationFromPrinterName(operationName) );
+           
+           char * consPart;
+           witGetSubsBomEntryConsumedPart(witRun(),operationName,bomEntry,subEntry,&consPart);
+           
+           matLoc.push_back(locationFromMaterialName(consPart));
+           matSize.push_back(nozSizeFromMaterialName(consPart));;
+           matType.push_back(plasticTypeFromMaterailName(consPart));                     
+           subVol.push_back(sv);
+           if( ownSupply(consPart) )own.push_back("yes");
+           else own.push_back("no");
+         
+           witFree(consPart);
+           witFree(operationName);
+        }
+     }     
+} 
 
 
 
@@ -272,6 +274,18 @@ std::string VISORproblem::nozSizeFromMaterialName(const std::string & matName)
 std::string VISORproblem::plasticTypeFromMaterailName(const std::string & matName)
 {  
   return textBetween(matName," Type "," at ");
+}
+bool VISORproblem::ownSupply(const std::string & matName)
+{  
+   bool retVal;
+   if ( beginsWith(matName,"shareableSupply: ") )
+      retVal=false;
+   else
+   {
+   	//assert( beginsWith(matName,"shareableSupply: ") );
+   	retVal = true;
+   }
+   return retVal;
 }
 
 //-------------------------------------------------------------------------
@@ -305,6 +319,7 @@ std::string VISORproblem::locationFromPrinterName(const std::string & baseName)
 {  
   return textAfter(baseName," at-> ");
 }
+
 
 //-------------------------------------------------------------------------
 // text utilities Methods
@@ -903,7 +918,7 @@ VISORproblem::test()
     prob.setNPeriods(25);    
     assert(prob.getNPeriods()==25);
     
-    prob.addMaterial("Briarcliff","N175","PLA",200.0,75);
+    prob.addMaterial("Briarcliff","1.75mm","PLA",200.0,75);
     
     std::vector<std::string> location, nozSize, plasticType;
     prob.getMaterials( location, nozSize, plasticType );
@@ -911,31 +926,31 @@ VISORproblem::test()
     assert( nozSize.size()==1 );
     assert( plasticType.size()==1 );    
     assert( location[0]=="Briarcliff" );
-    assert( nozSize[0]=="N175" );
+    assert( nozSize[0]=="1.75mm" );
     assert( plasticType[0]=="PLA" ); 
     
-    std::vector<float> sv=prob.getOwnSupply("Briarcliff","N175","PLA");
+    std::vector<float> sv=prob.getOwnSupply("Briarcliff","1.75mm","PLA");
     assert( eq(sv[0],50.) );
     assert( eq(sv[1],0.0) );
-    sv=prob.getSharedSupply("Briarcliff","N175","PLA");
+    sv=prob.getSharedSupply("Briarcliff","1.75mm","PLA");
     assert( eq(sv[0],150.) );
     assert( eq(sv[3],0.0) );
     assert( sv.size()==25 );
     
     
-    prob.addMaterial("Amawalk",   "N175","ABS",100.0,33);    
+    prob.addMaterial("Amawalk",   "1.75mm","ABS",100.0,33);    
     prob.getMaterials( location, nozSize, plasticType );
     assert( location.size()==2 );
-    sv=prob.getOwnSupply("Amawalk",   "N175","ABS");
+    sv=prob.getOwnSupply("Amawalk",   "1.75mm","ABS");
     assert( eq(sv[0],67.) );
     assert( eq(sv[24],0.0) );
-    sv=prob.getSharedSupply("Amawalk",   "N175","ABS");
+    sv=prob.getSharedSupply("Amawalk",   "1.75mm","ABS");
     assert( eq(sv[0],33.) );
     assert( eq(sv[20],0.0) );
 
 
     // Test printers
-    prob.addPrinter("DigiLab3D45","Kitchawan Rd", 30.f,   true, false,    true, true, true, false);
+    prob.addPrinter("DigiLab3D45","Kitchawan Rd", 30.f,   true, false,    true, true, false, false);
     std::vector<std::string> printerName, printerLoc;
     prob.getPrinters( printerName, printerLoc );
     assert( printerName.size()==1 );
@@ -948,6 +963,38 @@ VISORproblem::test()
     std::vector<float> shipVol=prob.getPrinterShipVol("DigiLab3D45","Kitchawan Rd");
     assert( eq(shipVol[0],0.) );
     assert( eq(shipVol[10],0.) );
+    
+    // Check Subs Boms
+    {
+      std::vector<std::string> printerName, printerLoc;
+      std::vector<std::string> matLoc, matSize, matType, own;
+      std::vector< std::vector<float>> subVol;
+    	prob.getSubVol(
+            printerName, printerLoc,
+            matLoc, matSize, matType,
+            subVol, own );
+      assert(printerName[0]=="DigiLab3D45" );
+      assert(printerLoc[0]=="Kitchawan Rd" );
+      assert(matLoc[0]=="Briarcliff" );
+      assert(matSize[0]=="1.75mm" );
+      assert(matType[0]=="PLA" );
+      assert(own[0]=="no" );            
+            
+      
+      prob.addPrinter("DigiLab3D45","Amawalk", 10.f,   true, false,    false, false, true, false);      
+      prob.getSubVol(
+            printerName, printerLoc,
+            matLoc, matSize, matType,
+            subVol, own );   
+      assert(subVol.size()==3);
+              
+      //    for( int i=0; i<printerName.size(); i++)
+      //    {
+      //    	std::cout <<printerName[i]+" "+printerLoc[i]+" "+matLoc[i]+" "+matSize[i]+" "+matType[i]+" "+own[i]+"\n";
+      //    }  
+    	
+    }
+ 
     
     //std::vector<float> vol = p1.getPartDemandShipVol("0000000P1413","980","980");
     //assert(eq(vol[0],0.0));

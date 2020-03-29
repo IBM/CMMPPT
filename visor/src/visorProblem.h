@@ -141,6 +141,7 @@ public:
   std::string locationFromMaterialName(const std::string & matName);
   std::string nozSizeFromMaterialName(const std::string & matName);
   std::string plasticTypeFromMaterailName(const std::string & matName);
+  bool ownSupply(const std::string & matName);
   
   //----------------------
   // Printer Methods
@@ -164,6 +165,17 @@ public:
   std::string basePrinterName(const std::string & name, const std::string & location );
   std::string printerFromPrinterName(const std::string & baseName);
   std::string locationFromPrinterName(const std::string & baseName);
+
+
+
+  //------------------------------------------
+  // Subs Bom Entry methods
+  //-----------------------------------------
+  void getSubVol(
+            std::vector<std::string> & printerName, std::vector<std::string> & printerLoc,
+            std::vector<std::string> & matLoc, std::vector<std::string> & matSize, std::vector<std::string> &matType,
+            std::vector< std::vector<float>> &subVol, std::vector<std::string> & own );
+
 
 
   // String Utilities
