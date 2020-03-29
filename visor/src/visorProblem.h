@@ -141,6 +141,42 @@ public:
   std::string locationFromMaterialName(const std::string & matName);
   std::string nozSizeFromMaterialName(const std::string & matName);
   std::string plasticTypeFromMaterailName(const std::string & matName);
+  bool ownSupply(const std::string & matName);
+  
+  //----------------------
+  // Printer Methods
+  //----------------------
+  void addPrinter(const std::string & name, const std::string & location,
+     float prodRate, 
+     bool n175, bool n285, 
+     bool petg, bool pla, bool abs, bool onyx);
+  
+  void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs ); 
+  std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
+  std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
+  
+  //-------------------------------------------------------------------------
+  // printer Name Methods
+  //-------------------------------------------------------------------------
+  std::string printerName(const std::string & name, const std::string & location );
+  std::string printerOperName(const std::string & name, const std::string & location );
+  std::string noSupplyPartName(const std::string & name, const std::string & location );
+  std::string visorPartName(const std::string & name, const std::string & location );
+  std::string basePrinterName(const std::string & name, const std::string & location );
+  std::string printerFromPrinterName(const std::string & baseName);
+  std::string locationFromPrinterName(const std::string & baseName);
+
+
+
+  //------------------------------------------
+  // Subs Bom Entry methods
+  //-----------------------------------------
+  void getSubVol(
+            std::vector<std::string> & printerName, std::vector<std::string> & printerLoc,
+            std::vector<std::string> & matLoc, std::vector<std::string> & matSize, std::vector<std::string> &matType,
+            std::vector< std::vector<float>> &subVol, std::vector<std::string> & own );
+
+
 
   // String Utilities
   static std::string textBetween(const std::string & src, const std::string & before,const std::string & after);
@@ -385,6 +421,7 @@ private:
   int nPeriods_; // cached for performance
 
   std::set<std::string> materialBaseNames_; 
+  std::set<std::string> printerBaseNames_;
   
 };
 

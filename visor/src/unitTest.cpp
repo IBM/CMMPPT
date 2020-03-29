@@ -6,6 +6,8 @@
 
 #include "requestQuantity.h"
 #include "printer.h"
+#include "onHandMaterial.h"
+#include "visorProblem.h"
 
 // Function Prototypes. Function definitions is in this file.
 void testingMessage( const char * const msg );
@@ -28,9 +30,14 @@ main (int argc, char * argv[])
   testingMessage( "Testing VISORprinterIterator\n" );
   VISORprinterIterator::test();
 
+  testingMessage( "Testing VISORonHandMaterial\n" );
+  VISORonHandMaterial::test();
 
-  //testingMessage( "Testing ESO2problem\n" );
-  //ESO2problem::test();
+  testingMessage( "Testing VISORonHandMaterialIterator\n" );
+  VISORonHandMaterialIterator::test();
+
+  testingMessage( "Testing VISORproblem\n" );
+  VISORproblem::test();
 
   testingMessage( "All tests completed successfully\n" );
 
