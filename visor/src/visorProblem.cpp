@@ -122,17 +122,31 @@ void VISORproblem::addPrinter(
 	std::vector<float> sv=floatToStlVec(prodRate);
    witSetNameAttribute(witSetPartSupplyVol,printerNm,sv);
    
+   float sumSupplyVol=1;
+   for ( int i=0; i<sv.size() ) sumSupplyVol += sv[i]];
+   
    // Add Demand for visor and set demandVol to big M
    witAddDemand(witRun(),visorPartNm.c_str(),"demand");
-   std::vector<float> dv=floatToStlVec(99999.0);
+   std::vector<float> dv=floatToStlVec(sumSupplyVol);
    witSetDemandAttribute(witSetDemandDemandVol,visorPartNm,"demand",dv);
+   
+   std::vector<float> cumShipRew=floatToStlVec(10.);
+   witSetDemandAttribute(witSetDemandCumShipReward,visorPartNm,"demand",cumShipRew);
+   std::vector<float> shipRew=floatToStlVec(100.);
+   witSetDemandAttribute(witSetDemandShipReward,visorPartNm,"demand",shipRew);
    
    //Subs Boms for all materaials printer can use
    {
       std::vector<std::string> matLoc, nozSize, plasticType;
       getMaterials( matLoc, nozSize, plasticType );
       
+      float * ownSubCost = floatToConstFloatStar(0.0f);
+      float * ownShrSubCost = floatToConstFloatStar(1.0f);
+      float * shrSubCost = floatToConstFloatStar(2.0f);
+      float * shipOffset = floatToConstFloatStar(1.0f);
+      
       //Loop once for each material
+      int nSubBomEntries = 0;
       for (int i=0; i<matLoc.size(); i++)
       {
       	// Determine if i'th material can be used with this printer
@@ -151,15 +165,34 @@ void VISORproblem::addPrinter(
 	         std::string shrMatName = shrMaterialName(matLoc[i], nozSize[i], plasticType[i] );
             witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,shrMatName.c_str());
             
+            if ( location==matLoc[i] )
+            {
+            	// ownd Share sub cost
+               witSetSubsBomEntrySubCost(witRun(),printerOperNm.c_str(),1,nSubBomEntries,ownShrSubCost);
+            }
+            else {
+            	// Share sub cost
+               witSetSubsBomEntrySubCost(witRun(),printerOperNm.c_str(),1,nSubBomEntries,shrSubCost);
+               // set shipping offset 1
+               witSetSubsBomEntryOffset(witRun(),printerOperNm.c_str(),1,nSubBomEntries,shipOffset);
+               
+            }
+            nSubBomEntries++;
+            
             // if material is local then add own supply
             if ( location==matLoc[i] )
             {
             	std::string ownMatName = ownMaterialName(matLoc[i], nozSize[i], plasticType[i] );
-               witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,ownMatName.c_str());      		
-                        
+               witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,ownMatName.c_str());      	
+               witSetSubsBomEntrySubCost(witRun(),printerOperNm.c_str(),1,nSubBomEntries,ownSubCost);	
+               nSubBomEntries++;         
             }
       	}
       }
+      delete [] ownSubCost;
+      delete [] ownShrSubCost;
+      delete [] shrSubCost;
+      delete [] shipOffset;
    }
 	
 	std::string baseName = basePrinterName(name,location);
@@ -694,6 +727,7 @@ printerBaseNames_()
 {
   witNewRun( &wr_ );
   witInitialize( witRun() );
+    witSetIndependentOffsets( witRun(), WitTRUE );
   //witSetOslMesgFileName(witRun(),WitSTDOUT);
   
   // Turn off WIT informational messages
