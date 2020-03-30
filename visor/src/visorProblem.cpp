@@ -279,6 +279,16 @@ void VISORproblem::getSubVol(
      }     
 } 
 
+// -----------------------------
+// solver methods
+// ----------------------------
+void VISORproblem::solve()
+{
+	//witOptImplode(witRun());
+	witHeurImplode(witRun());
+}
+
+
 
 
 //-------------------------------------------------------------------------
@@ -706,6 +716,11 @@ void VISORproblem::setSolverLogFileName(const std::string & name)
   witSetSolverLogFileName(witRun(),name.c_str());
 }
 
+void VISORproblem::writeWitData( std::string filename ) 
+{
+  witSetMesgFileAccessMode(mutableWitRun(),WitFALSE,"w");
+  witWriteData(mutableWitRun(), filename.c_str() );
+}
 
 
 

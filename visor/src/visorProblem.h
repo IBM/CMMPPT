@@ -113,6 +113,9 @@ public:
     int retVal = nPeriods_;
     return retVal;
   }
+  
+  // write wit data file
+  void writeWitData( std::string filename );
 
 
 

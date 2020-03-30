@@ -129,6 +129,44 @@ main (int argc, char * argv[])
        }
     }
     
+    visorProb.writeWitData(outputDirectory+"/wit.data");
+    
+    visorProb.solve();
+    
+    // write subVol file
+    bool writeHeader=true;
+    {
+    	std::string subVolFileName = outputDirectory+"/subVol.csv";
+      FILE * subVolFilePtr = fopen(subVolFileName.c_str(),"w");
+    
+      std::string heading;
+      heading="\"printerName\",\"printerLocation\",\"materialLocation\",\"filamentSize\",\"plasticType\",\"period\",\"quantity\",\"own\""; 
+      if (writeHeader) fprintf(subVolFilePtr,"%s\n",heading.c_str());
+      
+      std::vector<std::string> printerName, printerLoc;
+      std::vector<std::string> matLoc, matSize, matType, own;
+      std::vector< std::vector<float>> subVol;
+    	visorProb.getSubVol(
+            printerName, printerLoc,
+            matLoc, matSize, matType,
+            subVol, own );
+    
+       // Loop once for each sub bom
+       for( int s=0; s<printerName.size(); s++)
+       {
+       	for( int t=0; t<nPeriods; t++)
+       	{
+             if (subVol[s][t] == 0 ) continue;
+          
+             fprintf(subVolFilePtr,
+                  "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%f,\"%s\"\n",
+                  printerName[t].c_str(),printerLoc[t].c_str(),matLoc[t].c_str(),matSize[t].c_str(),matType[t].c_str(),t,subVol[s][t],own[t].c_str());
+         } 
+       }  
+
+       fclose(subVolFilePtr);
+    } // finished writing subVol file
+    
     //---------------------------------------------------------
   #if 0
     std::string printerFileName = outputDirectory+"/printer.csv";
