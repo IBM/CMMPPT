@@ -252,6 +252,41 @@ main (int argc, char * argv[])
        fclose(prodVolFilePtr);
     } // finished writing prodVol file
 
+    // --------------------------------------------
+    // write shipQuantity file
+    // --------------------------------------------
+    {
+    	std::string shipQuantityFileName = outputDirectory+"/shipQuantity.csv";
+      FILE * shipQuantityFilePtr = fopen(shipQuantityFileName.c_str(),"w");
+
+      std::string heading;
+      heading="\"requestingLocation\",\"producingLocation\",\"period\",\"shipQuantity\"";
+      if (writeHeader) fprintf(shipQuantityFilePtr,"%s\n",heading.c_str());
+
+      std::vector<std::vector<std::string>> demands=allocProb.getDemands();
+
+      // Loop once for each demand
+      for( int d=0; d<demands.size(); d++)
+      {
+         // Get shipVol to hospital
+         std::string pn=demands[d][0];
+         std::string dn=demands[d][1];
+         std::vector<float> sv=allocProb.getVisorShipVol(dn,pn);         
+         
+       	for( int t=0; t<nPeriods; t++)
+       	{
+       	    if ( eq(sv[t],0.0) ) continue;
+
+             fprintf(shipQuantityFilePtr,
+                  "\"%s\",\"%s\",%d,%f\n",
+                  dn.c_str(),pn.c_str(),t,sv[t]);
+         }
+      }
+
+       fclose(shipQuantityFilePtr);
+    } // finished writing prodVol file
+
+
     //---------------------------------------------------------
 
 

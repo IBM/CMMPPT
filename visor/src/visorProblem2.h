@@ -140,6 +140,8 @@ public:
   //----------------------
   void addVisorRequest( const std::string & name,  int period,  int requestedQuantity);
   bool witGetDemandExists(const std::string & visorName, const std::string & demandName );
+  std::vector<std::vector<std::string>> getDemands();
+  std::vector<float> getVisorShipVol(std::string & demandName,std::string & producingLocation);
 
 
 
@@ -398,8 +400,8 @@ private:
   int nPeriods_; // cached for performance
 
   std::set<std::string> locationBaseNames_;
-  //std::set<std::string> printerBaseNames_;
-
+  std::vector<std::vector<std::string>> demandList_;
+           
 };
 
 

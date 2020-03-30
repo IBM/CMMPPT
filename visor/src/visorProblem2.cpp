@@ -91,8 +91,15 @@ void VISORproblem2::addVisorRequest(
        
        // Only add demand if it doesn't already exist
        if(!witGetDemandExists(aggVisNm,name))
+       {
+       	//std::cout <<aggVisNm+"\n";
            witAddDemand(witRun(),aggVisNm.c_str(),name.c_str());
-
+           std::vector<std::string> pair;
+           pair.push_back(*it);
+           pair.push_back(name);
+           demandList_.push_back(pair);
+       }
+       
        // Set demand to the requested number of visors       
        witSetDemandAttribute(witGetDemandDemandVol,witSetDemandDemandVol,
                       aggVisNm, name, period, requestedQuantity);    
@@ -121,12 +128,22 @@ bool VISORproblem2::witGetDemandExists(const std::string & visorName, const std:
   return retVal;
 }
 
+std::vector<float> VISORproblem2::getVisorShipVol(std::string & demandName,std::string & producingLocation)
+{
+	//std::cout <<demandName+ "  |  "+producingLocation+"\n";
+	std::string aggVisNm  = aggregateVisorName(producingLocation);
+	return witGetDemandAttribute(witGetDemandShipVol,aggVisNm,demandName);
+}
+
+
+std::vector<std::vector<std::string>> VISORproblem2::getDemands() { return demandList_; }
+
+
 // -----------------------------
 // solver methods
 // ----------------------------
 void VISORproblem2::solve()
 {
-
 	witHeurImplode(witRun());
 }
 
@@ -164,9 +181,10 @@ std::string VISORproblem2::baseLocationName(const std::string & location )
 
 std::set<std::string> VISORproblem2::getLocation() { return locationBaseNames_; }
 
-//std::string VISORproblem2::printerFromPrinterName(const std::string & baseName)
+//std::string VISORproblem2::locationFromFromAggregateVisorName(const std::string & avn)
 //{
-//  return textBetween(baseName,"Printer: "," at-> ");
+//  //return textBetween(baseName,"Printer: "," at-> ");
+//  return textAfter(avn," at-> ");
 //}
 //std::string VISORproblem2::locationFromPrinterName(const std::string & baseName)
 //{
@@ -553,8 +571,8 @@ VISORproblem2::VISORproblem2()
 :
 wr_(NULL),
 nPeriods_(30),
-locationBaseNames_()
-//printerBaseNames_()
+locationBaseNames_(),
+demandList_()
 {
   witNewRun( &wr_ );
   witInitialize( witRun() );
