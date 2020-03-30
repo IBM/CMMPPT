@@ -231,7 +231,16 @@ std::vector<float> VISORproblem::getPrinterShipVol(
   return retVal;
 }
 
-
+std::vector<float> VISORproblem::getPrinterProdVol(
+             const std::string & name, 
+             const std::string & loc )
+{
+  std::vector<float> retVal;
+  std::string operNm = printerOperName(name, loc);
+  retVal = witGetNameAttribute(witGetOperationExecVol,operNm);
+  return retVal;
+}
+  std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );
 //------------------------------------------
 // Subs Bom Entry methods
 //-----------------------------------------

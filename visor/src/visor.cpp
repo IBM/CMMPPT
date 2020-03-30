@@ -173,6 +173,36 @@ main (int argc, char * argv[])
        fclose(subVolFilePtr);
     } // finished writing subVol file
     
+    // write prodVol file
+    {
+    	std::string prodVolFileName = outputDirectory+"/prodVol.csv";
+      FILE * prodVolFilePtr = fopen(prodVolFileName.c_str(),"w");
+    
+      std::string heading;
+      heading="\"printerName\",\"printerLocation\",\"period\",\"quantity\""; 
+      if (writeHeader) fprintf(prodVolFilePtr,"%s\n",heading.c_str());
+      
+      std::vector<std::string> printerName, printerLoc;
+      visorProb.getPrinters( printerName, printerLoc );
+          
+      // Loop once for each printer
+      for( int p=0; p<printerName.size(); p++)
+      {
+         // Get printers witOpExecVol
+         std::vector<float> ev=visorProb.getPrinterProdVol(printerName[p],printerLoc[p]);       	
+       	for( int t=0; t<nPeriods; t++)
+       	{
+             if (ev[t] == 0 ) continue;
+          
+             fprintf(prodVolFilePtr,
+                  "\"%s\",\"%s\",%d,%f\n",
+                  printerName[p].c_str(),printerLoc[p].c_str(),t,ev[p]);
+         } 
+       }  
+
+       fclose(prodVolFilePtr);
+    } // finished writing prodVol file
+    
     //---------------------------------------------------------
   #if 0
     std::string printerFileName = outputDirectory+"/printer.csv";
