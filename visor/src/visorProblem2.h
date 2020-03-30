@@ -130,6 +130,8 @@ public:
   //----------------------
   void addVisor( const std::string & name, const std::string & location);
   bool locationExists( const std::string & loc );
+  void setVisorSupplyVol( const std::string & name, const std::string & location, 
+         const std::vector<float> & supplyVol);
 
 
 

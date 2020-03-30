@@ -159,6 +159,27 @@ main (int argc, char * argv[])
     allocProb.writeWitData(outputDirectory+"/wit2.data");
 
     printingProb.solve(useOptImplode);
+    
+    //----------------------------------
+    // Get soln from first implosoin and set supply for 2nd
+    //----------------------------------
+    {
+    	std::vector<std::string> printerName, printerLoc;
+      printingProb.getPrinters( printerName, printerLoc );
+
+      // Loop once for each printer
+      for( int p=0; p<printerName.size(); p++)
+      {
+         // Get ShipVol from printer
+         std::vector<float> sv=printingProb.getPrinterShipVol(printerName[p],printerLoc[p]);
+       	
+       	// Set Supply Vol of 2nd implosion to 1st implosion shipVol
+       	allocProb.setVisorSupplyVol(printerName[p],printerLoc[p],sv);       
+       }
+    }
+       
+       //Do second implosion
+       allocProb.solve();
 
     // --------------------------------------------
     // write subVol file
@@ -215,9 +236,11 @@ main (int argc, char * argv[])
       for( int p=0; p<printerName.size(); p++)
       {
          // Get printers witOpExecVol
-         std::vector<float> ev=printingProb.getPrinterProdVol(printerName[p],printerLoc[p]);
+         std::vector<float> ev=printingProb.getPrinterProdVol(printerName[p],printerLoc[p]);         
+         //std::vector<float> sv=printingProb.getPrinterShipVol(printerName[p],printerLoc[p]);
        	for( int t=0; t<nPeriods; t++)
        	{
+       		//assert( eq(ev[t],sv[t]) );
              if ( eq(ev[t],0.0) ) continue;
 
              fprintf(prodVolFilePtr,

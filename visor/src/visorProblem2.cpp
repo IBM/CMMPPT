@@ -20,9 +20,7 @@
 //----------------------
 // Visor Methods
 //----------------------
-void VISORproblem2::addVisor(
-    const std::string & name,
-    const std::string & location)
+void VISORproblem2::addVisor( const std::string & name, const std::string & location)
 {
 	std::string aggVisNm       = aggregateVisorName(location );
 	std::string aggOperNm      = aggregateOperName(location );
@@ -55,6 +53,13 @@ void VISORproblem2::addVisor(
     witAddPart(witRun(), visorPartNm.c_str(),      WitMATERIAL);
     witAddSubsBomEntry(witRun(),aggOperNm.c_str(),0,visorPartNm.c_str());
 
+}
+
+void VISORproblem2::setVisorSupplyVol( const std::string & name, const std::string & location, 
+         const std::vector<float> & supplyVol)
+{
+    std::string visorPartNm    = visorPartName(name, location );
+    witSetNameAttribute(witSetPartSupplyVol,visorPartNm,supplyVol);
 }
 
 bool VISORproblem2::locationExists( const std::string & loc )
