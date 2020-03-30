@@ -113,6 +113,9 @@ public:
     int retVal = nPeriods_;
     return retVal;
   }
+  
+  // write wit data file
+  void writeWitData( std::string filename );
 
 
 
@@ -156,6 +159,8 @@ public:
   void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs ); 
   std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
+  std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );
+  
   
   //-------------------------------------------------------------------------
   // printer Name Methods
@@ -189,7 +194,7 @@ public:
   //--------------------
   // Solve Methods. 
   //--------------------
-  void solve();
+  void solve(bool useOptImplode);
 
 
   //----------------------------------------------------------------------

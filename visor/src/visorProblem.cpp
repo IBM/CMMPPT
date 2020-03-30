@@ -231,7 +231,16 @@ std::vector<float> VISORproblem::getPrinterShipVol(
   return retVal;
 }
 
-
+std::vector<float> VISORproblem::getPrinterProdVol(
+             const std::string & name, 
+             const std::string & loc )
+{
+  std::vector<float> retVal;
+  std::string operNm = printerOperName(name, loc);
+  retVal = witGetNameAttribute(witGetOperationExecVol,operNm);
+  return retVal;
+}
+  std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );
 //------------------------------------------
 // Subs Bom Entry methods
 //-----------------------------------------
@@ -278,6 +287,16 @@ void VISORproblem::getSubVol(
         }
      }     
 } 
+
+// -----------------------------
+// solver methods
+// ----------------------------
+void VISORproblem::solve(bool useOptImplode)
+{
+	if (useOptImplode) witOptImplode(witRun());
+	else witHeurImplode(witRun());
+}
+
 
 
 
@@ -706,6 +725,11 @@ void VISORproblem::setSolverLogFileName(const std::string & name)
   witSetSolverLogFileName(witRun(),name.c_str());
 }
 
+void VISORproblem::writeWitData( std::string filename ) 
+{
+  witSetMesgFileAccessMode(mutableWitRun(),WitFALSE,"w");
+  witWriteData(mutableWitRun(), filename.c_str() );
+}
 
 
 
@@ -733,7 +757,6 @@ printerBaseNames_()
 {
   witNewRun( &wr_ );
   witInitialize( witRun() );
-    witSetIndependentOffsets( witRun(), WitTRUE );
   //witSetOslMesgFileName(witRun(),WitSTDOUT);
   
   // Turn off WIT informational messages
@@ -772,7 +795,11 @@ printerBaseNames_()
   
   
 
+
+    witSetIndependentOffsets( witRun(), WitTRUE );
+    witSetNPeriods(witRun(),30);
   //witSetObjChoice( witRun(), 1 );
+  
   //witSetUseFocusHorizons( witRun(), WitFALSE );
 
   //witSetExecEmptyBom( witRun(), WitFALSE );
