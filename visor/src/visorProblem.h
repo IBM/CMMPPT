@@ -159,6 +159,8 @@ public:
   void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs ); 
   std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
+  std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );
+  
   
   //-------------------------------------------------------------------------
   // printer Name Methods
