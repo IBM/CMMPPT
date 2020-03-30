@@ -12,6 +12,7 @@ gcc -I$C_INCLUDE_PATH -c -o scoFile.o         ../src/scoFile.cpp
 gcc -I$C_INCLUDE_PATH -c -o unitTest.o        ../src/unitTest.cpp
 gcc -I$C_INCLUDE_PATH -c -o VisorFinite.o      ../src/VisorFinite.cpp
 gcc -I$C_INCLUDE_PATH -c -o visorProblem1.o    ../src/visorProblem1.cpp
+gcc -I$C_INCLUDE_PATH -c -o visorProblem2.o    ../src/visorProblem2.cpp
 
-gcc -o visor visor.o scoFile.o visorProblem1.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
-gcc -o unitTest unitTest.o scoFile.o visorProblem1.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
+gcc -o visor visor.o scoFile.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
+gcc -o unitTest unitTest.o scoFile.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
