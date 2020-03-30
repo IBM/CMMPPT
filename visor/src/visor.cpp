@@ -16,7 +16,7 @@
 #include "printer.h"
 #include "requestQuantity.h"
 #include "onHandMaterial.h"
-#include "visorProblem.h"
+#include "visorProblem1.h"
 #include "VisorFloatEqual.h"
 
 
@@ -83,7 +83,7 @@ main (int argc, char * argv[])
     std::string inputDirectory=args[1];
     bool useOptImplode = true;
     if ( std::string(args[2])=="heur") useOptImplode=false;
-    VISORproblem visorProb;
+    VISORproblem1 visorProb;
     int nPeriods;
     VisorRelFltEq eq(1.e-05);
 

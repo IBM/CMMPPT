@@ -1,5 +1,5 @@
-#ifndef VISORproblem_h
-#define VISORproblem_h
+#ifndef VISORproblem1_h
+#define VISORproblem1_h
 
 //#include <iostream>
 #include <string>
@@ -40,40 +40,40 @@ extern "C" {typedef witReturnCode (STDCALL * witGetName3FloatStar) (
 
 extern "C" {typedef witReturnCode (STDCALL * witSetNameIndexFloatStar) (
    WitRun * const theWitRun,
-   const char * const name,   
+   const char * const name,
    const int bopEntryIndex,
    const float * const floatVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witSetNameIndexIndexFloatStar) (
    WitRun * const theWitRun,
-   const char * const name,   
-   const int bopEntryIndex,   
+   const char * const name,
+   const int bopEntryIndex,
    const int subEntryIndex,
    const float * const floatVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexFloatStarStar) (
    WitRun * const theWitRun,
-   const char * const name,   
+   const char * const name,
    const int bopEntryIndex,
    float ** floatVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIntStarStar) (
    WitRun * const theWitRun,
-   const char * const name,   
+   const char * const name,
    const int bopEntryIndex,
    int ** intVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexFloatStarStar) (
    WitRun * const theWitRun,
-   const char * const name,   
-   const int bopEntryIndex,   
+   const char * const name,
+   const int bopEntryIndex,
    const int subEntryIndex,
    float ** floatVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexIntStarStar) (
    WitRun * const theWitRun,
-   const char * const name,   
-   const int bopEntryIndex,   
+   const char * const name,
+   const int bopEntryIndex,
    const int subEntryIndex,
    int ** intVec);}
 
@@ -86,8 +86,8 @@ extern "C" {typedef witReturnCode (STDCALL * witGetNameIndexIndexIntStar) (
 
 extern "C" {typedef witReturnCode (STDCALL * witSetDblNameFloatStar) (
    WitRun * const theWitRun,
-   const char * const partName,  
-   const char * const demandName, 
+   const char * const partName,
+   const char * const demandName,
    const float * const floatVec);}
 
 extern "C" {typedef witReturnCode (STDCALL * witGetDblNameFloatStarStar) (
@@ -96,7 +96,7 @@ extern "C" {typedef witReturnCode (STDCALL * witGetDblNameFloatStarStar) (
    const char * const demandName,
    float ** floatVec);}
 
-class VISORproblem  {
+class VISORproblem1  {
 public:
 
   //----------------------------------
@@ -113,7 +113,7 @@ public:
     int retVal = nPeriods_;
     return retVal;
   }
-  
+
   // write wit data file
   void writeWitData( std::string filename );
 
@@ -124,18 +124,18 @@ public:
 
   // Set OSL Logfile name
   void setSolverLogFileName(const std::string & name);
-  
+
   //----------------------
   // Methods for material.
   //----------------------
   void addMaterial    (const std::string & location, const std::string & filamentSize, const std::string & plasticType, float quantity, int sharePercent );
   bool materialExists (const std::string & location, const std::string & filamentSize, const std::string & plasticType );
- 
+
   // Get list of all materials added
   void getMaterials( std::vector<std::string> & location, std::vector<std::string> & filamentSize, std::vector<std::string> & plasticType );
   std::vector<float> getOwnSupply(const std::string & loc, const std::string & nSize, const std::string & pType );
   std::vector<float> getSharedSupply(const std::string & loc, const std::string & nSize, const std::string & pType );
-  
+
 
   //-------------------------------------------------------------------------
   // material Name Methods
@@ -147,21 +147,21 @@ public:
   std::string filamentSizeFromMaterialName(const std::string & matName);
   std::string plasticTypeFromMaterailName(const std::string & matName);
   bool ownSupply(const std::string & matName);
-  
+
   //----------------------
   // Printer Methods
   //----------------------
   void addPrinter(const std::string & name, const std::string & location,
-     float prodRate, 
-     bool n175, bool n285, 
+     float prodRate,
+     bool n175, bool n285,
      bool petg, bool pla, bool abs, bool onyx);
-  
-  void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs ); 
+
+  void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs );
   std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );
-  
-  
+
+
   //-------------------------------------------------------------------------
   // printer Name Methods
   //-------------------------------------------------------------------------
@@ -192,7 +192,7 @@ public:
   static bool contains(const std::string & haystack, const std::string & needle);
 
   //--------------------
-  // Solve Methods. 
+  // Solve Methods.
   //--------------------
   void solve(bool useOptImplode);
 
@@ -208,23 +208,23 @@ public:
   //----------------------------------------------------------------------
 
   // default constructor
-  VISORproblem();
-  
+  VISORproblem1();
+
   // copy constructor
-  VISORproblem( const VISORproblem& source );
-  
+  VISORproblem1( const VISORproblem1& source );
+
   // assignment operator
-  VISORproblem&
-  operator=(const VISORproblem& rhs);
-  
+  VISORproblem1&
+  operator=(const VISORproblem1& rhs);
+
   // destructor
-  ~VISORproblem();
-  
+  ~VISORproblem1();
+
 
   // Self-test
   static void test();
 
-    
+
   public:
   inline std::vector<float> witFloatStarToStlVec(const float * inputVec ) const
   {
@@ -256,7 +256,7 @@ public:
     }
     return retVal;
   };
-  
+
   inline float * floatToConstFloatStar(float input ) const
   {
     int len = getNPeriods();
@@ -266,7 +266,7 @@ public:
     for ( i=0; i<len; ++i ) retVal[i] = input;
     return retVal;
   };
-  
+
   inline std::vector<float> floatToStlVec(float input ) const
   {
     int len = getNPeriods();
@@ -292,9 +292,9 @@ private:
     witGetNameFloatStarStar witGetFunc,
     witSetNameFloatStar     witSetFunc,
     const std::string & name,
-    int period, 
-    float supply ); 
-  
+    int period,
+    float supply );
+
   // Set Part/Operation float* attribute, given std::vector<float>
   void witSetNameAttribute(
     witSetNameFloatStar     witSetFunc,
@@ -306,26 +306,26 @@ private:
     witSetNameFloatStar     witSetFunc,
     const std::string & name,
     float value );
-  
+
   // Set Part/Operation bound attribute, given three std::vector<float> vectors
   void witSetNameBoundAttribute(
     witSetName3FloatStar     witSetFunc,
     const std::string & name,
     const std::vector<float> & hlb,
     const std::vector<float> & slb,
-    const std::vector<float> & hub );  
-    
+    const std::vector<float> & hub );
+
 
   std::vector<std::string> witGetOperProducts(const std::string & opName) const;
-  
-  
+
+
   // Set element on bom/bop float* attribute, given period and fltValue
   void witSetArcAttribute(
     witGetNameIndexFloatStarStar witGetFunc,
     witSetNameIndexFloatStar     witSetFunc,
     const std::string & opName,
     int index,
-    int period, 
+    int period,
     float flt );
 
   // Set element on bom/bop float* attribute, given std::vector<float>
@@ -340,7 +340,7 @@ private:
     witSetNameIndexFloatStar     witSetFunc,
     const std::string & opName,
     int index,
-    float value );    
+    float value );
 
   // Set element on demand float* attribute, given period and fltValue
   void witSetDemandAttribute(
@@ -348,8 +348,8 @@ private:
     witSetDblNameFloatStar          witSetFunc,
     const std::string & partName,
     const std::string & demandName,
-    int period, 
-    float flt );    
+    int period,
+    float flt );
 
   // Set element on demand float* attribute, given std::vector<float>
   void witSetDemandAttribute(
@@ -357,7 +357,7 @@ private:
     const std::string & partName,
     const std::string & demandName,
     const std::vector<float> & fltVec );
-  
+
   // Get vector of wit part/Operation float* attribute
   std::vector<float> witGetNameAttribute(
     witGetNameFloatStarStar witGetFunc,
@@ -389,14 +389,14 @@ private:
     witGetNameIndexIndexIntStar     witGetFunc,
     const std::string & opName,
     int index, int subIndex )const;
-  
+
   // Set sub float* attribute, given period and fltValue
   void witSetSubArcAttribute(
     witGetNameIndexIndexFloatStarStar witGetFunc,
     witSetNameIndexIndexFloatStar     witSetFunc,
     const std::string & opName,
     int index, int subIndex,
-    int period, 
+    int period,
     float flt );
 
   // Get vector of wit demand float* attribute
@@ -405,7 +405,7 @@ private:
     const std::string & partName,
     const std::string & demandName )const;
 
-  
+
   // Get Part/Operation bound attributes, given three std::vector<float> vectors
   void witGetNameBoundAttribute(
     witGetName3FloatStar     witGetFunc,
@@ -416,7 +416,7 @@ private:
 
 
 
-  void gutsOfCopy( const VISORproblem& source );
+  void gutsOfCopy( const VISORproblem1& source );
   void gutsOfDestructor();
 
 
@@ -427,9 +427,9 @@ private:
 
   int nPeriods_; // cached for performance
 
-  std::set<std::string> materialBaseNames_; 
+  std::set<std::string> materialBaseNames_;
   std::set<std::string> printerBaseNames_;
-  
+
 };
 
 
