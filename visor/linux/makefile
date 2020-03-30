@@ -1,4 +1,4 @@
-all: clean unitTest
+all: unitTest visor
 clean:
 	-rm *.o
 	-rm unitTest
@@ -11,15 +11,13 @@ LIBRARY_PATH+=-L /opt/ibm/ILOG/CPLEX_Studio_Community129/cplex/lib/x86-64_linux/
 
 C_INCLUDE_PATH=../../wit/src
 
-OBJECTS=../src/scoFile.o ../src/unitTest.o ../src/VisorFinite.o ../src/visorProblem.o
-build: wit mcl $(OBJECTS)
-	gcc -o unitTest $(OBJECTS)  -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
+OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem.o
 
-libraries: wit mcl 
+libraries: ../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
 
-unitTest: $(OBJECTS) ../src/unitTest.o
+unitTest: $(OBJECTS) ../src/unitTest.o libraries
 	gcc -o unitTest ../src/unitTest.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
-visor: $(OBJECTS) ../src/visor.o ../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
+visor: $(OBJECTS) ../src/visor.o libraries
 	gcc -o visor ../src/visor.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
 
 ../../mcl/linux/libmcl.a: 
