@@ -195,7 +195,7 @@ main (int argc, char * argv[])
              if (ev[t] == 0 ) continue;
           
              fprintf(prodVolFilePtr,
-                  "\"%s\",\"%s\",%d,%f\"\n",
+                  "\"%s\",\"%s\",%d,%f\n",
                   printerName[p].c_str(),printerLoc[p].c_str(),t,ev[p]);
          } 
        }  
