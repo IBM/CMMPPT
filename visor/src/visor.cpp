@@ -90,9 +90,48 @@ main (int argc, char * argv[])
     nPeriods = visorProb.getNPeriods();
 
     
+    // Read Material file and add to model
+    {
+      std::string onHandMaterialFileName = inputDirectory + "/onHandMaterial.csv";
+      VISORonHandMaterial onHandMaterialFile(onHandMaterialFileName);
+      VISORonHandMaterialIterator onHandMaterialFileIter(onHandMaterialFile);
+
+      // loop once for each record in materail file
+      for ( ; onHandMaterialFileIter()!=NULL; ) {
+         std::string matLoc = onHandMaterialFileIter.location();
+         std::string filSze = onHandMaterialFileIter.filamentSize();         
+         std::string pType = onHandMaterialFileIter.plasticType();
+         float qty = onHandMaterialFileIter.quantityAsFloat();
+         int shrPer = onHandMaterialFileIter.shareAsInt();
+         visorProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
+       }
+    }
+    
+    // Read printer file and add to model
+    {
+      std::string printerFileName = inputDirectory + "/printer.csv";
+      VISORprinter printerFile(printerFileName);
+      VISORprinterIterator printerFileIter(printerFile);
+
+      // loop once for each record in printer file
+      for ( ; printerFileIter()!=NULL; ) {
+         std::string pNam = printerFileIter.name();
+         std::string pLoc = printerFileIter.location();
+         int prodRate = printerFileIter.prodRateAsInt();
+         bool f175 =printerFileIter.F175asBool();
+         bool f285 =printerFileIter.F285asBool();
+         bool petg =printerFileIter.PETGasBool();
+         bool pla  =printerFileIter.PLAasBool();
+         bool abs  =printerFileIter.ABSasBool();
+         bool onyx =printerFileIter.ONYXasBool();
+         
+         visorProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
+       }
+    }
+    
     //---------------------------------------------------------
-#if 0    
-    std::string mtmAcquirePlanFileName = outputDirectory+"/mtmAcquirePlanO.csv";
+  #if 0
+    std::string printerFileName = outputDirectory+"/printer.csv";
     FILE * mtmAcquirePlanFilePtr = fopen(mtmAcquirePlanFileName.c_str(),"w");
     
     std::string featureAcquirePlanFileName = outputDirectory+"/featureAcquirePlanO.csv";

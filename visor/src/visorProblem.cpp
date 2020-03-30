@@ -733,7 +733,6 @@ printerBaseNames_()
 {
   witNewRun( &wr_ );
   witInitialize( witRun() );
-    witSetIndependentOffsets( witRun(), WitTRUE );
   //witSetOslMesgFileName(witRun(),WitSTDOUT);
   
   // Turn off WIT informational messages
@@ -772,7 +771,11 @@ printerBaseNames_()
   
   
 
+
+    witSetIndependentOffsets( witRun(), WitTRUE );
+    witSetNPeriods(witRun(),30);
   //witSetObjChoice( witRun(), 1 );
+  
   //witSetUseFocusHorizons( witRun(), WitFALSE );
 
   //witSetExecEmptyBom( witRun(), WitFALSE );
