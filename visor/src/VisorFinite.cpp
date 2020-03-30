@@ -3,7 +3,7 @@
 // Corporation and others.  All Rights Reserved.
 // This code is licensed under the terms of the Eclipse Public License (EPL).
 
-#include "CoinFinite.h"
+#include "VisorFinite.h"
 //#include "CoinUtilsConfig.h"
 
 #ifdef HAVE_CFLOAT
@@ -30,19 +30,19 @@
 #endif
 #endif
 
-bool CoinFinite(double val)
+bool VisorFinite(double val)
 {
-#ifdef COIN_C_FINITE
-  return COIN_C_FINITE(val) != 0;
+#ifdef VISOR_C_FINITE
+  return VISOR_C_FINITE(val) != 0;
 #else
   //return val != DBL_MAX && val != -DBL_MAX;
   return val != std::numeric_limits<double>::max() && val != -std::numeric_limits<double>::max();
 #endif
 }
 
-bool CoinIsnan(double val)
+bool VisorIsnan(double val)
 {
-#ifdef COIN_C_ISNAN
+#ifdef VISOR_C_ISNAN
   return COIN_C_ISNAN(val) != 0;
 #else
   return false;

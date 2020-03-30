@@ -9,7 +9,7 @@
 
 #include <wit.h>
 
-#include "CoinFloatEqual.h"
+#include "VisorFloatEqual.h"
 #include "onHandMaterial.h"
 #include "printer.h"
 #include "requestQuantity.h"
@@ -963,7 +963,7 @@ void
 VISORproblem::test()
 {
   //OsiRelFltEq eq(1e-05);
-  CoinRelFltEq eq(1.e-05);
+  VisorRelFltEq eq(1.e-05);
 
   {
     VISORproblem prob;
