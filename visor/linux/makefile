@@ -1,4 +1,4 @@
-all: clean build
+all: clean unitTest
 clean:
 	-rm *.o
 	-rm unitTest
@@ -15,9 +15,16 @@ OBJECTS=../src/scoFile.o ../src/unitTest.o ../src/VisorFinite.o ../src/visorProb
 build: wit mcl $(OBJECTS)
 	gcc -o unitTest $(OBJECTS)  -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
 
-mcl:
+libraries: wit mcl 
+
+unitTest: $(OBJECTS) ../src/unitTest.o
+	gcc -o unitTest ../src/unitTest.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
+visor: $(OBJECTS) ../src/visor.o ../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
+	gcc -o visor ../src/visor.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
+
+../../mcl/linux/libmcl.a: 
 	(cd ../../mcl/linux; make all exe_type=released)
-wit: mcl
+../../wit/linux/libwit.a: ../../mcl/linux/libmcl.a
 	(cd ../../wit/linux; make all exe_type=released)
 %.o:	../src/%.cpp
 	gcc -c -o $@     ../src/$*.cpp -I$(C_INCLUDE_PATH)
