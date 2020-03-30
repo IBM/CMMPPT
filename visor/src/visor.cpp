@@ -45,13 +45,13 @@ main (int argc, char * argv[])
       }
       
       if ( ! parmError ) {
-        if ( args.size()!=2 ) {
+        if ( args.size()!=3 ) {
           // Wrong number of parms. Write message
           std::cerr 
             <<"-------------------------------------------------------"  <<std::endl
             <<"Wrong number of parmeters specified"                      <<std::endl
             <<"  Number parameters specified: " <<(int)args.size()-1     <<std::endl
-            <<"  Expected number of parameters: 1"                       <<std::endl
+            <<"  Expected number of parameters: 2"                       <<std::endl
             <<"-------------------------------------------------------"  <<std::endl;
           parmError = true;
         }
@@ -63,13 +63,16 @@ main (int argc, char * argv[])
         // Write correct usage
         std::cerr 
           <<"-------------------------------------------------------"  <<std::endl
-          <<argv[0] <<" dataDirectory "                                <<std::endl
+          <<argv[0] <<" dataDirectory  solveType "                     <<std::endl
           <<"  where:"                                                 <<std::endl
           <<"    dataDirectory:"                                       <<std::endl
           <<"      Directory where input files are located and"        <<std::endl
           <<"      output files are written."                          <<std::endl
+          <<"    solveType:"                                           <<std::endl
+          <<"      If heur, then heuristicImplode, "                   <<std::endl
+          <<"      otherwise optImplode."                              <<std::endl
           <<"  example usage:"                                         <<std::endl
-          <<"    " <<argv[0] <<" ../example1"                          <<std::endl
+          <<"    " <<argv[0] <<" ../data/BrendaData heur"              <<std::endl
           <<"-------------------------------------------------------"  <<std::endl;
         return 1;
       }
@@ -77,6 +80,8 @@ main (int argc, char * argv[])
     
     std::string outputDirectory=args[1];
     std::string inputDirectory=args[1];
+    bool useOptImplode = true;
+    if ( std::string(args[2])=="heur") useOptImplode=false;
     VISORproblem visorProb;
     int nPeriods;
     
@@ -131,8 +136,8 @@ main (int argc, char * argv[])
     
     visorProb.writeWitData(outputDirectory+"/wit.data");
     
-    visorProb.solve();
-    
+    visorProb.solve(useOptImplode);
+
     // write subVol file
     bool writeHeader=true;
     {
@@ -154,13 +159,14 @@ main (int argc, char * argv[])
        // Loop once for each sub bom
        for( int s=0; s<printerName.size(); s++)
        {
+       	//std::cout <<printerName[s]+" "+printerLoc[s]+" "+matLoc[s]+" "+matSize[s]+" "+matType[s]+" "+own[s]+"\n";
        	for( int t=0; t<nPeriods; t++)
        	{
              if (subVol[s][t] == 0 ) continue;
           
              fprintf(subVolFilePtr,
                   "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%f,\"%s\"\n",
-                  printerName[t].c_str(),printerLoc[t].c_str(),matLoc[t].c_str(),matSize[t].c_str(),matType[t].c_str(),t,subVol[s][t],own[t].c_str());
+                  printerName[s].c_str(),printerLoc[s].c_str(),matLoc[s].c_str(),matSize[s].c_str(),matType[s].c_str(),t,subVol[s][t],own[s].c_str());
          } 
        }  
 
