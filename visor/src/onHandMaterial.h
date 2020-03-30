@@ -9,7 +9,7 @@ public:
 
   // Fields
   getFieldH(location);
-  getFieldH(nozSize);
+  getFieldH(filamentSize);
   getFieldH(plasticType);
   getFloatFieldH(quantity);
   getIntFieldH(share);
@@ -27,10 +27,10 @@ public:
   // compute key for storing record in dictionary
   static std::string key( 
     const std::string & location,
-    const std::string & nozSize,
+    const std::string & filamentSize,
     const std::string & plasticType ) 
   {
-    std::string retVal = location+"$+&"+nozSize+"$+&"+plasticType;
+    std::string retVal = location+"$+&"+filamentSize+"$+&"+plasticType;
     return retVal;
   };
   
@@ -45,7 +45,7 @@ public:
     // Test reading first record
 
     assert( file.location(3)=="Amawalk");
-    assert( file.nozSize(3) == "1.75mm" );
+    assert( file.filamentSize(3) == "1.75mm" );
     assert( file.plasticType(3) == "PLA" );    
     assert( file.quantity(3) == "20" );
     assert( file.share(3) == "100" );
@@ -65,7 +65,7 @@ protected:
   {
     std::string retVal = key(
       location(recNum),
-      nozSize(recNum),
+      filamentSize(recNum),
       plasticType(recNum) );
     return retVal;
   };
@@ -92,7 +92,7 @@ public:
     
   // Fields
   getFieldFileWithIteratorH(location);
-  getFieldFileWithIteratorH(nozSize);
+  getFieldFileWithIteratorH(filamentSize);
   getFieldFileWithIteratorH(plasticType);
   getFloatFieldFileWithIteratorH(quantity);
   getIntFieldFileWithIteratorH(share);
@@ -118,7 +118,7 @@ public:
       if ( recNo == 3 ) {
                
         assert( fileIter.location()=="Amawalk");
-        assert( fileIter.nozSize() == "1.75mm" );
+        assert( fileIter.filamentSize() == "1.75mm" );
         assert( fileIter.plasticType() == "PLA" );    
         assert( fileIter.quantity() == "20" );
         assert( fileIter.share() == "100" );

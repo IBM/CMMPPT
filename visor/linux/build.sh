@@ -7,9 +7,11 @@ export LIBRARY_PATH=../../wit/linux/:../../mcl/linux:/opt/ibm/ILOG/CPLEX_Studio_
 export C_INCLUDE_PATH="../../wit/src"
 
 
+gcc -I$C_INCLUDE_PATH -c -o visor.o           ../src/visor.cpp
 gcc -I$C_INCLUDE_PATH -c -o scoFile.o         ../src/scoFile.cpp
 gcc -I$C_INCLUDE_PATH -c -o unitTest.o        ../src/unitTest.cpp
 gcc -I$C_INCLUDE_PATH -c -o CoinFinite.o      ../src/CoinFinite.cpp
 gcc -I$C_INCLUDE_PATH -c -o visorProblem.o    ../src/visorProblem.cpp
 
+gcc -o visor visor.o scoFile.o visorProblem.o CoinFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
 gcc -o unitTest unitTest.o scoFile.o visorProblem.o CoinFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
