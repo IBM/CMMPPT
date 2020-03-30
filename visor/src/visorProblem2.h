@@ -126,8 +126,11 @@ public:
   void setSolverLogFileName(const std::string & name);
 
   //----------------------
-  // Methods for Printers.
+  // Methods for Visor.
   //----------------------
+  void addVisor( const std::string & name, const std::string & location);
+  bool locationExists( const std::string & loc );
+
 
 
   //----------------------
@@ -138,8 +141,14 @@ public:
 
 
   //------------------------------------------
-  // Subs Bom Entry methods
+  // Visor name methods
   //-----------------------------------------
+  std::string aggregateVisorName(const std::string & location );
+  std::string aggregateOperName(const std::string & location );
+  std::string noSupplyVisorName(const std::string & location );
+  std::string visorPartName(const std::string & name, const std::string & location );
+  std::string baseLocationName(const std::string & location );
+
 
  // String Utilities
   static std::string textBetween(const std::string & src, const std::string & before,const std::string & after);
@@ -383,7 +392,7 @@ private:
 
   int nPeriods_; // cached for performance
 
-  //std::set<std::string> materialBaseNames_;
+  std::set<std::string> locationBaseNames_;
   //std::set<std::string> printerBaseNames_;
 
 };

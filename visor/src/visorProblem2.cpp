@@ -18,8 +18,55 @@
 
 //
 //----------------------
-// Printer Methods
+// Visor Methods
 //----------------------
+void VISORproblem2::addVisor(
+    const std::string & name,
+    const std::string & location)
+{
+	std::string aggVisNm       = aggregateVisorName(location );
+	std::string aggOperNm      = aggregateOperName(location );
+	std::string noSupplyPartNm = noSupplyVisorName(location );
+	std::string visorPartNm    = visorPartName(name, location );
+
+	// If this is the first visor at this location, then add location constructs
+	if ( !locationExists(location) )
+	{
+	   // Location does not exist so add it
+	   // Add parts: Printer, NoSupply, and produced visor
+       witAddPart(witRun(), aggVisNm.c_str(),      WitMATERIAL);
+	   witAddPart(witRun(), noSupplyPartNm.c_str(), WitMATERIAL);
+
+       // Add opertaion
+	   witAddOperation(witRun(),aggOperNm.c_str());
+
+	   // Add bom connecting operation to printer and noSupplyPart
+	   witAddBomEntry(witRun(), aggOperNm.c_str(), noSupplyPartNm.c_str());
+
+	   // Connect operation to produced visor
+	   witAddBopEntry(witRun(), aggOperNm.c_str(), aggVisNm.c_str());
+
+       std::string baseName = baseLocationName(location);
+	   locationBaseNames_.insert(location);
+    }
+
+    // Add part and SubBom entry to part
+    witAddPart(witRun(), visorPartNm.c_str(),      WitMATERIAL);
+    witAddSubsBomEntry(witRun(),aggOperNm.c_str(),0,visorPartNm.c_str());
+
+}
+
+bool VISORproblem2::locationExists( const std::string & loc )
+{
+  std::string aggOperNm      = aggregateOperName(loc );
+  witBoolean exists;
+  witGetOperationExists(mutableWitRun(),aggOperNm.c_str(),&exists);
+  bool retVal = false;
+  if( exists ) retVal = true;
+  std::cout <<aggOperNm <<" " <<retVal <<std::endl;
+  return retVal;
+}
+
 
 // -----------------------------
 // solver methods
@@ -41,6 +88,36 @@ void VISORproblem2::solve()
 //-------------------------------------------------------------------------
 // printer Name Methods
 //-------------------------------------------------------------------------
+std::string VISORproblem2::aggregateVisorName(const std::string & location )
+{
+  return "Visor aggregation "+baseLocationName(location);
+}
+std::string VISORproblem2::aggregateOperName(const std::string & location )
+{
+  return "Aggregate  "+baseLocationName(location);
+}
+std::string VISORproblem2::noSupplyVisorName(const std::string & location )
+{
+  return "No supply part "+baseLocationName(location);
+}
+std::string VISORproblem2::visorPartName(const std::string & name, const std::string & location )
+{
+  return "Visor "+name+" made "+baseLocationName(location);
+}
+std::string VISORproblem2::baseLocationName(const std::string & location )
+{
+  return " at-> "+location;
+}
+
+//std::string VISORproblem2::printerFromPrinterName(const std::string & baseName)
+//{
+//  return textBetween(baseName,"Printer: "," at-> ");
+//}
+//std::string VISORproblem2::locationFromPrinterName(const std::string & baseName)
+//{
+//  return textAfter(baseName," at-> ");
+
+
 
 //-------------------------------------------------------------------------
 // text utilities Methods
@@ -420,8 +497,8 @@ WitRun * VISORproblem2::witRun() { return wr_; }
 VISORproblem2::VISORproblem2()
 :
 wr_(NULL),
-nPeriods_(30)
-//materialBaseNames_(),
+nPeriods_(30),
+locationBaseNames_()
 //printerBaseNames_()
 {
   witNewRun( &wr_ );

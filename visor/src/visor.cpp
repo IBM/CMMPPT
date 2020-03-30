@@ -17,6 +17,7 @@
 #include "requestQuantity.h"
 #include "onHandMaterial.h"
 #include "visorProblem1.h"
+#include "visorProblem2.h"
 #include "VisorFloatEqual.h"
 
 
@@ -83,7 +84,8 @@ main (int argc, char * argv[])
     std::string inputDirectory=args[1];
     bool useOptImplode = true;
     if ( std::string(args[2])=="heur") useOptImplode=false;
-    VISORproblem1 visorProb;
+    VISORproblem1 printingProb;
+    VISORproblem2 allocProb;
     int nPeriods;
     VisorRelFltEq eq(1.e-05);
 
@@ -91,10 +93,10 @@ main (int argc, char * argv[])
     bool writeZeros=true;
 
 
-    visorProb.setSolverLogFileName(outputDirectory+"/clpMesgFile.txt");
-    bool useGlobalAttrFileSettings = true;
+    printingProb.setSolverLogFileName(outputDirectory+"/cplexMesgFile.txt");
     //createModel(eso2Prob, inputDirectory, useGlobalAttrFileSettings);
-    nPeriods = visorProb.getNPeriods();
+    nPeriods = printingProb.getNPeriods();
+    allocProb.setNPeriods(nPeriods);
 
 
     // Read Material file and add to model
@@ -110,7 +112,7 @@ main (int argc, char * argv[])
          std::string pType = onHandMaterialFileIter.plasticType();
          float qty = onHandMaterialFileIter.quantityAsFloat();
          int shrPer = onHandMaterialFileIter.shareAsInt();
-         visorProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
+         printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
        }
     }
 
@@ -132,13 +134,14 @@ main (int argc, char * argv[])
          bool abs  =printerFileIter.ABSasBool();
          bool onyx =printerFileIter.ONYXasBool();
 
-         visorProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
+         printingProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
+         allocProb.addVisor(pNam,pLoc);
        }
     }
 
-    visorProb.writeWitData(outputDirectory+"/wit.data");
+    printingProb.writeWitData(outputDirectory+"/wit.data");
 
-    visorProb.solve(useOptImplode);
+    printingProb.solve(useOptImplode);
 
     // --------------------------------------------
     // write subVol file
@@ -155,7 +158,7 @@ main (int argc, char * argv[])
       std::vector<std::string> printerName, printerLoc;
       std::vector<std::string> matLoc, matSize, matType, own;
       std::vector< std::vector<float>> subVol;
-    	visorProb.getSubVol(
+    	printingProb.getSubVol(
             printerName, printerLoc,
             matLoc, matSize, matType,
             subVol, own );
@@ -189,13 +192,13 @@ main (int argc, char * argv[])
       if (writeHeader) fprintf(prodVolFilePtr,"%s\n",heading.c_str());
 
       std::vector<std::string> printerName, printerLoc;
-      visorProb.getPrinters( printerName, printerLoc );
+      printingProb.getPrinters( printerName, printerLoc );
 
       // Loop once for each printer
       for( int p=0; p<printerName.size(); p++)
       {
          // Get printers witOpExecVol
-         std::vector<float> ev=visorProb.getPrinterProdVol(printerName[p],printerLoc[p]);
+         std::vector<float> ev=printingProb.getPrinterProdVol(printerName[p],printerLoc[p]);
        	for( int t=0; t<nPeriods; t++)
        	{
              if ( eq(ev[t],0.0) ) continue;
