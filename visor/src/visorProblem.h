@@ -117,17 +117,19 @@ public:
 
 
 
+
+
   // Set OSL Logfile name
   void setSolverLogFileName(const std::string & name);
   
   //----------------------
   // Methods for material.
   //----------------------
-  void addMaterial    (const std::string & location, const std::string & nozSize, const std::string & plasticType, float quantity, int sharePercent );
-  bool materialExists (const std::string & location, const std::string & nozSize, const std::string & plasticType );
+  void addMaterial    (const std::string & location, const std::string & filamentSize, const std::string & plasticType, float quantity, int sharePercent );
+  bool materialExists (const std::string & location, const std::string & filamentSize, const std::string & plasticType );
  
   // Get list of all materials added
-  void getMaterials( std::vector<std::string> & location, std::vector<std::string> & nozSize, std::vector<std::string> & plasticType );
+  void getMaterials( std::vector<std::string> & location, std::vector<std::string> & filamentSize, std::vector<std::string> & plasticType );
   std::vector<float> getOwnSupply(const std::string & loc, const std::string & nSize, const std::string & pType );
   std::vector<float> getSharedSupply(const std::string & loc, const std::string & nSize, const std::string & pType );
   
@@ -135,11 +137,11 @@ public:
   //-------------------------------------------------------------------------
   // material Name Methods
   //-------------------------------------------------------------------------
-  std::string ownMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType );
-  std::string shrMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType );
-  std::string baseMaterialName(const std::string & location, const std::string & nozSize, const std::string & plasticType );
+  std::string ownMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType );
+  std::string shrMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType );
+  std::string baseMaterialName(const std::string & location, const std::string & filamentSize, const std::string & plasticType );
   std::string locationFromMaterialName(const std::string & matName);
-  std::string nozSizeFromMaterialName(const std::string & matName);
+  std::string filamentSizeFromMaterialName(const std::string & matName);
   std::string plasticTypeFromMaterailName(const std::string & matName);
   bool ownSupply(const std::string & matName);
   

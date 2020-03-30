@@ -11,15 +11,15 @@ public:
   getFieldH(name);
   getFieldH(location);
   getIntFieldH(prodRate);
-  getFieldH(N175);
-  getFieldH(N285);
+  getFieldH(F175);
+  getFieldH(F285);
   getFieldH(PETG);
   getFieldH(PLA);
   getFieldH(ABS);
   getFieldH(ONYX);
   
-  bool N175asBool(int rec)  { return N175(rec)=="yes";}
-  bool N285asBool(int rec)  { return N285(rec)=="yes";}
+  bool F175asBool(int rec)  { return F175(rec)=="yes";}
+  bool F285asBool(int rec)  { return F285(rec)=="yes";}
   bool PETGasBool(int rec)  { return PETG(rec)=="yes";}
   bool PLAasBool(int rec)   { return PLA(rec) =="yes";}
   bool ABSasBool(int rec)   { return ABS(rec) =="yes";}
@@ -58,8 +58,8 @@ public:
     assert( file.location(1) == "Kitchawan Rd" );
     assert( file.prodRate(1) == "25" );
     assert( file.prodRateAsInt(1) == 25 );
-    assert( file.N175(1) == "yes" );
-    assert( file.N285(1) == "yes" );
+    assert( file.F175(1) == "yes" );
+    assert( file.F285(1) == "yes" );
     assert( file.PETG(1) == "yes" );
     assert( file.PLA(1) == "yes" );
     assert( file.ABS(1) == "no" );
@@ -69,8 +69,8 @@ public:
     assert( file.prodRateAsInt(key("FormlabsForm2","Kitchawan Rd"))==25);
     assert( file.prodRateAsInt(key("FormlabsForm2","Briarcliff, NY"))==16);
     
-    assert( file.N175asBool(1) );
-    assert( file.N285asBool(1) );
+    assert( file.F175asBool(1) );
+    assert( file.F285asBool(1) );
     assert( file.PETGasBool(1) );
     assert( file.PLAasBool(1) );
     assert( !file.ABSasBool(1) );
@@ -113,15 +113,15 @@ public:
   getFieldFileWithIteratorH(name);
   getFieldFileWithIteratorH(location);
   getIntFieldFileWithIteratorH(prodRate);
-  getFieldFileWithIteratorH(N175);
-  getFieldFileWithIteratorH(N285);
+  getFieldFileWithIteratorH(F175);
+  getFieldFileWithIteratorH(F285);
   getFieldFileWithIteratorH(PETG);
   getFieldFileWithIteratorH(PLA);
   getFieldFileWithIteratorH(ABS);
   getFieldFileWithIteratorH(ONYX);
   
-  bool N175asBool()  { return N175()=="yes";}
-  bool N285asBool()  { return N285()=="yes";}
+  bool F175asBool()  { return F175()=="yes";}
+  bool F285asBool()  { return F285()=="yes";}
   bool PETGasBool()  { return PETG()=="yes";}
   bool PLAasBool()   { return PLA() =="yes";}
   bool ABSasBool()   { return ABS() =="yes";}
@@ -149,8 +149,8 @@ public:
         assert( fileIter.name()=="MakerBotReplicator+");
         assert( fileIter.location() == "Amawalk" );
         assert( fileIter.prodRate() == "10" );
-        assert( fileIter.N175() == "yes" );
-        assert( fileIter.N285() == "no" );
+        assert( fileIter.F175() == "yes" );
+        assert( fileIter.F285() == "no" );
         assert( fileIter.PETG() == "yes" );
         assert( fileIter.PLA() == "yes" );
         assert( fileIter.ABS() == "yes" );
@@ -158,8 +158,8 @@ public:
         
         assert( fileIter.prodRateAsInt() == 10 );  
          
-        assert( fileIter.N175asBool() );
-        assert(!fileIter.N285asBool() );
+        assert( fileIter.F175asBool() );
+        assert(!fileIter.F285asBool() );
         assert( fileIter.PETGasBool() );
         assert( fileIter.PLAasBool()  );
         assert( fileIter.ABSasBool()  );
