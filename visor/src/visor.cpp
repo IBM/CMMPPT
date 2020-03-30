@@ -115,7 +115,7 @@ main (int argc, char * argv[])
          printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
        }
     }
-
+    
     // Read printer file and add to model
     {
       std::string printerFileName = inputDirectory + "/printer.csv";
@@ -139,7 +139,24 @@ main (int argc, char * argv[])
        }
     }
 
-    printingProb.writeWitData(outputDirectory+"/wit.data");
+    // Read visor request file
+    {
+      std::string requestQuantityFileName = inputDirectory + "/requestQuantity.csv";
+      VISORrequestQuantity requestQuantityFile(requestQuantityFileName);
+      VISORrequestQuantityIterator requestQuantityFileIter(requestQuantityFile);
+
+      // loop once for each record in printer file
+      for ( ; requestQuantityFileIter()!=NULL; ) {
+         std::string loc = requestQuantityFileIter.location();
+         int per = requestQuantityFileIter.dateAsInt();
+         int quan = requestQuantityFileIter.requestedQuantityAsInt();
+         
+         allocProb.addVisorRequest(loc,per,quan);
+       }
+    }
+
+    printingProb.writeWitData(outputDirectory+"/wit1.data");
+    allocProb.writeWitData(outputDirectory+"/wit2.data");
 
     printingProb.solve(useOptImplode);
 

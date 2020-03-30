@@ -48,6 +48,7 @@ void VISORproblem2::addVisor(
 
        std::string baseName = baseLocationName(location);
 	   locationBaseNames_.insert(location);
+	   //std::cout <<location+"\n";
     }
 
     // Add part and SubBom entry to part
@@ -63,10 +64,57 @@ bool VISORproblem2::locationExists( const std::string & loc )
   witGetOperationExists(mutableWitRun(),aggOperNm.c_str(),&exists);
   bool retVal = false;
   if( exists ) retVal = true;
-  std::cout <<aggOperNm <<" " <<retVal <<std::endl;
+  //std::cout <<aggOperNm <<" " <<retVal <<std::endl;
   return retVal;
 }
 
+//
+//----------------------
+// Visor Request (hospital demands) Methods
+//----------------------
+void VISORproblem2::addVisorRequest(
+    const std::string & name,
+    int period,
+    int requestedQuantity)
+{
+	 // get list of all locations
+    std::set<std::string> locs = getLocation();
+    std::set<std::string>::const_iterator it;
+    for ( it=locs.begin(); it!=locs.end(); ++it ) {
+       
+       std::string aggVisNm  = aggregateVisorName(*it);
+       
+       // Only add demand if it doesn't already exist
+       if(!witGetDemandExists(aggVisNm,name))
+           witAddDemand(witRun(),aggVisNm.c_str(),name.c_str());
+
+       // Set demand to the requested number of visors       
+       witSetDemandAttribute(witGetDemandDemandVol,witSetDemandDemandVol,
+                      aggVisNm, name, period, requestedQuantity);    
+    }
+}
+
+// Return true if demand exist
+bool VISORproblem2::witGetDemandExists(const std::string & visorName, const std::string & demandName ) 
+{
+  bool retVal = false;
+  
+  witBoolean partExists;
+  witGetPartExists( mutableWitRun(), visorName.c_str(), &partExists );
+  if ( !partExists ) return retVal;   
+  
+  int nPartDemands;
+  char ** demandList;
+  witGetPartDemands( mutableWitRun(), visorName.c_str(), &nPartDemands, &demandList);
+  for ( int d=0; d<nPartDemands; ++d ) {
+    if ( demandList[d] == demandName ) {
+      retVal = true;
+    }    
+    witFree(demandList[d]);
+  }
+  witFree(demandList);
+  return retVal;
+}
 
 // -----------------------------
 // solver methods
@@ -86,7 +134,7 @@ void VISORproblem2::solve()
 
 
 //-------------------------------------------------------------------------
-// printer Name Methods
+// Visor and location Name Methods
 //-------------------------------------------------------------------------
 std::string VISORproblem2::aggregateVisorName(const std::string & location )
 {
@@ -108,6 +156,8 @@ std::string VISORproblem2::baseLocationName(const std::string & location )
 {
   return " at-> "+location;
 }
+
+std::set<std::string> VISORproblem2::getLocation() { return locationBaseNames_; }
 
 //std::string VISORproblem2::printerFromPrinterName(const std::string & baseName)
 //{

@@ -136,6 +136,8 @@ public:
   //----------------------
   // Printer Hospital demands
   //----------------------
+  void addVisorRequest( const std::string & name,  int period,  int requestedQuantity);
+  bool witGetDemandExists(const std::string & visorName, const std::string & demandName );
 
 
 
@@ -148,6 +150,7 @@ public:
   std::string noSupplyVisorName(const std::string & location );
   std::string visorPartName(const std::string & name, const std::string & location );
   std::string baseLocationName(const std::string & location );
+  std::set<std::string> getLocation();
 
 
  // String Utilities
