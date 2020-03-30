@@ -11,7 +11,7 @@ LIBRARY_PATH+=-L /opt/ibm/ILOG/CPLEX_Studio_Community129/cplex/lib/x86-64_linux/
 
 C_INCLUDE_PATH=../../wit/src
 
-OBJECTS=../src/scoFile.o ../src/unitTest.o ../src/CoinFinite.o ../src/visorProblem.o
+OBJECTS=../src/scoFile.o ../src/unitTest.o ../src/VisorFinite.o ../src/visorProblem.o
 build: wit mcl $(OBJECTS)
 	gcc -o unitTest $(OBJECTS)  -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
 
