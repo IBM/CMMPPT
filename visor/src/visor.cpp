@@ -106,13 +106,51 @@ main (int argc, char * argv[])
       VISORonHandMaterialIterator onHandMaterialFileIter(onHandMaterialFile);
 
       // loop once for each record in materail file
+      int recNo =0;
       for ( ; onHandMaterialFileIter()!=NULL; ) {
          std::string matLoc = onHandMaterialFileIter.location();
          std::string filSze = onHandMaterialFileIter.filamentSize();
          std::string pType = onHandMaterialFileIter.plasticType();
          float qty = onHandMaterialFileIter.quantityAsFloat();
          int shrPer = onHandMaterialFileIter.shareAsInt();
+
+         // Convert strings to lower/upper case. see https://www.geeksforgeeks.org/conversion-whole-string-uppercase-lowercase-using-stl-c/
+	      transform(filSze.begin(), filSze.end(), filSze.begin(), ::tolower); 
+      	transform(pType.begin(), pType.end(), pType.begin(), ::toupper); 
+	
+	      if ( !(filSze=="1.75mm"||filSze=="2.85mm") )
+	      {
+	         std::cout <<"---------------------------------------------\n";
+	         std::cout <<" Unrecognized filament size: "+filSze+"\n";
+	         std::cout <<" Expected values: 1.75mm 2.85mm\n";
+	         std::cout <<" Record number: " <<recNo <<"\n";
+	         std::cout <<" location: "+matLoc+"\n";
+	         std::cout <<" plasticType: "+pType+"\n";
+	         std::cout <<" quantity: "<<qty <<+"\n";
+	         std::cout <<" share: :" <<shrPer <<+"\n";
+	         std::cout <<" Record is ignored\n";
+	         std::cout <<"---------------------------------------------\n";
+	         continue;
+	      }    
+   
+	      if ( !(pType=="PETG"||pType=="PLA"||pType=="ABS"||pType=="ONYX") )
+	      {
+	          std::cout <<"---------------------------------------------\n";
+	          std::cout <<" Unrecognized plasticType: "+pType+"\n";
+	          std::cout <<" Expected values: PETG PLA ABS ONYX\n";
+	          std::cout <<" Record number: " <<recNo <<"\n";
+	          std::cout <<" location: "+matLoc+"\n";
+	          std::cout <<" filamentSize: " <<filSze <<"\n";
+	          std::cout <<" quantity: "<<qty <<+"\n";
+	          std::cout <<" share: :" <<shrPer <<+"\n";
+	          std::cout <<" Record is ignored\n";
+	          std::cout <<"---------------------------------------------\n";
+	          continue;
+	      }             
+         
+         
          printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
+         recNo++;
        }
     }
     
@@ -134,6 +172,14 @@ main (int argc, char * argv[])
          bool abs  =printerFileIter.ABSasBool();
          bool onyx =printerFileIter.ONYXasBool();
 
+         if (printingProb.printerExists(pNam,pLoc))
+         {
+	          //std::cout <<"---------------------------------------------\n";
+	          std::cout <<"   Cannot have two printers with same name & location\n";
+	          std::cout <<"   Only first instance used. Others are ignored\n";
+	          std::cout <<"---------------------------------------------\n";
+	          continue;
+         }
          printingProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
          allocProb.addVisor(pNam,pLoc);
        }
