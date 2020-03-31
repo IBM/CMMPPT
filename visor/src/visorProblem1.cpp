@@ -164,6 +164,11 @@ void VISORproblem1::addPrinter(
       		// Material is good to use, so add SubBom Entry
 	         std::string shrMatName = shrMaterialName(matLoc[i], filamentSize[i], plasticType[i] );
             witAddSubsBomEntry(witRun(),printerOperNm.c_str(),1,shrMatName.c_str());
+            
+            // Set the consRate to be 1/12  (12 per pound)
+            float * consRate = floatToConstFloatStar(1./12.);
+            witSetSubsBomEntryConsRate(witRun(),printerOperNm.c_str(),1,nSubBomEntries,consRate);
+            delete [] consRate;
 
             if ( location==matLoc[i] )
             {
