@@ -263,23 +263,33 @@ main (int argc, char * argv[])
       heading="\"requestingLocation\",\"producingLocation\",\"period\",\"shipQuantity\"";
       if (writeHeader) fprintf(shipQuantityFilePtr,"%s\n",heading.c_str());
 
-      std::vector<std::vector<std::string>> demands=allocProb.getDemands();
+      std::vector<std::string> demands=allocProb.getDemands();
 
       // Loop once for each demand
       for( int d=0; d<demands.size(); d++)
       {
          // Get shipVol to hospital
-         std::string pn=demands[d][0];
-         std::string dn=demands[d][1];
-         std::vector<float> sv=allocProb.getVisorShipVol(dn,pn);         
+         std::string dn=demands[d];
+         //std::vector<float> sv=allocProb.getVisorShipVol(dn);         
          
-       	for( int t=0; t<nPeriods; t++)
-       	{
-       	    if ( eq(sv[t],0.0) ) continue;
+         //get the witSubVol for each location making visors
+         std::vector<std::string> partLoc;
+         std::vector<std::vector<float>> sv;
+         allocProb.getSubVols(dn,partLoc,sv);
+         
+         for (int l=0; l<partLoc.size(); l++ )
+         {         
+         
+            std::string pn = partLoc[l];
+         
+       	   for( int t=0; t<nPeriods; t++)
+       	   {
+       	       if ( eq(sv[l][t],0.0) ) continue;
 
-             fprintf(shipQuantityFilePtr,
+                fprintf(shipQuantityFilePtr,
                   "\"%s\",\"%s\",%d,%f\n",
-                  dn.c_str(),pn.c_str(),t,sv[t]);
+                  dn.c_str(),pn.c_str(),t,sv[l][t]);
+            }
          }
       }
 
