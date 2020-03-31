@@ -8,6 +8,7 @@
 #include "printer.h"
 #include "onHandMaterial.h"
 #include "visorProblem1.h"
+#include "visorProblem2.h"
 
 // Function Prototypes. Function definitions is in this file.
 void testingMessage( const char * const msg );
@@ -38,6 +39,9 @@ main (int argc, char * argv[])
 
   testingMessage( "Testing VISORproblem1\n" );
   VISORproblem1::test();
+
+  testingMessage( "Testing VISORproblem2\n" );
+  VISORproblem2::test();
 
   testingMessage( "All tests completed successfully\n" );
 

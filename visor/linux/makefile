@@ -13,7 +13,7 @@ LIBRARY_PATH+=-L $(WIT_CPLEX_HOME)/lib/$(WIT_CPLEX_LIB_SUBDIR)
 
 C_INCLUDE_PATH=../../wit/src
 
-OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem1.o
+OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem1.o ../src/visorProblem2.o
 
 LIBRARIES=../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
 
