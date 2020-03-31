@@ -17,6 +17,7 @@
 #include "requestQuantity.h"
 #include "onHandMaterial.h"
 #include "visorProblem1.h"
+#include "visorProblem2.h"
 #include "VisorFloatEqual.h"
 
 
@@ -83,7 +84,8 @@ main (int argc, char * argv[])
     std::string inputDirectory=args[1];
     bool useOptImplode = true;
     if ( std::string(args[2])=="heur") useOptImplode=false;
-    VISORproblem1 visorProb;
+    VISORproblem1 printingProb;
+    VISORproblem2 allocProb;
     int nPeriods;
     VisorRelFltEq eq(1.e-05);
 
@@ -91,10 +93,10 @@ main (int argc, char * argv[])
     bool writeZeros=true;
 
 
-    visorProb.setSolverLogFileName(outputDirectory+"/clpMesgFile.txt");
-    bool useGlobalAttrFileSettings = true;
+    printingProb.setSolverLogFileName(outputDirectory+"/cplexMesgFile.txt");
     //createModel(eso2Prob, inputDirectory, useGlobalAttrFileSettings);
-    nPeriods = visorProb.getNPeriods();
+    nPeriods = printingProb.getNPeriods();
+    allocProb.setNPeriods(nPeriods);
 
 
     // Read Material file and add to model
@@ -110,10 +112,10 @@ main (int argc, char * argv[])
          std::string pType = onHandMaterialFileIter.plasticType();
          float qty = onHandMaterialFileIter.quantityAsFloat();
          int shrPer = onHandMaterialFileIter.shareAsInt();
-         visorProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
+         printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
        }
     }
-
+    
     // Read printer file and add to model
     {
       std::string printerFileName = inputDirectory + "/printer.csv";
@@ -132,13 +134,52 @@ main (int argc, char * argv[])
          bool abs  =printerFileIter.ABSasBool();
          bool onyx =printerFileIter.ONYXasBool();
 
-         visorProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
+         printingProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
+         allocProb.addVisor(pNam,pLoc);
        }
     }
 
-    visorProb.writeWitData(outputDirectory+"/wit.data");
+    // Read visor request file
+    {
+      std::string requestQuantityFileName = inputDirectory + "/requestQuantity.csv";
+      VISORrequestQuantity requestQuantityFile(requestQuantityFileName);
+      VISORrequestQuantityIterator requestQuantityFileIter(requestQuantityFile);
 
-    visorProb.solve(useOptImplode);
+      // loop once for each record in printer file
+      for ( ; requestQuantityFileIter()!=NULL; ) {
+         std::string loc = requestQuantityFileIter.location();
+         int per = requestQuantityFileIter.dateAsInt();
+         int quan = requestQuantityFileIter.requestedQuantityAsInt();
+         
+         allocProb.addVisorRequest(loc,per,quan);
+       }
+    }
+
+    printingProb.writeWitData(outputDirectory+"/wit1.data");
+    allocProb.writeWitData(outputDirectory+"/wit2.data");
+
+    printingProb.solve(useOptImplode);
+    
+    //----------------------------------
+    // Get soln from first implosoin and set supply for 2nd
+    //----------------------------------
+    {
+    	std::vector<std::string> printerName, printerLoc;
+      printingProb.getPrinters( printerName, printerLoc );
+
+      // Loop once for each printer
+      for( int p=0; p<printerName.size(); p++)
+      {
+         // Get ShipVol from printer
+         std::vector<float> sv=printingProb.getPrinterShipVol(printerName[p],printerLoc[p]);
+       	
+       	// Set Supply Vol of 2nd implosion to 1st implosion shipVol
+       	allocProb.setVisorSupplyVol(printerName[p],printerLoc[p],sv);       
+       }
+    }
+       
+       //Do second implosion
+       allocProb.solve();
 
     // --------------------------------------------
     // write subVol file
@@ -155,7 +196,7 @@ main (int argc, char * argv[])
       std::vector<std::string> printerName, printerLoc;
       std::vector<std::string> matLoc, matSize, matType, own;
       std::vector< std::vector<float>> subVol;
-    	visorProb.getSubVol(
+    	printingProb.getSubVol(
             printerName, printerLoc,
             matLoc, matSize, matType,
             subVol, own );
@@ -189,15 +230,17 @@ main (int argc, char * argv[])
       if (writeHeader) fprintf(prodVolFilePtr,"%s\n",heading.c_str());
 
       std::vector<std::string> printerName, printerLoc;
-      visorProb.getPrinters( printerName, printerLoc );
+      printingProb.getPrinters( printerName, printerLoc );
 
       // Loop once for each printer
       for( int p=0; p<printerName.size(); p++)
       {
          // Get printers witOpExecVol
-         std::vector<float> ev=visorProb.getPrinterProdVol(printerName[p],printerLoc[p]);
+         std::vector<float> ev=printingProb.getPrinterProdVol(printerName[p],printerLoc[p]);         
+         //std::vector<float> sv=printingProb.getPrinterShipVol(printerName[p],printerLoc[p]);
        	for( int t=0; t<nPeriods; t++)
        	{
+       		//assert( eq(ev[t],sv[t]) );
              if ( eq(ev[t],0.0) ) continue;
 
              fprintf(prodVolFilePtr,
@@ -208,6 +251,41 @@ main (int argc, char * argv[])
 
        fclose(prodVolFilePtr);
     } // finished writing prodVol file
+
+    // --------------------------------------------
+    // write shipQuantity file
+    // --------------------------------------------
+    {
+    	std::string shipQuantityFileName = outputDirectory+"/shipQuantity.csv";
+      FILE * shipQuantityFilePtr = fopen(shipQuantityFileName.c_str(),"w");
+
+      std::string heading;
+      heading="\"requestingLocation\",\"producingLocation\",\"period\",\"shipQuantity\"";
+      if (writeHeader) fprintf(shipQuantityFilePtr,"%s\n",heading.c_str());
+
+      std::vector<std::vector<std::string>> demands=allocProb.getDemands();
+
+      // Loop once for each demand
+      for( int d=0; d<demands.size(); d++)
+      {
+         // Get shipVol to hospital
+         std::string pn=demands[d][0];
+         std::string dn=demands[d][1];
+         std::vector<float> sv=allocProb.getVisorShipVol(dn,pn);         
+         
+       	for( int t=0; t<nPeriods; t++)
+       	{
+       	    if ( eq(sv[t],0.0) ) continue;
+
+             fprintf(shipQuantityFilePtr,
+                  "\"%s\",\"%s\",%d,%f\n",
+                  dn.c_str(),pn.c_str(),t,sv[t]);
+         }
+      }
+
+       fclose(shipQuantityFilePtr);
+    } // finished writing prodVol file
+
 
     //---------------------------------------------------------
 

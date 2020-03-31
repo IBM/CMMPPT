@@ -11,7 +11,7 @@ LIBRARY_PATH+=-L /opt/ibm/ILOG/CPLEX_Studio_Community129/cplex/lib/x86-64_linux/
 
 C_INCLUDE_PATH=../../wit/src
 
-OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem1.o
+OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem1.o ../src/visorProblem2.o
 
 LIBRARIES=../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
 
