@@ -3,13 +3,13 @@
 // Corporation and others.  All Rights Reserved.
 // This code is licensed under the terms of the Eclipse Public License (EPL).
 
-#ifndef CoinFloatEqual_H
-#define CoinFloatEqual_H
+#ifndef VisorFloatEqual_H
+#define VisorFloatEqual_H
 
 #include <algorithm>
 #include <cmath>
 
-#include "CoinFinite.h"
+#include "VisorFinite.h"
 
 /*! \file CoinFloatEqual.hpp
     \brief Function objects for testing equality of real numbers.
@@ -43,14 +43,14 @@
   the test does not consider the relative magnitude of the operands.
 */
 
-class CoinAbsFltEq {
+class VisorAbsFltEq {
 public:
   //! Compare function
 
   inline bool operator()(const double f1, const double f2) const
 
   {
-    if (CoinIsnan(f1) || CoinIsnan(f2))
+    if (VisorIsnan(f1) || VisorIsnan(f2))
       return false;
     if (f1 == f2)
       return true;
@@ -65,32 +65,32 @@ public:
     Default tolerance is 1.0e-10.
   */
 
-  CoinAbsFltEq()
+  VisorAbsFltEq()
     : epsilon_(1.e-10)
   {
   }
 
   //! Alternate constructor with epsilon as a parameter
 
-  CoinAbsFltEq(const double epsilon)
+  VisorAbsFltEq(const double epsilon)
     : epsilon_(epsilon)
   {
   }
 
   //! Destructor
 
-  virtual ~CoinAbsFltEq() {}
+  virtual ~VisorAbsFltEq() {}
 
   //! Copy constructor
 
-  CoinAbsFltEq(const CoinAbsFltEq &src)
+  VisorAbsFltEq(const VisorAbsFltEq &src)
     : epsilon_(src.epsilon_)
   {
   }
 
   //! Assignment
 
-  CoinAbsFltEq &operator=(const CoinAbsFltEq &rhs)
+  VisorAbsFltEq &operator=(const VisorAbsFltEq &rhs)
 
   {
     if (this != &rhs)
@@ -117,18 +117,18 @@ private:
   epsilon calculated as epsilon_*(1+CoinMax(|f1|,|f2|)).
 */
 
-class CoinRelFltEq {
+class VisorRelFltEq {
 public:
   //! Compare function
 
   inline bool operator()(const double f1, const double f2) const
 
   {
-    if (CoinIsnan(f1) || CoinIsnan(f2))
+    if (VisorIsnan(f1) || VisorIsnan(f2))
       return false;
     if (f1 == f2)
       return true;
-    if (!CoinFinite(f1) || !CoinFinite(f2))
+    if (!VisorFinite(f1) || !VisorFinite(f2))
       return false;
 
     double tol = (fabs(f1) > fabs(f2)) ? fabs(f1) : fabs(f2);
@@ -139,12 +139,12 @@ public:
   /*! \name Constructors and destructors */
   //@{
 
-#ifndef COIN_FLOAT
+#ifndef VISOR_FLOAT
   /*! Default constructor
 
     Default tolerance is 1.0e-10.
   */
-  CoinRelFltEq()
+  VisorRelFltEq()
     : epsilon_(1.e-10)
   {
   }
@@ -153,31 +153,31 @@ public:
 
     Default tolerance is 1.0e-6.
   */
-  CoinRelFltEq()
+  VisorRelFltEq()
     : epsilon_(1.e-6) {}; // as float
 #endif
 
   //! Alternate constructor with epsilon as a parameter
 
-  CoinRelFltEq(const double epsilon)
+  VisorRelFltEq(const double epsilon)
     : epsilon_(epsilon)
   {
   }
 
   //! Destructor
 
-  virtual ~CoinRelFltEq() {}
+  virtual ~VisorRelFltEq() {}
 
   //! Copy constructor
 
-  CoinRelFltEq(const CoinRelFltEq &src)
+  VisorRelFltEq(const VisorRelFltEq &src)
     : epsilon_(src.epsilon_)
   {
   }
 
   //! Assignment
 
-  CoinRelFltEq &operator=(const CoinRelFltEq &rhs)
+  VisorRelFltEq &operator=(const VisorRelFltEq &rhs)
 
   {
     if (this != &rhs)
