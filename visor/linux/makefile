@@ -13,11 +13,11 @@ C_INCLUDE_PATH=../../wit/src
 
 OBJECTS=../src/scoFile.o ../src/VisorFinite.o ../src/visorProblem1.o ../src/visorProblem2.o
 
-libraries: ../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
+LIBRARIES=../../wit/linux/libwit.a ../../mcl/linux/libmcl.a 
 
-unitTest: $(OBJECTS) ../src/unitTest.o libraries
+unitTest: $(OBJECTS) ../src/unitTest.o $(LIBRARIES)
 	gcc -o unitTest ../src/unitTest.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
-visor: $(OBJECTS) ../src/visor.o libraries
+visor: $(OBJECTS) ../src/visor.o $(LIBRARIES)
 	gcc -o visor ../src/visor.o $(OBJECTS) -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm -I$(C_INCLUDE_PATH) $(LIBRARY_PATH)
 
 ../../mcl/linux/libmcl.a: 
