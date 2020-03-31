@@ -79,32 +79,43 @@ bool VISORproblem2::locationExists( const std::string & loc )
 // Visor Request (hospital demands) Methods
 //----------------------
 void VISORproblem2::addVisorRequest(
-    const std::string & name,
+    const std::string & demName,
     int period,
     int requestedQuantity)
 {
-	 // get list of all locations
-    std::set<std::string> locs = getLocation();
-    std::set<std::string>::const_iterator it;
-    for ( it=locs.begin(); it!=locs.end(); ++it ) {
-       
-       std::string aggVisNm  = aggregateVisorName(*it);
-       
-       // Only add demand if it doesn't already exist
-       if(!witGetDemandExists(aggVisNm,name))
+	std::string visForHospNm = visorForHospitalName(demName);
+	std::string aggVisForHospNm = aggregateVisorForHospitalName(demName);
+	std::string noSupForHospNm = noSupplyForHospital(demName);
+	
+	 // Only add demand if it doesn't already exist
+    if(!witGetDemandExists(visForHospNm,demName))
+    {
+	
+	    witAddPart(witRun(),visForHospNm.c_str(),WitMATERIAL);
+	    witAddPart(witRun(),noSupForHospNm.c_str(),WitMATERIAL);
+	
+       witAddOperation(witRun(),aggVisForHospNm.c_str());
+	
+	    witAddBomEntry(witRun(),aggVisForHospNm.c_str(),noSupForHospNm.c_str());
+	    witAddBopEntry(witRun(),aggVisForHospNm.c_str(),visForHospNm.c_str());
+	    witAddDemand(witRun(),visForHospNm.c_str(),demName.c_str());
+	    demandList_.push_back(demName);
+	    
+       // Loop once for each printer location. Add subsBomEntry from that location
+       std::set<std::string> locs = getLocation(); 
+       std::set<std::string>::const_iterator it;
+       for ( it=locs.begin(); it!=locs.end(); ++it ) 
        {
-       	//std::cout <<aggVisNm+"\n";
-           witAddDemand(witRun(),aggVisNm.c_str(),name.c_str());
-           std::vector<std::string> pair;
-           pair.push_back(*it);
-           pair.push_back(name);
-           demandList_.push_back(pair);
+            std::string aggVisNm  = aggregateVisorName(*it);
+            
+            witAddSubsBomEntry(witRun(),aggVisForHospNm.c_str(),0,aggVisNm.c_str());
        }
-       
-       // Set demand to the requested number of visors       
-       witSetDemandAttribute(witGetDemandDemandVol,witSetDemandDemandVol,
-                      aggVisNm, name, period, requestedQuantity);    
+	    
     }
+      
+    // Set demand to the requested number of visors       
+    witSetDemandAttribute(witGetDemandDemandVol,witSetDemandDemandVol,
+                      visForHospNm, demName, period, requestedQuantity);    
 }
 
 // Return true if demand exist
@@ -129,15 +140,45 @@ bool VISORproblem2::witGetDemandExists(const std::string & visorName, const std:
   return retVal;
 }
 
-std::vector<float> VISORproblem2::getVisorShipVol(std::string & demandName,std::string & producingLocation)
+
+std::vector<float> VISORproblem2::getVisorShipVol(std::string & demandName)
 {
+//**  need to change demanded part name 
 	//std::cout <<demandName+ "  |  "+producingLocation+"\n";
-	std::string aggVisNm  = aggregateVisorName(producingLocation);
-	return witGetDemandAttribute(witGetDemandShipVol,aggVisNm,demandName);
+	std::string visorForHospitalNm = visorForHospitalName(demandName);
+	return witGetDemandAttribute(witGetDemandShipVol,visorForHospitalNm,demandName);
 }
 
 
-std::vector<std::vector<std::string>> VISORproblem2::getDemands() { return demandList_; }
+// for a specified demandName (hosptial), return all the visor parts supplying the hospital, and the amount supplied each period
+void  VISORproblem2::getSubVols(std::string demandName,std::vector<std::string> &consPartLocation, std::vector<std::vector<float>>& subsVol)
+{
+	consPartLocation.clear();
+	subsVol.clear();
+	std::string operName  = aggregateVisorForHospitalName(demandName);
+	
+	// Get list of all locations.  Every location making visors can supply the demand
+	std::set<std::string> locs = getLocation();
+	std::set<std::string>::const_iterator it;
+	int i=0;
+   for ( it=locs.begin(); it!=locs.end(); ++it ) 
+   {  
+       char * consPart;
+       witGetSubsBomEntryConsumedPart(witRun(),operName.c_str(),0,i,&consPart);
+       consPartLocation.push_back(locationFormAggregateVisorName(std::string(consPart)));
+       witFree(consPart);
+       
+       std::vector<float> sv = witGetSubArcAttribute(witGetSubsBomEntrySubVol,operName,0,i);
+       subsVol.push_back(sv);
+       
+       i++;
+     
+   }
+	
+}
+
+
+std::vector<std::string> VISORproblem2::getDemands() { return demandList_; }
 
 
 // -----------------------------
@@ -155,7 +196,7 @@ void VISORproblem2::solve()
    // Set up data structures for first witEqHeurAlloc
    //-------------------------------------------------
    {
-     std::vector<std::vector<std::string>> allDemands = getDemands();
+     std::vector<std::string> allDemands = getDemands();
      int nDems=allDemands.size();
      int listLen = nDems*firstEqAllocPeriodBnd;
      char * demandedPartNameList[listLen] ;
@@ -164,8 +205,8 @@ void VISORproblem2::solve()
      float desIncVolList[listLen];
      for ( int d=0; d<nDems; d++)
      {
-   	  std::string partIName = aggregateVisorName(allDemands[d][0]);   	
-   	  std::string demIName = allDemands[d][1];
+   	  std::string partIName = visorForHospitalName(allDemands[d]);   	
+   	  std::string demIName = allDemands[d];
    	  std::vector<float> demandVol =witGetDemandAttribute(witGetDemandDemandVol,partIName,demIName);
    	  for ( int p=0; p<firstEqAllocPeriodBnd;p++)
         {
@@ -210,7 +251,7 @@ void VISORproblem2::solve()
    // Set up data structures for second witEqHeurAlloc
    //-------------------------------------------------
    {
-     std::vector<std::vector<std::string>> allDemands = getDemands();
+     std::vector<std::string> allDemands = getDemands();
      int nDems=allDemands.size();
      int perBlkSz=getNPeriods()-firstEqAllocPeriodBnd;
      int listLen = nDems*perBlkSz;
@@ -220,8 +261,8 @@ void VISORproblem2::solve()
      float desIncVolList[listLen];
      for ( int d=0; d<nDems; d++)
      {
-   	  std::string partIName = aggregateVisorName(allDemands[d][0]);   	
-   	  std::string demIName = allDemands[d][1];
+   	  std::string partIName = visorForHospitalName(allDemands[d]);   	
+   	  std::string demIName = allDemands[d];
    	  std::vector<float> demandVol =witGetDemandAttribute(witGetDemandDemandVol,partIName,demIName);
    	  for ( int p=0; p<perBlkSz;p++)
         {
@@ -272,9 +313,14 @@ void VISORproblem2::solve()
 
 
 //-------------------------------------------------------------------------
-// material Name Methods
+// demand (hospital) Name Methods
 //-------------------------------------------------------------------------
-
+std::string VISORproblem2::visorForHospitalName(const std::string &demName)
+{return "Visors for Hospital "+demName;}
+std::string VISORproblem2::aggregateVisorForHospitalName(const std::string &demName)
+{return "aggregateVisors for "+demName;}
+std::string VISORproblem2::noSupplyForHospital(const std::string &demName)
+{return "noSupplyPart for "+demName;}
 
 //-------------------------------------------------------------------------
 // Visor and location Name Methods
@@ -298,6 +344,11 @@ std::string VISORproblem2::visorPartName(const std::string & name, const std::st
 std::string VISORproblem2::baseLocationName(const std::string & location )
 {
   return " at-> "+location;
+}
+
+std::string VISORproblem2::locationFormAggregateVisorName(const std::string & location )
+{
+  return  textAfter(location,std::string("Visor aggregation ")+std::string(" at-> "));
 }
 
 std::set<std::string> VISORproblem2::getLocation() { return locationBaseNames_; }
@@ -738,6 +789,7 @@ demandList_()
 
     witSetIndependentOffsets( witRun(), WitTRUE );
     witSetNPeriods(witRun(),30);
+    witSetMultiRoute(witRun(),WitTRUE);
   //witSetObjChoice( witRun(), 1 );
 
   //witSetUseFocusHorizons( witRun(), WitFALSE );
@@ -854,5 +906,3 @@ VISORproblem2::test()
 
 
 }
-
-

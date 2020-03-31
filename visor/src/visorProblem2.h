@@ -140,8 +140,9 @@ public:
   //----------------------
   void addVisorRequest( const std::string & name,  int period,  int requestedQuantity);
   bool witGetDemandExists(const std::string & visorName, const std::string & demandName );
-  std::vector<std::vector<std::string>> getDemands();
-  std::vector<float> getVisorShipVol(std::string & demandName,std::string & producingLocation);
+  std::vector<std::string> getDemands();
+  std::vector<float> getVisorShipVol(std::string & demandName);
+  void  getSubVols(std::string demandName,std::vector<std::string> & consPart, std::vector<std::vector<float>> & subsVol);
 
 
 
@@ -154,7 +155,16 @@ public:
   std::string noSupplyVisorName(const std::string & location );
   std::string visorPartName(const std::string & name, const std::string & location );
   std::string baseLocationName(const std::string & location );
+  std::string locationFormAggregateVisorName(const std::string & location );
   std::set<std::string> getLocation();
+
+//-------------------------------------------------------------------------
+// demand (hospital) Name Methods
+//-------------------------------------------------------------------------
+std::string visorForHospitalName(const std::string &demName);
+std::string aggregateVisorForHospitalName(const std::string &demName);
+std::string noSupplyForHospital(const std::string &demName);
+
 
 
  // String Utilities
@@ -400,9 +410,10 @@ private:
   int nPeriods_; // cached for performance
 
   std::set<std::string> locationBaseNames_;
-  std::vector<std::vector<std::string>> demandList_;
+  std::vector<std::string> demandList_;
            
 };
 
 
 #endif
+
