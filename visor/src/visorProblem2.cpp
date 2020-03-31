@@ -6,6 +6,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <climits>
+#include <cstring>
 
 #include <wit.h>
 
@@ -144,7 +145,127 @@ std::vector<std::vector<std::string>> VISORproblem2::getDemands() { return deman
 // ----------------------------
 void VISORproblem2::solve()
 {
-	witHeurImplode(witRun());
+   
+   witSetEquitability(witRun(),100);
+   witStartHeurAlloc(witRun());
+   
+   
+   int firstEqAllocPeriodBnd = 5;
+   //-------------------------------------------------
+   // Set up data structures for first witEqHeurAlloc
+   //-------------------------------------------------
+   {
+     std::vector<std::vector<std::string>> allDemands = getDemands();
+     int nDems=allDemands.size();
+     int listLen = nDems*firstEqAllocPeriodBnd;
+     char * demandedPartNameList[listLen] ;
+     char * demandNameList[listLen] ;
+     int shipPeriodList[listLen];
+     float desIncVolList[listLen];
+     for ( int d=0; d<nDems; d++)
+     {
+   	  std::string partIName = aggregateVisorName(allDemands[d][0]);   	
+   	  std::string demIName = allDemands[d][1];
+   	  std::vector<float> demandVol =witGetDemandAttribute(witGetDemandDemandVol,partIName,demIName);
+   	  for ( int p=0; p<firstEqAllocPeriodBnd;p++)
+        {
+   	  
+   	    demandedPartNameList[d*firstEqAllocPeriodBnd+p]=new char [ partIName.size()+1];
+   	    strcpy(demandedPartNameList[d*firstEqAllocPeriodBnd+p],partIName.c_str());
+   	  
+   	    demandNameList[d*firstEqAllocPeriodBnd+p]=new char [ demIName.size()+1];
+   	    strcpy(demandNameList[d*firstEqAllocPeriodBnd+p],demIName.c_str());
+   	  
+          shipPeriodList[d*firstEqAllocPeriodBnd+p]=p; 
+          desIncVolList[d*firstEqAllocPeriodBnd+p]=demandVol[p];  
+        
+        	  
+   	    //std::cout <<d*firstEqAllocPeriodBnd+p <<"   " <<demandedPartNameList[d*firstEqAllocPeriodBnd+p] 
+   	    //<<"  |  " <<demandNameList[d*firstEqAllocPeriodBnd+p] <<"  |  " <<shipPeriodList[d*firstEqAllocPeriodBnd+p]
+   	    //<<"  |  " <<desIncVolList[d*firstEqAllocPeriodBnd+p] <<"\n";       	  
+   	  }
+     }
+     
+#if 0     
+     for ( int i=0; i<listLen; i++)
+     {
+         std::cout <<i <<"   " <<demandedPartNameList[i] 
+   	      <<"  |  " <<demandNameList[i] <<"  |  " <<shipPeriodList[i]
+   	      <<"  |  " <<desIncVolList[i] <<"\n";       	  
+     }   
+#endif   
+     float * incVolList;
+     witEqHeurAlloc (witRun(),listLen,demandedPartNameList,demandNameList,shipPeriodList,desIncVolList,&incVolList);
+   
+     for ( int i=0; i<<listLen; i++)
+     {
+        delete [] demandedPartNameList[i];
+   	  delete [] demandNameList[i];
+     }   
+      
+     witFree(incVolList);  
+   } 
+     
+   //-------------------------------------------------
+   // Set up data structures for second witEqHeurAlloc
+   //-------------------------------------------------
+   {
+     std::vector<std::vector<std::string>> allDemands = getDemands();
+     int nDems=allDemands.size();
+     int perBlkSz=getNPeriods()-firstEqAllocPeriodBnd;
+     int listLen = nDems*perBlkSz;
+     char * demandedPartNameList[listLen] ;
+     char * demandNameList[listLen] ;
+     int shipPeriodList[listLen];
+     float desIncVolList[listLen];
+     for ( int d=0; d<nDems; d++)
+     {
+   	  std::string partIName = aggregateVisorName(allDemands[d][0]);   	
+   	  std::string demIName = allDemands[d][1];
+   	  std::vector<float> demandVol =witGetDemandAttribute(witGetDemandDemandVol,partIName,demIName);
+   	  for ( int p=0; p<perBlkSz;p++)
+        {
+   	  
+   	    demandedPartNameList[d*perBlkSz+p]=new char [ partIName.size()+1];
+   	    strcpy(demandedPartNameList[d*perBlkSz+p],partIName.c_str());
+   	  
+   	    demandNameList[d*perBlkSz+p]=new char [ demIName.size()+1];
+   	    strcpy(demandNameList[d*perBlkSz+p],demIName.c_str());
+   	  
+          shipPeriodList[d*perBlkSz+p]=firstEqAllocPeriodBnd+p; 
+          desIncVolList[d*perBlkSz+p]=demandVol[firstEqAllocPeriodBnd+p];  
+        
+        	  
+   	    //std::cout <<d*nDems+p <<"   " <<demandedPartNameList[d*nDems+p] 
+   	    //<<"  |  " <<demandNameList[d*nDems+p] <<"  |  " <<shipPeriodList[d*nDems+p]
+   	    //<<"  |  " <<desIncVolList[d*nDems+p] <<"\n";       	  
+   	  }
+     }
+
+#if 0
+    for ( int i=0; i<listLen; i++)
+    {
+        std::cout <<i <<"   " <<demandedPartNameList[i] 
+   	      <<"  |  " <<demandNameList[i] <<"  |  " <<shipPeriodList[i]
+   	      <<"  |  " <<desIncVolList[i] <<"\n";       	  
+    }   
+#endif   
+   
+     float * incVolList;
+     witEqHeurAlloc (witRun(),listLen,demandedPartNameList,demandNameList,shipPeriodList,desIncVolList,&incVolList);
+   
+     for ( int i=0; i<<listLen; i++)
+     {
+        delete [] demandedPartNameList[i];
+   	  delete [] demandNameList[i];
+     }   
+      
+     witFree(incVolList);  
+   } 
+
+
+   witFinishHeurAlloc (witRun());
+
 }
 
 
