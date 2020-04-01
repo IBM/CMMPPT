@@ -157,6 +157,8 @@ public:
      bool petg, bool pla, bool abs, bool onyx);
 
   void getPrinters(std::vector<std::string> & names,std::vector<std::string> & locs );
+  bool printerExists(std::string pNam, std::string pLoc);  
+  
   std::vector<float> getPrinterProdRate(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterShipVol(const std::string & name, const std::string & loc );
   std::vector<float> getPrinterProdVol(const std::string & name, const std::string & loc );

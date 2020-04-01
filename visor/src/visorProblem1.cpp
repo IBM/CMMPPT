@@ -23,7 +23,7 @@
 void VISORproblem1::addMaterial    (const std::string & location, const std::string & filamentSize, const std::string & plasticType, float quantity, int sharePercent )
 {
 	assert(filamentSize=="1.75mm"||filamentSize=="2.85mm");
-   assert(plasticType=="PETG"||plasticType=="PLA"||plasticType=="ABS"||plasticType=="ONYX");
+	assert(plasticType=="PETG"||plasticType=="PLA"||plasticType=="ABS"||plasticType=="ONYX");
 
 	std::string ownMatName = ownMaterialName(location, filamentSize, plasticType );
 	std::string shrMatName = shrMaterialName(location, filamentSize, plasticType );
@@ -38,6 +38,16 @@ void VISORproblem1::addMaterial    (const std::string & location, const std::str
 
 	std::string baseName = baseMaterialName(location, filamentSize, plasticType);
 	materialBaseNames_.insert(baseName);
+}
+ 
+bool VISORproblem1::materialExists (const std::string & location, const std::string & filamentSize, const std::string & plasticType )
+{
+  std::string partName = ownMaterialName(location,filamentSize,plasticType);
+  witBoolean partExists;
+  witGetPartExists(mutableWitRun(),partName.c_str(),&partExists);
+  bool retVal = false;
+  if( partExists) retVal = true;
+  return retVal;
 }
 
 void VISORproblem1::getMaterials(
@@ -215,6 +225,11 @@ void VISORproblem1::getPrinters(
   	 names.push_back( printerFromPrinterName(*it) );
     locs.push_back( locationFromPrinterName(*it) );
   }
+}
+
+bool VISORproblem1::printerExists(std::string pNam, std::string pLoc) {
+	std::string key=basePrinterName(pNam,pLoc);
+	return printerBaseNames_.find(key)!=printerBaseNames_.end();
 }
 
 std::vector<float> VISORproblem1::getPrinterProdRate(

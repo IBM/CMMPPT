@@ -1,6 +1,7 @@
 #ifndef VISOR_printer_h
 #define VISOR_printer_h
 
+#include <algorithm>
 #include "scoFile.h"
 
 
@@ -18,12 +19,18 @@ public:
   getFieldH(ABS);
   getFieldH(ONYX);
   
-  bool F175asBool(int rec)  { return F175(rec)=="yes";}
-  bool F285asBool(int rec)  { return F285(rec)=="yes";}
-  bool PETGasBool(int rec)  { return PETG(rec)=="yes";}
-  bool PLAasBool(int rec)   { return PLA(rec) =="yes";}
-  bool ABSasBool(int rec)   { return ABS(rec) =="yes";}
-  bool ONYXasBool(int rec)  { return ONYX(rec)=="yes";}
+  bool isYes(std::string s)
+  { 
+     transform(s.begin(), s.end(), s.begin(), ::tolower); 
+     return s=="yes";
+  }  
+  
+  bool F175asBool(int rec)  { return isYes(F175(rec)); }
+  bool F285asBool(int rec)  { return isYes(F285(rec));}
+  bool PETGasBool(int rec)  { return isYes(PETG(rec));}
+  bool PLAasBool(int rec)   { return isYes(PLA(rec));}
+  bool ABSasBool(int rec)   { return isYes(ABS(rec));}
+  bool ONYXasBool(int rec)  { return isYes(ONYX(rec));}
   
   // preferred constructor
   VISORprinter(std::string filename)
