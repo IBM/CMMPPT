@@ -104,12 +104,22 @@ main (int argc, char * argv[])
       std::string onHandMaterialFileName = inputDirectory + "/onHandMaterial.csv";
       VISORonHandMaterial onHandMaterialFile(onHandMaterialFileName);
       VISORonHandMaterialIterator onHandMaterialFileIter(onHandMaterialFile);
-       bool dupKeyWarningPrinted = false;
+      bool dupKeyWarningPrinted = false;
 
       // loop once for each record in materail file
-      int recNo =0;
+      int recNo =1;
       for ( ; onHandMaterialFileIter()!=NULL; ) {
+      	recNo++;
          std::string matLoc = onHandMaterialFileIter.location();
+	      if ( matLoc=="" )
+	      {
+	         std::cout <<"WARNING: location not specifed\n";
+	         std::cout <<"   Filename: "+onHandMaterialFileName+"\n";
+	         std::cout <<"   Record number: " <<recNo <<"\n";
+	         std::cout <<"   Record is ignored\n";
+	         continue;
+	      }                      
+         
          std::string filSze = onHandMaterialFileIter.filamentSize();
          std::string pType = onHandMaterialFileIter.plasticType();
          float qty = onHandMaterialFileIter.quantityAsFloat();
@@ -129,7 +139,7 @@ main (int argc, char * argv[])
 	         std::cout <<"   location: "+matLoc+"\n";
 	         std::cout <<"   plasticType: "+pType+"\n";
 	         std::cout <<"   quantity: "<<qty <<+"\n";
-	         std::cout <<"   share: :" <<shrPer <<+"\n";
+	         std::cout <<"   share: " <<shrPer <<+"\n";
 	         std::cout <<"   Record is ignored\n";
 	         //std::cout <<"---------------------------------------------\n";
 	         continue;
@@ -163,7 +173,6 @@ main (int argc, char * argv[])
          
          
          printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
-         recNo++;
        }
     }
     
@@ -175,8 +184,20 @@ main (int argc, char * argv[])
       bool dupKeyWarningPrinted = false;
 
       // loop once for each record in printer file
+      int recNo=1;
       for ( ; printerFileIter()!=NULL; ) {
+      	recNo++;
          std::string pNam = printerFileIter.name();
+         
+	      if ( pNam=="" )
+	      {
+	         std::cout <<"WARNING: name not specifed\n";
+	         std::cout <<"   Filename: "+printerFileName+"\n";
+	         std::cout <<"   Record number: " <<recNo <<"\n";
+	         std::cout <<"   Record is ignored\n";
+	         continue;
+	      }              
+         
          std::string pLoc = printerFileIter.location();
          int prodRate = printerFileIter.prodRateAsInt();
          bool f175 =printerFileIter.F175asBool();
@@ -209,10 +230,26 @@ main (int argc, char * argv[])
       VISORrequestQuantityIterator requestQuantityFileIter(requestQuantityFile);
 
       // loop once for each record in printer file
+      int recNo =1;
       for ( ; requestQuantityFileIter()!=NULL; ) {
+      	recNo++;
          std::string loc = requestQuantityFileIter.location();
+
+	      if ( loc=="" )
+	      {
+	         //std::cout <<"---------------------------------------------\n";
+	         std::cout <<"WARNING: location not specifed\n";
+	         std::cout <<"   Filename: "+requestQuantityFileName+"\n";
+	         std::cout <<"   Record number: " <<recNo <<"\n";
+	         std::cout <<"   Record is ignored\n";
+	         //std::cout <<"---------------------------------------------\n";
+	         continue;
+	      }             
+         
+         
          int per = requestQuantityFileIter.dateAsInt();
          int quan = requestQuantityFileIter.requestedQuantityAsInt();
+         //std::cout <<recNo <<" "+loc <<"\n";         
          
          allocProb.addVisorRequest(loc,per,quan);
        }
