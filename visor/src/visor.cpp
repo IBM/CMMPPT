@@ -104,6 +104,7 @@ main (int argc, char * argv[])
       std::string onHandMaterialFileName = inputDirectory + "/onHandMaterial.csv";
       VISORonHandMaterial onHandMaterialFile(onHandMaterialFileName);
       VISORonHandMaterialIterator onHandMaterialFileIter(onHandMaterialFile);
+       bool dupKeyWarningPrinted = false;
 
       // loop once for each record in materail file
       int recNo =0;
@@ -120,8 +121,8 @@ main (int argc, char * argv[])
 	
 	      if ( !(filSze=="1.75mm"||filSze=="2.85mm") )
 	      {
-	         std::cout <<"---------------------------------------------\n";
-	         std::cout <<" WARNING: Unrecognized filament size: "+filSze+"\n";
+	         //std::cout <<"---------------------------------------------\n";
+	         std::cout <<"WARNING: Unrecognized filament size: "+filSze+"\n";
 	         std::cout <<"   Expected values: 1.75mm 2.85mm\n";
 	         std::cout <<"   Filename: " <<onHandMaterialFileName <<"\n";
 	         std::cout <<"   Record number: " <<recNo <<"\n";
@@ -130,14 +131,14 @@ main (int argc, char * argv[])
 	         std::cout <<"   quantity: "<<qty <<+"\n";
 	         std::cout <<"   share: :" <<shrPer <<+"\n";
 	         std::cout <<"   Record is ignored\n";
-	         std::cout <<"---------------------------------------------\n";
+	         //std::cout <<"---------------------------------------------\n";
 	         continue;
 	      }    
    
 	      if ( !(pType=="PETG"||pType=="PLA"||pType=="ABS"||pType=="ONYX") )
 	      {
-	          std::cout <<"---------------------------------------------\n";
-	          std::cout <<" WARNING: Unrecognized plasticType: "+pType+"\n";
+	          //std::cout <<"---------------------------------------------\n";
+	          std::cout <<"WARNING: Unrecognized plasticType: "+pType+"\n";
 	          std::cout <<"   Expected values: PETG PLA ABS ONYX\n";
 	          std::cout <<"   Filename: " <<onHandMaterialFileName <<"\n";
 	          std::cout <<"   Record number: " <<recNo <<"\n";
@@ -146,9 +147,19 @@ main (int argc, char * argv[])
 	          std::cout <<"   quantity: "<<qty <<+"\n";
 	          std::cout <<"   share: :" <<shrPer <<+"\n";
 	          std::cout <<"   Record is ignored\n";
-	          std::cout <<"---------------------------------------------\n";
+	          //std::cout <<"---------------------------------------------\n";
 	          continue;
-	      }             
+	      }     
+	      
+	      if ( printingProb.materialExists(matLoc,filSze,pType) )
+	      {
+	      	if ( !dupKeyWarningPrinted ) {
+               std::cout <<"   Cannot have two materials with same location, filamentSize and plasticType\n";
+	            std::cout <<"   Only first instance used. Others are ignored\n";
+               dupKeyWarningPrinted=true;
+            }	      	
+	      	continue;
+	      }        
          
          
          printingProb.addMaterial(matLoc,filSze,pType,qty,shrPer);
@@ -161,6 +172,7 @@ main (int argc, char * argv[])
       std::string printerFileName = inputDirectory + "/printer.csv";
       VISORprinter printerFile(printerFileName);
       VISORprinterIterator printerFileIter(printerFile);
+      bool dupKeyWarningPrinted = false;
 
       // loop once for each record in printer file
       for ( ; printerFileIter()!=NULL; ) {
@@ -176,11 +188,14 @@ main (int argc, char * argv[])
 
          if (printingProb.printerExists(pNam,pLoc))
          {
-	          //std::cout <<"---------------------------------------------\n";
-	          std::cout <<"   Cannot have two printers with same name & location\n";
-	          std::cout <<"   Only first instance used. Others are ignored\n";
-	          std::cout <<"---------------------------------------------\n";
-	          continue;
+         	if ( !dupKeyWarningPrinted ) {
+	            //std::cout <<"---------------------------------------------\n";
+	            std::cout <<"   Cannot have two printers with same name & location\n";
+	            std::cout <<"   Only first instance used. Others are ignored\n";
+	            //std::cout <<"---------------------------------------------\n";
+	            dupKeyWarningPrinted = true;
+	         } 
+	         continue;
          }
          printingProb.addPrinter(pNam,pLoc,prodRate,f175,f285,petg,pla,abs,onyx);
          allocProb.addVisor(pNam,pLoc);

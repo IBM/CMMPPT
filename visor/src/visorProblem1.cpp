@@ -39,6 +39,16 @@ void VISORproblem1::addMaterial    (const std::string & location, const std::str
 	std::string baseName = baseMaterialName(location, filamentSize, plasticType);
 	materialBaseNames_.insert(baseName);
 }
+ 
+bool VISORproblem1::materialExists (const std::string & location, const std::string & filamentSize, const std::string & plasticType )
+{
+  std::string partName = ownMaterialName(location,filamentSize,plasticType);
+  witBoolean partExists;
+  witGetPartExists(mutableWitRun(),partName.c_str(),&partExists);
+  bool retVal = false;
+  if( partExists) retVal = true;
+  return retVal;
+}
 
 void VISORproblem1::getMaterials(
     std::vector<std::string> & locs,
