@@ -121,14 +121,15 @@ main (int argc, char * argv[])
 	      if ( !(filSze=="1.75mm"||filSze=="2.85mm") )
 	      {
 	         std::cout <<"---------------------------------------------\n";
-	         std::cout <<" Unrecognized filament size: "+filSze+"\n";
-	         std::cout <<" Expected values: 1.75mm 2.85mm\n";
-	         std::cout <<" Record number: " <<recNo <<"\n";
-	         std::cout <<" location: "+matLoc+"\n";
-	         std::cout <<" plasticType: "+pType+"\n";
-	         std::cout <<" quantity: "<<qty <<+"\n";
-	         std::cout <<" share: :" <<shrPer <<+"\n";
-	         std::cout <<" Record is ignored\n";
+	         std::cout <<" WARNING: Unrecognized filament size: "+filSze+"\n";
+	         std::cout <<"   Expected values: 1.75mm 2.85mm\n";
+	         std::cout <<"   Filename: " <<onHandMaterialFileName <<"\n";
+	         std::cout <<"   Record number: " <<recNo <<"\n";
+	         std::cout <<"   location: "+matLoc+"\n";
+	         std::cout <<"   plasticType: "+pType+"\n";
+	         std::cout <<"   quantity: "<<qty <<+"\n";
+	         std::cout <<"   share: :" <<shrPer <<+"\n";
+	         std::cout <<"   Record is ignored\n";
 	         std::cout <<"---------------------------------------------\n";
 	         continue;
 	      }    
@@ -136,14 +137,15 @@ main (int argc, char * argv[])
 	      if ( !(pType=="PETG"||pType=="PLA"||pType=="ABS"||pType=="ONYX") )
 	      {
 	          std::cout <<"---------------------------------------------\n";
-	          std::cout <<" Unrecognized plasticType: "+pType+"\n";
-	          std::cout <<" Expected values: PETG PLA ABS ONYX\n";
-	          std::cout <<" Record number: " <<recNo <<"\n";
-	          std::cout <<" location: "+matLoc+"\n";
-	          std::cout <<" filamentSize: " <<filSze <<"\n";
-	          std::cout <<" quantity: "<<qty <<+"\n";
-	          std::cout <<" share: :" <<shrPer <<+"\n";
-	          std::cout <<" Record is ignored\n";
+	          std::cout <<" WARNING: Unrecognized plasticType: "+pType+"\n";
+	          std::cout <<"   Expected values: PETG PLA ABS ONYX\n";
+	          std::cout <<"   Filename: " <<onHandMaterialFileName <<"\n";
+	          std::cout <<"   Record number: " <<recNo <<"\n";
+	          std::cout <<"   location: "+matLoc+"\n";
+	          std::cout <<"   filamentSize: " <<filSze <<"\n";
+	          std::cout <<"   quantity: "<<qty <<+"\n";
+	          std::cout <<"   share: :" <<shrPer <<+"\n";
+	          std::cout <<"   Record is ignored\n";
 	          std::cout <<"---------------------------------------------\n";
 	          continue;
 	      }             
