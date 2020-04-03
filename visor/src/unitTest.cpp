@@ -9,6 +9,7 @@
 #include "onHandMaterial.h"
 #include "visorProblem1.h"
 #include "visorProblem2.h"
+#include "globalAttrData.h"
 
 // Function Prototypes. Function definitions is in this file.
 void testingMessage( const char * const msg );
@@ -42,6 +43,9 @@ main (int argc, char * argv[])
 
   testingMessage( "Testing VISORproblem2\n" );
   VISORproblem2::test();
+
+  testingMessage( "Testing VISORglobalAttrData\n" );
+  VISORglobalAttrData::test();
 
   testingMessage( "All tests completed successfully\n" );
 

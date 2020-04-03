@@ -114,6 +114,11 @@ public:
     return retVal;
   }
 
+  // setEquAllocPerBnd: equitable allocation period bound
+  void setEqAlloPerBnd(int bnd);
+  int getEqAllocPerBnd();
+
+
   // write wit data file
   void writeWitData( std::string filename );
 
@@ -408,6 +413,7 @@ private:
   mutable WitRun * wr_;
 
   int nPeriods_; // cached for performance
+  int eqAllocPerBnd_;
 
   std::set<std::string> locationBaseNames_;
   std::vector<std::string> demandList_;

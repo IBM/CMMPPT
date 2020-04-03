@@ -5,8 +5,7 @@
 #include <vector>
 #include <string>
 #include <map>
-
-
+#include <fstream>
 
 
 #if 0
@@ -229,6 +228,10 @@ public:
   // If this condition is not met, then an error condition is raised.
   bool commentRecords() const;
   void commentRecords(bool);
+
+
+  // return true if file exists
+  static bool fileExist(const std::string & fn);
 
 
 

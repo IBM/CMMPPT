@@ -191,7 +191,7 @@ void VISORproblem2::solve()
    witStartHeurAlloc(witRun());
    
    
-   int firstEqAllocPeriodBnd = 5;
+   int firstEqAllocPeriodBnd = getEqAllocPerBnd();
    //-------------------------------------------------
    // Set up data structures for first witEqHeurAlloc
    //-------------------------------------------------
@@ -690,6 +690,15 @@ std::vector<float> VISORproblem2::witGetDemandAttribute(
 
 
 //--------------------------------------------------------
+// setEquAllocPerBnd: equitable allocation period bound
+void VISORproblem2::setEqAlloPerBnd(int bnd)
+{
+  eqAllocPerBnd_ = bnd;
+}
+int VISORproblem2::getEqAllocPerBnd()
+{
+  return eqAllocPerBnd_ ;
+}
 
 void VISORproblem2::setTitle( const std::string & title)
 {
@@ -743,6 +752,7 @@ VISORproblem2::VISORproblem2()
 :
 wr_(NULL),
 nPeriods_(30),
+eqAllocPerBnd_(5),
 locationBaseNames_(),
 demandList_()
 {
@@ -819,7 +829,8 @@ VISORproblem2::~VISORproblem2()
 // copy constructor. Not yet suported
 VISORproblem2::VISORproblem2( const VISORproblem2& source ):
 wr_(NULL),
-nPeriods_(source.nPeriods_)
+nPeriods_(source.nPeriods_),
+eqAllocPerBnd_(source.eqAllocPerBnd_)
 {
   gutsOfCopy(source);
 }
@@ -850,6 +861,7 @@ void VISORproblem2::gutsOfCopy( const VISORproblem2& source )
 
   witCopyData(wr_,source.wr_);
   nPeriods_ = source.nPeriods_;
+  eqAllocPerBnd_ = source.eqAllocPerBnd_;
 
 
 

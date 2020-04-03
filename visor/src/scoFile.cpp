@@ -18,6 +18,13 @@
 
 //size_t RWCollection::DEFAULT_CAPACITY = 64;
 
+bool SCOfile::fileExist(const std::string & fn)
+{
+    std::ifstream f(fn.c_str());
+    bool retVal=f.good();
+    //std::cout <<"fileExist "+fn+" retVal=" <<retVal <<"\n";
+    return retVal;
+}
 
 void SCOfile::resize(
   size_t newSize)
@@ -75,6 +82,7 @@ void
   }
   commentRecords_ = rdr;
 }
+
 
 bool
   SCOfile::removeDuplicateRecords()
