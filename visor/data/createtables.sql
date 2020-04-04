@@ -19,7 +19,7 @@ create table printer (
 
 create table onHandMaterial (
     "location" VARCHAR,
-    "filamentSize" VARCHAR CHECK("filamentSize" = '175mm' or "filamentSize" = '285mm'),
+    "filamentSize" VARCHAR CHECK("filamentSize" = '1.75mm' or "filamentSize" = '2.85mm'),
     "plasticType" VARCHAR CHECK("plasticType" = 'PETG' or "plasticType" = 'PLA' or "plasticType" = 'ABS' or "plasticType" = 'ONYX'),
     "quantity" FLOAT,
     "share" INTEGER CHECK( share >=0 and share <= 100),
@@ -32,17 +32,17 @@ create table requestQuantity (
     PRIMARY KEY("location", "date" )
 );
 create table shipQuantity (
-    "requestLocation" VARCHAR,
+    "requestingLocation" VARCHAR,
     "producingLocation" VARCHAR,
-    "date" DATE,
-    "rhipQuantity" FLOAT,
-    PRIMARY KEY("requestLocation", "producingLocation", "date" )
+    "period" INTEGER,
+    "shipQuantity" FLOAT,
+    PRIMARY KEY("requestingLocation", "producingLocation", "period" )
 );
 create table subVol (
     "printerName" VARCHAR,
     "printerLocation" VARCHAR,
     "materialLocation" VARCHAR,
-    "filamentSize" VARCHAR CHECK("filamentSize" = '175mm' or "filamentSize" = '285mm'),
+    "filamentSize" VARCHAR CHECK("filamentSize" = '1.75mm' or "filamentSize" = '2.85mm'),
     "plasticType" VARCHAR CHECK("plasticType" = 'PETG' or "plasticType" = 'PLA' or "plasticType" = 'ABS' or "plasticType" = 'ONYX'),    
     "period" INTEGER,
     "quantity" FLOAT,
@@ -59,4 +59,4 @@ create table prodVol (
     PRIMARY KEY("printerName", "printerLocation", "period")
 );
 
-INSERT INTO onHandMaterial (location, "filamentSize", "plasticType", quantity, share) VALUES ('a','175mm', 'PETG', 0.5, 38);
+-- INSERT INTO onHandMaterial (location, "filamentSize", "plasticType", quantity, share) VALUES ('a','1.75mm', 'PETG', 0.5, 38);
