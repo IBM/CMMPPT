@@ -38,6 +38,9 @@ main (int argc, char * argv[])
   testingMessage( "Testing VISORonHandMaterialIterator\n" );
   VISORonHandMaterialIterator::test();
 
+  testingMessage( "Testing VISORproblem\n" );
+  VISORproblem::test();
+
   testingMessage( "Testing VISORproblem1\n" );
   VISORproblem1::test();
 

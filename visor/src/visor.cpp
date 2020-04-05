@@ -1,13 +1,12 @@
 
-#include "wit.h"
-
 #include <map>
 #include <vector>
 
-#include <assert.h>
+#include <cassert>
 #include <iostream>
 #include <float.h>
 #include <math.h>
+#include "wit.h"
 
 
 
@@ -388,7 +387,6 @@ main(int argc, char *argv[]) {
             for (int d = 0; d < demands.size(); d++) {
                 // Get shipVol to hospital
                 std::string dn = demands[d];
-                //std::vector<float> sv=allocProb.getVisorShipVol(dn);
 
                 //get the witSubVol for each location making visors
                 std::vector<std::string> partLoc;
