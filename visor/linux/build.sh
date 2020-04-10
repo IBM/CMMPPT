@@ -7,13 +7,14 @@ export LIBRARY_PATH=../../wit/linux/:../../mcl/linux:/opt/ibm/ILOG/CPLEX_Studio_
 export C_INCLUDE_PATH="../../wit/src"
 
 
-gcc -I$C_INCLUDE_PATH -c -o visor.o           ../src/visor.cpp
-gcc -I$C_INCLUDE_PATH -c -o scoFile.o         ../src/scoFile.cpp
-gcc -I$C_INCLUDE_PATH -c -o unitTest.o        ../src/unitTest.cpp
+gcc -I$C_INCLUDE_PATH -c -o visor.o            ../src/visor.cpp
+gcc -I$C_INCLUDE_PATH -c -o visorUtil.o        ../src/visorUtil.cpp
+gcc -I$C_INCLUDE_PATH -c -o scoFile.o          ../src/scoFile.cpp
+gcc -I$C_INCLUDE_PATH -c -o unitTest.o         ../src/unitTest.cpp
 gcc -I$C_INCLUDE_PATH -c -o VisorFinite.o      ../src/VisorFinite.cpp
 gcc -I$C_INCLUDE_PATH -c -o visorProblem.o     ../src/visorProblem.cpp
 gcc -I$C_INCLUDE_PATH -c -o visorProblem1.o    ../src/visorProblem1.cpp
 gcc -I$C_INCLUDE_PATH -c -o visorProblem2.o    ../src/visorProblem2.cpp
 
-gcc -o visor visor.o scoFile.o visorProblem.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
-gcc -o unitTest unitTest.o scoFile.o visorProblem.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
+gcc -o visor visor.o scoFile.o visorUtil.o visorProblem.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm
+gcc -o unitTest unitTest.o scoFile.o visorUtil.o visorProblem.o visorProblem1.o visorProblem2.o VisorFinite.o -lwit -lmcl -pthread -ldl -lstdc++ -lcplex -lm

@@ -388,10 +388,9 @@ void VISORproblem1::getSubVol(
 // -----------------------------
 // solver methods
 // ----------------------------
-void VISORproblem1::solve(bool useOptImplode)
+void VISORproblem1::solve()
 {
-  if (useOptImplode) witOptImplode(witRun());
-  else witHeurImplode(witRun());
+   witOptImplode(witRun());
 }
 
 
