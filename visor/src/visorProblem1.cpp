@@ -21,7 +21,7 @@ VISORproblem1::addMaterial(const std::string &location, const std::string &filam
   std::string shrMatName = shrMaterialName(location, filamentSize, plasticType);
 
   witAddPart(witRun(), ownMatName.c_str(), WitMATERIAL);
-  witAddPart(witRun(), shrMatName.c_str(), WitCAPACITY);
+  witAddPart(witRun(), shrMatName.c_str(), WitMATERIAL);
 
   float shrQty = quantity * (float) sharePercent / 100.0f;
   float ownQty = quantity - shrQty;
@@ -31,6 +31,20 @@ VISORproblem1::addMaterial(const std::string &location, const std::string &filam
   std::string baseName = baseMaterialName(location, filamentSize, plasticType);
   materialBaseNames_.insert(baseName);
 }
+
+std::vector<float> VISORproblem1::getMaterialStockVol(const std::string &location, const std::string &filamentSize,
+                                                      const std::string &plasticType)
+{
+  std::string ownMatName = ownMaterialName(location, filamentSize, plasticType);
+  std::string shrMatName = shrMaterialName(location, filamentSize, plasticType);
+  std::vector<float> ownStockVol=witGetNameAttribute(witGetPartStockVol,ownMatName);
+  std::vector<float> shrStockVol=witGetNameAttribute(witGetPartStockVol,shrMatName);
+  std::vector<float> retVal;
+  for (int t=0; t<ownStockVol.size(); t++)
+    retVal.push_back(ownStockVol[t]+shrStockVol[t]);
+  return retVal;
+}
+
 
 bool VISORproblem1::materialExists(const std::string &location, const std::string &filamentSize,
                                    const std::string &plasticType)
@@ -562,5 +576,6 @@ VISORproblem1::test()
   }
 
 }
+
 
 
