@@ -152,32 +152,85 @@ class application(object):
         return "hello"
 
     @staticmethod
-    @app.route('/visor/printer', methods=['POST'])
-    def printer():
+    def getinsertsql(table, form):
+        values = [f['value'] for f in form.values()]
+        sql = f'INSERT INTO {table} ("'
+        sql += '","'.join(form.keys()) + '"' + ") VALUES ('" + "','".join(values) + "')"
+        sql = sql.replace('"', '\\"')
+        return sql
+
+    @staticmethod
+    def getupdatesql(table, form):
+        sql = f'INSERT INTO {table} ("'
+        sql += '","'.join(form.keys()) + '"' + ") VALUES ('" + "','".join(form.values()) + "')"
+        sql = sql.replace('"', '\\"')
+        return sql
+
+    @staticmethod
+    def getdeletesql(table, form):
+        sql = f'INSERT INTO {table} ("'
+        sql += '","'.join(form.keys()) + '"' + ") VALUES ('" + "','".join(form.values()) + "')"
+        sql = sql.replace('"', '\\"')
+        return sql
+
+    @staticmethod
+    def getsqlcommand(request, table, form):
         if request.args['action'] == 'add':
-            sql = 'INSERT INTO printer ("'
-            sql += '","'.join(request.form.keys()) + '"' + ") VALUES ('" + "','".join(request.form.values()) + "')"
-            # command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "select * from printer"'
-            # (stdout, stderr) = runbashcommand(command)
-            # print(stdout)
-            sql = sql.replace('"', '\\"')
+            sql = application.getinsertsql(table, form)
             command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
         if request.args['action'] == 'update':
-            sql = 'INSERT INTO printer ("'
-            sql += '","'.join(request.form.keys()) + '"' + ") VALUES ('" + "','".join(request.form.values()) + "')"
-            # command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "select * from printer"'
-            # (stdout, stderr) = runbashcommand(command)
-            # print(stdout)
-            sql = sql.replace('"', '\\"')
+            sql = application.getupdatesql(table, form)
             command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
-        (stdout, stderr) = runbashcommand(command)
-        payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
+            command = None
+        if request.args['action'] == 'update':
+            sql = application.getdeletesql(table, form)
+            command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
+            command = None
+        return sql, command
+
+    @staticmethod
+    @app.route('/visor/printer', methods=['POST'])
+    def printer():
+        table = 'printer'
+        form = json.loads(request.form['json'])
+        sql, command = application.getsqlcommand(request,table,form)
+        if command:
+            (stdout, stderr) = runbashcommand(command)
+            payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
+        else:
+            payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
         return payload
 
     @staticmethod
+    @app.route('/visor/material', methods=['POST'])
+    def material():
+        table = 'onhandmaterial'
+        form = json.loads(request.form['json'])
+        sql, command = application.getsqlcommand(request,table,form)
+        if command:
+            (stdout, stderr) = runbashcommand(command)
+            payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
+        else:
+            payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
+        return payload
+
+    @staticmethod
+    @app.route('/visor/request', methods=['POST'])
+    def request():
+        table = 'requestquantity'
+        form = json.loads(request.form['json'])
+        sql, command = application.getsqlcommand(request, table, form)
+        if command:
+            (stdout, stderr) = runbashcommand(command)
+            payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
+        else:
+            payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
+        return payload
+    @staticmethod
     @app.route('/visor/sql', methods=['POST'])
     def sql():
-        sql = request.form['sql']
+        form = json.loads(request.form['json'])
+        sql = form['sql']['value']
         sql = sql.replace('"', '\\"')
         command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
         (stdout, stderr) = runbashcommand(command)
