@@ -1,27 +1,26 @@
-from flask import Flask, render_template, request, jsonify, url_for, Response, redirect, session
 import json
 import os
 import sys
+
+from flask import Flask, request, Response, redirect, session
+from functools import reduce
 
 print(sys.path)
 from utilities import getLogger
 from queue import Queue
 import threading
-import base64
-import pandas as pd
 import numpy as np
 import traceback
-from io import StringIO
 import re
-import time
 import subprocess
 
 # from flask_socketio import SocketIO
 # from flask_socketio import send, emit
-from logging import Handler, DEBUG, INFO
 
+SQLHOST = '3.15.33.87'
 logger = getLogger('edu.cornell')
 app = Flask(__name__, root_path=os.path.abspath(os.path.curdir))
+app.secret_key = 'abcd123456789efgh'
 
 
 # socketio = SocketIO(app)
@@ -147,13 +146,21 @@ class application(object):
     # def node_modules0():
     #     return app.send_static_file(f'/node_modules/{p}')
     @staticmethod
+    def sqltojson(sql):
+        return 'SELECT json_agg(row_to_json(t)) FROM (' + sql + ') as t'
+    @staticmethod
+    def runsql(sql):
+        command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -t -c "' + sql + '"'
+        return runbashcommand(command)
+
+    @staticmethod
     @app.route('/visor/hello', methods=['GET'])
     def hello():
         return "hello"
 
     @staticmethod
     def getinsertsql(table, form):
-        values = [f['value'] for f in form.values()]
+        values = [str(f['value']) for f in form.values()]
         sql = f'INSERT INTO {table} ("'
         sql += '","'.join(form.keys()) + '"' + ") VALUES ('" + "','".join(values) + "')"
         sql = sql.replace('"', '\\"')
@@ -161,8 +168,16 @@ class application(object):
 
     @staticmethod
     def getupdatesql(table, form):
-        sql = f'INSERT INTO {table} ("'
-        sql += '","'.join(form.keys()) + '"' + ") VALUES ('" + "','".join(form.values()) + "')"
+        where = []
+        set = []
+        for e in form:
+            if form[e]['keyfield']:
+                where.append(f'"{e}"' + "='" + form[e]['value'] + "'")
+            else:
+                set.append(f'"{e}"' + "='" + str(form[e]['value']) + "'")
+        where = ' and '.join(where)
+        set = ', '.join(set)
+        sql = f'UPDATE  {table}  SET {set} WHERE {where} '
         sql = sql.replace('"', '\\"')
         return sql
 
@@ -177,25 +192,25 @@ class application(object):
     def getsqlcommand(request, table, form):
         if request.args['action'] == 'add':
             sql = application.getinsertsql(table, form)
-            command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
+            # command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -c "' + sql + '"'
         if request.args['action'] == 'update':
             sql = application.getupdatesql(table, form)
-            command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
-            command = None
-        if request.args['action'] == 'update':
+            # command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -c "' + sql + '"'
+            # command = None
+        if request.args['action'] == 'delete':
             sql = application.getdeletesql(table, form)
-            command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
-            command = None
-        return sql, command
+            command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -c "' + sql + '"'
+            sql=None
+        return sql
 
     @staticmethod
     @app.route('/visor/printer', methods=['POST'])
     def printer():
         table = 'printer'
         form = json.loads(request.form['json'])
-        sql, command = application.getsqlcommand(request,table,form)
-        if command:
-            (stdout, stderr) = runbashcommand(command)
+        sql = application.getsqlcommand(request, table, form)
+        if sql:
+            (stdout, stderr) = application.runsql(sql)
             payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         else:
             payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
@@ -206,9 +221,9 @@ class application(object):
     def material():
         table = 'onhandmaterial'
         form = json.loads(request.form['json'])
-        sql, command = application.getsqlcommand(request,table,form)
-        if command:
-            (stdout, stderr) = runbashcommand(command)
+        sql = application.getsqlcommand(request, table, form)
+        if sql:
+            (stdout, stderr) = application.runsql(sql)
             payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         else:
             payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
@@ -219,47 +234,44 @@ class application(object):
     def request():
         table = 'requestquantity'
         form = json.loads(request.form['json'])
-        sql, command = application.getsqlcommand(request, table, form)
-        if command:
-            (stdout, stderr) = runbashcommand(command)
+        sql = application.getsqlcommand(request, table, form)
+        if sql:
+            (stdout, stderr) = application.runsql(sql)
             payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         else:
             payload = {'status': 0, 'sql': sql, 'stdout': "", 'stderr': "Not run"}
         return payload
+
     @staticmethod
     @app.route('/visor/sql', methods=['POST'])
     def sql():
         form = json.loads(request.form['json'])
         sql = form['sql']['value']
         sql = sql.replace('"', '\\"')
-        command = 'psql -h 13.59.186.14 -p 15432 -U cmmppt -c "' + sql + '"'
-        (stdout, stderr) = runbashcommand(command)
+        (stdout, stderr)=application.runsql(application.sqltojson(sql))
         payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         return payload
 
     @staticmethod
+    def savedata(name, data):
+        f = open(name, "wb")
+        f.write(data)
+        f.close()
+        return
+
+    @staticmethod
     @app.route('/visor/senddata', methods=['POST'])
-    def senddata(self):
+    def senddata():
         try:
-            data = request.json
-            X = data['X']
-            y = data['y']
-            beta = data['beta']
-            filepath = data['filepath']
-            print(filepath)
-            application.filepath = filepath
-            os.makedirs(filepath, exist_ok=True)
-            xfilename = os.path.abspath(os.path.join(filepath, 'X.csv'))
-            np.savetxt(xfilename, X, delimiter=',')
-            yfilename = os.path.abspath(os.path.join(filepath, 'y.csv'))
-            np.savetxt(yfilename, y, delimiter=',')
-            betafilename = os.path.abspath(os.path.join(filepath, 'beta.csv'))
-            np.savetxt(betafilename, beta, delimiter=',')
-            print(xfilename, yfilename, betafilename)
-            result = 'OK'
-            return getResponse(
-                {"contents": {"xfilename": xfilename, "yfilename": yfilename, "betafilename": betafilename},
-                 "encoding": "base64"})
+            files = request.files
+            for k in files.keys():
+                filestorage = files[k]
+                data = filestorage.read()
+                application.savedata(k, data)
+            # return getResponse(
+            #     {"contents": {"xfilename": xfilename, "yfilename": yfilename, "betafilename": betafilename},
+            #      "encoding": "base64"})
+            return {'status': 0}
         except Exception as e:
             return getResponse(e)
 
@@ -299,6 +311,39 @@ class application(object):
             traceback.print_exc(file=sys.stdout)
             logger.error(e)
             return getResponse(e)
+
+    @staticmethod
+    @app.route('/visor/login', methods=['POST'])
+    def login():
+        password = request.form['psw']
+        user = request.form['uname']
+        (stdout, stderr)  = application.runsql(application.sqltojson('SELECT * FROM USERS WHERE "name"=' + "'" + user + "'"))
+        if len(stdout.strip()) == 0:
+            return {"status": 1, "message": "Unknown user"}
+        result = json.loads(stdout)
+        result = result[0]
+        if result['password'] == password:
+            (stdout, stderr)  = application.runsql(application.sqltojson('select roles.role from users INNER JOIN roles on users.name=roles.name where users.name='
+                                                                         + "'" + user + "'"))
+            session['user'] = user
+            session['password'] = password
+            session['roles'] = reduce(lambda a, v: a + v, (map(lambda d: list(d.values()), json.loads(stdout))))
+            return {"status": 0, "url": '/static/index.html'}
+        return {"status": 1, "message": "Incorrect password"}
+
+    @staticmethod
+    @app.route('/visor/authenticate', methods=['GET'])
+    def authenticate():
+        if 'user' in session and 'password' in session:
+            return {'status': 0, 'roles': session['roles']}
+        return {'status': 1, 'url': '/static/login.html'}
+
+    @staticmethod
+    @app.route('/visor/logout', methods=['GET'])
+    def logout():
+        session.pop('user')
+        session.pop('password')
+        return {'status': 1, 'url': '/static/login.html'}
 
     @app.route('/visor/runos', methods=['POST'])
     def runos(self):
