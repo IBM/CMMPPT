@@ -4,6 +4,7 @@
 
 #include "VisorFloatEqual.h"
 #include "visorProblem2.h"
+#include "visorUtil.h"
 
 
 //----------------------------------
@@ -65,16 +66,21 @@ void VISORproblem2::setVisorSupplyVol(const std::string &name, const std::string
   std::string visorPartNm = visorPartName(name, location);
   witSetNameAttribute(witSetPartSupplyVol, visorPartNm, supplyVol);
 }
-
+void VISORproblem2::setVisorSupplyVol( const std::string &location,
+                                      int period, float supplyVol)
+{
+  std::string visorPartNm = aggregateVisorName(location);
+  witSetNameAttribute(witGetPartSupplyVol,witSetPartSupplyVol, visorPartNm, period, supplyVol);
+}
+bool VISORproblem2::visorExists(const std::string &name,const std::string &loc)
+{
+  std::string visorPartNm = visorPartName(name, loc);
+  return witGetNameAttributeBool(witGetPartExists,visorPartNm);
+}
 bool VISORproblem2::locationExists(const std::string &loc)
 {
   std::string aggOperNm = aggregateOperName(loc);
-  witBoolean exists;
-  witGetOperationExists(mutableWitRun(), aggOperNm.c_str(), &exists);
-  bool retVal = false;
-  if (exists) retVal = true;
-  //std::cout <<aggOperNm <<" " <<retVal <<std::endl;
-  return retVal;
+  return witGetNameAttributeBool(witGetOperationExists,aggOperNm);
 }
 
 //-------------------------------------------------------------------------
@@ -492,9 +498,100 @@ VISORproblem2::test()
     assert(prob.getNPeriods() == 30);
     prob.setNPeriods(25);
     assert(prob.getNPeriods() == 25);
-
-
   }
+  {
+    /* Do first and second implosion with BrendaData */
+    VISORproblem1 *prob1Ptr = new VISORproblem1();
+    VISORproblem2 *prob2Ptr = new VISORproblem2();
+    std::string inputDirectory = "../data/BrendaData";
+    std::string onHandMaterialFileName = inputDirectory + "/onHandMaterial.csv";
+    readOnHandMaterial(onHandMaterialFileName, *prob1Ptr);
+    std::string printerFileName = inputDirectory + "/printer.csv";
+    readPrinter(printerFileName, prob1Ptr, prob2Ptr);
+    std::string requestQuantityFileName = inputDirectory + "/requestQuantity.csv";
+    readRequestQuantity(requestQuantityFileName, *prob2Ptr);
+    prob1Ptr->solve();
+    copyImplosion1ShipVolToImplosion2SupplyVol(*prob1Ptr, *prob2Ptr);
+    prob2Ptr->solve();
+
+    std::vector<float> pv = prob1Ptr->getPrinterProdVol("P1", "115 Cherry");
+    assert(eq(pv[0], 0.0));
+    assert(eq(pv[1], 10.0));
+
+    std::vector<std::string> partLoc;
+    std::vector<std::vector<float>> sv;
+    prob2Ptr->getSubVols("Urgent Care", partLoc, sv);
+    bool found206=false,found210=false,found217=false;
+    for (int i = 0; i < partLoc.size(); i++)
+    {
+      //std::cout <<i <<"  "+partLoc[i] <<std::endl;
+      if (partLoc[i]=="206 Carpenter")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],5.0));
+        found206=true;
+      }
+      if (partLoc[i]=="210 Gates")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],5.0));
+        found210=true;
+      }
+      if (partLoc[i]=="217 Rhodes")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],13.0));
+        found217=true;
+      }
+    }
+    assert(found206 && found210 && found217);
+  }
+
+  {
+    /* Do only second implosion with BrendaData */
+    VISORproblem1 *prob1Ptr = nullptr;
+    VISORproblem2 *prob2Ptr = new VISORproblem2();
+    std::string inputDirectory = "../data/BrendaData";
+
+    std::string printerFileName = inputDirectory + "/printer.csv";
+    readPrinter(printerFileName, prob1Ptr, prob2Ptr);
+
+    std::string requestQuantityFileName = inputDirectory + "/requestQuantity.csv";
+    readRequestQuantity(requestQuantityFileName, *prob2Ptr);
+
+    std::string visorProdPlanFileName = inputDirectory + "/visorProdPlan.csv";
+    readVisorProdPlan(visorProdPlanFileName,*prob2Ptr);
+
+    prob2Ptr->solve();
+
+    std::vector<std::string> partLoc;
+    std::vector<std::vector<float>> sv;
+    prob2Ptr->getSubVols("Urgent Care", partLoc, sv);
+    bool found206=false,found210=false,found217=false;
+    for (int i = 0; i < partLoc.size(); i++)
+    {
+      if (partLoc[i]=="206 Carpenter")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],5.0));
+        found206=true;
+      }
+      if (partLoc[i]=="210 Gates")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],5.0));
+        found210=true;
+      }
+      if (partLoc[i]=="217 Rhodes")
+      {
+        assert( eq(sv[i][0],0.0));
+        assert( eq(sv[i][1],13.0));
+        found217=true;
+      }
+    }
+    assert(found206 && found210 && found217);
+  }
+
 
 
 }

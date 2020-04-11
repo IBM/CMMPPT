@@ -5,6 +5,7 @@
 //#include <wit.h>
 
 #include "requestQuantity.h"
+#include "visorProdPlan.h"
 #include "printer.h"
 #include "onHandMaterial.h"
 #include "visorProblem1.h"
@@ -25,6 +26,12 @@ main (int argc, char * argv[])
 
   testingMessage( "Testing VISORrequestQuantityIterator\n" );
   VISORrequestQuantityIterator::test();
+
+  testingMessage( "Testing VISORvisorProdPlan\n" );
+  VISORvisorProdPlan::test();
+
+  testingMessage( "Testing VISORvisorProdPlanIterator\n" );
+  VISORvisorProdPlanIterator::test();
 
   testingMessage( "Testing VISORprinter\n" );
   VISORprinter::test();

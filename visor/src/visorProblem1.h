@@ -96,7 +96,7 @@ public:
   //--------------------
   // Solve Methods.
   //--------------------
-  void solve(bool useOptImplode);
+  void solve();
 
 
 

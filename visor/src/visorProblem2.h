@@ -29,11 +29,12 @@ public:
   // Methods for Visor.
   //----------------------
   void addVisor(const std::string &name, const std::string &location);
-
+  bool visorExists(const std::string &name, const std::string &loc);
   bool locationExists(const std::string &loc);
 
   void setVisorSupplyVol(const std::string &name, const std::string &location,
                          const std::vector<float> &supplyVol);
+  void setVisorSupplyVol(const std::string &location,int period, float supplyVol);
 
   //------------------------------------------
   // Visor name methods
