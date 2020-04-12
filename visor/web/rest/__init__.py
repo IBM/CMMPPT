@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import sys
@@ -13,11 +14,14 @@ import numpy as np
 import traceback
 import re
 import subprocess
+import pandas as pd
 
 # from flask_socketio import SocketIO
 # from flask_socketio import send, emit
 
 SQLHOST = '3.15.33.87'
+INDEXHTML='/static/html/index.html'
+LOGINHTML='/static/html/login.html'
 logger = getLogger('edu.cornell')
 app = Flask(__name__, root_path=os.path.abspath(os.path.curdir))
 app.secret_key = 'abcd123456789efgh'
@@ -202,7 +206,46 @@ class application(object):
             command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -c "' + sql + '"'
             sql=None
         return sql
-
+    @staticmethod
+    def gettable(table) :
+        sql = f'select * from {table}'
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        sql = f'select column_name from information_schema.columns where table_name=\'{table}\''
+        rows = stdout
+        error = stderr
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        error += stderr
+        columns = stdout
+        return {'status': 0, 'columns': columns, 'rows': rows, 'error': error}
+    @staticmethod
+    @app.route('/visor/table', methods=['GET'])
+    def table():
+        return application.gettable(request.args['table'])
+    @staticmethod
+    @app.route('/visor/download', methods=['GET'])
+    def download():
+        table=request.args['table']
+        data= application.gettable(table)
+        rows=json.loads(data['rows'])
+        columns=json.loads(data['columns'])
+        location=None
+        dictionary = {}
+        csvrows=[]
+        header=[]
+        for i,d in enumerate(columns):
+            header.append(d['column_name'])
+            dictionary[d['column_name']]=i
+        for r in rows:
+            row=[0]*len(columns)
+            for k in r.keys():
+                row[dictionary[k]] = r[k]
+            csvrows.append(row)
+        df = pd.DataFrame(csvrows, columns=header)
+        user = session['user']
+        os.makedirs(f'static/data/{user}', 0o755, True)
+        location=f'static/data/{user}/{table}.csv'
+        df.to_csv(location,index=False, quoting=csv.QUOTE_NONNUMERIC)
+        return {"status":0, "url": f'/{location}'}
     @staticmethod
     @app.route('/visor/printer', methods=['POST'])
     def printer():
@@ -328,7 +371,7 @@ class application(object):
             session['user'] = user
             session['password'] = password
             session['roles'] = reduce(lambda a, v: a + v, (map(lambda d: list(d.values()), json.loads(stdout))))
-            return {"status": 0, "url": '/static/index.html'}
+            return {"status": 0, "url": INDEXHTML}
         return {"status": 1, "message": "Incorrect password"}
 
     @staticmethod
@@ -336,14 +379,21 @@ class application(object):
     def authenticate():
         if 'user' in session and 'password' in session:
             return {'status': 0, 'roles': session['roles']}
-        return {'status': 1, 'url': '/static/login.html'}
+        return {'status': 1, 'url': LOGINHTML}
 
     @staticmethod
     @app.route('/visor/logout', methods=['GET'])
     def logout():
         session.pop('user')
         session.pop('password')
-        return {'status': 1, 'url': '/static/login.html'}
+        return {'status': 1, 'url': LOGINHTML}
+
+    @staticmethod
+    @app.route('/visor/tables', methods=['GET'])
+    def tables():
+        sql="select table_name from information_schema.tables where table_catalog='cmmppt' and table_schema='public'"
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        return {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
 
     @app.route('/visor/runos', methods=['POST'])
     def runos(self):

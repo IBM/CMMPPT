@@ -126,6 +126,73 @@ $(function() {
                 $(location).attr("href",data.url)
             })
         })
+        $('#downloadtable').click(function(e) {
+            var tablename=null;
+            $("input[type='radio']",$(e.target).parent().parent()).each(function(itag,tag){
+                if($(tag).prop("checked")) {
+                    tablename=$(tag).attr("data-tablename")
+                }
+            })
+            $("#table").empty()
+            $("#table").append($("<div>").attr("width", "100%").css("text-align","center").
+            append($("<span>").addClass("spinner-border spinner-border-sm").
+            attr("role", "status").attr("aria-hidden", "true").css("width","200px").css("height","200px").css("color","red")))
+            $.get("/visor/download", {table:tablename}).done(function(data) {
+                $("#table").empty()
+                location=data.url
+            })
+            })
+        $('#submittable').click(function(e) {
+            var tablename=null;
+            $("input[type='radio']",$(e.target).parent().parent()).each(function(itag,tag){
+                if($(tag).prop("checked")) {
+                    tablename=$(tag).attr("data-tablename")
+                }
+            })
+            $("#table").empty()
+            $("#table").append($("<div>").attr("width", "100%").css("text-align","center").
+            append($("<span>").addClass("spinner-border spinner-border-sm").
+            attr("role", "status").attr("aria-hidden", "true").css("width","200px").css("height","200px").css("color","red")))
+            $.get("/visor/table", {table:tablename}).done(function(data) {
+                $("#table").empty()
+                var columns=JSON.parse(data["columns"])
+                var rows=JSON.parse(data["rows"])
+                var tablediv = $("#table")
+                var table = $("<table>")
+                tablediv.append(table)
+                table.addClass("table table-striped table-bordered table-sm").attr("cellspacing","0").attr("width","100%")
+                var thead = $("<thead>")
+                table.append(thead)
+                var th=$("<tr>")
+                thead.append(th)
+                var c=[]
+                columns.forEach(function(column) {
+                    var name=column.column_name
+                    c.push(name)
+                    var td=$("<th>").addClass("th-sm").text(name)
+                    th.append(td)
+                })
+                var tbody=$("<tbody>")
+                table.append(tbody)
+                rows.forEach(function(row) {
+                    var tr=$("<tr>")
+                    tbody.append(tr)
+                    for(cc in c) {
+                        var name=row[c[cc]]
+                        var td=$("<td>").text(name)
+                        tr.append(td)
+                    }
+                })
+                        $(table).DataTable({
+            "scrollY": "200px",
+            "scrollCollapse": true,
+            });
+                    $('.dataTables_length').addClass('bs-select');
+
+                return
+            })
+            return;
+        })
         $('.nav-tabs a').on('shown.bs.tab', function(event){
             var x = $(event.target).text();         // active tab
             var y = $(event.relatedTarget).text();  // previous tab
@@ -133,6 +200,27 @@ $(function() {
             $("#stdout").text("")
             $("#stderr").text("")
         });
+        $.get("/visor/tables").done(function(data) {
+            tables=JSON.parse(data.stdout)
+            var table=$("<table>")
+            $("#selecttable").append(table)
+            table.css("width","100%")
+            var tr = $("<tr>")
+            table.append(tr)
+            for(var i in tables) {
+                var table=tables[i].table_name
+                var id = table+"_radio"
+                var td=$("<td>")
+                tr.append(td)
+                td.append(
+                    $("<input>").attr("type","radio").attr("id",id).
+                    attr("name","table_radio").
+                    attr("data-tablename",table).
+                    addClass("form-check-input")
+                )
+                td.append($("<label>").addClass("form-check-label").attr("for",id).text(table))
+            }
+        })
         /*
           var forms = document.getElementsByClassName('needs-validation');
           // Loop over them and prevent submission
