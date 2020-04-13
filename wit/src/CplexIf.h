@@ -76,9 +76,9 @@ class WitCplexIf: public WitSolverIf
       virtual void         reSolveLp       ();
       virtual void         solveLp         (bool);
       virtual void         solveMip        (bool);
-      virtual void         setVarLB        (int, double);
-      virtual void         setObjCoeff     (int, double);
-      virtual double       primalVarVal    (int);
+      virtual void         setVarLB        (WitOptVar *, double);
+      virtual void         setObjCoeff     (WitOptVar *, double);
+      virtual double       primalVarVal    (WitOptVar *);
       virtual void         getPrimalSoln   (WitVector <double> &);
       virtual void         getDualSoln     (WitVector <double> &);
       virtual const char * solverName      ();

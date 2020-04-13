@@ -45,12 +45,19 @@ class WitSolverIf: public WitProbAssoc
       virtual ~WitSolverIf ();
 
       //------------------------------------------------------------------------
-      // Pure virtual public member functions.
+      // Virtual public member functions.
       //------------------------------------------------------------------------
 
-      virtual void issueVersionMsg () = 0;
+      virtual void issueVersionMsg ();
          //
          // Issues a msg indicating the version # of the solver, if possible.
+         // The default implementation does nothing.
+
+      virtual bool lexOptReloadNeeded ();
+         //
+         // Returns true, iff lexicographic optimization with re-leading is
+         // needed.
+         // The default implementation returns false.
 
       virtual void loadLp () = 0;
          //
@@ -89,19 +96,17 @@ class WitSolverIf: public WitProbAssoc
          // problem as a MIP.
          // optNeeded is to be true, iff an optimal solution is required.
 
-      virtual void setVarLB (int theColIdx, double theLB) = 0;
+      virtual void setVarLB (WitOptVar * theOptVar, double theLB) = 0;
          //
-         // Sets the lower bound on the variable whose index is theColIdx to
-         // theLB.
+         // Sets the lower bound on theOptVar to theLB.
 
-      virtual void setObjCoeff (int theColIdx, double theVal) = 0;
+      virtual void setObjCoeff (WitOptVar * theOptVar, double theVal) = 0;
          //
-         // Sets the objective coefficient on the variable whose index is
-         // theColIdx to theVal.
+         // Sets the objective coefficient on theOptVar to theVal.
 
-      virtual double primalVarVal (int theColIdx) = 0;
+      virtual double primalVarVal (WitOptVar * theOptVar) = 0;
          //
-         // Returns the value of the primal variable whose index is theColIdx.
+         // Returns the primal variable value of theOptVar.
 
       virtual void getPrimalSoln (WitVector <double> & primalSoln) = 0;
          //

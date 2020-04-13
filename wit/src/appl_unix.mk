@@ -52,7 +52,8 @@ MclModule: $(mcl_client_objects) $(mcl_lib)
 #       The choice of link flags depends on how COIN CLP and CBC were built.
 #       Suggested possible values:
 #          export WIT_COIN_LINK_FLAGS="-lz -llapack"
-#          export WIT_COIN_LINK_FLAGS="-lcoinglpk -lcoinlapack -lcoinmumps"
+#          export WIT_COIN_LINK_FLAGS=\
+#                 "-lcoinasl -lcoinglpk -lcoinlapack -lcoinmetis -lcoinmumps"
 #          export WIT_COIN_LINK_FLAGS=
 #-------------------------------------------------------------------------------
 

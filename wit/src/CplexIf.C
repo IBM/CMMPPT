@@ -264,13 +264,13 @@ void WitCplexIf::solveMip (bool optNeeded)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::setVarLB (int theColIdx, double theLB)
+void WitCplexIf::setVarLB (WitOptVar * theOptVar, double theLB)
    {
    int    indices[1];
    char   lu     [1];
    double bd     [1];
 
-   indices[0] = theColIdx;
+   indices[0] = theOptVar->index ();
    lu     [0] = 'L';
    bd     [0] = theLB;
 
@@ -292,12 +292,12 @@ void WitCplexIf::setVarLB (int theColIdx, double theLB)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::setObjCoeff (int theColIdx, double theVal)
+void WitCplexIf::setObjCoeff (WitOptVar * theOptVar, double theVal)
    {
    int    indices[1];
    double values [1];
 
-   indices[0] = theColIdx;
+   indices[0] = theOptVar->index ();
    values [0] = theVal;
 
    enterCplex ();
@@ -317,7 +317,7 @@ void WitCplexIf::setObjCoeff (int theColIdx, double theVal)
 
 //------------------------------------------------------------------------------
 
-double WitCplexIf::primalVarVal (int theColIdx)
+double WitCplexIf::primalVarVal (WitOptVar * theOptVar)
    {
    double primalSoln[1];
 
@@ -328,7 +328,8 @@ double WitCplexIf::primalVarVal (int theColIdx)
          myCpxEnv_,
          myCpxLp_,
          primalSoln,
-         theColIdx, theColIdx);
+         theOptVar->index (),
+         theOptVar->index ());
 
    checkErrCode ("CPXgetx");
 

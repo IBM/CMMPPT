@@ -102,10 +102,11 @@ void WitOptSolveMgr::setUseDualSimplex (bool theValue)
 
 WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
 
-      WitProbAssoc    (theOptProblem),
-      myOptProblem_   (theOptProblem),
-      mySolverIf_     (NULL),
-      useDualSimplex_ (true)
+      WitProbAssoc      (theOptProblem),
+      myOptProblem_     (theOptProblem),
+      mySolverIf_       (NULL),
+      useDualSimplex_   (true),
+      optLexObjElemVal_ ()
    {
    bool useCoin;
 
@@ -258,6 +259,9 @@ void WitOptSolveMgr::solveLexOpt ()
    if (devMode ())
       WitTimer::getTimeAndChargeToCurrent ();
 
+   if (mySolverIf_->lexOptReloadNeeded ())
+      setUpLexOptReload ();
+
    if (not myOptComp ()->mipMode ())
       loadInitSoln ();
 
@@ -271,14 +275,20 @@ void WitOptSolveMgr::solveLexOpt ()
 
       if (prevOptVar != NULL)
          {
-         lockLexObjElemVal (prevOptVar);
-
-         mySolverIf_->setObjCoeff (prevOptVar->index (), 0.0);
+         if (mySolverIf_->lexOptReloadNeeded ())
+            {
+            lexReloadAndBound (theOptVar);
+            }
+         else
+            prepLexObjElemOpt (prevOptVar);
          }
 
-      mySolverIf_->setObjCoeff (theOptVar->index (), 1.0);
+      mySolverIf_->setObjCoeff (theOptVar, 1.0);
 
       solveCurrentObj (prevOptVar == NULL);
+
+      if (mySolverIf_->lexOptReloadNeeded ())
+         storeOptLexObjElemVal (theOptVarItr);
 
       if (devMode ())
          if (WitSaeMgr::standAloneMode ())
@@ -287,6 +297,66 @@ void WitOptSolveMgr::solveLexOpt ()
 
       prevOptVar = theOptVar;
       }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::setUpLexOptReload ()
+   {
+   optLexObjElemVal_.resize (myOptProblem ()->myLexOptVarSeq ().length (), 0.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::lexReloadAndBound (WitOptVar * theOptVar)
+   {
+   WitPtrVecItr <WitOptVar> innerOptVarItr;
+   WitOptVar *              innerOptVar;
+   double                   theObjVal;
+
+   mySolverIf_->loadLp ();
+
+   mySolverIf_->loadIntData ();
+
+   myOptProblem ()->myLexOptVarSeq ().attachItr (innerOptVarItr);
+
+   while (innerOptVarItr.advance (innerOptVar))
+      {
+      if (innerOptVar == theOptVar)
+         break;
+
+      theObjVal = optLexObjElemVal_[innerOptVarItr.myIdx ()];
+
+      boundLexObjElemVal (innerOptVar, theObjVal);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::storeOptLexObjElemVal (
+      WitPtrVecItr <WitOptVar> & theOptVarItr)
+   {
+   int         theIdx;
+   WitOptVar * theOptVar;
+
+   theIdx                    = theOptVarItr.myIdx ();
+
+   theOptVar                 = myOptProblem ()->myLexOptVarSeq ()[theIdx];
+
+   optLexObjElemVal_[theIdx] = mySolverIf_->primalVarVal (theOptVar);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::prepLexObjElemOpt (WitOptVar * prevOptVar)
+   {
+   double prevObjVal;
+
+   prevObjVal = mySolverIf_->primalVarVal (prevOptVar);
+
+   boundLexObjElemVal (prevOptVar, prevObjVal);
+
+   mySolverIf_->setObjCoeff (prevOptVar, 0.0);
    }
 
 //------------------------------------------------------------------------------
@@ -309,19 +379,16 @@ void WitOptSolveMgr::loadInitSoln ()
 
 //------------------------------------------------------------------------------
 
-void WitOptSolveMgr::lockLexObjElemVal (WitOptVar * theOptVar)
+void WitOptSolveMgr::boundLexObjElemVal (WitOptVar * theOptVar, double theVal)
    {
-   double objVal;
    double moTol;
    double theTol;
 
-   objVal = mySolverIf_->primalVarVal (theOptVar->index ());
-
    moTol  = myOptComp ()->myMultiObjMgr ()->multiObjTol ();
 
-   theTol = WitNonClass::max (moTol * fabs (objVal), moTol);
+   theTol = WitNonClass::max (moTol * fabs (theVal), moTol);
 
-   mySolverIf_->setVarLB (theOptVar->index (), objVal - theTol);
+   mySolverIf_->setVarLB (theOptVar, theVal - theTol);
    }
 
 //------------------------------------------------------------------------------
@@ -414,4 +481,17 @@ WitSolverIf::WitSolverIf (WitOptSolveMgr * theOptSolveMgr):
       myOptSolveMgr_ (theOptSolveMgr),
       myOptProblem_  (theOptSolveMgr->myOptProblem ())
    {
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::issueVersionMsg ()
+   {
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitSolverIf::lexOptReloadNeeded ()
+   {
+   return false;
    }

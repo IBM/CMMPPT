@@ -111,17 +111,37 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // Solves the lexicographic optimization problem.
 
+      void setUpLexOptReload ();
+         //
+         // Sets up lex opt reload mode.
+
+      void lexReloadAndBound (WitOptVar * theOptVar);
+         //
+         // For lex opt reload mode only.
+         // Reloads the opt problem and applies the bounds on the lex
+         // objective elements prior to theOptVar.
+
+      void storeOptLexObjElemVal (WitPtrVecItr <WitOptVar> & theOptVarItr);
+         //
+         // Stores the optimal objective function value for the lex objective
+         // element at theOptVarItr
+
+      void prepLexObjElemOpt (WitOptVar * prevOptVar);
+         //
+         // For non lex opt reload mode only.
+         // Prepares to optimize the next lex objective element after prevOptVar.
+
       void loadInitSoln ();
          //
          // If an external initial primal solution is to be used, this function
          // acquires it from myOptProblem_ and then loads it into the solver.
          // Not valid in MIP mode.
 
-      void lockLexObjElemVal (WitOptVar * theOptVar);
+      void boundLexObjElemVal (WitOptVar * theOptVar, double theVal);
          //
-         // Assuming theOptVar represents a lexicographic objective element that
-         // has just been maximized, this function locks the theOptVar at its
-         // maximum value minus a tolerance.
+         // Assuming theOptVar represents a lexicographic objective element,
+         // this function bounds the theOptVar to be at least theVal minus a
+         // tolerance.
 
       void solveCurrentObj (bool firstObj);
          //
@@ -156,6 +176,14 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // If true,  dual   simplex is to be used.
          // If false, primal simplex is to be used.
+
+      WitVector <double> optLexObjElemVal_;
+         //
+         // If mySolverIf_->lexOptReloadNeeded () is true,
+         //    optLexObjElemVal_[theIdx] is the optimal objective function
+         //    value for the lex objective element whose index in the lex opt
+         //    sequence is theIdx.
+         // Otherwise optLexObjElemVal_ is not allocated.
    };
 
 #endif

@@ -322,7 +322,8 @@ CoinMipIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
 CoinMipIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
 CoinMipIf.obj: ../src/Link.h ../src/PtrVec.h
 CoinMipIf.obj: ../../config/dummy_headers/algorithm ../src/OptVar.h
-CoinMipIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/MsgFac.h
+CoinMipIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/OptComp.h
+CoinMipIf.obj: ../src/Component.h ../src/Str.h ../src/MsgFac.h
 CoinMipIf.obj: ../src/MsgArg.h
 CompMgr.obj: ../src/CompMgr.h ../src/List.h ../src/Util.h ../src/typedefs.h
 CompMgr.obj: ../src/macs.h ../../config/dummy_headers/stdio.h

@@ -48,12 +48,6 @@ WitCoinComIf::~WitCoinComIf ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinComIf::issueVersionMsg ()
-   {
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinComIf::loadLp ()
    {
    WitVector <int>    start;
@@ -111,23 +105,23 @@ void WitCoinComIf::solverWriteMps ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinComIf::setVarLB (int theColIdx, double theLB)
+void WitCoinComIf::setVarLB (WitOptVar * theOptVar, double theLB)
    {
-   myOsiSI ()->setColLower (theColIdx, theLB);
+   myOsiSI ()->setColLower (theOptVar->index (), theLB);
    }
 
 //------------------------------------------------------------------------------
 
-void WitCoinComIf::setObjCoeff (int theColIdx, double theVal)
+void WitCoinComIf::setObjCoeff (WitOptVar * theOptVar, double theVal)
    {
-   myOsiSI ()->setObjCoeff (theColIdx, theVal);
+   myOsiSI ()->setObjCoeff (theOptVar->index (), theVal);
    }
 
 //------------------------------------------------------------------------------
 
-double WitCoinComIf::primalVarVal (int theColIdx)
+double WitCoinComIf::primalVarVal (WitOptVar * theOptVar)
    {
-   return myOsiSI ()->getColSolution()[theColIdx];
+   return myOsiSI ()->getColSolution()[theOptVar->index ()];
    }
 
 //------------------------------------------------------------------------------

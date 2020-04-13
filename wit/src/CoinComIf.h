@@ -56,13 +56,12 @@ class WitCoinComIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void   issueVersionMsg ();
-      virtual void   loadLp          ();
-      virtual void   solverWriteMps  ();
-      virtual void   setVarLB        (int, double);
-      virtual void   setObjCoeff     (int, double);
-      virtual double primalVarVal    (int);
-      virtual void   getPrimalSoln   (WitVector <double> &);
+      virtual void   loadLp         ();
+      virtual void   solverWriteMps ();
+      virtual void   setVarLB       (WitOptVar *, double);
+      virtual void   setObjCoeff    (WitOptVar *, double);
+      virtual double primalVarVal   (WitOptVar *);
+      virtual void   getPrimalSoln  (WitVector <double> &);
 
    protected:
 

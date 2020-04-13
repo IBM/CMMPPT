@@ -20,6 +20,7 @@
 #include <CoinMipIf.h>
 #include <OptProblem.h>
 #include <OptVar.h>
+#include <OptComp.h>
 #include <MsgFac.h>
 
 //------------------------------------------------------------------------------
@@ -47,6 +48,13 @@ WitCoinMipIf::~WitCoinMipIf ()
    delete myCbcModel_;
 
    leaveCoin ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitCoinMipIf::lexOptReloadNeeded ()
+   {
+   return myOptComp ()->multiObjMode ();
    }
 
 //------------------------------------------------------------------------------
