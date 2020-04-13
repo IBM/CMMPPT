@@ -56,13 +56,6 @@ WitCoinLpIf::~WitCoinLpIf ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinLpIf::loadIntData ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinLpIf::reviseLp ()
    {
    reviseVarBounds ();
@@ -181,13 +174,6 @@ void WitCoinLpIf::solveLp (bool)
    leaveCoin ();
 
    myMsgFac () ("nSimplexItersMsg", nIters);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinLpIf::solveMip (bool)
-   {
-   stronglyAssert (false);
    }
 
 //------------------------------------------------------------------------------

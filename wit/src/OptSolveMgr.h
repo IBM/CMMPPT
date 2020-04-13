@@ -115,6 +115,11 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // Sets up lex opt reload mode.
 
+      void prepLexObjElemOpt (WitOptVar * prevOptVar, WitOptVar * theOptVar);
+         //
+         // Prepares to optimize theOptVar as a lex objective element.
+         // prevOptVar is the previous lex obj element, if any, else NULL.
+
       void lexReloadAndBound (WitOptVar * theOptVar);
          //
          // For lex opt reload mode only.
@@ -125,11 +130,6 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // Stores the optimal objective function value for the lex objective
          // element at theOptVarItr
-
-      void prepLexObjElemOpt (WitOptVar * prevOptVar);
-         //
-         // For non lex opt reload mode only.
-         // Prepares to optimize the next lex objective element after prevOptVar.
 
       void loadInitSoln ();
          //

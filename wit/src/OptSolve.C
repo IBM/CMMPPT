@@ -271,19 +271,7 @@ void WitOptSolveMgr::solveLexOpt ()
 
    while (theOptVarItr.advance (theOptVar))
       {
-      myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
-
-      if (prevOptVar != NULL)
-         {
-         if (mySolverIf_->lexOptReloadNeeded ())
-            {
-            lexReloadAndBound (theOptVar);
-            }
-         else
-            prepLexObjElemOpt (prevOptVar);
-         }
-
-      mySolverIf_->setObjCoeff (theOptVar, 1.0);
+      prepLexObjElemOpt (prevOptVar, theOptVar);
 
       solveCurrentObj (prevOptVar == NULL);
 
@@ -304,6 +292,35 @@ void WitOptSolveMgr::solveLexOpt ()
 void WitOptSolveMgr::setUpLexOptReload ()
    {
    optLexObjElemVal_.resize (myOptProblem ()->myLexOptVarSeq ().length (), 0.0);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::prepLexObjElemOpt (
+      WitOptVar * prevOptVar,
+      WitOptVar * theOptVar)
+   {
+   double prevObjVal;
+
+   myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
+
+   if (prevOptVar != NULL)
+      {
+      if (mySolverIf_->lexOptReloadNeeded ())
+         {
+         lexReloadAndBound (theOptVar);
+         }
+      else
+         {
+         prevObjVal = mySolverIf_->primalVarVal (prevOptVar);
+
+         boundLexObjElemVal (prevOptVar, prevObjVal);
+
+         mySolverIf_->setObjCoeff (prevOptVar, 0.0);
+         }
+      }
+
+   mySolverIf_->setObjCoeff (theOptVar, 1.0);
    }
 
 //------------------------------------------------------------------------------
@@ -344,19 +361,6 @@ void WitOptSolveMgr::storeOptLexObjElemVal (
    theOptVar                 = myOptProblem ()->myLexOptVarSeq ()[theIdx];
 
    optLexObjElemVal_[theIdx] = mySolverIf_->primalVarVal (theOptVar);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::prepLexObjElemOpt (WitOptVar * prevOptVar)
-   {
-   double prevObjVal;
-
-   prevObjVal = mySolverIf_->primalVarVal (prevOptVar);
-
-   boundLexObjElemVal (prevOptVar, prevObjVal);
-
-   mySolverIf_->setObjCoeff (prevOptVar, 0.0);
    }
 
 //------------------------------------------------------------------------------
@@ -494,4 +498,53 @@ void WitSolverIf::issueVersionMsg ()
 bool WitSolverIf::lexOptReloadNeeded ()
    {
    return false;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::loadIntData ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::reviseLp ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::loadInitSoln (const WitVector <double> &)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::reSolveLp ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::solveLp (bool)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::solveMip (bool)
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolverIf::getDualSoln (WitVector <double> &)
+   {
+   stronglyAssert (false);
    }

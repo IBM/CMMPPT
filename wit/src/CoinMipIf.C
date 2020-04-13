@@ -72,34 +72,6 @@ void WitCoinMipIf::loadIntData ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinMipIf::reviseLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::loadInitSoln (const WitVector <double> &)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::reSolveLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::solveLp (bool)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinMipIf::solveMip (bool)
    {
    enterCoin ();
@@ -111,13 +83,6 @@ void WitCoinMipIf::solveMip (bool)
    checkMipSolnStatus ();
 
    printMipSolveInfo ();
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::getDualSoln (WitVector <double> & dualSoln)
-   {
-   stronglyAssert (false);
    }
 
 //------------------------------------------------------------------------------

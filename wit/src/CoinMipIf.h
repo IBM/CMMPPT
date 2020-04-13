@@ -58,12 +58,7 @@ class WitCoinMipIf: public WitCoinComIf
 
       virtual bool         lexOptReloadNeeded ();
       virtual void         loadIntData        ();
-      virtual void         reviseLp           ();
-      virtual void         loadInitSoln       (const WitVector <double> &);
-      virtual void         reSolveLp          ();
-      virtual void         solveLp            (bool);
       virtual void         solveMip           (bool);
-      virtual void         getDualSoln        (WitVector <double> &);
       virtual const char * solverName         ();
 
    private:
