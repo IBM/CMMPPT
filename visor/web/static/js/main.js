@@ -1,39 +1,47 @@
+function processform(formtag) {
+    var payload={}
+    $(formtag).each(function(itag,tag) {
+        var inputs=$("input",tag)
+        inputs.each(function(itag,tag){
+            var input = $(tag)
+            var value = null
+            var fieldname = input.attr('data-fieldname')
+            var keyfield=input.attr('data-key')?(input.attr('data-key')=="true"):false
+            if(input.attr("type")=="checkbox") {
+                value = input.prop("checked")
+                payload[fieldname]={value: value, keyfield:keyfield}
+            }
+            else if(input.attr("type")=="radio") {
+                if(input.prop("checked")) {
+                    fieldname=input.attr("name")
+                    value=input.attr('data-value')
+                    payload[fieldname]={value: value, keyfield:keyfield}
+                }
+            }
+            else {
+                value=input.val()
+                payload[fieldname]={value: value, keyfield:keyfield}
+            }
+        })
+        return
+    })
+    return payload
+}
+function setstatus(data) {
+                $("#status").text(data.sql)
+                $("#stdout").text(data.stdout)
+                $("#stderr").text(data.stderr)
+}
 $(function() {
     $.get('/visor/authenticate').done(function(data) {
         if(data.status) {
             $(location).attr('href', data.url)
         }
-        function processform(e) {
-            var payload={}
-            $('.form-group',$(e.target).parent()).each(function(itag,tag) {
-                var inputs=$("input",tag)
-                inputs.each(function(itag,tag){
-                    var input = $(tag)
-                    var value = null
-                    var fieldname = input.attr('data-fieldname')
-                    var keyfield=input.attr('data-key')?(input.attr('data-key')=="true"):false
-                    if(input.attr("type")=="checkbox") {
-                        value = input.prop("checked")
-                        payload[fieldname]={value: value, keyfield:keyfield}
-                    }
-                    else if(input.attr("type")=="radio") {
-                        if(input.prop("checked")) {
-                            fieldname=input.attr("name")
-                            value=input.attr('data-value')
-                            payload[fieldname]={value: value, keyfield:keyfield}
-                        }
-                    }
-                    else {
-                        value=input.val()
-                        payload[fieldname]={value: value, keyfield:keyfield}
-                    }
-                })
-                return
-            })
-            return payload
+        function processform_(e) {
+            return processform($('.form-group',$(e.target).parent()))
         }
         function post(e, verb, action) {
-            var payload=processform(e)
+            var payload=processform_(e)
             payload={json: JSON.stringify(payload)}
             $.post("/visor/"+verb+"?action="+action, payload).done(function(data) {
                 $("#status").text(data.sql)
@@ -109,7 +117,7 @@ $(function() {
         })
         $("#submitsql").click(function(e) {
             // alert('submit pressed')
-            var payload=processform(e)
+            var payload=processform_(e)
             payload={json: JSON.stringify(payload)}
             $.post("/visor/sql", payload).done(function(data) {
                 $("#status").text(data.sql)
@@ -130,7 +138,7 @@ $(function() {
             var tablename=null;
             $("input[type='radio']",$(e.target).parent().parent()).each(function(itag,tag){
                 if($(tag).prop("checked")) {
-                    tablename=$(tag).attr("data-tablename")
+                    tablename=$(tag).attr("data-value")
                 }
             })
             $("#table").empty()
@@ -146,7 +154,7 @@ $(function() {
             var tablename=null;
             $("input[type='radio']",$(e.target).parent().parent()).each(function(itag,tag){
                 if($(tag).prop("checked")) {
-                    tablename=$(tag).attr("data-tablename")
+                    tablename=$(tag).attr("data-value")
                 }
             })
             $("#table").empty()
@@ -215,7 +223,7 @@ $(function() {
                 td.append(
                     $("<input>").attr("type","radio").attr("id",id).
                     attr("name","table_radio").
-                    attr("data-tablename",table).
+                    attr("data-value",table).
                     addClass("form-check-input")
                 )
                 td.append($("<label>").addClass("form-check-label").attr("for",id).text(table))

@@ -6,6 +6,7 @@ $(function() {
             file=files[f]
             formdata.append(file.name,file)
         }
+        formdata.append('table',processform($("#selecttable")).table_radio.value)
         $.ajax({url:'/visor/senddata',
                 type:'POST',
                 data:formdata,
@@ -13,6 +14,7 @@ $(function() {
                 contentType:false,
                 processData: false
                }).done(function(data){
+                   setstatus(data)
                    return;
                }).fail(function(data) {
                    return;

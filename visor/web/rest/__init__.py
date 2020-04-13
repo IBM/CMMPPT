@@ -1,4 +1,4 @@
-import csv
+proimport csv
 import json
 import os
 import sys
@@ -48,16 +48,29 @@ def runcommand(command, **kwargs):
     #
     # run command with output stored in arrays
     #
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs) as proc:
-        global stdout, stderr
-        stdout = ""
-        stderr = ""
-        t1 = threading.Thread(target=worker, args=["stdout", stdout, proc.stdout, proc], daemon=True)
-        t2 = threading.Thread(target=worker, args=["stderr", stderr, proc.stderr, proc], daemon=True)
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+    stdin=sys.stdin
+    data=None
+    try:
+        if 'data' in kwargs:
+            data = kwargs.pop('data')
+            stdin = subprocess.PIPE
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, **kwargs) as proc:
+            global stdout, stderr
+            stdout = ""
+            stderr = ""
+            t1 = threading.Thread(target=worker, args=["stdout", stdout, proc.stdout, proc], daemon=True)
+            t2 = threading.Thread(target=worker, args=["stderr", stderr, proc.stderr, proc], daemon=True)
+            t1.start()
+            t2.start()
+            if data is not None:
+                if isinstance(data,str) :
+                    data=data.encode()
+                proc.stdin.write(data)
+                proc.stdin.close()
+            t1.join()
+            t2.join()
+    except Exception as e:
+        logger.error(e)
     return stdout, stderr
 
 
@@ -153,9 +166,9 @@ class application(object):
     def sqltojson(sql):
         return 'SELECT json_agg(row_to_json(t)) FROM (' + sql + ') as t'
     @staticmethod
-    def runsql(sql):
-        command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -t -c "' + sql + '"'
-        return runbashcommand(command)
+    def runsql(sql, **kwargs):
+        command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -t -c "' + str(sql) + '"'
+        return runbashcommand(command, **kwargs)
 
     @staticmethod
     @app.route('/visor/hello', methods=['GET'])
@@ -290,8 +303,12 @@ class application(object):
     def sql():
         form = json.loads(request.form['json'])
         sql = form['sql']['value']
+        usejson=form['json']['value']
         sql = sql.replace('"', '\\"')
-        (stdout, stderr)=application.runsql(application.sqltojson(sql))
+        if usejson:
+            (stdout, stderr)=application.runsql(application.sqltojson(sql))
+        else:
+            (stdout, stderr) = application.runsql(sql)
         payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         return payload
 
@@ -307,14 +324,17 @@ class application(object):
     def senddata():
         try:
             files = request.files
+            user=session['user']
             for k in files.keys():
                 filestorage = files[k]
                 data = filestorage.read()
-                application.savedata(k, data)
+                application.savedata(f'static/data/{user}/{k}', data)
+                sql=f'copy {request.form["table"]} from STDIN DELIMITER \',\' HEADER CSV'
+                (stdout,stderr)=application.runsql(sql,data=data)
             # return getResponse(
             #     {"contents": {"xfilename": xfilename, "yfilename": yfilename, "betafilename": betafilename},
             #      "encoding": "base64"})
-            return {'status': 0}
+            return {'status': 0, 'stdout':stdout,'stderr':stderr}
         except Exception as e:
             return getResponse(e)
 
@@ -408,3 +428,11 @@ class application(object):
 
 
 applicationinstance = application()
+if False:
+    (stdout,stderr)=runbashcommand('cat - ', data='abcd')
+    (stdout,stderr)=runbashcommand('ls -ltr')
+    with open("static/data/dave.jensen.55@gmail.com/printer.csv","rb") as f:
+        data=f.read()
+    sql=f'copy printer from STDIN DELIMITER \',\' HEADER CSV'
+    (stdout,stderr)=application.runsql(sql,data=data)
+pass
