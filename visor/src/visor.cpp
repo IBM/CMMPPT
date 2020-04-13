@@ -308,9 +308,41 @@ main(int argc, char *argv[])
       }
 
       fclose(shipQuantityFilePtr);
-    } // finished writing prodVol file
+    } // finished writing shipQuantity file
 
+    // --------------------------------------------
+    // write stockVolMaterial file
+    // --------------------------------------------
+    if ( doFirstImplosion(printingProb) )
+    {
+      std::string stockVolMaterialFileName = outputDirectory + "/stockVolMaterial.csv";
+      FILE *stockVolMaterialFilePtr = fopen(stockVolMaterialFileName.c_str(), "w");
 
+      std::string heading;
+      heading = R"("location","filamentSize","plasticType","period","stockQuantity")";
+      if (writeHeader) fprintf(stockVolMaterialFilePtr, "%s\n", heading.c_str());
+
+      std::vector<std::string> locs, filamentSizes, pTypes;
+      printingProb.getMaterials( locs,filamentSizes, pTypes);
+
+      // Loop once for each demand
+      for (int i = 0; i < locs.size(); i++)
+      {
+        // Get stock vol
+        std::vector<float> sv= printingProb.getMaterialStockVol(locs[i],filamentSizes[i],pTypes[i]);
+
+        for (int t = 0; t < sv.size(); t++)
+          {
+            if (eq(sv[t], 0.0)) continue;
+
+            fprintf(stockVolMaterialFilePtr,
+                    "\"%s\",\"%s\",\"%s\",%d,%f\n",
+                    locs[i].c_str(), filamentSizes[i].c_str(),pTypes[i].c_str(), t, sv[t]);
+          }
+        }
+
+      fclose(stockVolMaterialFilePtr);
+    } // finished writing stockVolMateral
     //---------------------------------------------------------
 
 

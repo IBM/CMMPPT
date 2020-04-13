@@ -22,6 +22,9 @@ public:
   void getMaterials(std::vector<std::string> &location, std::vector<std::string> &filamentSize,
                     std::vector<std::string> &plasticType);
 
+  std::vector<float> getMaterialStockVol(const std::string &location,
+      const std::string &filamentSize, const std::string &plasticType);
+
   std::vector<float> getOwnSupply(const std::string &loc, const std::string &nSize, const std::string &pType);
 
   std::vector<float> getSharedSupply(const std::string &loc, const std::string &nSize, const std::string &pType);
