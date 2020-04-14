@@ -8,7 +8,7 @@
 // Source file: "CoinMipIf.C"
 //
 // Contains the implementation of class CoinMipIf.
-// If COIN_EMBEDDED is not defined, then only static functions are implemented.
+// The implementation is compiled only if COIN_EMBEDDED is defined.
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -34,9 +34,24 @@
 
 //------------------------------------------------------------------------------
 
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptProblem * theOptProblem)
+WitCoinMipIf::WitCoinMipIf (WitOptProblem * theOptProblem):
+
+      WitCoinComIf (theOptProblem),
+      myCbcModel_  (NULL)
    {
-   return new WitCoinMipIf (theOptProblem);
+   OsiClpSolverInterface * theOsiClpSI;
+
+   enterCoin ();
+
+   theOsiClpSI = new OsiClpSolverInterface;
+
+   myCbcModel_ = new CbcModel (* theOsiClpSI);
+
+   delete theOsiClpSI;
+
+   myCbcModel_->passInMessageHandler (myMsgHandler ());
+
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -94,28 +109,6 @@ const char * WitCoinMipIf::solverName ()
 
 //------------------------------------------------------------------------------
 
-WitCoinMipIf::WitCoinMipIf (WitOptProblem * theOptProblem):
-
-      WitCoinComIf (theOptProblem),
-      myCbcModel_  (NULL)
-   {
-   OsiClpSolverInterface * theOsiClpSI;
-
-   enterCoin ();
-
-   theOsiClpSI = new OsiClpSolverInterface;
-
-   myCbcModel_ = new CbcModel (* theOsiClpSI);
-
-   delete theOsiClpSI;
-
-   myCbcModel_->passInMessageHandler (myMsgHandler ());
-
-   leaveCoin ();
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCoinMipIf::checkMipSolnStatus ()
    {
    if (myCbcModel_->isProvenOptimal ())
@@ -164,18 +157,3 @@ OsiSolverInterface * WitCoinMipIf::myOsiSI ()
    }
 
 #endif // COIN_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Non-COIN-embedded Implementation of class CoinMipIf.
-//------------------------------------------------------------------------------
-
-#ifndef COIN_EMBEDDED
-
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptProblem *)
-   {
-   stronglyAssert (false);
-
-   return NULL;
-   }
-
-#endif // Not COIN_EMBEDDED

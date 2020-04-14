@@ -17,7 +17,8 @@
 // correctly.
 //------------------------------------------------------------------------------
 
-#include <CoinComIf.h>
+#include <CoinLpIf.h>
+#include <CoinMipIf.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <OptVar.h>
@@ -37,6 +38,16 @@
 bool WitCoinComIf::coinEmbedded ()
    {
    return true;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinComIf * WitCoinComIf::newInstance (WitOptProblem * theOptProblem)
+   {
+   if (theOptProblem->myOptComp ()->mipMode ())
+      return new WitCoinMipIf (theOptProblem);
+   else
+      return new WitCoinLpIf  (theOptProblem);
    }
 
 //------------------------------------------------------------------------------
@@ -200,6 +211,15 @@ void WitCoinComIf::shutDownMessageHandler ()
 bool WitCoinComIf::coinEmbedded ()
    {
    return false;
+   }
+
+//------------------------------------------------------------------------------
+
+WitCoinComIf * WitCoinComIf::newInstance (WitOptProblem *)
+   {
+   stronglyAssert (false);
+
+   return NULL;
    }
 
 #endif // Not COIN_EMBEDDED

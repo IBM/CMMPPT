@@ -8,7 +8,7 @@
 // Source file: "CoinLpIf.C"
 //
 // Contains the implementation of class CoinLpIf.
-// If COIN_EMBEDDED is not defined, then only static functions are implemented.
+// The implementation is compiled only if COIN_EMBEDDED is defined.
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -36,9 +36,23 @@
 
 //------------------------------------------------------------------------------
 
-WitCoinLpIf * WitCoinLpIf::newInstance (WitOptProblem * theOptProblem)
+WitCoinLpIf::WitCoinLpIf (WitOptProblem * theOptProblem):
+
+      WitCoinComIf  (theOptProblem),
+      myClpSimplex_ (NULL),
+      myOsiSI_      (NULL)
    {
-   return new WitCoinLpIf (theOptProblem);
+   OsiClpSolverInterface * theOsiClpSI;
+
+   enterCoin ();
+
+   myClpSimplex_ = new ClpSimplex;
+
+   myOsiSI_      = new OsiClpSolverInterface (myClpSimplex_);
+
+   myClpSimplex_->passInMessageHandler (myMsgHandler ());
+
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -191,27 +205,6 @@ const char * WitCoinLpIf::solverName ()
 
 //------------------------------------------------------------------------------
 
-WitCoinLpIf::WitCoinLpIf (WitOptProblem * theOptProblem):
-
-      WitCoinComIf  (theOptProblem),
-      myClpSimplex_ (NULL),
-      myOsiSI_      (NULL)
-   {
-   OsiClpSolverInterface * theOsiClpSI;
-
-   enterCoin ();
-
-   myClpSimplex_ = new ClpSimplex;
-
-   myOsiSI_      = new OsiClpSolverInterface (myClpSimplex_);
-
-   myClpSimplex_->passInMessageHandler (myMsgHandler ());
-
-   leaveCoin ();
-   }
-
-//------------------------------------------------------------------------------
-
 OsiSolverInterface * WitCoinLpIf::myOsiSI ()
    {
    return myOsiSI_;
@@ -306,18 +299,3 @@ void WitCoinLpIf::checkLpSolnStatus (ClpSimplex * theClpSimplex)
    }
 
 #endif // COIN_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Non-COIN-embedded Implementation of class CoinLpIf.
-//------------------------------------------------------------------------------
-
-#ifndef COIN_EMBEDDED
-
-WitCoinLpIf * WitCoinLpIf::newInstance (WitOptProblem *)
-   {
-   stronglyAssert (false);
-
-   return NULL;
-   }
-
-#endif // Not COIN_EMBEDDED

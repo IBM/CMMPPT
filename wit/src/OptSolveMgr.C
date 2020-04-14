@@ -11,8 +11,7 @@
 //------------------------------------------------------------------------------
 
 #include <OptSolveMgr.h>
-#include <CoinLpIf.h>
-#include <CoinMipIf.h>
+#include <CoinComIf.h>
 #include <CplexIf.h>
 #include <OptProblem.h>
 #include <SaeMgr.h>
@@ -69,13 +68,10 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
 
    if (useCoin)
       {
-      if (myOptComp ()->mipMode ())
-         mySolverIf_ = WitCoinMipIf::newInstance (myOptProblem_);
-      else
-         mySolverIf_ = WitCoinLpIf ::newInstance (myOptProblem_);
+      mySolverIf_ = WitCoinComIf::newInstance (myOptProblem_);
       }
    else
-      mySolverIf_    = WitCplexIf  ::newInstance (myOptProblem_);
+      mySolverIf_ = WitCplexIf  ::newInstance (myOptProblem_);
    }
 
 //------------------------------------------------------------------------------

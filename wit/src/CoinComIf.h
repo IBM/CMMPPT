@@ -46,6 +46,13 @@ class WitCoinComIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
+      static WitCoinComIf * newInstance (WitOptProblem * theOptProblem);
+         //
+         // If COIN is embedded,
+         //    creates and returns a new CoinComIf for theOptProblem.
+         // If COIN is not embedded,
+         //    issues a fatal error.
+
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------

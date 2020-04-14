@@ -287,15 +287,16 @@ BuildDate.obj: ../src/typedefs.h ../src/macs.h
 BuildDate.obj: ../../config/dummy_headers/stdio.h
 BuildDate.obj: ../../config/dummy_headers/string.h
 BuildDate.obj: ../../config/dummy_headers/math.h
-CoinComIf.obj: ../src/CoinComIf.h ../src/SolverIf.h ../src/Assoc.h
-CoinComIf.obj: ../src/Problem.h ../src/List.h ../src/Util.h ../src/typedefs.h
-CoinComIf.obj: ../src/macs.h ../../config/dummy_headers/stdio.h
+CoinComIf.obj: ../src/CoinLpIf.h ../src/CoinComIf.h ../src/SolverIf.h
+CoinComIf.obj: ../src/Assoc.h ../src/Problem.h ../src/List.h ../src/Util.h
+CoinComIf.obj: ../src/typedefs.h ../src/macs.h
+CoinComIf.obj: ../../config/dummy_headers/stdio.h
 CoinComIf.obj: ../../config/dummy_headers/string.h
 CoinComIf.obj: ../../config/dummy_headers/math.h
 CoinComIf.obj: ../../config/dummy_headers/list ../src/TVec.h ../src/Vector.h
-CoinComIf.obj: ../src/OptComp.h ../src/Component.h ../src/Str.h
-CoinComIf.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-CoinComIf.obj: ../src/Link.h ../src/PtrVec.h
+CoinComIf.obj: ../src/CoinMipIf.h ../src/OptComp.h ../src/Component.h
+CoinComIf.obj: ../src/Str.h ../src/OptProblem.h ../src/ObjStack.h
+CoinComIf.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h
 CoinComIf.obj: ../../config/dummy_headers/algorithm ../src/OptVar.h
 CoinComIf.obj: ../src/OptVC.h ../src/BoundPair.h ../src/MsgFac.h
 CoinComIf.obj: ../src/MsgArg.h ../src/Timing.h
@@ -979,10 +980,9 @@ OptSolveMgr.obj: ../../config/dummy_headers/stdio.h
 OptSolveMgr.obj: ../../config/dummy_headers/string.h
 OptSolveMgr.obj: ../../config/dummy_headers/math.h
 OptSolveMgr.obj: ../../config/dummy_headers/list ../src/TVec.h
-OptSolveMgr.obj: ../src/Vector.h ../src/CoinLpIf.h ../src/CoinComIf.h
-OptSolveMgr.obj: ../src/SolverIf.h ../src/CoinMipIf.h ../src/CplexIf.h
-OptSolveMgr.obj: ../src/OptProblem.h ../src/ObjStack.h ../src/Stack.h
-OptSolveMgr.obj: ../src/Link.h ../src/PtrVec.h
+OptSolveMgr.obj: ../src/Vector.h ../src/CoinComIf.h ../src/SolverIf.h
+OptSolveMgr.obj: ../src/CplexIf.h ../src/OptProblem.h ../src/ObjStack.h
+OptSolveMgr.obj: ../src/Stack.h ../src/Link.h ../src/PtrVec.h
 OptSolveMgr.obj: ../../config/dummy_headers/algorithm ../src/SaeMgr.h
 OptSolveMgr.obj: ../src/OptVar.h ../src/OptVC.h ../src/BoundPair.h
 OptSolveMgr.obj: ../src/OptCon.h ../src/OptComp.h ../src/Component.h

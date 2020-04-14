@@ -36,15 +36,10 @@ class WitCoinLpIf: public WitCoinComIf
    public:
 
       //------------------------------------------------------------------------
-      // Static public member functions.
+      // Constructor functions.
       //------------------------------------------------------------------------
 
-      static WitCoinLpIf * newInstance (WitOptProblem * theOptProblem);
-         //
-         // If COIN is embedded,
-         //    creates and returns a new CoinLpIf for theOptProblem.
-         // If COIN is not embedded,
-         //    issues a fatal error.
+      WitCoinLpIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -64,12 +59,6 @@ class WitCoinLpIf: public WitCoinComIf
       virtual const char * solverName   ();
 
    private:
-
-      //------------------------------------------------------------------------
-      // Private constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCoinLpIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
