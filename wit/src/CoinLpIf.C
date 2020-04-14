@@ -18,7 +18,6 @@
 //------------------------------------------------------------------------------
 
 #include <CoinLpIf.h>
-#include <OptSolveMgr.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <OptVar.h>
@@ -37,9 +36,9 @@
 
 //------------------------------------------------------------------------------
 
-WitCoinLpIf * WitCoinLpIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
+WitCoinLpIf * WitCoinLpIf::newInstance (WitOptProblem * theOptProblem)
    {
-   return new WitCoinLpIf (theOptSolveMgr);
+   return new WitCoinLpIf (theOptProblem);
    }
 
 //------------------------------------------------------------------------------
@@ -132,7 +131,7 @@ void WitCoinLpIf::solveLp (bool)
    ClpSimplex *  psClpSimplex;
    int           nIters;
 
-   ifValuesPass       = myOptSolveMgr ()->useDualSimplex ()? 0: 1;
+   ifValuesPass       = useDualSimplex ()? 0: 1;
 
    startFinishOptions = myOptComp ()->accAfterOptImp ()? 1: 0;
 
@@ -145,7 +144,7 @@ void WitCoinLpIf::solveLp (bool)
    if (psClpSimplex == NULL)
       myMsgFac () ("unboundedOrInfeasSmsg");
 
-   if (myOptSolveMgr ()->useDualSimplex ())
+   if (useDualSimplex ())
       psClpSimplex->dual   (ifValuesPass, startFinishOptions);
    else
       psClpSimplex->primal (ifValuesPass, startFinishOptions);
@@ -192,9 +191,9 @@ const char * WitCoinLpIf::solverName ()
 
 //------------------------------------------------------------------------------
 
-WitCoinLpIf::WitCoinLpIf (WitOptSolveMgr * theOptSolveMgr):
+WitCoinLpIf::WitCoinLpIf (WitOptProblem * theOptProblem):
 
-      WitCoinComIf  (theOptSolveMgr),
+      WitCoinComIf  (theOptProblem),
       myClpSimplex_ (NULL),
       myOsiSI_      (NULL)
    {
@@ -314,7 +313,7 @@ void WitCoinLpIf::checkLpSolnStatus (ClpSimplex * theClpSimplex)
 
 #ifndef COIN_EMBEDDED
 
-WitCoinLpIf * WitCoinLpIf::newInstance (WitOptSolveMgr *)
+WitCoinLpIf * WitCoinLpIf::newInstance (WitOptProblem *)
    {
    stronglyAssert (false);
 

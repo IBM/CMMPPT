@@ -30,8 +30,6 @@
 //          CoinLpIf
 //          CoinMipIf
 //       CplexIf
-//
-// Implemented in OptSolve.C
 //------------------------------------------------------------------------------
 
 class WitSolverIf: public WitProbAssoc
@@ -129,6 +127,14 @@ class WitSolverIf: public WitProbAssoc
          //
          // Returns the name of the solver.
 
+      //------------------------------------------------------------------------
+      // Other public member functions.
+      //------------------------------------------------------------------------
+
+      void setUseDualSimplex (bool);
+         //
+         // Setter
+
    protected:
 
       //------------------------------------------------------------------------
@@ -139,14 +145,14 @@ class WitSolverIf: public WitProbAssoc
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitSolverIf (WitOptSolveMgr *);
+      WitSolverIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
-      accessFunc (WitOptSolveMgr *, myOptSolveMgr)
-      accessFunc (WitOptProblem *,  myOptProblem)
+      accessFunc (WitOptProblem *, myOptProblem)
+      accessFunc (bool,            useDualSimplex)
 
    private:
 
@@ -160,13 +166,14 @@ class WitSolverIf: public WitProbAssoc
       // Private member data.
       //-----------------------------------------------------------------------
 
-      WitOptSolveMgr * const myOptSolveMgr_;
-         //
-         // The OptSolveMgr that owns this SolverIf.
-
       WitOptProblem * const myOptProblem_;
          //
          // The OptProblem for this SolverIf.
+
+      bool useDualSimplex_;
+         //
+         // If true,  dual   simplex is to be used.
+         // If false, primal simplex is to be used.
    };
 
 #endif

@@ -23,26 +23,35 @@
 // problem.
 // Directly responsible for the aspects of solving the optimization problem
 // that do not actually involve invoking the embedded solver.
-//
-// Implemented in OptSolve.C
 //------------------------------------------------------------------------------
 
 class WitOptSolveMgr: public WitProbAssoc
    {
-      //------------------------------------------------------------------------
-      // Friends.
-      //------------------------------------------------------------------------
-
-      friend class WitOptSolveGate;
-
    public:
 
       //------------------------------------------------------------------------
-      // Data access functions.
+      // Static public member functions.
       //------------------------------------------------------------------------
 
-      accessFunc (WitOptProblem *, myOptProblem)
-      accessFunc (bool,            useDualSimplex)
+      static bool coinEmbedded ();
+         //
+         // Returns true, iff COIN embedded into the current build of WIT.
+
+      static bool cplexEmbedded ();
+         //
+         // Returns true, iff CPLEX embedded into the current build of WIT.
+
+      //------------------------------------------------------------------------
+      // Constructor function.
+      //------------------------------------------------------------------------
+
+      WitOptSolveMgr (WitOptProblem *);
+
+      //------------------------------------------------------------------------
+      // Destructor function.
+      //------------------------------------------------------------------------
+
+      ~WitOptSolveMgr ();
 
       //------------------------------------------------------------------------
       // Other public member functions.
@@ -52,28 +61,10 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // Solves the optimization problem.
 
-      void setUseDualSimplex (bool);
-         //
-         // Setter
-
    private:
 
       //------------------------------------------------------------------------
-      // Constructor function.
-      // To be called by friend class OptSolveGate.
-      //------------------------------------------------------------------------
-
-      WitOptSolveMgr (WitOptProblem *);
-
-      //------------------------------------------------------------------------
-      // Destructor function.
-      // To be called by friend class OptSolveGate.
-      //------------------------------------------------------------------------
-
-      ~WitOptSolveMgr ();
-
-      //------------------------------------------------------------------------
-      // Other private member functions.
+      // Private member functions.
       //------------------------------------------------------------------------
 
       noCopyCtorAssign (WitOptSolveMgr);
@@ -171,11 +162,6 @@ class WitOptSolveMgr: public WitProbAssoc
       WitSolverIf * mySolverIf_;
          //
          // The SolverIf owned by this OptSolveMgr.
-
-      bool useDualSimplex_;
-         //
-         // If true,  dual   simplex is to be used.
-         // If false, primal simplex is to be used.
 
       WitVector <double> optLexObjElemVal_;
          //

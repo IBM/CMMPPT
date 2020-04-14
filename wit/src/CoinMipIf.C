@@ -34,9 +34,9 @@
 
 //------------------------------------------------------------------------------
 
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
+WitCoinMipIf * WitCoinMipIf::newInstance (WitOptProblem * theOptProblem)
    {
-   return new WitCoinMipIf (theOptSolveMgr);
+   return new WitCoinMipIf (theOptProblem);
    }
 
 //------------------------------------------------------------------------------
@@ -94,9 +94,9 @@ const char * WitCoinMipIf::solverName ()
 
 //------------------------------------------------------------------------------
 
-WitCoinMipIf::WitCoinMipIf (WitOptSolveMgr * theOptSolveMgr):
+WitCoinMipIf::WitCoinMipIf (WitOptProblem * theOptProblem):
 
-      WitCoinComIf (theOptSolveMgr),
+      WitCoinComIf (theOptProblem),
       myCbcModel_  (NULL)
    {
    OsiClpSolverInterface * theOsiClpSI;
@@ -171,7 +171,7 @@ OsiSolverInterface * WitCoinMipIf::myOsiSI ()
 
 #ifndef COIN_EMBEDDED
 
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptSolveMgr *)
+WitCoinMipIf * WitCoinMipIf::newInstance (WitOptProblem *)
    {
    stronglyAssert (false);
 

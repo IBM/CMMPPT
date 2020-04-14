@@ -69,7 +69,7 @@ class WitCoinComIf: public WitSolverIf
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitCoinComIf (WitOptSolveMgr *);
+      WitCoinComIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Other protected constructor functions.

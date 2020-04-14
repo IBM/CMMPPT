@@ -133,9 +133,9 @@ void WitCoinComIf::getPrimalSoln (WitVector <double> & primalSoln)
 
 //------------------------------------------------------------------------------
 
-WitCoinComIf::WitCoinComIf (WitOptSolveMgr * theOptSolveMgr):
+WitCoinComIf::WitCoinComIf (WitOptProblem * theOptProblem):
 
-      WitSolverIf   (theOptSolveMgr),
+      WitSolverIf   (theOptProblem),
       myMsgHandler_ (NULL)
    {
    setUpMessageHandler ();

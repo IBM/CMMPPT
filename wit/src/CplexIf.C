@@ -1,4 +1,4 @@
-//==============================================================================
+   //==============================================================================
 // Constrained Materials Management and Production Planning Tool
 //
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
@@ -18,7 +18,6 @@
 //------------------------------------------------------------------------------
 
 #include <CplexIf.h>
-#include <OptSolveMgr.h>
 #include <OptComp.h>
 #include <OptProblem.h>
 #include <CpxParSpecMgr.h>
@@ -47,9 +46,9 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
+WitCplexIf * WitCplexIf::newInstance (WitOptProblem * theOptProblem)
    {
-   return new WitCplexIf (theOptSolveMgr);
+   return new WitCplexIf (theOptProblem);
    }
 
 //------------------------------------------------------------------------------
@@ -212,7 +211,7 @@ void WitCplexIf::loadInitSoln (const WitVector <double> & initSoln)
 
 void WitCplexIf::reSolveLp ()
    {
-   myOptSolveMgr ()->setUseDualSimplex (true);
+   setUseDualSimplex (true);
 
    solveLp (myOptProblem ()->needDual ());
    }
@@ -223,7 +222,7 @@ void WitCplexIf::solveLp (bool optNeeded)
    {
    setIntParam (
       CPX_PARAM_LPMETHOD,
-      myOptSolveMgr ()->useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
+      useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
 
    setSpecCpxPars ();
 
@@ -385,9 +384,9 @@ const char * WitCplexIf::solverName ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf::WitCplexIf (WitOptSolveMgr * theOptSolveMgr):
+WitCplexIf::WitCplexIf (WitOptProblem * theOptProblem):
 
-      WitSolverIf (theOptSolveMgr),
+      WitSolverIf (theOptProblem),
       myCpxEnv_   (NULL),
       myCpxLp_    (NULL),
       myErrCode_  (0)
@@ -1043,7 +1042,7 @@ bool WitCplexIf::cplexEmbedded ()
 
 //------------------------------------------------------------------------------
 
-WitCplexIf * WitCplexIf::newInstance (WitOptSolveMgr *)
+WitCplexIf * WitCplexIf::newInstance (WitOptProblem *)
    {
    stronglyAssert (false);
 

@@ -156,7 +156,6 @@ class WitOperation;
 class WitOptComp;
 class WitOptCon;
 class WitOptProblem;
-class WitOptSolveGate;
 class WitOptSolveMgr;
 class WitOptStarter;
 class WitOptVC;

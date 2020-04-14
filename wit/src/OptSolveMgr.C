@@ -5,15 +5,11 @@
 //==============================================================================
 
 //------------------------------------------------------------------------------
-// Source file: "OptSolve.C"
+// Source file: "OptSolveMgr.C"
 //
-// Contains the implementation of the following classes:
-//    OptSolveGate
-//    OptSolveMgr
-//    SolverIf
+// Contains the implementation of classe OptSolveMgr
 //------------------------------------------------------------------------------
 
-#include <OptSolveGate.h>
 #include <OptSolveMgr.h>
 #include <CoinLpIf.h>
 #include <CoinMipIf.h>
@@ -30,72 +26,17 @@
 #include <Timing.h>
 
 //------------------------------------------------------------------------------
-// Implementation of class OptSolveGate
-//------------------------------------------------------------------------------
 
-bool WitOptSolveGate::coinEmbedded ()
+bool WitOptSolveMgr::coinEmbedded ()
    {
    return WitCoinComIf::coinEmbedded ();
    }
 
 //------------------------------------------------------------------------------
 
-bool WitOptSolveGate::cplexEmbedded ()
+bool WitOptSolveMgr::cplexEmbedded ()
    {
    return WitCplexIf::cplexEmbedded ();
-   }
-
-//------------------------------------------------------------------------------
-
-WitOptSolveGate::WitOptSolveGate (WitOptProblem * theOptProblem):
-
-      myOptSolveMgr_ (new WitOptSolveMgr (theOptProblem))
-   {
-   }
-
-//------------------------------------------------------------------------------
-
-WitOptSolveGate::~WitOptSolveGate ()
-   {
-   delete myOptSolveMgr_;
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveGate::solveOptProb ()
-   {
-   myOptSolveMgr_->solveOptProb ();
-   }
-
-//------------------------------------------------------------------------------
-// Implementation of class OptSolveMgr
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::solveOptProb ()
-   {
-   if      (myOptComp ()->multiObjMode ())
-      {
-      solveOptProbAsLexOpt ();
-      }
-   else if (myOptComp ()->accOptStarter ()->isChosen ())
-      {
-      reSolveOptProbAsLp ();
-      }
-   else if (myOptComp ()->mipMode ())
-      {
-      solveOptProbAsMip ();
-      }
-   else
-      {
-      solveOptProbAsLp ();
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitOptSolveMgr::setUseDualSimplex (bool theValue)
-   {
-   useDualSimplex_ = theValue;
    }
 
 //------------------------------------------------------------------------------
@@ -105,7 +46,6 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
       WitProbAssoc      (theOptProblem),
       myOptProblem_     (theOptProblem),
       mySolverIf_       (NULL),
-      useDualSimplex_   (true),
       optLexObjElemVal_ ()
    {
    bool useCoin;
@@ -130,12 +70,12 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
    if (useCoin)
       {
       if (myOptComp ()->mipMode ())
-         mySolverIf_ = WitCoinMipIf::newInstance (this);
+         mySolverIf_ = WitCoinMipIf::newInstance (myOptProblem_);
       else
-         mySolverIf_ =  WitCoinLpIf::newInstance (this);
+         mySolverIf_ = WitCoinLpIf ::newInstance (myOptProblem_);
       }
    else
-      mySolverIf_    =   WitCplexIf::newInstance (this);
+      mySolverIf_    = WitCplexIf  ::newInstance (myOptProblem_);
    }
 
 //------------------------------------------------------------------------------
@@ -143,6 +83,28 @@ WitOptSolveMgr::WitOptSolveMgr (WitOptProblem * theOptProblem):
 WitOptSolveMgr::~WitOptSolveMgr ()
    {
    delete mySolverIf_;
+   }
+
+//------------------------------------------------------------------------------
+
+void WitOptSolveMgr::solveOptProb ()
+   {
+   if      (myOptComp ()->multiObjMode ())
+      {
+      solveOptProbAsLexOpt ();
+      }
+   else if (myOptComp ()->accOptStarter ()->isChosen ())
+      {
+      reSolveOptProbAsLp ();
+      }
+   else if (myOptComp ()->mipMode ())
+      {
+      solveOptProbAsMip ();
+      }
+   else
+      {
+      solveOptProbAsLp ();
+      }
    }
 
 //------------------------------------------------------------------------------
@@ -175,7 +137,9 @@ void WitOptSolveMgr::solveOptProbAsLp ()
 
    writeMps ();
 
-   useDualSimplex_ = myOptComp ()->crashOptStarter ()->isChosen ();
+   mySolverIf_->
+      setUseDualSimplex (
+         myOptComp ()->crashOptStarter ()->isChosen ());
 
    loadInitSoln ();
 
@@ -201,7 +165,7 @@ void WitOptSolveMgr::reSolveOptProbAsLp ()
 
    storePrimalSoln ();
 
-   if (myOptProblem ()->needDual ())
+   if (myOptProblem_->needDual ())
       storeDualSoln ();
    }
 
@@ -267,7 +231,7 @@ void WitOptSolveMgr::solveLexOpt ()
 
    prevOptVar = NULL;
 
-   myOptProblem ()->myLexOptVarSeq ().attachItr (theOptVarItr);
+   myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
 
    while (theOptVarItr.advance (theOptVar))
       {
@@ -291,7 +255,7 @@ void WitOptSolveMgr::solveLexOpt ()
 
 void WitOptSolveMgr::setUpLexOptReload ()
    {
-   optLexObjElemVal_.resize (myOptProblem ()->myLexOptVarSeq ().length (), 0.0);
+   optLexObjElemVal_.resize (myOptProblem_->myLexOptVarSeq ().length (), 0.0);
    }
 
 //------------------------------------------------------------------------------
@@ -335,7 +299,7 @@ void WitOptSolveMgr::lexReloadAndBound (WitOptVar * theOptVar)
 
    mySolverIf_->loadIntData ();
 
-   myOptProblem ()->myLexOptVarSeq ().attachItr (innerOptVarItr);
+   myOptProblem_->myLexOptVarSeq ().attachItr (innerOptVarItr);
 
    while (innerOptVarItr.advance (innerOptVar))
       {
@@ -358,7 +322,7 @@ void WitOptSolveMgr::storeOptLexObjElemVal (
 
    theIdx                    = theOptVarItr.myIdx ();
 
-   theOptVar                 = myOptProblem ()->myLexOptVarSeq ()[theIdx];
+   theOptVar                 = myOptProblem_->myLexOptVarSeq ()[theIdx];
 
    optLexObjElemVal_[theIdx] = mySolverIf_->primalVarVal (theOptVar);
    }
@@ -405,8 +369,9 @@ void WitOptSolveMgr::solveCurrentObj (bool firstObj)
       }
    else
       {
-      useDualSimplex_ =
-         firstObj and myOptComp ()->crashOptStarter ()->isChosen ();
+      mySolverIf_->
+         setUseDualSimplex (
+            firstObj and myOptComp ()->crashOptStarter ()->isChosen ());
 
       mySolverIf_->solveLp (true);
       }
@@ -418,7 +383,7 @@ bool WitOptSolveMgr::optProbHasIntVars ()
    {
    WitOptVar * theOptVar;
 
-   forEachEl (theOptVar, myOptProblem ()->myOptVars ())
+   forEachEl (theOptVar, myOptProblem_->myOptVars ())
       {
       if (theOptVar->isAnIntVar ())
          {
@@ -467,84 +432,4 @@ void WitOptSolveMgr::storeDualSoln ()
 
       theCon->setDualValue (dualSoln[theIdx]);
       }
-   }
-
-//------------------------------------------------------------------------------
-// Implementation of class SolverIf
-//------------------------------------------------------------------------------
-
-WitSolverIf::~WitSolverIf ()
-   {
-   }
-
-//------------------------------------------------------------------------------
-
-WitSolverIf::WitSolverIf (WitOptSolveMgr * theOptSolveMgr):
-
-      WitProbAssoc   (theOptSolveMgr),
-      myOptSolveMgr_ (theOptSolveMgr),
-      myOptProblem_  (theOptSolveMgr->myOptProblem ())
-   {
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::issueVersionMsg ()
-   {
-   }
-
-//------------------------------------------------------------------------------
-
-bool WitSolverIf::lexOptReloadNeeded ()
-   {
-   return false;
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::loadIntData ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::reviseLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::loadInitSoln (const WitVector <double> &)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::reSolveLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::solveLp (bool)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::solveMip (bool)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::getDualSoln (WitVector <double> &)
-   {
-   stronglyAssert (false);
    }
