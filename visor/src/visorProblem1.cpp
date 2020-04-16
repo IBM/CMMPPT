@@ -404,6 +404,7 @@ void VISORproblem1::getSubVol(
 // ----------------------------
 void VISORproblem1::solve()
 {
+   //witSetPreferCoin(witRun(),WitTRUE);
    witOptImplode(witRun());
 }
 

@@ -1035,7 +1035,9 @@ void SCOcsvFormatFile::hasHeaderRecord( int numFields )
     SCOfileIterator fileIter(*this);
     const std::string * headerRecPtr = fileIter();
     assert( headerRecPtr!=NULL ); // test to ensure header rec exists
-    std::string fieldNameOnHeader = fieldOnRecord( *headerRecPtr, f );
+    std::string headerRec = *headerRecPtr;
+    if ( headerRec.back() == '\r') headerRec.pop_back();  /* JPF added 4/14/2020 to allow header without double quotes */
+    std::string fieldNameOnHeader = fieldOnRecord( headerRec, f );
     insertField( fieldNameOnHeader );
   }
 }
