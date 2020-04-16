@@ -1,3 +1,4 @@
+proimport csv
 import json
 import os
 import sys
@@ -13,11 +14,14 @@ import numpy as np
 import traceback
 import re
 import subprocess
+import pandas as pd
 
 # from flask_socketio import SocketIO
 # from flask_socketio import send, emit
 
 SQLHOST = '3.15.33.87'
+INDEXHTML='/static/html/index.html'
+LOGINHTML='/static/html/login.html'
 logger = getLogger('edu.cornell')
 app = Flask(__name__, root_path=os.path.abspath(os.path.curdir))
 app.secret_key = 'abcd123456789efgh'
@@ -44,16 +48,29 @@ def runcommand(command, **kwargs):
     #
     # run command with output stored in arrays
     #
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs) as proc:
-        global stdout, stderr
-        stdout = ""
-        stderr = ""
-        t1 = threading.Thread(target=worker, args=["stdout", stdout, proc.stdout, proc], daemon=True)
-        t2 = threading.Thread(target=worker, args=["stderr", stderr, proc.stderr, proc], daemon=True)
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+    stdin=sys.stdin
+    data=None
+    try:
+        if 'data' in kwargs:
+            data = kwargs.pop('data')
+            stdin = subprocess.PIPE
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=stdin, **kwargs) as proc:
+            global stdout, stderr
+            stdout = ""
+            stderr = ""
+            t1 = threading.Thread(target=worker, args=["stdout", stdout, proc.stdout, proc], daemon=True)
+            t2 = threading.Thread(target=worker, args=["stderr", stderr, proc.stderr, proc], daemon=True)
+            t1.start()
+            t2.start()
+            if data is not None:
+                if isinstance(data,str) :
+                    data=data.encode()
+                proc.stdin.write(data)
+                proc.stdin.close()
+            t1.join()
+            t2.join()
+    except Exception as e:
+        logger.error(e)
     return stdout, stderr
 
 
@@ -149,9 +166,9 @@ class application(object):
     def sqltojson(sql):
         return 'SELECT json_agg(row_to_json(t)) FROM (' + sql + ') as t'
     @staticmethod
-    def runsql(sql):
-        command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -t -c "' + sql + '"'
-        return runbashcommand(command)
+    def runsql(sql, **kwargs):
+        command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -t -c "' + str(sql) + '"'
+        return runbashcommand(command, **kwargs)
 
     @staticmethod
     @app.route('/visor/hello', methods=['GET'])
@@ -202,7 +219,46 @@ class application(object):
             command = f'psql -h {SQLHOST} -p 15432 -U cmmppt -c "' + sql + '"'
             sql=None
         return sql
-
+    @staticmethod
+    def gettable(table) :
+        sql = f'select * from {table}'
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        sql = f'select column_name from information_schema.columns where table_name=\'{table}\''
+        rows = stdout
+        error = stderr
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        error += stderr
+        columns = stdout
+        return {'status': 0, 'columns': columns, 'rows': rows, 'error': error}
+    @staticmethod
+    @app.route('/visor/table', methods=['GET'])
+    def table():
+        return application.gettable(request.args['table'])
+    @staticmethod
+    @app.route('/visor/download', methods=['GET'])
+    def download():
+        table=request.args['table']
+        data= application.gettable(table)
+        rows=json.loads(data['rows'])
+        columns=json.loads(data['columns'])
+        location=None
+        dictionary = {}
+        csvrows=[]
+        header=[]
+        for i,d in enumerate(columns):
+            header.append(d['column_name'])
+            dictionary[d['column_name']]=i
+        for r in rows:
+            row=[0]*len(columns)
+            for k in r.keys():
+                row[dictionary[k]] = r[k]
+            csvrows.append(row)
+        df = pd.DataFrame(csvrows, columns=header)
+        user = session['user']
+        os.makedirs(f'static/data/{user}', 0o755, True)
+        location=f'static/data/{user}/{table}.csv'
+        df.to_csv(location,index=False, quoting=csv.QUOTE_NONNUMERIC)
+        return {"status":0, "url": f'/{location}'}
     @staticmethod
     @app.route('/visor/printer', methods=['POST'])
     def printer():
@@ -247,8 +303,12 @@ class application(object):
     def sql():
         form = json.loads(request.form['json'])
         sql = form['sql']['value']
+        usejson=form['json']['value']
         sql = sql.replace('"', '\\"')
-        (stdout, stderr)=application.runsql(application.sqltojson(sql))
+        if usejson:
+            (stdout, stderr)=application.runsql(application.sqltojson(sql))
+        else:
+            (stdout, stderr) = application.runsql(sql)
         payload = {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
         return payload
 
@@ -264,14 +324,17 @@ class application(object):
     def senddata():
         try:
             files = request.files
+            user=session['user']
             for k in files.keys():
                 filestorage = files[k]
                 data = filestorage.read()
-                application.savedata(k, data)
+                application.savedata(f'static/data/{user}/{k}', data)
+                sql=f'copy {request.form["table"]} from STDIN DELIMITER \',\' HEADER CSV'
+                (stdout,stderr)=application.runsql(sql,data=data)
             # return getResponse(
             #     {"contents": {"xfilename": xfilename, "yfilename": yfilename, "betafilename": betafilename},
             #      "encoding": "base64"})
-            return {'status': 0}
+            return {'status': 0, 'stdout':stdout,'stderr':stderr}
         except Exception as e:
             return getResponse(e)
 
@@ -328,7 +391,7 @@ class application(object):
             session['user'] = user
             session['password'] = password
             session['roles'] = reduce(lambda a, v: a + v, (map(lambda d: list(d.values()), json.loads(stdout))))
-            return {"status": 0, "url": '/static/index.html'}
+            return {"status": 0, "url": INDEXHTML}
         return {"status": 1, "message": "Incorrect password"}
 
     @staticmethod
@@ -336,14 +399,21 @@ class application(object):
     def authenticate():
         if 'user' in session and 'password' in session:
             return {'status': 0, 'roles': session['roles']}
-        return {'status': 1, 'url': '/static/login.html'}
+        return {'status': 1, 'url': LOGINHTML}
 
     @staticmethod
     @app.route('/visor/logout', methods=['GET'])
     def logout():
         session.pop('user')
         session.pop('password')
-        return {'status': 1, 'url': '/static/login.html'}
+        return {'status': 1, 'url': LOGINHTML}
+
+    @staticmethod
+    @app.route('/visor/tables', methods=['GET'])
+    def tables():
+        sql="select table_name from information_schema.tables where table_catalog='cmmppt' and table_schema='public'"
+        (stdout, stderr) = application.runsql(application.sqltojson(sql))
+        return {'status': 0, 'sql': sql, 'stdout': stdout, 'stderr': stderr}
 
     @app.route('/visor/runos', methods=['POST'])
     def runos(self):
@@ -358,3 +428,11 @@ class application(object):
 
 
 applicationinstance = application()
+if False:
+    (stdout,stderr)=runbashcommand('cat - ', data='abcd')
+    (stdout,stderr)=runbashcommand('ls -ltr')
+    with open("static/data/dave.jensen.55@gmail.com/printer.csv","rb") as f:
+        data=f.read()
+    sql=f'copy printer from STDIN DELIMITER \',\' HEADER CSV'
+    (stdout,stderr)=application.runsql(sql,data=data)
+pass
