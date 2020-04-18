@@ -26,7 +26,7 @@
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinLpIf
 //          CoinMipIf
 //       CplexIf

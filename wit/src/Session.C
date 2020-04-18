@@ -18,7 +18,7 @@
 //------------------------------------------------------------------------------
 
 #include <Session.h>
-#include <OptSolveMgr.h>
+#include <SolveMgr.h>
 #include <ApiMgr.h>
 #include <WitRun.h>
 #include <FSS.h>
@@ -151,8 +151,8 @@ void WitSession::writeHeading (FILE * outFile)
       buildDate (),
       EXE_TYPE_STRING,
       PLATFORM_STRING,
-      WitOptSolveMgr::coinEmbedded  ()? "Yes": "No",
-      WitOptSolveMgr::cplexEmbedded ()? "Yes": "No",
+      WitSolveMgr::coinEmbedded  ()? "Yes": "No",
+      WitSolveMgr::cplexEmbedded ()? "Yes": "No",
       startTime_.myCstring ());
    }
 
@@ -163,8 +163,8 @@ void WitSession::printHeading ()
    const char * coinFragID;
    const char * cplexFragID;
 
-   coinFragID  = WitOptSolveMgr::coinEmbedded  ()? "yesFrag": "noFrag";
-   cplexFragID = WitOptSolveMgr::cplexEmbedded ()? "yesFrag": "noFrag";
+   coinFragID  = WitSolveMgr::coinEmbedded  ()? "yesFrag": "noFrag";
+   cplexFragID = WitSolveMgr::cplexEmbedded ()? "yesFrag": "noFrag";
 
    myMsgFac () ("headingMsg",
       proprietaryStmt_,

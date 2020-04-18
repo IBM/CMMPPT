@@ -13,7 +13,7 @@
 // Contains the declaration of class CoinLpIf.
 //------------------------------------------------------------------------------
 
-#include <CoinComIf.h>
+#include <CoinIf.h>
 
 class ClpSimplex;
 
@@ -27,11 +27,11 @@ class ClpSimplex;
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinLpIf
 //------------------------------------------------------------------------------
 
-class WitCoinLpIf: public WitCoinComIf
+class WitCoinLpIf: public WitCoinIf
    {
    public:
 
@@ -68,7 +68,7 @@ class WitCoinLpIf: public WitCoinComIf
 
       virtual OsiSolverInterface * myOsiSI ();
          //
-         // Override from class CoinComIf.
+         // Override from class CoinIf.
 
       void reviseVarBounds ();
          //

@@ -82,7 +82,7 @@ endif
 # Rule to build the CoinModule library object file.
 #
 # In COIN-embedded mode, this file contains:
-#    The COIN client objects (CoinComIf.o, CoinLpIf.o, CoinMipIf.o)
+#    The COIN client objects (CoinIf.o, CoinLpIf.o, CoinMipIf.o)
 #    The relevent contents of the COIN libraries
 #
 # In COIN-not-embedded mode, this file contains:

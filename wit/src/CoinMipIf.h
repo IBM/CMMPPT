@@ -13,7 +13,7 @@
 // Contains the declaration of class CoinMipIf.
 //------------------------------------------------------------------------------
 
-#include <CoinComIf.h>
+#include <CoinIf.h>
 
 class CbcModel;
 
@@ -27,11 +27,11 @@ class CbcModel;
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinMipIf
 //------------------------------------------------------------------------------
 
-class WitCoinMipIf: public WitCoinComIf
+class WitCoinMipIf: public WitCoinIf
    {
    public:
 
@@ -74,7 +74,7 @@ class WitCoinMipIf: public WitCoinComIf
 
       virtual OsiSolverInterface * myOsiSI ();
          //
-         // Override from class CoinComIf.
+         // Override from class CoinIf.
 
       //-----------------------------------------------------------------------
       // Private member data.

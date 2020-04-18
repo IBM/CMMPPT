@@ -4,28 +4,27 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef OptSolveMgrH
-#define OptSolveMgrH
+#ifndef SolveMgrH
+#define SolveMgrH
 
 //------------------------------------------------------------------------------
-// Header file: "OptSolveMgr.h"
+// Header file: "SolveMgr.h"
 //
-// Contains the declaration of class OptSolveMgr
+// Contains the declaration of class SolveMgr
 //------------------------------------------------------------------------------
 
 #include <Assoc.h>
 
 //------------------------------------------------------------------------------
-// Class OptSolveMgr.
+// Class SolveMgr.
 //
-// "Opt-Solve Manager"
-// Oversees the Opt-Solve Process, the process of solving the optimization
-// problem.
+// "Solve Manager"
+// Oversees the Solve Process, the process of solving the optimization problem.
 // Directly responsible for the aspects of solving the optimization problem
 // that do not actually involve invoking the embedded solver.
 //------------------------------------------------------------------------------
 
-class WitOptSolveMgr: public WitProbAssoc
+class WitSolveMgr: public WitProbAssoc
    {
    public:
 
@@ -45,13 +44,13 @@ class WitOptSolveMgr: public WitProbAssoc
       // Constructor function.
       //------------------------------------------------------------------------
 
-      WitOptSolveMgr (WitOptProblem *);
+      WitSolveMgr (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
       //------------------------------------------------------------------------
 
-      ~WitOptSolveMgr ();
+      ~WitSolveMgr ();
 
       //------------------------------------------------------------------------
       // Other public member functions.
@@ -67,7 +66,11 @@ class WitOptSolveMgr: public WitProbAssoc
       // Private member functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitOptSolveMgr);
+      noCopyCtorAssign (WitSolveMgr);
+
+      static WitSolverIf * newSolverIf (WitOptProblem * theOptProblem);
+         //
+         // Creates and returns a new SolverIf for solving theOptProblem.
 
       void solveOptProbAsLexOpt ();
          //
@@ -159,9 +162,9 @@ class WitOptSolveMgr: public WitProbAssoc
          //
          // The optimization probllem to be solved.
 
-      WitSolverIf * mySolverIf_;
+      WitSolverIf * const mySolverIf_;
          //
-         // The SolverIf owned by this OptSolveMgr.
+         // The SolverIf owned by this SolveMgr.
 
       WitVector <double> optLexObjElemVal_;
          //

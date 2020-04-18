@@ -38,7 +38,7 @@
 
 WitCoinLpIf::WitCoinLpIf (WitOptProblem * theOptProblem):
 
-      WitCoinComIf  (theOptProblem),
+      WitCoinIf     (theOptProblem),
       myClpSimplex_ (NULL),
       myOsiSI_      (NULL)
    {

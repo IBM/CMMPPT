@@ -361,9 +361,9 @@ class WitOptProblem: public WitProbAssoc
          //
          // Optimization problem output file.
 
-      WitOptSolveMgr * myOptSolveMgr_;
+      WitSolveMgr * mySolveMgr_;
          //
-         // The OptSolveMgr owned by this OptProblem, when there is one;
+         // The SolveMgr owned by this OptProblem, when there is one;
          // otherwise, NULL.
    };
 

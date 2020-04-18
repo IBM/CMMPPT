@@ -36,8 +36,8 @@
 
 WitCoinMipIf::WitCoinMipIf (WitOptProblem * theOptProblem):
 
-      WitCoinComIf (theOptProblem),
-      myCbcModel_  (NULL)
+      WitCoinIf   (theOptProblem),
+      myCbcModel_ (NULL)
    {
    OsiClpSolverInterface * theOsiClpSI;
 

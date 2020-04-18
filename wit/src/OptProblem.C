@@ -14,7 +14,7 @@
 #include <OptVar.h>
 #include <OptCon.h>
 #include <Coeff.h>
-#include <OptSolveMgr.h>
+#include <SolveMgr.h>
 #include <OptComp.h>
 #include <Timing.h>
 #include <MsgFrag.h>
@@ -229,7 +229,7 @@ WitOptProblem::WitOptProblem (WitProblem * theProblem):
       curConCoeffs_   (myProblem ()),
       myLexOptVarSeq_ (),
       optProbFile_    (NULL),
-      myOptSolveMgr_  (NULL)
+      mySolveMgr_     (NULL)
    {
    }
 
@@ -239,7 +239,7 @@ WitOptProblem::~WitOptProblem ()
    {
    int idx;
 
-   delete myOptSolveMgr_;
+   delete mySolveMgr_;
 
    while (not myOptCons_.isEmpty ())
       delete myOptCons_.get ();
@@ -271,10 +271,10 @@ void WitOptProblem::solve ()
    if (myOptComp ()->printOptProblem ())
       print ();
 
-   if (myOptSolveMgr_ == NULL)
-       myOptSolveMgr_ = new WitOptSolveMgr (this);
+   if (mySolveMgr_ == NULL)
+       mySolveMgr_ = new WitSolveMgr (this);
 
-   myOptSolveMgr_->solveOptProb ();
+   mySolveMgr_->solveOptProb ();
 
    if (needDual ())
       reconstructDual ();

@@ -4,13 +4,13 @@
 // (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
 //==============================================================================
 
-#ifndef CoinComIfH
-#define CoinComIfH
+#ifndef CoinIfH
+#define CoinIfH
 
 //------------------------------------------------------------------------------
-// Header file: "CoinComIf.h"
+// Header file: "CoinIf.h"
 //
-// Contains the declaration of class CoinComIf.
+// Contains the declaration of class CoinIf.
 //------------------------------------------------------------------------------
 
 #include <SolverIf.h>
@@ -19,9 +19,9 @@ class OsiSolverInterface;
 class CoinMessageHandler;
 
 //------------------------------------------------------------------------------
-// Class CoinComIf
+// Class CoinIf
 //
-// "COIN Common Interface"
+// "COIN Interface"
 // Responsible for all interactions with COIN that occur in BOTH LP mode and
 // MIP mode.
 //
@@ -29,12 +29,12 @@ class CoinMessageHandler;
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinLpIf
 //          CoinMipIf
 //------------------------------------------------------------------------------
 
-class WitCoinComIf: public WitSolverIf
+class WitCoinIf: public WitSolverIf
    {
    public:
 
@@ -46,10 +46,10 @@ class WitCoinComIf: public WitSolverIf
          //
          // Returns true, iff COIN embedded into the current build of WIT.
 
-      static WitCoinComIf * newInstance (WitOptProblem * theOptProblem);
+      static WitCoinIf * newInstance (WitOptProblem * theOptProblem);
          //
          // If COIN is embedded,
-         //    creates and returns a new CoinComIf for theOptProblem.
+         //    creates and returns a new CoinIf for theOptProblem.
          // If COIN is not embedded,
          //    issues a fatal error.
 
@@ -57,7 +57,7 @@ class WitCoinComIf: public WitSolverIf
       // Destructor function.
       //------------------------------------------------------------------------
 
-      virtual ~WitCoinComIf ();
+      virtual ~WitCoinIf ();
 
       //------------------------------------------------------------------------
       // Overrides from class SolverIf.
@@ -76,7 +76,7 @@ class WitCoinComIf: public WitSolverIf
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitCoinComIf (WitOptProblem *);
+      WitCoinIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Other protected constructor functions.
@@ -84,7 +84,7 @@ class WitCoinComIf: public WitSolverIf
 
       virtual OsiSolverInterface * myOsiSI () = 0;
          //
-         // Returns the OsiSolverInterface for this CoinComIf.
+         // Returns the OsiSolverInterface for this CoinIf.
 
       accessFunc (CoinMessageHandler *, myMsgHandler)
 
@@ -104,7 +104,7 @@ class WitCoinComIf: public WitSolverIf
       // Private member functions.
       //------------------------------------------------------------------------
 
-      noCopyCtorAssign (WitCoinComIf);
+      noCopyCtorAssign (WitCoinIf);
 
       void setUpMessageHandler ();
          //
