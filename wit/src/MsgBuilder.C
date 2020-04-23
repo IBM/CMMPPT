@@ -7959,41 +7959,6 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "solverStoppedErrorsSmsg",
-      1066,
-      severe_,
-      "The solver terminated early due to errors.\n");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "solverStoppedEventSmsg",
-      1067,
-      severe_,
-      "CLP was terminated by its event handler.\n");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "unexpClpStatusCodeSmsg",
-      1068,
-      severe_,
-      "CLP terminated with an unexpected problem status code.\n"
-      "\n"
-      "   Problem Status Code: %1$d");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "nSimplexItersMsg",
       1069,
       info_,
@@ -8046,6 +8011,28 @@ void WitMsgBuilder::buildMsgs ()
 
    currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "iterLimitSmsg",
+      1074,
+      severe_,
+      "The solver terminated early due to reaching its iteration limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "termUnknownReasonSmsg",
+      1075,
+      severe_,
+      "The solver terminated early for an unknown reason.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
    }

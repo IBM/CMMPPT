@@ -31,26 +31,21 @@
 #ifdef COIN_EMBEDDED
 
 #include <OsiClpSolverInterface.hpp>
-#include <ClpSimplex.hpp>
-#include <ClpPresolve.hpp>
 
 //------------------------------------------------------------------------------
 
 WitCoinLpIf::WitCoinLpIf (WitOptProblem * theOptProblem):
 
-      WitCoinIf     (theOptProblem),
-      myClpSimplex_ (NULL),
-      myOsiSI_      (NULL)
+      WitCoinIf (theOptProblem),
+      myOsiSI_  (NULL)
    {
    OsiClpSolverInterface * theOsiClpSI;
 
    enterCoin ();
 
-   myClpSimplex_ = new ClpSimplex;
+   myOsiSI_ = new OsiClpSolverInterface;
 
-   myOsiSI_      = new OsiClpSolverInterface (myClpSimplex_);
-
-   myClpSimplex_->passInMessageHandler (myMsgHandler ());
+   myOsiSI_->passInMessageHandler (myMsgHandler ());
 
    leaveCoin ();
    }
@@ -62,7 +57,6 @@ WitCoinLpIf::~WitCoinLpIf ()
    enterCoin ();
 
    delete myOsiSI_;
-   delete myClpSimplex_;
 
    leaveCoin ();
    }
@@ -82,109 +76,57 @@ void WitCoinLpIf::loadInitSoln (const WitVector <double> & initSoln)
    {
    enterCoin ();
 
-   myClpSimplex_->setColSolution (initSoln.myCVec ());
+   myOsiSI_->setColSolution (initSoln.myCVec ());
 
    leaveCoin ();
-   }
-
-//------------------------------------------------------------------------------
-// reSolveLp
-//
-// Note that the existing basis may be primal feasible, dual feasible, both, or
-// neither. Dual simplex is being used for this general case.
-//------------------------------------------------------------------------------
-
-void WitCoinLpIf::reSolveLp ()
-   {
-   int ifValuespass;
-   int startFinishOptions;
-   int nIters;
-
-   ifValuespass = 0;
-      //
-      // 0 means don't do a values pass.
-
-   startFinishOptions = 1 + 2 + 4;
-      //
-      // Interpreted as bits:
-      //    1 - do not delete work areas and factorization at end
-      //    2 - use old factorization if same number of rows
-      //    4 - skip as much initialization of work areas as possible
-      //        (based on whatsChanged in clpmodel.hpp)
-
-   enterCoin ();
-
-   myClpSimplex_->setWhatsChanged (MATRIX_SAME + BASIS_SAME);
-
-   myClpSimplex_->dual (ifValuespass, startFinishOptions);
-
-   nIters = myClpSimplex_->numberIterations ();
-
-   leaveCoin ();
-
-   checkLpSolnStatus (myClpSimplex_);
-
-   myMsgFac () ("nSimplexItersMsg", nIters);
    }
 
 //------------------------------------------------------------------------------
 // solveLp
 //
-// ifValuesPass == 0, means don't do a values pass.
-// ifValuesPass == 1, means       do a values pass.
-//
-// startFinishOptions == 1 means retain work areas and factorization at end.
-// startFinishOptions == 0 means delete work areas and factorization at end.
+// Note that when the primal simplex method is used, the input primal solution
+// is used as the starting solution. (A values pass is performed.)
 //------------------------------------------------------------------------------
 
 void WitCoinLpIf::solveLp (bool)
    {
-   int           ifValuesPass;
-   int           startFinishOptions;
-   ClpPresolve * theClpPresolve;
-   ClpSimplex *  psClpSimplex;
-   int           nIters;
-
-   ifValuesPass       = useDualSimplex ()? 0: 1;
-
-   startFinishOptions = myOptComp ()->accAfterOptImp ()? 1: 0;
+   int nIters;
 
    enterCoin ();
 
-   theClpPresolve = new ClpPresolve;
+   myOsiSI ()->setHintParam (OsiDoPresolveInInitial,          true, OsiHintDo);
+   myOsiSI ()->setHintParam (OsiDoScale,                      true, OsiHintDo);
+   myOsiSI ()->setHintParam (OsiDoDualInInitial, useDualSimplex (), OsiHintDo);
 
-   psClpSimplex = theClpPresolve->presolvedModel (* myClpSimplex_);
+   myOsiSI ()->initialSolve ();
 
-   if (psClpSimplex == NULL)
-      myMsgFac () ("unboundedOrInfeasSmsg");
-
-   if (useDualSimplex ())
-      psClpSimplex->dual   (ifValuesPass, startFinishOptions);
-   else
-      psClpSimplex->primal (ifValuesPass, startFinishOptions);
-
-   nIters = psClpSimplex->numberIterations ();
+   nIters = myOsiSI ()->getIterationCount ();
 
    leaveCoin ();
 
-   checkLpSolnStatus (psClpSimplex);
+   checkLpSolnStatup ();
+
+   myMsgFac () ("nSimplexItersMsg", nIters);
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCoinLpIf::reSolveLp ()
+   {
+   int nIters;
 
    enterCoin ();
 
-   theClpPresolve->postsolve (true);
+   myOsiSI ()->setHintParam (OsiDoPresolveInResolve, true, OsiHintDo);
+   myOsiSI ()->setHintParam (OsiDoScale,             true, OsiHintDo);
 
-   delete theClpPresolve;
+   myOsiSI ()->resolve ();
 
-   delete psClpSimplex;
-
-   if (not myClpSimplex_->isProvenOptimal ())
-      {
-      myClpSimplex_->primal (1, startFinishOptions);
-
-      nIters += myClpSimplex_->numberIterations ();
-      }
+   nIters = myOsiSI ()->getIterationCount ();
 
    leaveCoin ();
+
+   checkLpSolnStatup ();
 
    myMsgFac () ("nSimplexItersMsg", nIters);
    }
@@ -193,7 +135,7 @@ void WitCoinLpIf::solveLp (bool)
 
 void WitCoinLpIf::getDualSoln (WitVector <double> & dualSoln)
    {
-   dualSoln = myClpSimplex_->getRowPrice ();
+   dualSoln = myOsiSI_->getRowPrice ();
    }
 
 //------------------------------------------------------------------------------
@@ -214,17 +156,19 @@ OsiSolverInterface * WitCoinLpIf::myOsiSI ()
 
 void WitCoinLpIf::reviseVarBounds ()
    {
-   double *    lowerBound;
-   double *    upperBound;
    WitOptVar * theOptVar;
-
-   lowerBound = myClpSimplex_->columnLower ();
-   upperBound = myClpSimplex_->columnUpper ();
 
    forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
-      lowerBound[theOptVar->index ()] = theOptVar->bounds ().lower ();
-      upperBound[theOptVar->index ()] = theOptVar->bounds ().upper ();
+      myOsiSI_->
+         setColLower (
+            theOptVar->index (),
+            theOptVar->bounds ().lower ());
+
+      myOsiSI_->
+         setColUpper (
+            theOptVar->index (),
+            theOptVar->bounds ().upper ());
       }
    }
 
@@ -232,17 +176,19 @@ void WitCoinLpIf::reviseVarBounds ()
 
 void WitCoinLpIf::reviseConBounds ()
    {
-   double *    lowerBound;
-   double *    upperBound;
    WitOptCon * theOptCon;
-
-   lowerBound = myClpSimplex_->rowLower ();
-   upperBound = myClpSimplex_->rowUpper ();
 
    forEachEl (theOptCon, myOptProblem ()->myOptCons ())
       {
-      lowerBound[theOptCon->index ()] = theOptCon->bounds ().lower ();
-      upperBound[theOptCon->index ()] = theOptCon->bounds ().upper ();
+      myOsiSI_->
+         setRowLower (
+            theOptCon->index (),
+            theOptCon->bounds ().lower ());
+
+      myOsiSI_->
+         setRowUpper (
+            theOptCon->index (),
+            theOptCon->bounds ().upper ());
       }
    }
 
@@ -254,8 +200,8 @@ void WitCoinLpIf::reviseObjCoeffs ()
 
    forEachEl (theOptVar, myOptProblem ()->myOptVars ())
       {
-      myClpSimplex_->
-         setObjectiveCoefficient (
+      myOsiSI_->
+         setObjCoeff (
             theOptVar->index (),
             theOptVar->objCoeff ());
       }
@@ -263,39 +209,26 @@ void WitCoinLpIf::reviseObjCoeffs ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinLpIf::checkLpSolnStatus (ClpSimplex * theClpSimplex)
+void WitCoinLpIf::checkLpSolnStatup ()
    {
-   int statusCode;
+   enterCoin ();
 
-   statusCode = theClpSimplex->problemStatus ();
+   if      (myOsiSI ()->isProvenOptimal ())
+      myMsgFac () ("optSolnFoundMsg");
 
-   switch (statusCode)
-      {
-      case 0:
-         {
-         myMsgFac () ("optSolnFoundMsg");
+   else if (myOsiSI ()->isProvenPrimalInfeasible ())
+      myMsgFac () ("infeasSmsg");
 
-         return;
-         }
+   else if (myOsiSI ()->isProvenDualInfeasible ())
+      myMsgFac () ("unboundedOrInfeasSmsg");
 
-      case 1:
-         myMsgFac () ("infeasSmsg");
+   else if (myOsiSI ()->isIterationLimitReached ())
+      myMsgFac () ("iterLimitSmsg");
 
-      case 2:
-         myMsgFac () ("unboundedOrInfeasSmsg");
+   else
+      myMsgFac () ("termUnknownReasonSmsg");
 
-      case 3:
-         myMsgFac () ("iterOrTimeLimitSmsg");
-
-      case 4:
-         myMsgFac () ("solverStoppedErrorsSmsg");
-
-      case 5:
-         myMsgFac () ("clpStoppedEventSmsg");
-
-      default:
-         myMsgFac () ("unexpClpStatusCodeSmsg", statusCode);
-      }
+   leaveCoin ();
    }
 
 #endif // COIN_EMBEDDED

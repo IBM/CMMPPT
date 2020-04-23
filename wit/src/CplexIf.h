@@ -73,8 +73,8 @@ class WitCplexIf: public WitSolverIf
       virtual void         reviseLp        ();
       virtual void         solverWriteMps  ();
       virtual void         loadInitSoln    (const WitVector <double> &);
-      virtual void         reSolveLp       ();
       virtual void         solveLp         (bool);
+      virtual void         reSolveLp       ();
       virtual void         solveMip        (bool);
       virtual void         setVarLB        (WitOptVar *, double);
       virtual void         setObjCoeff     (WitOptVar *, double);

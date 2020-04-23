@@ -15,8 +15,6 @@
 
 #include <CoinIf.h>
 
-class ClpSimplex;
-
 //------------------------------------------------------------------------------
 // Class CoinLpIf
 //
@@ -53,8 +51,8 @@ class WitCoinLpIf: public WitCoinIf
 
       virtual void         reviseLp     ();
       virtual void         loadInitSoln (const WitVector <double> &);
-      virtual void         reSolveLp    ();
       virtual void         solveLp      (bool);
+      virtual void         reSolveLp    ();
       virtual void         getDualSoln  (WitVector <double> &);
       virtual const char * solverName   ();
 
@@ -85,22 +83,20 @@ class WitCoinLpIf: public WitCoinIf
          // Revises the objective function coefficients of the LP problem that
          // was previously loaded into CLP.
 
-      void checkLpSolnStatus (ClpSimplex * theClpSimplex);
+      void checkLpSolnStatup ();
          //
-         // Checks the status of the LP solution in theClpSimplex.
+         // Checks the status of the LP solution.
 
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
 
-      ClpSimplex * myClpSimplex_;
-         //
-         // The ClpSimplex owned by this CoinLpIf.
-
       OsiSolverInterface * myOsiSI_;
          //
          // The OsiSolverInterface owned by this CoinLpIf.
-         // myOsiSI_ represents myClpSimplex_.
+         // It's actually an OsiClpSolverInterface and so the actual solver is
+         // CLP, but all interaction with it except construction is as an
+         // OsiSolverInterface.
    };
 
 #endif

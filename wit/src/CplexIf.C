@@ -209,15 +209,6 @@ void WitCplexIf::loadInitSoln (const WitVector <double> & initSoln)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::reSolveLp ()
-   {
-   setUseDualSimplex (true);
-
-   solveLp (myOptProblem ()->needDual ());
-   }
-
-//------------------------------------------------------------------------------
-
 void WitCplexIf::solveLp (bool optNeeded)
    {
    setIntParam (
@@ -237,6 +228,15 @@ void WitCplexIf::solveLp (bool optNeeded)
    checkLpSolnStatus (optNeeded);
 
    printLpSolveInfo ();
+   }
+
+//------------------------------------------------------------------------------
+
+void WitCplexIf::reSolveLp ()
+   {
+   setUseDualSimplex (true);
+
+   solveLp (myOptProblem ()->needDual ());
    }
 
 //------------------------------------------------------------------------------
