@@ -51,10 +51,10 @@ class WitCoinMipIf: public WitCoinIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual bool         lexOptReloadNeeded ();
-      virtual void         loadIntData        ();
-      virtual void         solveMip           (bool);
-      virtual const char * solverName         ();
+      virtual bool         lexOptNeedsReload ();
+      virtual void         loadIntData       ();
+      virtual void         solveMip          (bool);
+      virtual const char * solverName        ();
 
    private:
 

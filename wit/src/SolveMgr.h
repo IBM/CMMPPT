@@ -101,35 +101,31 @@ class WitSolveMgr: public WitProbAssoc
          // Writes an MPS file of the opt problem entered into the solver, if
          // appropriate.
 
-      void solveLexOpt ();
-         //
-         // Solves the lexicographic optimization problem.
-
-      void setUpLexOptReload ();
-         //
-         // Sets up lex opt reload mode.
-
-      void prepLexObjElemOpt (WitOptVar * prevOptVar, WitOptVar * theOptVar);
-         //
-         // Prepares to optimize theOptVar as a lex objective element.
-         // prevOptVar is the previous lex obj element, if any, else NULL.
-
-      void lexReloadAndBound (WitOptVar * theOptVar);
-         //
-         // For lex opt reload mode only.
-         // Reloads the opt problem and applies the bounds on the lex
-         // objective elements prior to theOptVar.
-
-      void storeOptLexObjElemVal (WitPtrVecItr <WitOptVar> & theOptVarItr);
-         //
-         // Stores the optimal objective function value for the lex objective
-         // element at theOptVarItr
-
       void loadInitSoln ();
          //
          // If an external initial primal solution is to be used, this function
          // acquires it from myOptProblem_ and then loads it into the solver.
          // Not valid in MIP mode.
+
+      void solveLexOptNoReload ();
+         //
+         // Solves the lexicographic optimization problem without the "reload"
+         // option.
+
+      void solveLexOptWReload ();
+         //
+         // Solves the lexicographic optimization problem with the "reload"
+         // option, which reloads the problem into the solver at each
+         // iteration.
+
+      void applyPrevBounds (
+            WitOptVar *                theOptVar,
+            const WitVector <double> & optLexObjElemVal);
+         //
+         // Applies the bounds on the lex objective elements prior to theOptVar.
+         // optLexObjElemVal[theIdx] is the optimal objective function value for
+         // the lex objective element whose index in the lex opt sequence is
+         // theIdx.
 
       void boundLexObjElemVal (WitOptVar * theOptVar, double theVal);
          //
@@ -137,10 +133,11 @@ class WitSolveMgr: public WitProbAssoc
          // this function bounds the theOptVar to be at least theVal minus a
          // tolerance.
 
-      void solveCurrentObj (bool firstObj);
+      void solveCurrentObj (WitOptVar * theOptVar, bool firstObj);
          //
-         // Optimizies the current objective in a lexicographic optimization.
-         // firstObj is true, iff the current objective is the first objecetve.
+         // Sets theOptVar as the current objective in a lexicographic
+         // optimization and optimizies it.
+         // firstObj is true, iff theOptVar is the first objecetve.
 
       bool optProbHasIntVars ();
          //
@@ -165,14 +162,6 @@ class WitSolveMgr: public WitProbAssoc
       WitSolverIf * const mySolverIf_;
          //
          // The SolverIf owned by this SolveMgr.
-
-      WitVector <double> optLexObjElemVal_;
-         //
-         // If mySolverIf_->lexOptReloadNeeded () is true,
-         //    optLexObjElemVal_[theIdx] is the optimal objective function
-         //    value for the lex objective element whose index in the lex opt
-         //    sequence is theIdx.
-         // Otherwise optLexObjElemVal_ is not allocated.
    };
 
 #endif

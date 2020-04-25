@@ -51,10 +51,10 @@ class WitSolverIf: public WitProbAssoc
          // Issues a msg indicating the version # of the solver, if possible.
          // The default implementation does nothing.
 
-      virtual bool lexOptReloadNeeded ();
+      virtual bool lexOptNeedsReload ();
          //
-         // Returns true, iff lexicographic optimization with re-leading is
-         // needed.
+         // Returns true, iff lexicographic optimization needs to be done by the
+         // "reload" algorithm, when this SolverIf is being used.
          // The default implementation returns false.
 
       virtual void loadLp () = 0;

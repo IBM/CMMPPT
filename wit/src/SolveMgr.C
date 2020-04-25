@@ -42,10 +42,9 @@ bool WitSolveMgr::cplexEmbedded ()
 
 WitSolveMgr::WitSolveMgr (WitOptProblem * theOptProblem):
 
-      WitProbAssoc      (theOptProblem),
-      myOptProblem_     (theOptProblem),
-      mySolverIf_       (newSolverIf (theOptProblem)),
-      optLexObjElemVal_ ()
+      WitProbAssoc  (theOptProblem),
+      myOptProblem_ (theOptProblem),
+      mySolverIf_   (newSolverIf (theOptProblem))
    {
    }
 
@@ -121,7 +120,16 @@ void WitSolveMgr::solveOptProbAsLexOpt ()
 
    writeMps ();
 
-   solveLexOpt ();
+   if (devMode ())
+      WitTimer::getTimeAndChargeToCurrent ();
+
+   if (not myOptComp ()->mipMode ())
+      loadInitSoln ();
+
+   if (mySolverIf_->lexOptNeedsReload ())
+      solveLexOptWReload ();
+   else
+      solveLexOptNoReload ();
 
    storePrimalSoln ();
    }
@@ -213,121 +221,6 @@ void WitSolveMgr::writeMps ()
 
 //------------------------------------------------------------------------------
 
-void WitSolveMgr::solveLexOpt ()
-   {
-   WitOptVar *              prevOptVar;
-   WitPtrVecItr <WitOptVar> theOptVarItr;
-   WitOptVar *              theOptVar;
-
-   if (devMode ())
-      WitTimer::getTimeAndChargeToCurrent ();
-
-   if (mySolverIf_->lexOptReloadNeeded ())
-      setUpLexOptReload ();
-
-   if (not myOptComp ()->mipMode ())
-      loadInitSoln ();
-
-   prevOptVar = NULL;
-
-   myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
-
-   while (theOptVarItr.advance (theOptVar))
-      {
-      prepLexObjElemOpt (prevOptVar, theOptVar);
-
-      solveCurrentObj (prevOptVar == NULL);
-
-      if (mySolverIf_->lexOptReloadNeeded ())
-         storeOptLexObjElemVal (theOptVarItr);
-
-      if (devMode ())
-         if (WitSaeMgr::standAloneMode ())
-            myMsgFac () ("lexObjElemCpuTimeMsg",
-               WitTimer::getTimeAndChargeToCurrent ());
-
-      prevOptVar = theOptVar;
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolveMgr::setUpLexOptReload ()
-   {
-   optLexObjElemVal_.resize (myOptProblem_->myLexOptVarSeq ().length (), 0.0);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolveMgr::prepLexObjElemOpt (
-      WitOptVar * prevOptVar,
-      WitOptVar * theOptVar)
-   {
-   double prevObjVal;
-
-   myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
-
-   if (prevOptVar != NULL)
-      {
-      if (mySolverIf_->lexOptReloadNeeded ())
-         {
-         lexReloadAndBound (theOptVar);
-         }
-      else
-         {
-         prevObjVal = mySolverIf_->primalVarVal (prevOptVar);
-
-         boundLexObjElemVal (prevOptVar, prevObjVal);
-
-         mySolverIf_->setObjCoeff (prevOptVar, 0.0);
-         }
-      }
-
-   mySolverIf_->setObjCoeff (theOptVar, 1.0);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolveMgr::lexReloadAndBound (WitOptVar * theOptVar)
-   {
-   WitPtrVecItr <WitOptVar> innerOptVarItr;
-   WitOptVar *              innerOptVar;
-   double                   theObjVal;
-
-   mySolverIf_->loadLp ();
-
-   mySolverIf_->loadIntData ();
-
-   myOptProblem_->myLexOptVarSeq ().attachItr (innerOptVarItr);
-
-   while (innerOptVarItr.advance (innerOptVar))
-      {
-      if (innerOptVar == theOptVar)
-         break;
-
-      theObjVal = optLexObjElemVal_[innerOptVarItr.myIdx ()];
-
-      boundLexObjElemVal (innerOptVar, theObjVal);
-      }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolveMgr::storeOptLexObjElemVal (
-      WitPtrVecItr <WitOptVar> & theOptVarItr)
-   {
-   int         theIdx;
-   WitOptVar * theOptVar;
-
-   theIdx                    = theOptVarItr.myIdx ();
-
-   theOptVar                 = myOptProblem_->myLexOptVarSeq ()[theIdx];
-
-   optLexObjElemVal_[theIdx] = mySolverIf_->primalVarVal (theOptVar);
-   }
-
-//------------------------------------------------------------------------------
-
 void WitSolveMgr::loadInitSoln ()
    {
    WitVector <double> initSoln;
@@ -346,6 +239,102 @@ void WitSolveMgr::loadInitSoln ()
 
 //------------------------------------------------------------------------------
 
+void WitSolveMgr::solveLexOptNoReload ()
+   {
+   WitOptVar *              prevOptVar;
+   WitPtrVecItr <WitOptVar> theOptVarItr;
+   WitOptVar *              theOptVar;
+   double                   prevObjVal;
+
+   prevOptVar = NULL;
+
+   myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
+
+   while (theOptVarItr.advance (theOptVar))
+      {
+      myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
+
+      if (prevOptVar != NULL)
+         {
+         prevObjVal = mySolverIf_->primalVarVal (prevOptVar);
+
+         boundLexObjElemVal (prevOptVar, prevObjVal);
+
+         mySolverIf_->setObjCoeff (prevOptVar, 0.0);
+         }
+
+      solveCurrentObj (theOptVar, prevOptVar == NULL);
+
+      prevOptVar = theOptVar;
+      }
+   }
+
+//------------------------------------------------------------------------------
+// solveLexOptWReload
+//
+// For the meaning of optLexObjElemVal, see applyPrevBounds.
+//------------------------------------------------------------------------------
+
+void WitSolveMgr::solveLexOptWReload ()
+   {
+   WitVector <double>       optLexObjElemVal;
+   bool                     firstObj;
+   WitPtrVecItr <WitOptVar> theOptVarItr;
+   WitOptVar *              theOptVar;
+
+   optLexObjElemVal.resize (myOptProblem_->myLexOptVarSeq ().length (), 0.0);
+
+   firstObj = true;
+
+   myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
+
+   while (theOptVarItr.advance (theOptVar))
+      {
+      myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
+
+      if (not firstObj)
+         {
+         mySolverIf_->loadLp ();
+
+         mySolverIf_->loadIntData ();
+
+         applyPrevBounds (theOptVar, optLexObjElemVal);
+         }
+
+      solveCurrentObj (theOptVar, firstObj);
+
+      optLexObjElemVal[theOptVarItr.myIdx ()] =
+         mySolverIf_->primalVarVal (theOptVar);
+
+      firstObj = false;
+      }
+   }
+
+//------------------------------------------------------------------------------
+
+void WitSolveMgr::applyPrevBounds (
+      WitOptVar *                theOptVar,
+      const WitVector <double> & optLexObjElemVal)
+   {
+   WitPtrVecItr <WitOptVar> innerOptVarItr;
+   WitOptVar *              innerOptVar;
+   double                   theObjVal;
+
+   myOptProblem_->myLexOptVarSeq ().attachItr (innerOptVarItr);
+
+   while (innerOptVarItr.advance (innerOptVar))
+      {
+      if (innerOptVar == theOptVar)
+         break;
+
+      theObjVal = optLexObjElemVal[innerOptVarItr.myIdx ()];
+
+      boundLexObjElemVal (innerOptVar, theObjVal);
+      }
+   }
+
+//------------------------------------------------------------------------------
+
 void WitSolveMgr::boundLexObjElemVal (WitOptVar * theOptVar, double theVal)
    {
    double moTol;
@@ -360,8 +349,10 @@ void WitSolveMgr::boundLexObjElemVal (WitOptVar * theOptVar, double theVal)
 
 //------------------------------------------------------------------------------
 
-void WitSolveMgr::solveCurrentObj (bool firstObj)
+void WitSolveMgr::solveCurrentObj (WitOptVar * theOptVar, bool firstObj)
    {
+   mySolverIf_->setObjCoeff (theOptVar, 1.0);
+
    if (myOptComp ()->mipMode ())
       {
       mySolverIf_->solveMip (true);
@@ -374,6 +365,11 @@ void WitSolveMgr::solveCurrentObj (bool firstObj)
 
       mySolverIf_->solveLp (true);
       }
+
+   if (devMode ())
+      if (WitSaeMgr::standAloneMode ())
+         myMsgFac () ("lexObjElemCpuTimeMsg",
+            WitTimer::getTimeAndChargeToCurrent ());
    }
 
 //------------------------------------------------------------------------------

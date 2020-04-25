@@ -37,7 +37,7 @@ void WitSolverIf::issueVersionMsg ()
 
 //------------------------------------------------------------------------------
 
-bool WitSolverIf::lexOptReloadNeeded ()
+bool WitSolverIf::lexOptNeedsReload ()
    {
    return false;
    }

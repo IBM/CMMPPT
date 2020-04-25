@@ -67,9 +67,9 @@ WitCoinMipIf::~WitCoinMipIf ()
 
 //------------------------------------------------------------------------------
 
-bool WitCoinMipIf::lexOptReloadNeeded ()
+bool WitCoinMipIf::lexOptNeedsReload ()
    {
-   return myOptComp ()->multiObjMode ();
+   return true;
    }
 
 //------------------------------------------------------------------------------
