@@ -87,7 +87,7 @@ void WitCoinMipIf::loadIntData ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinMipIf::solveMip (bool)
+void WitCoinMipIf::solveMip ()
    {
    enterCoin ();
 

@@ -53,7 +53,7 @@ class WitCoinMipIf: public WitCoinIf
 
       virtual bool         lexOptNeedsReload ();
       virtual void         loadIntData       ();
-      virtual void         solveMip          (bool);
+      virtual void         solveMip          ();
       virtual const char * solverName        ();
 
    private:

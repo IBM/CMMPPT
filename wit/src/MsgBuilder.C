@@ -7751,49 +7751,16 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "inFeasLpCpxStatSmsg",
-      1049,
-      severe_,
-      "The solution status code returned by CPLEX indicates that the LP solve "
-      "routine terminated early. The resulting LP solution is not known to be "
-      "primal feasible.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "nonOptLpCpxStatSmsg",
       1050,
       severe_,
       "The solution status code returned by CPLEX indicates that the LP solve "
       "routine terminated early and did not find an optimal solution "
-      "to the LP problem. Optimality is required in this case.\n"
+      "to the LP problem.\n"
       "\n"
       "   Solution Status Code: %1$d\n"
       "   Solution Status:      \"%2$s\"");
 
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "nonOptButFeasLpCpxStatWmsg",
-      1051,
-      warning_,
-      "The solution status code returned by CPLEX indicates that the LP solve "
-      "routine terminated early. Nevertheless, it did find a primal feasible "
-      "solution and WIT will use it to compute the implosion solution.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
 
@@ -7821,28 +7788,11 @@ void WitMsgBuilder::buildMsgs ()
       severe_,
       "The solution status code returned by CPLEX indicates that the MIP solve "
       "routine terminated early and did not find an optimal solution "
-      "to the MIP problem. Optimality is required in this case.\n"
+      "to the MIP problem.\n"
       "\n"
       "   Solution Status Code: %1$d\n"
       "   Solution Status:      \"%2$s\"");
 
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "nonOptButFeasMipCpxStatWmsg",
-      1054,
-      warning_,
-      "The solution status code returned by CPLEX indicates that the MIP solve "
-      "routine terminated early, but it did find an integer feasible solution "
-      "to the MIP problem. WIT will use it to compute the implosion solution.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
 

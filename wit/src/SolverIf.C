@@ -65,7 +65,7 @@ void WitSolverIf::loadInitSoln (const WitVector <double> &)
 
 //------------------------------------------------------------------------------
 
-void WitSolverIf::solveLp (bool)
+void WitSolverIf::solveLp ()
    {
    stronglyAssert (false);
    }
@@ -79,7 +79,7 @@ void WitSolverIf::reSolveLp ()
 
 //------------------------------------------------------------------------------
 
-void WitSolverIf::solveMip (bool)
+void WitSolverIf::solveMip ()
    {
    stronglyAssert (false);
    }

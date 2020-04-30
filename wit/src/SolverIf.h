@@ -80,11 +80,10 @@ class WitSolverIf: public WitProbAssoc
          // Loads the initial primal solution (initSoln) into the solver.
          // The default implementation issues a fatal error.
 
-      virtual void solveLp (bool optNeeded);
+      virtual void solveLp ();
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as an LP.
-         // optNeeded is to be true, iff an optimal solution is required.
          // The default implementation issues a fatal error.
 
       virtual void reSolveLp ();
@@ -93,11 +92,10 @@ class WitSolverIf: public WitProbAssoc
          // problem as an LP.
          // The default implementation issues a fatal error.
 
-      virtual void solveMip (bool optNeeded);
+      virtual void solveMip ();
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as a MIP.
-         // optNeeded is to be true, iff an optimal solution is required.
          // The default implementation issues a fatal error.
 
       virtual void setVarLB (WitOptVar * theOptVar, double theLB) = 0;

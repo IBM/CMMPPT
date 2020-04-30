@@ -209,7 +209,7 @@ void WitCplexIf::loadInitSoln (const WitVector <double> & initSoln)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::solveLp (bool optNeeded)
+void WitCplexIf::solveLp ()
    {
    setIntParam (
       CPX_PARAM_LPMETHOD,
@@ -225,7 +225,7 @@ void WitCplexIf::solveLp (bool optNeeded)
 
    leaveCplex ();
 
-   checkLpSolnStatus (optNeeded);
+   checkLpSolnStatus ();
 
    printLpSolveInfo ();
    }
@@ -236,12 +236,12 @@ void WitCplexIf::reSolveLp ()
    {
    setUseDualSimplex (true);
 
-   solveLp (myOptProblem ()->needDual ());
+   solveLp ();
    }
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::solveMip (bool optNeeded)
+void WitCplexIf::solveMip ()
    {
    setSpecCpxPars ();
 
@@ -254,7 +254,7 @@ void WitCplexIf::solveMip (bool optNeeded)
 
    leaveCplex ();
 
-   checkMipSolnStatus (optNeeded);
+   checkMipSolnStatus ();
 
    storeObjBoundInfo ();
 
@@ -678,7 +678,7 @@ void WitCplexIf::printLpSolveInfo ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::checkLpSolnStatus (bool optNeeded)
+void WitCplexIf::checkLpSolnStatus ()
    {
    storeCplexStatus ();
 
@@ -703,42 +703,11 @@ void WitCplexIf::checkLpSolnStatus (bool optNeeded)
       case CPX_STAT_ABORT_TIME_LIM:
       case CPX_STAT_NUM_BEST:
       case CPX_STAT_OPTIMAL_INFEAS:
-         {
-         repEarlyTermLpSolnStatus (optNeeded);
-
-         return;
-         }
+         issueStatusMsg ("nonOptLpCpxStatSmsg");
 
       default:
          issueStatusMsg ("unexpCpxStatSmsg");
       }
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCplexIf::repEarlyTermLpSolnStatus (bool optNeeded)
-   {
-   int primalFeas;
-
-   myErrCode_ =
-      CPXsolninfo (
-         myCpxEnv_,
-         myCpxLp_,
-         NULL,
-         NULL,
-       & primalFeas,
-         NULL);
-
-   checkErrCode ("CPXsolninfo");
-
-   if (not primalFeas)
-      issueStatusMsg ("inFeasLpCpxStatSmsg");
-
-   else if (optNeeded)
-      issueStatusMsg ("nonOptLpCpxStatSmsg");
-
-   else
-      issueStatusMsg ("nonOptButFeasLpCpxStatWmsg");
    }
 
 //------------------------------------------------------------------------------
@@ -763,7 +732,7 @@ void WitCplexIf::printMipSolveInfo ()
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::checkMipSolnStatus (bool optNeeded)
+void WitCplexIf::checkMipSolnStatus ()
    {
    storeCplexStatus ();
 
@@ -791,14 +760,7 @@ void WitCplexIf::checkMipSolnStatus (bool optNeeded)
       case CPXMIP_NODE_LIM_FEAS:
       case CPXMIP_SOL_LIM:
       case CPXMIP_TIME_LIM_FEAS:
-         {
-         if (optNeeded)
-            issueStatusMsg ("nonOptMipCpxStatSmsg");
-         else
-            issueStatusMsg ("nonOptButFeasMipCpxStatWmsg");
-
-         return;
-         }
+         issueStatusMsg ("nonOptMipCpxStatSmsg");
 
       case CPXMIP_ABORT_INFEAS:
       case CPXMIP_FAIL_INFEAS:

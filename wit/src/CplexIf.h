@@ -73,9 +73,9 @@ class WitCplexIf: public WitSolverIf
       virtual void         reviseLp        ();
       virtual void         solverWriteMps  ();
       virtual void         loadInitSoln    (const WitVector <double> &);
-      virtual void         solveLp         (bool);
+      virtual void         solveLp         ();
       virtual void         reSolveLp       ();
-      virtual void         solveMip        (bool);
+      virtual void         solveMip        ();
       virtual void         setVarLB        (WitOptVar *, double);
       virtual void         setObjCoeff     (WitOptVar *, double);
       virtual double       primalVarVal    (WitOptVar *);
@@ -147,25 +147,17 @@ class WitCplexIf: public WitSolverIf
          //
          // Prints some information about the LP solve.
 
-      void checkLpSolnStatus (bool optNeeded);
+      void checkLpSolnStatus ();
          //
          // Checks the status of the LP solution.
-         // optNeeded is to be true, iff an optimal solution is required.
-
-      void repEarlyTermLpSolnStatus (bool optNeeded);
-         //
-         // Reports the status of the LP solution, in cases where the solve
-         // routine terminated early.
-         // optNeeded is to be true, iff an optimal solution is required.
 
       void printMipSolveInfo ();
          //
          // Prints some information about the MIP solve.
 
-      void checkMipSolnStatus (bool optNeeded);
+      void checkMipSolnStatus ();
          //
          // Checks the status of the MIP solution.
-         // optNeeded is to be true, iff an optimal solution is required.
 
       void issueStatusMsg (WitMsgID theMsgID);
          //

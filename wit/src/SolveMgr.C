@@ -150,7 +150,7 @@ void WitSolveMgr::solveOptProbAsLp ()
 
    loadInitSoln ();
 
-   mySolverIf_->solveLp (myOptProblem_->needDual ());
+   mySolverIf_->solveLp ();
 
    storePrimalSoln ();
 
@@ -191,7 +191,7 @@ void WitSolveMgr::solveOptProbAsMip ()
 
    writeMps ();
 
-   mySolverIf_->solveMip (false);
+   mySolverIf_->solveMip ();
 
    storePrimalSoln ();
    }
@@ -355,7 +355,7 @@ void WitSolveMgr::solveCurrentObj (WitOptVar * theOptVar, bool firstObj)
 
    if (myOptComp ()->mipMode ())
       {
-      mySolverIf_->solveMip (true);
+      mySolverIf_->solveMip ();
       }
    else
       {
@@ -363,7 +363,7 @@ void WitSolveMgr::solveCurrentObj (WitOptVar * theOptVar, bool firstObj)
          setUseDualSimplex (
             firstObj and myOptComp ()->crashOptStarter ()->isChosen ());
 
-      mySolverIf_->solveLp (true);
+      mySolverIf_->solveLp ();
       }
 
    if (devMode ())

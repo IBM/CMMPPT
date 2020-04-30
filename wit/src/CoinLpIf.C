@@ -88,7 +88,7 @@ void WitCoinLpIf::loadInitSoln (const WitVector <double> & initSoln)
 // is used as the starting solution. (A values pass is performed.)
 //------------------------------------------------------------------------------
 
-void WitCoinLpIf::solveLp (bool)
+void WitCoinLpIf::solveLp ()
    {
    int nIters;
 
