@@ -92,6 +92,13 @@ class WitSolverIf: public WitProbAssoc
          // problem as an LP.
          // The default implementation issues a fatal error.
 
+      virtual void reSolveLexLp ();
+         //
+         // Makes appropriate calls to the solver to solve the optimization
+         // problem as an LP, assuming it's for the second or subsequent
+         // iteration of a lexicographic optimization.
+         // The default implementation issues a fatal error.
+
       virtual void solveMip ();
          //
          // Makes appropriate calls to the solver to solve the optimization

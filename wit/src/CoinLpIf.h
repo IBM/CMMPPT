@@ -53,6 +53,7 @@ class WitCoinLpIf: public WitCoinIf
       virtual void         loadInitSoln (const WitVector <double> &);
       virtual void         solveLp      ();
       virtual void         reSolveLp    ();
+      virtual void         reSolveLexLp ();
       virtual void         getDualSoln  (WitVector <double> &);
       virtual const char * solverName   ();
 

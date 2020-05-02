@@ -133,6 +133,15 @@ void WitCoinLpIf::reSolveLp ()
 
 //------------------------------------------------------------------------------
 
+void WitCoinLpIf::reSolveLexLp ()
+   {
+   myOsiSI ()->setHintParam (OsiDoDualInResolve, false, OsiHintDo);
+
+   reSolveLp ();
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCoinLpIf::getDualSoln (WitVector <double> & dualSoln)
    {
    dualSoln = myOsiSI_->getRowPrice ();

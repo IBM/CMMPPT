@@ -241,6 +241,15 @@ void WitCplexIf::reSolveLp ()
 
 //------------------------------------------------------------------------------
 
+void WitCplexIf::reSolveLexLp ()
+   {
+   setUseDualSimplex (false);
+
+   solveLp ();
+   }
+
+//------------------------------------------------------------------------------
+
 void WitCplexIf::solveMip ()
    {
    setSpecCpxPars ();

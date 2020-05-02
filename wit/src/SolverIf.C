@@ -79,6 +79,13 @@ void WitSolverIf::reSolveLp ()
 
 //------------------------------------------------------------------------------
 
+void WitSolverIf::reSolveLexLp ()
+   {
+   stronglyAssert (false);
+   }
+
+//------------------------------------------------------------------------------
+
 void WitSolverIf::solveMip ()
    {
    stronglyAssert (false);

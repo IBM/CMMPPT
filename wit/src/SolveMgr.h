@@ -133,11 +133,11 @@ class WitSolveMgr: public WitProbAssoc
          // this function bounds the theOptVar to be at least theVal minus a
          // tolerance.
 
-      void solveCurrentObj (WitOptVar * theOptVar, bool firstObj);
+      void solveCurLexObjElem (WitOptVar * theOptVar, bool firstObjElem);
          //
-         // Sets theOptVar as the current objective in a lexicographic
-         // optimization and optimizies it.
-         // firstObj is true, iff theOptVar is the first objecetve.
+         // Sets theOptVar as the current objective element in a lexicographic
+         // optimization and optimizes it.
+         // firstObjElem is true, iff theOptVar is the first objective element.
 
       bool optProbHasIntVars ();
          //

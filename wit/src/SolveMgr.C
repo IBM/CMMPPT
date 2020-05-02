@@ -263,7 +263,7 @@ void WitSolveMgr::solveLexOptNoReload ()
          mySolverIf_->setObjCoeff (prevOptVar, 0.0);
          }
 
-      solveCurrentObj (theOptVar, prevOptVar == NULL);
+      solveCurLexObjElem (theOptVar, prevOptVar == NULL);
 
       prevOptVar = theOptVar;
       }
@@ -278,13 +278,13 @@ void WitSolveMgr::solveLexOptNoReload ()
 void WitSolveMgr::solveLexOptWReload ()
    {
    WitVector <double>       optLexObjElemVal;
-   bool                     firstObj;
+   bool                     firstObjElem;
    WitPtrVecItr <WitOptVar> theOptVarItr;
    WitOptVar *              theOptVar;
 
    optLexObjElemVal.resize (myOptProblem_->myLexOptVarSeq ().length (), 0.0);
 
-   firstObj = true;
+   firstObjElem = true;
 
    myOptProblem_->myLexOptVarSeq ().attachItr (theOptVarItr);
 
@@ -292,7 +292,7 @@ void WitSolveMgr::solveLexOptWReload ()
       {
       myMsgFac () ("optLexObjElemMsg", theOptVar->lexObjElemName ());
 
-      if (not firstObj)
+      if (not firstObjElem)
          {
          mySolverIf_->loadLp ();
 
@@ -301,12 +301,12 @@ void WitSolveMgr::solveLexOptWReload ()
          applyPrevBounds (theOptVar, optLexObjElemVal);
          }
 
-      solveCurrentObj (theOptVar, firstObj);
+      solveCurLexObjElem (theOptVar, firstObjElem);
 
       optLexObjElemVal[theOptVarItr.myIdx ()] =
          mySolverIf_->primalVarVal (theOptVar);
 
-      firstObj = false;
+      firstObjElem = false;
       }
    }
 
@@ -349,7 +349,7 @@ void WitSolveMgr::boundLexObjElemVal (WitOptVar * theOptVar, double theVal)
 
 //------------------------------------------------------------------------------
 
-void WitSolveMgr::solveCurrentObj (WitOptVar * theOptVar, bool firstObj)
+void WitSolveMgr::solveCurLexObjElem (WitOptVar * theOptVar, bool firstObjElem)
    {
    mySolverIf_->setObjCoeff (theOptVar, 1.0);
 
@@ -357,14 +357,16 @@ void WitSolveMgr::solveCurrentObj (WitOptVar * theOptVar, bool firstObj)
       {
       mySolverIf_->solveMip ();
       }
-   else
+   else if (firstObjElem)
       {
       mySolverIf_->
          setUseDualSimplex (
-            firstObj and myOptComp ()->crashOptStarter ()->isChosen ());
+            myOptComp ()->crashOptStarter ()->isChosen ());
 
       mySolverIf_->solveLp ();
       }
+   else
+      mySolverIf_->reSolveLexLp ();
 
    if (devMode ())
       if (WitSaeMgr::standAloneMode ())
