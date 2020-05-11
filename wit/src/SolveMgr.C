@@ -138,19 +138,19 @@ void WitSolveMgr::solveOptProbAsLexOpt ()
 
 void WitSolveMgr::solveOptProbAsLp ()
    {
+   bool useDualSimplex;
+
    issueSolveMsg ();
 
    mySolverIf_->loadLp ();
 
    writeMps ();
 
-   mySolverIf_->
-      setUseDualSimplex (
-         myOptComp ()->crashOptStarter ()->isChosen ());
-
    loadInitSoln ();
 
-   mySolverIf_->solveLp ();
+   useDualSimplex = myOptComp ()->crashOptStarter ()->isChosen ();
+
+   mySolverIf_->solveLp (useDualSimplex);
 
    storePrimalSoln ();
 
@@ -359,11 +359,11 @@ void WitSolveMgr::solveCurLexObjElem (WitOptVar * theOptVar, bool firstObjElem)
       }
    else if (firstObjElem)
       {
-      mySolverIf_->
-         setUseDualSimplex (
-            myOptComp ()->crashOptStarter ()->isChosen ());
+      bool useDualSimplex;
 
-      mySolverIf_->solveLp ();
+      useDualSimplex = myOptComp ()->crashOptStarter ()->isChosen ();
+
+      mySolverIf_->solveLp (useDualSimplex);
       }
    else
       mySolverIf_->reSolveLexLp ();

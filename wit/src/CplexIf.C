@@ -209,11 +209,11 @@ void WitCplexIf::loadInitSoln (const WitVector <double> & initSoln)
 
 //------------------------------------------------------------------------------
 
-void WitCplexIf::solveLp ()
+void WitCplexIf::solveLp (bool useDualSimplex)
    {
    setIntParam (
       CPX_PARAM_LPMETHOD,
-      useDualSimplex ()? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
+      useDualSimplex? CPX_ALG_DUAL: CPX_ALG_PRIMAL);
 
    setSpecCpxPars ();
 
@@ -234,18 +234,14 @@ void WitCplexIf::solveLp ()
 
 void WitCplexIf::reSolveLp ()
    {
-   setUseDualSimplex (true);
-
-   solveLp ();
+   solveLp (true);
    }
 
 //------------------------------------------------------------------------------
 
 void WitCplexIf::reSolveLexLp ()
    {
-   setUseDualSimplex (false);
-
-   solveLp ();
+   solveLp (false);
    }
 
 //------------------------------------------------------------------------------

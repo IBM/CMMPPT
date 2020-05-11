@@ -20,7 +20,7 @@
 // "Solver Interface"
 // Abstract base class
 // The classes derived from this class are responsible for all interactions
-// with the embedded solver of the optimization problem.
+// with the embedded solver of optimization problems.
 //
 // Class Hierarchy:
 //
@@ -80,10 +80,12 @@ class WitSolverIf: public WitProbAssoc
          // Loads the initial primal solution (initSoln) into the solver.
          // The default implementation issues a fatal error.
 
-      virtual void solveLp ();
+      virtual void solveLp (bool useDualSimplex);
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as an LP.
+         // If useDualSimplex is true, the Dual   Simplex Method is to be used.
+         // Otherwise,                 the Primal Simplex Method is to be used.
          // The default implementation issues a fatal error.
 
       virtual void reSolveLp ();
@@ -132,14 +134,6 @@ class WitSolverIf: public WitProbAssoc
          //
          // Returns the name of the solver.
 
-      //------------------------------------------------------------------------
-      // Other public member functions.
-      //------------------------------------------------------------------------
-
-      void setUseDualSimplex (bool);
-         //
-         // Setter
-
    protected:
 
       //------------------------------------------------------------------------
@@ -157,7 +151,6 @@ class WitSolverIf: public WitProbAssoc
       //------------------------------------------------------------------------
 
       accessFunc (WitOptProblem *, myOptProblem)
-      accessFunc (bool,            useDualSimplex)
 
    private:
 
@@ -174,11 +167,6 @@ class WitSolverIf: public WitProbAssoc
       WitOptProblem * const myOptProblem_;
          //
          // The OptProblem for this SolverIf.
-
-      bool useDualSimplex_;
-         //
-         // If true,  dual   simplex is to be used.
-         // If false, primal simplex is to be used.
    };
 
 #endif

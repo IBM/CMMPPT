@@ -23,9 +23,8 @@ WitSolverIf::~WitSolverIf ()
 
 WitSolverIf::WitSolverIf (WitOptProblem * theOptProblem):
 
-      WitProbAssoc    (theOptProblem),
-      myOptProblem_   (theOptProblem),
-      useDualSimplex_ (true)
+      WitProbAssoc  (theOptProblem),
+      myOptProblem_ (theOptProblem)
    {
    }
 
@@ -65,7 +64,7 @@ void WitSolverIf::loadInitSoln (const WitVector <double> &)
 
 //------------------------------------------------------------------------------
 
-void WitSolverIf::solveLp ()
+void WitSolverIf::solveLp (bool)
    {
    stronglyAssert (false);
    }
@@ -96,11 +95,4 @@ void WitSolverIf::solveMip ()
 void WitSolverIf::getDualSoln (WitVector <double> &)
    {
    stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitSolverIf::setUseDualSimplex (bool theValue)
-   {
-   useDualSimplex_ = theValue;
    }
