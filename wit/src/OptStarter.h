@@ -39,10 +39,10 @@ class WitOptStarter
             WitMsgID     theMsgID,
             bool         externalVal);
          //
-         // paramValue     <-- theParamValue.
-         // myApiAttr_     <-- theApiAttr.
-         // myMsgID_       <-- theMsgID.
-         // external_      <-- externalVal.
+         // paramValue <-- theParamValue.
+         // myApiAttr_ <-- theApiAttr.
+         // myMsgID_   <-- theMsgID.
+         // external_  <-- externalVal.
 
       //------------------------------------------------------------------------
       // Destructor function.

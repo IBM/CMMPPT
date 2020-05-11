@@ -88,15 +88,19 @@ void WitCoinLpIf::loadInitSoln (const WitVector <double> & initSoln)
 // is used as the starting solution. (A values pass is performed.)
 //------------------------------------------------------------------------------
 
-void WitCoinLpIf::solveLp (bool useDualSimplex)
+void WitCoinLpIf::solveLp (bool reqPrimalSimplex)
    {
    int nIters;
 
    enterCoin ();
 
-   myOsiSI ()->setHintParam (OsiDoPresolveInInitial,       true, OsiHintDo);
-   myOsiSI ()->setHintParam (OsiDoScale,                   true, OsiHintDo);
-   myOsiSI ()->setHintParam (OsiDoDualInInitial, useDualSimplex, OsiHintDo);
+   myOsiSI ()->setHintParam (OsiDoPresolveInInitial, true, OsiHintDo);
+   myOsiSI ()->setHintParam (OsiDoScale,             true, OsiHintDo);
+
+   if (reqPrimalSimplex)
+      myOsiSI ()->setHintParam (OsiDoDualInInitial, false, OsiHintDo);
+   else
+      myOsiSI ()->setHintParam (OsiDoDualInInitial, false, OsiHintIgnore);
 
    myOsiSI ()->initialSolve ();
 

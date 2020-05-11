@@ -80,12 +80,12 @@ class WitSolverIf: public WitProbAssoc
          // Loads the initial primal solution (initSoln) into the solver.
          // The default implementation issues a fatal error.
 
-      virtual void solveLp (bool useDualSimplex);
+      virtual void solveLp (bool reqPrimalSimplex);
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as an LP.
-         // If useDualSimplex is true, the Dual   Simplex Method is to be used.
-         // Otherwise,                 the Primal Simplex Method is to be used.
+         // If reqPrimalSimplex is true, the Primal Simplex Method will be used.
+         // Otherwise, the solver selects the method (Primal or Dual Simplex).
          // The default implementation issues a fatal error.
 
       virtual void reSolveLp ();
