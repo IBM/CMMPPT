@@ -700,6 +700,8 @@ void WitCplexIf::checkLpSolnStatus ()
          myMsgFac () ("infeasSmsg");
 
       case CPX_STAT_UNBOUNDED:
+         myMsgFac () ("unboundedSmsg");
+
       case CPX_STAT_INForUNBD:
          myMsgFac () ("unboundedOrInfeasSmsg");
 
@@ -755,6 +757,8 @@ void WitCplexIf::checkMipSolnStatus ()
          myMsgFac () ("infeasSmsg");
 
       case CPXMIP_UNBOUNDED:
+         myMsgFac () ("unboundedSmsg");
+
       case CPXMIP_INForUNBD:
          myMsgFac () ("unboundedOrInfeasSmsg");
 
