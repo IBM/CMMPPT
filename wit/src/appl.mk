@@ -32,7 +32,7 @@ mcl_client_objects =        \
 #-------------------------------------------------------------------------------
 
 coin_client_objects =      \
-   CoinComIf.$(obj_suffix) \
+   CoinIf.$(obj_suffix)    \
    CoinLpIf.$(obj_suffix)  \
    CoinMipIf.$(obj_suffix) \
 
@@ -107,7 +107,7 @@ Session.$(obj_suffix):	Session.$(cxx_suffix)
 
 #-------------------------------------------------------------------------------
 # Special rule to compile the COIN client source files:
-#    CoinComIf.C
+#    CoinIf.C
 #    CoinLpIf.C
 #    CoinMipIf.C:
 #
@@ -130,7 +130,7 @@ ifneq ($(WIT_COIN_HOME),)
 
    comp_coin_flags = -DCOIN_EMBEDDED -I$(WIT_COIN_HOME)/include/coin
 
-   CoinComIf.$(obj_suffix):	CoinComIf.$(cxx_suffix)
+   CoinIf.$(obj_suffix):	CoinIf.$(cxx_suffix)
 			$(COMPILE.C) $(OUTPUT_OPTION) $< $(comp_coin_flags)
 
    CoinLpIf.$(obj_suffix):	CoinLpIf.$(cxx_suffix)

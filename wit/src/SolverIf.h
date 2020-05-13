@@ -18,19 +18,18 @@
 //------------------------------------------------------------------------------
 // Class SolverIf.
 // "Solver Interface"
-// Responsible for all interactions with the embedded solver of the optimization
-// problem. The interactions are implemented im the derived classes.
+// Abstract base class
+// The classes derived from this class are responsible for all interactions
+// with the embedded solver of optimization problems.
 //
 // Class Hierarchy:
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinLpIf
 //          CoinMipIf
 //       CplexIf
-//
-// Implemented in OptSolve.C
 //------------------------------------------------------------------------------
 
 class WitSolverIf: public WitProbAssoc
@@ -44,64 +43,92 @@ class WitSolverIf: public WitProbAssoc
       virtual ~WitSolverIf ();
 
       //------------------------------------------------------------------------
-      // Pure virtual public member functions.
+      // Virtual public member functions.
       //------------------------------------------------------------------------
 
-      virtual void solveOptProbAsLexOpt () = 0;
-         //
-         // Loads, solves and retrieves the solution to the optimization problem
-         // as a lexicographic optimization.
-
-      virtual void issueVersionMsg () = 0;
+      virtual void issueVersionMsg ();
          //
          // Issues a msg indicating the version # of the solver, if possible.
+         // The default implementation does nothing.
+
+      virtual bool lexOptNeedsReload ();
+         //
+         // Returns true, iff lexicographic optimization needs to be done by the
+         // "reload" algorithm, when this SolverIf is being used.
+         // The default implementation returns false.
 
       virtual void loadLp () = 0;
          //
          // Loads the optimization problem into CPLEX as an LP.
 
-      virtual void loadIntData () = 0;
+      virtual void loadIntData ();
          //
          // Loads the integrality data of the opt problem into the solver.
+         // The default implementation issues a fatal error.
 
-      virtual void reviseLp () = 0;
+      virtual void reviseLp ();
          //
          // Revises the LP problem that was previously loaded into the solver.
+         // The default implementation issues a fatal error.
 
       virtual void solverWriteMps () = 0;
          //
          // Calls the solver to write an MPS file
 
-      virtual void loadInitSoln (const WitVector <double> & initSoln) = 0;
+      virtual void loadInitSoln (const WitVector <double> & initSoln);
          //
          // Loads the initial primal solution (initSoln) into the solver.
+         // The default implementation issues a fatal error.
 
-      virtual void reSolveLp () = 0;
+      virtual void solveLp (bool reqPrimalSimplex);
+         //
+         // Makes appropriate calls to the solver to solve the optimization
+         // problem as an LP.
+         // If reqPrimalSimplex is true, the Primal Simplex Method will be used.
+         // Otherwise, the solver selects the method (Primal or Dual Simplex).
+         // The default implementation issues a fatal error.
+
+      virtual void reSolveLp ();
          //
          // Makes appropriate calls to the solver to re-solve the optimization
          // problem as an LP.
+         // The default implementation issues a fatal error.
 
-      virtual void solveLp (bool optNeeded) = 0;
+      virtual void reSolveLexLp ();
          //
          // Makes appropriate calls to the solver to solve the optimization
-         // problem as an LP.
-         // optNeeded is to be true, iff an optimal solution is required.
+         // problem as an LP, assuming it's for the second or subsequent
+         // iteration of a lexicographic optimization.
+         // The default implementation issues a fatal error.
 
-      virtual void solveMip (bool optNeeded) = 0;
+      virtual void solveMip ();
          //
          // Makes appropriate calls to the solver to solve the optimization
          // problem as a MIP.
-         // optNeeded is to be true, iff an optimal solution is required.
+         // The default implementation issues a fatal error.
+
+      virtual void setVarLB (WitOptVar * theOptVar, double theLB) = 0;
+         //
+         // Sets the lower bound on theOptVar to theLB.
+
+      virtual void setObjCoeff (WitOptVar * theOptVar, double theVal) = 0;
+         //
+         // Sets the objective coefficient on theOptVar to theVal.
+
+      virtual double primalVarVal (WitOptVar * theOptVar) = 0;
+         //
+         // Returns the primal variable value of theOptVar.
 
       virtual void getPrimalSoln (WitVector <double> & primalSoln) = 0;
          //
          // Sets primalSoln to the vector of primal solution values.
          // primalSoln must already be of the appropriate size.
 
-      virtual void getDualSoln (WitVector <double> & dualSoln) = 0;
+      virtual void getDualSoln (WitVector <double> & dualSoln);
          //
          // Sets dualSoln to the vector of dual solution values.
          // dualSoln must already be of the appropriate size.
+         // The default implementation issues a fatal error.
 
       virtual const char * solverName () = 0;
          //
@@ -117,14 +144,13 @@ class WitSolverIf: public WitProbAssoc
       // Constructor functions.
       //------------------------------------------------------------------------
 
-      WitSolverIf (WitOptSolveMgr *);
+      WitSolverIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Data access functions.
       //------------------------------------------------------------------------
 
-      accessFunc (WitOptSolveMgr *, myOptSolveMgr)
-      accessFunc (WitOptProblem *,  myOptProblem)
+      accessFunc (WitOptProblem *, myOptProblem)
 
    private:
 
@@ -137,10 +163,6 @@ class WitSolverIf: public WitProbAssoc
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
-
-      WitOptSolveMgr * const myOptSolveMgr_;
-         //
-         // The OptSolveMgr that owns this SolverIf.
 
       WitOptProblem * const myOptProblem_;
          //

@@ -13,7 +13,7 @@
 // Contains the declaration of class CoinMipIf.
 //------------------------------------------------------------------------------
 
-#include <CoinComIf.h>
+#include <CoinIf.h>
 
 class CbcModel;
 
@@ -27,24 +27,19 @@ class CbcModel;
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinMipIf
 //------------------------------------------------------------------------------
 
-class WitCoinMipIf: public WitCoinComIf
+class WitCoinMipIf: public WitCoinIf
    {
    public:
 
       //------------------------------------------------------------------------
-      // Static public member functions.
+      // Constructor functions.
       //------------------------------------------------------------------------
 
-      static WitCoinMipIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
-         //
-         // If COIN is embedded,
-         //    creates and returns a new CoinMipIf for theOptSolveMgr.
-         // If COIN is not embedded,
-         //    issues a fatal error.
+      WitCoinMipIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -56,22 +51,12 @@ class WitCoinMipIf: public WitCoinComIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         loadIntData  ();
-      virtual void         reviseLp     ();
-      virtual void         loadInitSoln (const WitVector <double> &);
-      virtual void         reSolveLp    ();
-      virtual void         solveLp      (bool);
-      virtual void         solveMip     (bool);
-      virtual void         getDualSoln  (WitVector <double> &);
-      virtual const char * solverName   ();
+      virtual bool         lexOptNeedsReload ();
+      virtual void         loadIntData       ();
+      virtual void         solveMip          ();
+      virtual const char * solverName        ();
 
    private:
-
-      //------------------------------------------------------------------------
-      // Private constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCoinMipIf (WitOptSolveMgr *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
@@ -89,7 +74,7 @@ class WitCoinMipIf: public WitCoinComIf
 
       virtual OsiSolverInterface * myOsiSI ();
          //
-         // Override from class CoinComIf.
+         // Override from class CoinIf.
 
       //-----------------------------------------------------------------------
       // Private member data.

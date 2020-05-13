@@ -8,7 +8,7 @@
 // Source file: "CoinMipIf.C"
 //
 // Contains the implementation of class CoinMipIf.
-// If COIN_EMBEDDED is not defined, then only static functions are implemented.
+// The implementation is compiled only if COIN_EMBEDDED is defined.
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -20,6 +20,7 @@
 #include <CoinMipIf.h>
 #include <OptProblem.h>
 #include <OptVar.h>
+#include <OptComp.h>
 #include <MsgFac.h>
 
 //------------------------------------------------------------------------------
@@ -33,9 +34,24 @@
 
 //------------------------------------------------------------------------------
 
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptSolveMgr * theOptSolveMgr)
+WitCoinMipIf::WitCoinMipIf (WitOptProblem * theOptProblem):
+
+      WitCoinIf   (theOptProblem),
+      myCbcModel_ (NULL)
    {
-   return new WitCoinMipIf (theOptSolveMgr);
+   OsiClpSolverInterface * theOsiClpSI;
+
+   enterCoin ();
+
+   theOsiClpSI = new OsiClpSolverInterface;
+
+   myCbcModel_ = new CbcModel (* theOsiClpSI);
+
+   delete theOsiClpSI;
+
+   myCbcModel_->passInMessageHandler (myMsgHandler ());
+
+   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -47,6 +63,13 @@ WitCoinMipIf::~WitCoinMipIf ()
    delete myCbcModel_;
 
    leaveCoin ();
+   }
+
+//------------------------------------------------------------------------------
+
+bool WitCoinMipIf::lexOptNeedsReload ()
+   {
+   return true;
    }
 
 //------------------------------------------------------------------------------
@@ -64,35 +87,7 @@ void WitCoinMipIf::loadIntData ()
 
 //------------------------------------------------------------------------------
 
-void WitCoinMipIf::reviseLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::loadInitSoln (const WitVector <double> &)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::reSolveLp ()
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::solveLp (bool)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
-void WitCoinMipIf::solveMip (bool)
+void WitCoinMipIf::solveMip ()
    {
    enterCoin ();
 
@@ -107,38 +102,9 @@ void WitCoinMipIf::solveMip (bool)
 
 //------------------------------------------------------------------------------
 
-void WitCoinMipIf::getDualSoln (WitVector <double> & dualSoln)
-   {
-   stronglyAssert (false);
-   }
-
-//------------------------------------------------------------------------------
-
 const char * WitCoinMipIf::solverName ()
    {
    return "CBC";
-   }
-
-//------------------------------------------------------------------------------
-
-WitCoinMipIf::WitCoinMipIf (WitOptSolveMgr * theOptSolveMgr):
-
-      WitCoinComIf (theOptSolveMgr),
-      myCbcModel_  (NULL)
-   {
-   OsiClpSolverInterface * theOsiClpSI;
-
-   enterCoin ();
-
-   theOsiClpSI = new OsiClpSolverInterface;
-
-   myCbcModel_ = new CbcModel (* theOsiClpSI);
-
-   delete theOsiClpSI;
-
-   myCbcModel_->passInMessageHandler (myMsgHandler ());
-
-   leaveCoin ();
    }
 
 //------------------------------------------------------------------------------
@@ -191,18 +157,3 @@ OsiSolverInterface * WitCoinMipIf::myOsiSI ()
    }
 
 #endif // COIN_EMBEDDED
-
-//------------------------------------------------------------------------------
-// Non-COIN-embedded Implementation of class CoinMipIf.
-//------------------------------------------------------------------------------
-
-#ifndef COIN_EMBEDDED
-
-WitCoinMipIf * WitCoinMipIf::newInstance (WitOptSolveMgr *)
-   {
-   stronglyAssert (false);
-
-   return NULL;
-   }
-
-#endif // Not COIN_EMBEDDED

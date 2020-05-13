@@ -7751,49 +7751,16 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "inFeasLpCpxStatSmsg",
-      1049,
-      severe_,
-      "The solution status code returned by CPLEX indicates that the LP solve "
-      "routine terminated early. The resulting LP solution is not known to be "
-      "primal feasible.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "nonOptLpCpxStatSmsg",
       1050,
       severe_,
       "The solution status code returned by CPLEX indicates that the LP solve "
       "routine terminated early and did not find an optimal solution "
-      "to the LP problem. Optimality is required in this case.\n"
+      "to the LP problem.\n"
       "\n"
       "   Solution Status Code: %1$d\n"
       "   Solution Status:      \"%2$s\"");
 
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "nonOptButFeasLpCpxStatWmsg",
-      1051,
-      warning_,
-      "The solution status code returned by CPLEX indicates that the LP solve "
-      "routine terminated early. Nevertheless, it did find a primal feasible "
-      "solution and WIT will use it to compute the implosion solution.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
 
@@ -7821,28 +7788,11 @@ void WitMsgBuilder::buildMsgs ()
       severe_,
       "The solution status code returned by CPLEX indicates that the MIP solve "
       "routine terminated early and did not find an optimal solution "
-      "to the MIP problem. Optimality is required in this case.\n"
+      "to the MIP problem.\n"
       "\n"
       "   Solution Status Code: %1$d\n"
       "   Solution Status:      \"%2$s\"");
 
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "nonOptButFeasMipCpxStatWmsg",
-      1054,
-      warning_,
-      "The solution status code returned by CPLEX indicates that the MIP solve "
-      "routine terminated early, but it did find an integer feasible solution "
-      "to the MIP problem. WIT will use it to compute the implosion solution.\n"
-      "\n"
-      "   Solution Status Code: %1$d\n"
-      "   Solution Status:      \"%2$s\"");
-
-   currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
 
@@ -7934,17 +7884,6 @@ void WitMsgBuilder::buildMsgs ()
    //---------------------------------------------------------------------------
 
    makeMsg (
-      "coinNYISmsg",
-      1062,
-      severe_,
-      "%1$s with COIN is not yet implemented.");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
       "osiWriteMpsExcSmsg",
       1064,
       severe_,
@@ -7963,41 +7902,6 @@ void WitMsgBuilder::buildMsgs ()
       severe_,
       "The solver terminated early due to reaching its iteration limit or time "
       "limit.\n");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "solverStoppedErrorsSmsg",
-      1066,
-      severe_,
-      "The solver terminated early due to errors.\n");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "solverStoppedEventSmsg",
-      1067,
-      severe_,
-      "CLP was terminated by its event handler.\n");
-
-   currentMsg_->preceedingLineFeeds   (1);
-   currentMsg_->trailingLineFeeds     (2);
-
-   //---------------------------------------------------------------------------
-
-   makeMsg (
-      "unexpClpStatusCodeSmsg",
-      1068,
-      severe_,
-      "CLP terminated with an unexpected problem status code.\n"
-      "\n"
-      "   Problem Status Code: %1$d");
 
    currentMsg_->preceedingLineFeeds   (1);
    currentMsg_->trailingLineFeeds     (2);
@@ -8057,6 +7961,28 @@ void WitMsgBuilder::buildMsgs ()
 
    currentMsg_->testable              (false);
    currentMsg_->preceedingLineFeeds   (1);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "iterLimitSmsg",
+      1074,
+      severe_,
+      "The solver terminated early due to reaching its iteration limit.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
+
+   //---------------------------------------------------------------------------
+
+   makeMsg (
+      "termUnknownReasonSmsg",
+      1075,
+      severe_,
+      "The solver terminated early for an unknown reason.\n");
+
+   currentMsg_->preceedingLineFeeds   (1);
+   currentMsg_->trailingLineFeeds     (2);
 
    //---------------------------------------------------------------------------
    }

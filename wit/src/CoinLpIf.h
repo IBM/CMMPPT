@@ -13,9 +13,7 @@
 // Contains the declaration of class CoinLpIf.
 //------------------------------------------------------------------------------
 
-#include <CoinComIf.h>
-
-class ClpSimplex;
+#include <CoinIf.h>
 
 //------------------------------------------------------------------------------
 // Class CoinLpIf
@@ -27,24 +25,19 @@ class ClpSimplex;
 //
 // ProbAssoc
 //    SolverIf
-//       CoinComIf
+//       CoinIf
 //          CoinLpIf
 //------------------------------------------------------------------------------
 
-class WitCoinLpIf: public WitCoinComIf
+class WitCoinLpIf: public WitCoinIf
    {
    public:
 
       //------------------------------------------------------------------------
-      // Static public member functions.
+      // Constructor functions.
       //------------------------------------------------------------------------
 
-      static WitCoinLpIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
-         //
-         // If COIN is embedded,
-         //    creates and returns a new CoinLpIf for theOptSolveMgr.
-         // If COIN is not embedded,
-         //    issues a fatal error.
+      WitCoinLpIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Destructor function.
@@ -56,22 +49,15 @@ class WitCoinLpIf: public WitCoinComIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         loadIntData  ();
       virtual void         reviseLp     ();
       virtual void         loadInitSoln (const WitVector <double> &);
-      virtual void         reSolveLp    ();
       virtual void         solveLp      (bool);
-      virtual void         solveMip     (bool);
+      virtual void         reSolveLp    ();
+      virtual void         reSolveLexLp ();
       virtual void         getDualSoln  (WitVector <double> &);
       virtual const char * solverName   ();
 
    private:
-
-      //------------------------------------------------------------------------
-      // Private constructor functions.
-      //------------------------------------------------------------------------
-
-      WitCoinLpIf (WitOptSolveMgr *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
@@ -81,7 +67,7 @@ class WitCoinLpIf: public WitCoinComIf
 
       virtual OsiSolverInterface * myOsiSI ();
          //
-         // Override from class CoinComIf.
+         // Override from class CoinIf.
 
       void reviseVarBounds ();
          //
@@ -98,22 +84,20 @@ class WitCoinLpIf: public WitCoinComIf
          // Revises the objective function coefficients of the LP problem that
          // was previously loaded into CLP.
 
-      void checkLpSolnStatus (ClpSimplex * theClpSimplex);
+      void checkLpSolnStatup ();
          //
-         // Checks the status of the LP solution in theClpSimplex.
+         // Checks the status of the LP solution.
 
       //-----------------------------------------------------------------------
       // Private member data.
       //-----------------------------------------------------------------------
 
-      ClpSimplex * myClpSimplex_;
-         //
-         // The ClpSimplex owned by this CoinLpIf.
-
       OsiSolverInterface * myOsiSI_;
          //
          // The OsiSolverInterface owned by this CoinLpIf.
-         // myOsiSI_ represents myClpSimplex_.
+         // It's actually an OsiClpSolverInterface and so the actual solver is
+         // CLP, but all interaction with it except construction is as an
+         // OsiSolverInterface.
    };
 
 #endif

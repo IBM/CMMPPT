@@ -50,10 +50,10 @@ class WitCplexIf: public WitSolverIf
          //
          // Returns true, iff CPLEX embedded into the current build of WIT.
 
-      static WitCplexIf * newInstance (WitOptSolveMgr * theOptSolveMgr);
+      static WitCplexIf * newInstance (WitOptProblem * theOptProblem);
          //
          // If CPLEX is embedded,
-         //    creates and returns a new CplexIf for theOptSolveMgr.
+         //    creates and returns a new CplexIf for theOptProblem.
          // If CPLEX is not embedded,
          //    issues a fatal error.
 
@@ -67,19 +67,22 @@ class WitCplexIf: public WitSolverIf
       // Overrides from class SolverIf.
       //------------------------------------------------------------------------
 
-      virtual void         solveOptProbAsLexOpt ();
-      virtual void         issueVersionMsg      ();
-      virtual void         loadLp               ();
-      virtual void         loadIntData          ();
-      virtual void         reviseLp             ();
-      virtual void         solverWriteMps       ();
-      virtual void         loadInitSoln         (const WitVector <double> &);
-      virtual void         reSolveLp            ();
-      virtual void         solveLp              (bool);
-      virtual void         solveMip             (bool);
-      virtual void         getPrimalSoln        (WitVector <double> &);
-      virtual void         getDualSoln          (WitVector <double> &);
-      virtual const char * solverName           ();
+      virtual void         issueVersionMsg ();
+      virtual void         loadLp          ();
+      virtual void         loadIntData     ();
+      virtual void         reviseLp        ();
+      virtual void         solverWriteMps  ();
+      virtual void         loadInitSoln    (const WitVector <double> &);
+      virtual void         solveLp         (bool);
+      virtual void         reSolveLp       ();
+      virtual void         reSolveLexLp    ();
+      virtual void         solveMip        ();
+      virtual void         setVarLB        (WitOptVar *, double);
+      virtual void         setObjCoeff     (WitOptVar *, double);
+      virtual double       primalVarVal    (WitOptVar *);
+      virtual void         getPrimalSoln   (WitVector <double> &);
+      virtual void         getDualSoln     (WitVector <double> &);
+      virtual const char * solverName      ();
 
    private:
 
@@ -87,7 +90,7 @@ class WitCplexIf: public WitSolverIf
       // Private constructor functions.
       //------------------------------------------------------------------------
 
-      WitCplexIf (WitOptSolveMgr *);
+      WitCplexIf (WitOptProblem *);
 
       //------------------------------------------------------------------------
       // Other private member functions.
@@ -141,44 +144,21 @@ class WitCplexIf: public WitSolverIf
          // Sets rhs and sense to the CPLEX RHS and constraint sense for
          // theOptCon.
 
-      void solveLexOpt ();
-         //
-         // Makes appropriate calls to CPLEX to solve the optimization problem
-         // as a lexicographic optimization.
-
-      void setObjCoef (WitOptVar * theOptVar, double theVal);
-         //
-         // Sets the objective coefficient of theOptVar to theVal.
-
-      void lockLexObjElemVal (WitOptVar * theOptVar);
-         //
-         // Assuming theOptVar represents a lexicographic objective element that
-         // has just been maximized, this function locks the variable at its
-         // maximum value minus a tolerance.
-
       void printLpSolveInfo ();
          //
          // Prints some information about the LP solve.
 
-      void checkLpSolnStatus (bool optNeeded);
+      void checkLpSolnStatus ();
          //
          // Checks the status of the LP solution.
-         // optNeeded is to be true, iff an optimal solution is required.
-
-      void repEarlyTermLpSolnStatus (bool optNeeded);
-         //
-         // Reports the status of the LP solution, in cases where the solve
-         // routine terminated early.
-         // optNeeded is to be true, iff an optimal solution is required.
 
       void printMipSolveInfo ();
          //
          // Prints some information about the MIP solve.
 
-      void checkMipSolnStatus (bool optNeeded);
+      void checkMipSolnStatus ();
          //
          // Checks the status of the MIP solution.
-         // optNeeded is to be true, iff an optimal solution is required.
 
       void issueStatusMsg (WitMsgID theMsgID);
          //

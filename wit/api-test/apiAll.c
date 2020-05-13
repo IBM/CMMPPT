@@ -136,7 +136,7 @@ void testStageByPeriod   ();
 void buildCoreProblemSBP (WitRun *);
 void specifyStochDataSBP (WitRun *);
 
-void testMultiObjMode  ();
+void testMultiObjMode  (witBoolean);
 void testObjListSpec   (WitRun *);
 void testObjList       (WitRun *);
 void testObjSeqNo      (WitRun *);
@@ -2524,7 +2524,13 @@ int main ()
    testGetExpCycle     ();
    testStageByObject   ();
    testStageByPeriod   ();
-   testMultiObjMode    ();
+
+   if (coinEmbedded)
+      testMultiObjMode (WitTRUE);
+
+   if (cplexEmbedded)
+      testMultiObjMode (WitFALSE);
+
    testLeadTimeBounds  ();
 
    printf (
@@ -7273,20 +7279,27 @@ void specifyStochDataSBP (WitRun * theWitRun)
 /* Function testMultiObjMode                                                  */
 /*                                                                            */
 /* Tests multiple objectives mode.                                            */
+/* Uses COIN or CPLEX, depending on preferCoin.                               */
 /*----------------------------------------------------------------------------*/
 
-void testMultiObjMode ()
+void testMultiObjMode (witBoolean preferCoin)
    {
    WitRun *   theWitRun;
    WitRun *   cpyWitRun;
    witBoolean theBool;
 
-   if (! cplexEmbedded)
-      return;
+   printf (
+      "\n"
+      "--- Testing Optimizing Implosion with Multiple Objectives ---\n"
+      "\n"
+      "Preferred Solver: %s\n",
+      preferCoin? "COIN": "CPLEX");
 
    witNewRun        (& theWitRun);
 
    witInitialize      (theWitRun);
+
+   witSetPreferCoin   (theWitRun,   preferCoin);
 
    witSetNPeriods     (theWitRun,   2);
 
@@ -7310,8 +7323,6 @@ void testMultiObjMode ()
    testGetObjVecs     (cpyWitRun);
 
    witOptImplode      (cpyWitRun);
-       /**/
-      /* Not ready for COIN yet: multiObjMode */
 
    testMultiObjValue  (cpyWitRun);
 
