@@ -575,7 +575,7 @@ char *yytext_ptr;
 //==============================================================================
 // Constrained Materials Management and Production Planning Tool
 //
-// (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
+// (C) Copyright IBM Corp. 1993, 2020  All Rights Reserved
 //==============================================================================
 
 /*------------------------------------------------------------------------------

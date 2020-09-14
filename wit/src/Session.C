@@ -1,7 +1,7 @@
 //==============================================================================
 // Constrained Materials Management and Production Planning Tool
 //
-// (C) Copyright IBM Corp. 1993, 2012  All Rights Reserved
+// (C) Copyright IBM Corp. 1993, 2020  All Rights Reserved
 //==============================================================================
 
 //------------------------------------------------------------------------------
@@ -97,7 +97,7 @@ const char * const WitSession::proprietaryStmt_ =
    "\n"
    "Constrained Materials Management and Production Planning Tool\n"
    "\n"
-   "(C) Copyright IBM Corp. 1993, 2012  All Rights Reserved\n"
+   "(C) Copyright IBM Corp. 1993, 2020  All Rights Reserved\n"
    "\n"
    "US Government Users Restricted Rights -\n"
    "Use, duplication or disclosure restricted by\n"
