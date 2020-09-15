@@ -44,7 +44,7 @@ include ../src/appl_unix.mk
 #
 # If WIT_GEN_PARSER is not "YES", then building the WIT library on linux will
 # just use the existing versions of  witParse.C, ytab.h, and witLexer.C.
-# Normally, these would be retrieved unaltered from RTC.
+# Normally, these would be retrieved unaltered from GitHub.
 #
 # Basically, WIT_GEN_PARSER should be set to "YES" only if the user (of this
 # Makefile) is developing WIT, i.e., altering its source code.
