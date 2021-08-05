@@ -1,4 +1,4 @@
-## CMMPPT (Constrained Materials Management and Production Planning Tool)
+### CMMPPT (Constrained Materials Management and Production Planning Tool)
 CMMPPT is a software tool for optimal and near-optimal allocation of scarce resources, when the resources are utilized in pre-determined sets of material parts (as in a bill of material) and/or sets of capacities (such as machine processing capacity).
 
 This repository contains the CMMPPT source code, testing code and data, documentation, and some application programs.
