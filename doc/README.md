@@ -4,11 +4,11 @@
 * **wit-intro-2.pdf:**
   * Introduction to CMMPPT
   * 38 pages
-  * (Frozen document: no source file available)
+  * Frozen document: No source file is available.
 * **wit.pdf**:
   * Comprehensive User's Guide and Reference for CMMPPT
   * 531 pages
-  * (Frozen document: no source file available)
+  * Essentially frozen document: The source files are in FrameMaker.
 * **wit-supp.odt & wit-supp.pdf**:
   * Supplement to the User's Guide and Reference
   * Documents revisions to CMMPPT since it became open-source.
