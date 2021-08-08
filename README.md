@@ -5,28 +5,49 @@ This repository contains the CMMPPT source code, testing code and data, document
 
 #### Directories:
 
-* **doc**
+* **doc:**
   * Documentation
-  * Status: Some files maintained; some not
-* **wit**
+  * Status: Mixed: Some documents up-to-date; some not
+* **wit:**
   * CMMPPT source code, build facilities, and some test code
-  * Status: Maintained
-* **mcl**
+  * Status: Up-To-Date
+* **mcl:**
   * Message Class Library
   * Used by CMMPPT for issuing messages (textual output)
   * Source code, build facilities, and test code
-  * Status: Maintained
-* **config**
+  * Status: Up-To-Date
+* **config:**
   * Generic Makefiles used by CMMPPT, MCL, and other programs in this project
-  * Status: Maintained
-* **wit-sa-test**
+  * Status: Up-To-Date
+* **wit-sa-test:**
   * Data and scripts for testing CMMPPT in Stand-Alone Executable mode.
-  * Status: Maintained
-* **sce**
+  * Status: Up-To-Date
+* **samples:**
+  * Small example CMMPPT application programs.
+  * Status: Mixed: Some programs up-to-date; some not
+* **sce:**
   * Supply Capability Engine: A major CMMPPT application program
   * Source code, build facilities, and test code
-  * Status: Maintained
-
+  * Status: Up-To-Date
+* **scenario & witutil:**
+  * Two class libraries used by SCE
+  * Source code, build facilities, and test code
+  * Status: Up-To-Date
+* **witj:**
+  * An object-oriented Java interface to CMMPPT
+  * Source code, build facilities, and test code
+  * Status: Out Of Date, but could be brought up-to-date if there is interest
+* **witviz:**
+  * A visualization tool for CMMPPT models
+  * Source code, build facilities, and test code
+  * Uses witj
+  * Status: Out Of Date
+* **eso2:**
+  * A major CMMPPT application program
+  * Source code, build facilities, and test code
+  * Status: Out Of Date
+* **gsa:**
+  * Various historical files associated with CMMPPT from before it became open-source
 
 #### Running Docker build:
 
