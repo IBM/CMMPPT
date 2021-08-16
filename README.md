@@ -3,6 +3,9 @@ CMMPPT is a software tool for optimal and near-optimal allocation of scarce reso
 
 This repository contains the CMMPPT source code, testing code and data, documentation, and some application programs.
 
+#### Note:
+Before CMMPPT became open-source, it was called "WIT". Consequently, "wit" appears in the names of many of CMMPPT's components. 
+
 #### Directories:
 
 * **doc:**
