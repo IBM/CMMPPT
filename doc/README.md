@@ -1,6 +1,6 @@
-# Documentation Directory for CMMPPT.
+### Documentation Directory for CMMPPT.
 
-**Contents:**
+#### **Contents:**
 * **wit-intro-2.pdf:**
   * Introduction to CMMPPT
   * 38 pages
@@ -18,3 +18,13 @@
 * **wit-winsdk.odt & wit-winsdk.pdf:**
   * Windows SDK Platform for CMMPPT
   * Explains how to work with (build, run, etc.) CMMPPT on Windows.
+
+#### **Note:**
+wit-intro-2 and wit-dh both refer to CMMPPT as "WIT: Watson Implosion Technology".
+Please note that CMMPPT has nothing to do with **Watson**, IBM's
+portfolio of AI tools, applications and solutions.
+"Watson Implosion Technology" was simply the IBM internal name for CMMPPT before
+it became open-source.
+(The name dates from a time before IBM's Watson AI portfolio existed.)
+Since wit-intro-2 and wit-dh have not been not revised since before CMMPPT became
+open-source, they use the old name.
