@@ -16,7 +16,7 @@ Before CMMPPT became open-source, it was called "WIT". Consequently, "wit" appea
   * Status: Maintained
 * **mcl:**
   * Message Class Library
-  * Used by CMMPPT for issuing messages (textual output)
+  * Used by CMMPPT and SCE for issuing messages (textual output)
   * Source code, build facilities, and test code
   * Status: Maintained
 * **config:**
