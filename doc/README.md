@@ -21,10 +21,7 @@
 
 #### **Note:**
 wit-intro-2 and wit-dh both refer to CMMPPT as "WIT: Watson Implosion Technology".
-Please note that CMMPPT has nothing to do with **Watson**, IBM's
-portfolio of AI tools, applications and solutions.
-"Watson Implosion Technology" was simply the IBM internal name for CMMPPT before
-it became open-source.
+Please note that CMMPPT has nothing to do with **Watson**, IBM's portfolio of AI tools, applications and solutions.
+"Watson Implosion Technology" was simply the internal name for CMMPPT before it became open-source.
 (The name dates from a time before IBM's Watson AI portfolio existed.)
-Since wit-intro-2 and wit-dh have not been not revised since before CMMPPT became
-open-source, they use the old name.
+Since wit-intro-2 and wit-dh have not been not revised since before CMMPPT became open-source, they use the old name.
