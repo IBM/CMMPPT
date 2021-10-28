@@ -54,11 +54,16 @@ Before CMMPPT became open-source, it was called "WIT". Consequently, "wit" appea
 
 #### Running Docker build:
 
-Install docker for your operating system . You can install Community Edition or Enterprise
-Clone project to a local folder (git clone git@github.com:IBM/CMMPPT.git)
+Install docker for your operating system. You can install Community Edition or Enterprise
+Clone project to a local folder 
+```
+git clone git@github.com:IBM/CMMPPT.git
 cd CMMPPT
-Build a docker image using the commond bellow. It will build and test CMMPPT.  
-   command : docker build . -t cmmppt
+```
 
+Build a docker image using the commond bellow. It will build and test CMMPPT.  
+```
+command : docker build . -t cmmppt
+```
 
 
